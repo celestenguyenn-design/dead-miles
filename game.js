@@ -543,6 +543,7 @@ async function rpc(fn,args){
   const t=await r.text();if(!r.ok)throw new Error(fn+' failed ('+r.status+'): '+t.slice(0,160));return t?JSON.parse(t):null;
 }
 const O=()=>S.online||(S.online={handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0});
+async function copyText(t){try{await navigator.clipboard.writeText(t);toast('Copied','z');}catch(e){const i=$('#syncLink');if(i){i.focus();i.select();try{document.execCommand('copy');toast('Copied','z');}catch(e2){toast('Long-press the box, Select All, Copy');}}}}
 function slug(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,20);}
 async function goOnline(handle){
   const o=O();handle=slug(handle||S.name);if(!handle){toast('Pick a handle first');return;}
@@ -732,10 +733,16 @@ function renderOnline(){
   if(!o.ok){body=`<div class="row"><input id="handleInput" type="text" maxlength="20" placeholder="handle, e.g. celeste" value="${esc(o.handle||slug(S.name))}" style="flex:1;min-width:140px"><button class="btn r" onclick="goOnline($('#handleInput').value)">Go online</button></div>${o.err?`<p class="help" style="color:#ff8a92">${esc(o.err)}</p>`:''}`;}
   else{body=`<div class="kv"><span>Handle</span><b>@${esc(o.handle)}</b><span>Last phone sync</span><b>${o.lastPost?timeStr(o.lastPost)+' today':'none yet'}</b><span>Server</span><b>${o.err?'<span style="color:#ff8a92">'+esc(o.err)+'</span>':'ok'}</b></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pullSteps();loadFriends();partySync();toast('Syncing')">Sync now</button><button class="btn sm ghost" onclick="testOnline()">Test connection</button></div>`;}
   $('#onlineBody').innerHTML=body;
-  const sh=$('#shortcutHelp');if(sh){sh.innerHTML=o.ok?`<b>iPhone, one time:</b> open <b>Shortcuts</b> → <b>Automation</b> → <b>+</b> → <b>Time of Day</b>, pick a time (make 3 or 4 of these: noon, 4 pm, 8 pm, 11 pm), choose <b>Run Immediately</b>. Then add these actions in order:<br>
-  1. <b>Find Health Samples</b> → Type: Steps · Start Date: Today at 12:00 AM · Group By: Day.<br>
-  2. <b>Get Contents of URL</b>: URL = <code style="color:var(--amber);word-break:break-all">${SB.url}/rest/v1/rpc/post_steps</code> · Method <b>POST</b> · Headers: <code>apikey</code> = <span style="color:var(--amber);word-break:break-all">${SB.key}</span> and <code>Content-Type</code> = <code>application/json</code> · Request Body: <b>JSON</b> with three fields: <code>p_handle</code> = <b>${esc(o.handle)}</b>, <code>p_token</code> = <b style="word-break:break-all">${esc(o.token)}</b>, <code>p_steps</code> = the <b>Health Samples</b> variable (as a Number).<br>
-  That is it. The shortcut posts your step total silently; the game catches up whenever you open it.<br><b>Android:</b> install the tiny companion app <a href="./DeadMilesSteps.apk">DeadMilesSteps.apk</a> (Android asks once to allow installs from your browser), paste the handle <b>${esc(o.handle)}</b> and token <b style="word-break:break-all">${esc(o.token)}</b> into it, tap Allow reading steps, then Save. It posts your Health Connect steps every hour on its own.`:'Go online first, then the recipe appears here with your handle and token filled in.';}
+  const sh=$('#shortcutHelp');if(sh){const link=SB.url+'/rest/v1/rpc/post_steps?apikey='+SB.key+'&p_handle='+encodeURIComponent(o.handle)+'&p_token='+encodeURIComponent(o.token)+'&p_steps=';sh.innerHTML=o.ok?`<b>iPhone, one time.</b> Your personal sync link (copy it, you will paste it once):<br>
+  <input id="syncLink" readonly value="${esc(link)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncLink').value)">Copy sync link</button>
+  <ol style="padding-left:20px;margin:10px 0">
+  <li>Open the <b>Shortcuts</b> app → <b>Automation</b> tab → <b>+</b> → <b>Time of Day</b>. Pick a time (say 12:00 PM), <b>Daily</b>, <b>Run Immediately</b> → <b>Next</b> → <b>New Blank Automation</b>.</li>
+  <li>Tap <b>Add Action</b>, search <b>Find Health Samples</b>, add it. Tap the blue <b>Type</b> word and choose <b>Steps</b>. Tap <b>Show More</b>: set <b>Start Date</b> to <b>Today at 12:00 AM</b> and <b>Group By</b> to <b>Day</b>.</li>
+  <li>Tap <b>Add Action</b> again, search <b>Get Contents of URL</b>, add it. Tap the <b>URL</b> field and <b>paste</b> the sync link. Leave the cursor at the very end, right after the last <b>=</b>, and tap the <b>Health Samples</b> bubble in the bar above the keyboard so it lands there.</li>
+  <li>Tap <b>Done</b>. To test: tap the automation → <b>Run</b>, then come back here and tap <b>Sync now</b>.</li>
+  <li>Make two or three more of these at other times (4 PM, 8 PM, 11 PM): open the automation → three dots → <b>Duplicate</b> → change the time.</li>
+  </ol>
+  <b>Android:</b> install the tiny companion app <a href="./DeadMilesSteps.apk">DeadMilesSteps.apk</a> (Android asks once to allow installs from your browser), paste the handle <b>${esc(o.handle)}</b> and token <b style="word-break:break-all">${esc(o.token)}</b> into it, tap Allow reading steps, then Save. It posts your Health Connect steps every hour on its own.`:'Go online first, then your personal sync link and the recipe appear here.';}
 }
 function renderFriends(){
   const o=O();const el=$('#friends');if(!el)return;const sub=$('#friendsSub');const help=$('#friendsHelp');
