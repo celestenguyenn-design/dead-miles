@@ -1,0 +1,905 @@
+<title>Dead Miles</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --ash:#121214; --ash2:#1b1b1f; --panel:#232328; --panel2:#2c2c33; --line:#3a3a44;
+  --bone:#e8e0d0; --bone2:#b9b2a4; --muted:#7f7a70;
+  --rust:#d0602e; --blood:#c22b3a; --rot:#7fbf4d; --rot2:#4e8a2a; --amber:#e6a530; --steel:#8fb3c9;
+  --shadow:0 12px 30px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:var(--ash);color:var(--bone);font-family:'Barlow',system-ui,'Segoe UI',sans-serif;font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+input,select{font:inherit;color:var(--bone);background:var(--ash2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%}
+h1,h2,h3{font-family:'Bebas Neue','Barlow',sans-serif;font-weight:400;margin:0;letter-spacing:1px;text-wrap:balance}
+.num{font-family:'Bebas Neue','Barlow',sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+#app{height:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;position:relative}
+.top{display:flex;align-items:center;gap:12px;padding:10px 16px 8px;background:linear-gradient(180deg,#1f1f24,var(--ash));border-bottom:1px solid var(--line)}
+.top .logo{font-family:'Bebas Neue';font-size:26px;color:var(--rust);line-height:1;letter-spacing:2px}
+.top .logo small{display:block;font-family:'Barlow';font-weight:600;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted)}
+.top .hp{flex:1;max-width:150px}
+.top .stat{margin-left:auto;text-align:right;line-height:1}
+.top .stat b{font-family:'Bebas Neue';font-size:26px;font-variant-numeric:tabular-nums}
+.top .stat span{display:block;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+.hpbar{height:10px;border-radius:4px;background:var(--ash2);border:1px solid var(--line);overflow:hidden}
+.hpbar i{display:block;height:100%;background:linear-gradient(90deg,var(--blood),#e2503f);transition:width .4s}
+.hpbar.en i{background:linear-gradient(90deg,var(--rot2),var(--rot))}
+.hplab{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
+.main{flex:1;overflow-y:auto;padding:0 16px 16px}
+.view{display:none;flex-direction:column;gap:14px;padding-top:14px}
+.view.on{display:flex}
+.nav{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--line);background:var(--ash2);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px))}
+.nav button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:8px;font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);position:relative}
+.nav button .ic{font-size:20px;line-height:1}
+.nav button.on{color:var(--bone);background:var(--panel)}
+.nav button .alert{position:absolute;top:4px;right:10px;width:9px;height:9px;border-radius:50%;background:var(--blood);box-shadow:0 0 8px var(--blood)}
+.scene{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--line);box-shadow:var(--shadow);background:#0c0c0e}
+.scene canvas{display:block;width:100%;height:auto}
+.scene .tag{position:absolute;left:12px;top:10px;background:rgba(12,12,14,.75);padding:5px 10px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--bone2)}
+.scene .arrive{position:absolute;right:12px;top:10px;background:var(--amber);color:#2a1a00;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase}
+.progress{display:flex;flex-direction:column;gap:6px}
+.progress .bar{height:12px;border-radius:4px;background:var(--panel);overflow:hidden;border:1px solid var(--line)}
+.progress .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--rust),var(--amber));transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.progress .row{display:flex;justify-content:space-between;font-size:13px;color:var(--bone2)}
+.progress .row b{color:var(--bone)}
+.card{background:var(--panel);border-radius:10px;padding:14px 16px;border:1px solid var(--line)}
+.card h2{font-size:22px;display:flex;align-items:center;gap:8px}
+.card h2 .sub{margin-left:auto;font-family:'Barlow';font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.card p{margin:6px 0 0;color:var(--bone2);font-size:14px}
+.card.amber{border-color:#6b4a12;background:linear-gradient(180deg,#2e2718,var(--panel))}
+.card.blood{border-color:#6b1a22;background:linear-gradient(180deg,#2e1a1d,var(--panel))}
+.card.rot{border-color:#2f5a1a}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border-radius:8px;font-weight:700;font-size:15px;background:var(--panel2);border:1px solid var(--line);color:var(--bone);transition:transform .08s;letter-spacing:.2px}
+.btn:active{transform:scale(.97)}
+.btn.r{background:var(--rust);border-color:var(--rust);color:#1a0a02}
+.btn.a{background:var(--amber);border-color:var(--amber);color:#2a1a00}
+.btn.z{background:var(--rot);border-color:var(--rot);color:#0b1a04}
+.btn.d{background:var(--blood);border-color:var(--blood);color:#fff}
+.btn.ghost{background:transparent}
+.btn.sm{padding:8px 12px;font-size:13px}
+.btn.wide{width:100%}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:4px;font-size:12px;font-weight:700;background:var(--ash2);border:1px solid var(--line);color:var(--bone2);letter-spacing:.3px}
+.chip.z{color:var(--rot);border-color:#2f5a1a}.chip.a{color:var(--amber);border-color:#6b4a12}.chip.d{color:#ff7b86;border-color:#6b1a22}.chip.s{color:var(--steel);border-color:#2f4a5a}
+.noise{height:10px;border-radius:4px;background:var(--ash2);border:1px solid var(--line);overflow:hidden}
+.noise i{display:block;height:100%;background:linear-gradient(90deg,var(--rot2),var(--rot),var(--amber),var(--blood));width:0;transition:width .4s}
+.rooms{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.room{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:12px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);text-align:left}
+.room .n{font-family:'Bebas Neue';font-size:20px;letter-spacing:1px}
+.room .m{font-size:12px;color:var(--muted)}
+.room.done{opacity:.5;border-style:dashed}
+.room .peek{font-size:12px;color:var(--amber)}
+.loot{display:flex;flex-wrap:wrap;gap:8px}
+.item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;background:var(--ash2);border:1px solid var(--line);font-size:13px;font-weight:600;animation:pop .3s cubic-bezier(.2,1.4,.4,1)}
+.item .e{font-size:20px}.item .pt{color:var(--amber);font-family:'Bebas Neue';font-size:16px}
+.item.rare{border-color:var(--amber)}.item.gear{border-color:var(--steel)}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+.section-label{font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+.help{font-size:13px;color:var(--muted)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;color:var(--bone2)}.kv b{color:var(--bone)}
+/* combat */
+.enemy{display:grid;grid-template-columns:54px 1fr;gap:10px;align-items:center;padding:10px;border-radius:8px;background:var(--ash2);border:1px solid var(--line)}
+.enemy.target{border-color:var(--amber);box-shadow:0 0 0 2px rgba(230,165,48,.25)}
+.enemy.dead{opacity:.35}
+.enemy .e{font-size:38px;text-align:center}
+.enemy .n{font-family:'Bebas Neue';font-size:20px;letter-spacing:1px}
+.enemy .d{font-size:12px;color:var(--muted)}
+.clog{list-style:none;margin:0;padding:10px;background:var(--ash2);border-radius:8px;border:1px solid var(--line);max-height:150px;overflow-y:auto;font-size:13.5px;display:flex;flex-direction:column;gap:4px}
+.clog li.you{color:var(--bone)}.clog li.hit{color:#ff8a92}.clog li.good{color:var(--rot)}.clog li.sys{color:var(--amber)}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.acts .btn{flex-direction:column;gap:2px;padding:10px 8px}
+.acts .btn small{font-weight:500;font-size:11px;opacity:.85}
+.shake{animation:shake .35s}
+@keyframes shake{0%,100%{transform:none}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+/* crew */
+.crew{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:center;padding:12px;border-radius:8px;background:var(--panel);border:1px solid var(--line)}
+.crew.active{border-color:var(--rust)}
+.crew .av{width:56px;height:56px;border-radius:8px;display:grid;place-items:center;font-size:30px;background:var(--ash2);border:1px solid var(--line)}
+.crew .nm{font-family:'Bebas Neue';font-size:20px;letter-spacing:1px}
+.crew .role{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:700}
+.crew .tr{font-size:13px;color:var(--bone2);margin-top:2px}
+.xp{height:5px;border-radius:3px;background:var(--ash2);margin-top:6px;overflow:hidden}.xp i{display:block;height:100%;background:var(--rust);width:0}
+.crew .a2{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+/* gear */
+.gear{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:10px;border-radius:8px;background:var(--ash2);border:1px solid var(--line)}
+.gear.eq{border-color:var(--steel)}
+.gear .e{font-size:28px;text-align:center}.gear .n{font-weight:700}.gear .d{font-size:12px;color:var(--muted)}
+/* base */
+.room2{display:flex;gap:10px;align-items:center;padding:10px;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
+.room2 .e{font-size:26px}.room2 .t{flex:1}.room2 .t b{display:block;font-family:'Bebas Neue';font-size:18px;letter-spacing:1px}.room2 .t span{font-size:12px;color:var(--muted)}
+.room2.own{border-color:var(--rot2)}
+.stock{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.stock .s{text-align:center;padding:8px 2px;border-radius:6px;background:var(--ash2);border:1px solid var(--line)}
+.stock .s .e{font-size:18px}.stock .s b{display:block;font-family:'Bebas Neue';font-size:20px}.stock .s span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+.def{display:flex;align-items:center;gap:12px}
+.def .big{font-family:'Bebas Neue';font-size:44px;line-height:1;color:var(--steel)}
+/* league */
+.lb{display:flex;flex-direction:column;gap:8px}
+.lbrow{display:grid;grid-template-columns:28px 40px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
+.lbrow.me{border-color:var(--amber);background:linear-gradient(90deg,#3a2f18,var(--panel2))}
+.lbrow .rk{font-family:'Bebas Neue';font-size:24px;color:var(--muted);text-align:center}
+.lbrow .av{font-size:26px;text-align:center}
+.lbrow .nm{font-weight:700}.lbrow .nm small{display:block;font-weight:500;font-size:12px;color:var(--muted)}
+.lbrow .sc{font-family:'Bebas Neue';font-size:24px;color:var(--amber);font-variant-numeric:tabular-nums}
+.tier{display:flex;align-items:center;gap:12px}
+.tier .badge{width:54px;height:54px;border-radius:8px;display:grid;place-items:center;font-size:28px;background:var(--ash2);border:2px solid var(--amber)}
+.journal{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13.5px;color:var(--bone2)}
+.journal li{display:flex;gap:8px;align-items:flex-start}
+.journal li time{color:var(--muted);font-size:11px;min-width:42px;font-variant-numeric:tabular-nums;padding-top:2px}
+.modal{position:fixed;inset:0;background:rgba(6,6,8,.8);display:none;align-items:flex-end;justify-content:center;z-index:50;padding:12px}
+.modal.on{display:flex}
+.sheet{width:100%;max-width:490px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);max-height:92vh;overflow-y:auto;animation:up .25s cubic-bezier(.2,1,.3,1)}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.sheet h2{font-size:28px;margin-bottom:6px}
+.sheet .big{font-size:56px;text-align:center;line-height:1.1;margin:6px 0}
+.sheet p{color:var(--bone2);margin:6px 0 12px}
+.toasts{position:fixed;left:0;right:0;top:12px;display:flex;flex-direction:column;align-items:center;gap:6px;z-index:60;pointer-events:none;padding:0 16px}
+.toast{background:var(--bone);color:#1a1a1e;font-weight:700;padding:9px 14px;border-radius:6px;box-shadow:var(--shadow);font-size:14px;animation:up .25s;max-width:100%}
+.toast.a{background:var(--amber)}.toast.z{background:var(--rot);color:#0b1a04}.toast.d{background:var(--blood);color:#fff}
+.starter{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.starter button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-radius:8px;background:var(--panel2);border:2px solid var(--line);font-size:12px;font-weight:700}
+.starter button.on{border-color:var(--rust);background:#3a2a22}
+.starter .av{font-size:36px}
+.shelf{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.shelf .it{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:6px;background:var(--ash2);border:1px solid var(--line);font-size:11px;text-align:center}
+.shelf .it .e{font-size:22px}.shelf .it.locked{opacity:.3;filter:grayscale(1)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:380px){.stock{grid-template-columns:repeat(3,1fr)}}
+</style>
+
+<div id="app">
+  <div class="top">
+    <div class="logo">Dead Miles<small>Hollow County</small></div>
+    <div class="hp"><div class="hplab"><span>HP</span><span id="hpNum"></span></div><div class="hpbar"><i id="hpBar"></i></div></div>
+    <div class="stat"><b class="num" id="topSteps">0</b><span>steps today</span></div>
+  </div>
+  <div class="main" id="main">
+
+    <section class="view on" id="v-street">
+      <div class="scene"><canvas id="cv" width="960" height="500"></canvas><div class="tag" id="sceneTag"></div><div class="arrive" id="arriveTag" hidden>Arrived</div></div>
+      <div class="progress"><div class="bar"><i id="pbar"></i></div><div class="row"><span id="pleft"></span><span id="pright"></span></div></div>
+      <div class="card" id="locCard" hidden></div>
+      <div class="card" id="raidCard" hidden></div>
+      <div class="card">
+        <h2>Steps <span class="sub" id="syncHint"></span></h2>
+        <div class="row" style="margin-top:8px">
+          <button class="btn z" id="pedoBtn">Walk mode</button>
+          <button class="btn" id="clipBtn">Read clipboard</button>
+          <span class="help" id="pedoStatus"></span>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <input id="syncInput" type="number" inputmode="numeric" min="0" placeholder="Today's total from Health" style="flex:1;min-width:150px" aria-label="Today's total steps">
+          <button class="btn r" id="syncBtn">Sync</button>
+        </div>
+        <p class="help" style="margin-top:8px">Hands-free: set up the phone shortcut in Settings once, and your Health steps land here on their own. Walk mode counts live while the screen is on.</p>
+      </div>
+      <div class="card">
+        <h2>Daily target <span class="sub" id="goalSub"></span></h2>
+        <div class="progress" style="margin-top:8px"><div class="bar"><i id="goalBar" style="background:linear-gradient(90deg,var(--rot2),var(--rot))"></i></div><div class="row"><span id="goalLeft"></span><span id="goalRight"></span></div></div>
+      </div>
+      <div class="card"><h2>Log</h2><ul class="journal" id="journal" style="margin-top:8px"></ul></div>
+    </section>
+
+    <section class="view" id="v-pack">
+      <div class="card amber">
+        <h2>Pack <span class="sub" id="packSub"></span></h2>
+        <p>Stashing rests you (+15 HP). Nothing counts until it is stashed at your base. Each place you clear without going home stacks +10% on the stash. Die and you lose the pack.</p>
+        <div class="row" style="margin-top:10px"><div class="chip a">Run <b class="num" id="runMult">x1.0</b></div><div class="chip">Worth <b class="num" id="packPts">0</b> pts</div><div class="chip s">Capacity <b class="num" id="cap"></b></div></div>
+        <button class="btn a wide" style="margin-top:12px" id="bankBtn">Stash it at base</button>
+      </div>
+      <div class="card"><h2>Carrying</h2><div class="loot" id="packList" style="margin-top:10px"></div></div>
+      <div class="card"><h2>Gear <span class="sub">tap to equip</span></h2><div class="stack" id="gearList" style="margin-top:10px"></div></div>
+    </section>
+
+    <section class="view" id="v-crew">
+      <div class="card"><h2>You <span class="sub" id="lvlSub"></span></h2><div class="kv" style="margin-top:8px" id="youKv"></div><div class="xp"><i id="youXp"></i></div></div>
+      <div class="card blood"><h2>Crew <span class="sub" id="crewSub"></span></h2><p>Survivors you meet on the road. Active crew fight beside you. Everyone active eats 1 food when you stash. Bunkhouse at base adds slots.</p></div>
+      <div class="stack" id="crewList"></div>
+    </section>
+
+    <section class="view" id="v-base">
+      <div class="card" id="baseHead"></div>
+      <div class="card"><h2>Stash</h2><div class="stock" id="stock" style="margin-top:10px"></div>
+        <div class="row" style="margin-top:10px"><button class="btn sm" id="healBtn">Use medkit: +40 HP</button><button class="btn sm" id="eatBtn">Eat: +15 HP</button><span class="help">HP also recovers overnight.</span></div>
+        <div class="row" style="margin-top:8px" id="dropRow" hidden><button class="btn sm z" id="dropBtn">📻 Call in today's supply drop</button><span class="help" id="dropHelp"></span></div>
+      </div>
+      <div class="card"><h2>Build</h2><p>Scrap builds. Walls and towers are what raiders hit first.</p><div class="stack" id="build" style="margin-top:10px"></div></div>
+      <div class="card"><h2>Raid log</h2><ul class="journal" id="raidLog" style="margin-top:8px"></ul></div>
+      <div class="card"><h2>Trophies <span class="sub" id="shelfSub"></span></h2><div class="shelf" id="shelf" style="margin-top:10px"></div></div>
+      <div class="card">
+        <h2>Settings</h2>
+        <div class="stack" style="margin-top:10px">
+          <label class="row" style="justify-content:space-between">Daily step target <input id="goalInput" type="number" inputmode="numeric" min="1000" step="500" style="width:120px"></label>
+          <label class="row" style="justify-content:space-between">Your name <input id="nameInput" type="text" maxlength="18" style="width:160px"></label>
+          <div class="card" style="background:var(--ash2)" id="onlineCard">
+            <h2>Online <span class="sub" id="onlineStatus">off</span></h2>
+            <p id="onlineHelp">Online turns on silent step sync from your phone, the friends board, and raiding friends' bases.</p>
+            <div class="stack" style="margin-top:10px" id="onlineBody"></div>
+          </div>
+          <details><summary style="cursor:pointer;font-weight:700">Phone shortcut (silent step sync)</summary>
+            <div class="help" style="margin-top:8px;line-height:1.6" id="shortcutHelp"></div>
+          </details>
+          <div class="row"><button class="btn sm ghost" id="demoBtn">Demo: +300 steps</button><span class="help">Try it at your desk.</span></div>
+          <div class="row"><button class="btn sm ghost d" id="resetBtn">Reset everything</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="v-league">
+      <div class="card rot">
+        <div class="tier"><div class="badge" id="tierBadge">🔰</div><div><h2 id="tierName"></h2><p id="tierSub" style="margin:2px 0 0"></p></div></div>
+        <p style="margin-top:10px">Three rival crews scavenge Hollow County all week on a real clock. First place on Sunday night moves you up a tier. Last place drops you. Only stashed points count.</p>
+        <div class="row" style="margin-top:8px"><div class="chip z" id="weekChip"></div><div class="chip" id="resetChip"></div></div>
+      </div>
+      <div class="card"><h2>Friends <span class="sub" id="friendsSub"></span></h2><p class="help" id="friendsHelp"></p><div class="lb" id="friends" style="margin-top:10px"></div></div>
+      <div class="card"><h2>Rival crews</h2><div class="lb" id="board" style="margin-top:10px"></div><p class="help" id="boardHelp" style="margin-top:8px"></p></div>
+      <div class="card"><h2>Radio chatter</h2><ul class="journal" id="radio" style="margin-top:8px"></ul></div>
+      <div class="card"><h2>Past weeks</h2><ul class="journal" id="seasons" style="margin-top:8px"></ul></div>
+    </section>
+  </div>
+  <nav class="nav">
+    <button data-v="street" class="on"><span class="ic">🚶</span>Road</button>
+    <button data-v="pack"><span class="ic">🎒</span>Pack</button>
+    <button data-v="crew"><span class="ic">👥</span>Crew</button>
+    <button data-v="base"><span class="ic">🏚️</span>Base<span class="alert" id="baseAlert" hidden></span></button>
+    <button data-v="league"><span class="ic">☠️</span>League</button>
+  </nav>
+</div>
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+<div class="toasts" id="toasts"></div>
+
+<script>
+/* ================= utils ================= */
+const $=(s)=>document.querySelector(s);
+const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
+const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const fmt=(n)=>Math.round(n).toLocaleString();
+function wpick(list,k){let t=0;for(const x of list)t+=x[k]||1;let r=Math.random()*t;for(const x of list){r-=x[k]||1;if(r<=0)return x;}return list[list.length-1];}
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function mulberry(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function todayStr(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function weekStart(d=new Date()){const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-(x.getDay()+6)%7);return x;}
+function weekId(d=new Date()){return todayStr(weekStart(d));}
+function timeStr(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=(s)=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ================= data ================= */
+const ITEMS={
+  beans:{n:'Canned beans',e:'🥫',pts:6,cat:'food',w:10},ramen:{n:'Instant ramen',e:'🍜',pts:5,cat:'food',w:9},jerky:{n:'Beef jerky',e:'🥩',pts:8,cat:'food',w:5},mre:{n:'MRE ration',e:'🍱',pts:12,cat:'food',w:2},
+  water:{n:'Water bottle',e:'💧',pts:5,cat:'water',w:10},tablets:{n:'Purification tablets',e:'🧂',pts:9,cat:'water',w:3},coffee:{n:'Ground coffee',e:'☕',pts:7,cat:'water',w:4},
+  bandage:{n:'Bandages',e:'🩹',pts:8,cat:'meds',w:8},pain:{n:'Painkillers',e:'💊',pts:10,cat:'meds',w:6},abx:{n:'Antibiotics',e:'💉',pts:16,cat:'meds',w:3},kit:{n:'Trauma kit',e:'🧰',pts:24,cat:'meds',w:1.5},
+  scrap:{n:'Scrap metal',e:'🔩',pts:4,cat:'scrap',w:10},tape:{n:'Duct tape',e:'🧻',pts:5,cat:'scrap',w:7},nails:{n:'Box of nails',e:'🔨',pts:5,cat:'scrap',w:6},wire:{n:'Copper wire',e:'🧵',pts:4,cat:'scrap',w:6},battery:{n:'Car battery',e:'🔋',pts:10,cat:'scrap',w:2.5},fuel:{n:'Fuel can',e:'⛽',pts:12,cat:'scrap',w:2},
+  ammo:{n:'Box of rounds (x6)',e:'📦',pts:14,cat:'ammo',w:2.5,qty:6},shells:{n:'Shotgun shells (x4)',e:'🟥',pts:16,cat:'ammo',w:1.2,qty:4},
+  vinyl:{n:'Vinyl record',e:'💿',pts:25,cat:'shelf',w:1},polaroid:{n:'Old polaroid',e:'📸',pts:20,cat:'shelf',w:1.1},teddy:{n:'One-eyed teddy',e:'🧸',pts:18,cat:'shelf',w:1.2},watch:{n:'Gold watch',e:'⌚',pts:28,cat:'shelf',w:.7},globe:{n:'Snow globe',e:'🔮',pts:30,cat:'shelf',w:.6},comic:{n:'Comic issue #1',e:'📖',pts:20,cat:'shelf',w:1},badge:{n:'Sheriff badge',e:'⭐',pts:40,cat:'shelf',w:.3},dogtag:{n:'Soldier dog tag',e:'🏷️',pts:35,cat:'shelf',w:0},skull:{n:'Raider skull mask',e:'💀',pts:45,cat:'shelf',w:0}
+};
+const GEAR={
+  pipe:{n:'Lead pipe',e:'🪈',slot:'melee',dmg:[8,13],dur:6,w:6,pts:10},bat:{n:'Baseball bat',e:'⚾',slot:'melee',dmg:[9,15],dur:5,w:5,pts:14},crowbar:{n:'Crowbar',e:'🔧',slot:'melee',dmg:[11,17],dur:8,w:3,pts:18},machete:{n:'Machete',e:'🔪',slot:'melee',dmg:[14,21],dur:7,w:2,pts:26},axe:{n:'Fire axe',e:'🪓',slot:'melee',dmg:[18,26],dur:6,w:1.2,pts:34},sledge:{n:'Sledgehammer',e:'🔨',slot:'melee',dmg:[22,32],dur:5,w:.6,pts:40},
+  pistol:{n:'9mm pistol',e:'🔫',slot:'ranged',dmg:[22,30],ammo:'ammo',w:1.6,pts:30},shotgun:{n:'Pump shotgun',e:'🎯',slot:'ranged',dmg:[34,50],ammo:'shells',w:.6,pts:45},
+  jacket:{n:'Leather jacket',e:'🧥',slot:'armor',dr:2,w:4,pts:14},pads:{n:'Hockey pads',e:'🏒',slot:'armor',dr:4,w:2,pts:20},vest:{n:'Riot vest',e:'🦺',slot:'armor',dr:6,w:.9,pts:34},
+  helmet:{n:'Motorcycle helmet',e:'⛑️',slot:'head',dr:2,w:2.5,pts:12},riot:{n:'Riot helmet',e:'🪖',slot:'head',dr:3,w:1,pts:22},
+  pack2:{n:'Hiking pack',e:'🎒',slot:'bag',cap:6,w:1.5,pts:16},pack3:{n:'Military ruck',e:'🪖',slot:'bag',cap:12,w:.5,pts:28}
+};
+const CATS=['food','water','meds','scrap','ammo','shelf'];
+const CAT_LABEL={food:'Food',water:'Water',meds:'Meds',scrap:'Scrap',ammo:'Ammo',shelf:'Trophy'};
+const byCat=(c)=>Object.entries(ITEMS).filter(([k,v])=>v.cat===c&&v.w>0).map(([k,v])=>({id:k,...v}));
+function table(cats,shelfW,gearW){const out=[];for(const c of cats)out.push(...byCat(c));if(shelfW)out.push(...byCat('shelf').map(x=>({...x,w:x.w*shelfW})));if(gearW)out.push(...Object.entries(GEAR).map(([k,v])=>({id:k,gear:true,...v,w:v.w*gearW})));return out;}
+
+const LOCS=[
+  {t:'house',n:['Ranch house','Two-story colonial','Duplex','Bungalow','Split-level','Farmhouse'],e:'🏠',w:38,rooms:[{n:'Kitchen',noise:32,cats:['food','water'],shelf:.3},{n:'Bedroom',noise:18,cats:['scrap'],shelf:2.2,gear:.3},{n:'Bathroom',noise:22,cats:['meds'],shelf:.2},{n:'Garage',noise:40,cats:['scrap'],shelf:.4,gear:1.4}],threat:1},
+  {t:'pharmacy',n:['Corner pharmacy','Drugmart','Hollow Rx'],e:'💊',w:11,rooms:[{n:'Front counter',noise:25,cats:['meds','water'],shelf:.2},{n:'Back room',noise:30,cats:['meds'],shelf:.3},{n:'Storage',noise:38,cats:['meds','scrap'],shelf:.2,gear:.3}],threat:1.2},
+  {t:'gas',n:['Gas & Go','Stop-N-Fuel','Pump station'],e:'⛽',w:12,rooms:[{n:'Snack shelves',noise:26,cats:['food','water'],shelf:.3},{n:'Pumps',noise:44,cats:['scrap'],shelf:.1},{n:'Office',noise:30,cats:['scrap'],shelf:.8,gear:.9}],threat:1},
+  {t:'grocery',n:['Family grocery','Corner mart','Foodway'],e:'🛒',w:12,rooms:[{n:'Canned goods',noise:28,cats:['food'],shelf:.2},{n:'Freezer',noise:36,cats:['food','water'],shelf:.1},{n:'Stockroom',noise:34,cats:['scrap','food'],shelf:.3},{n:'Registers',noise:30,cats:['scrap'],shelf:1.4}],threat:1.3},
+  {t:'police',n:['Police substation','Sheriff outpost'],e:'🚓',w:5,rooms:[{n:'Locker room',noise:34,cats:['ammo'],shelf:.4,gear:1.6},{n:'Armory cage',noise:44,cats:['ammo'],shelf:.3,gear:2.5},{n:'Break room',noise:24,cats:['food','water'],shelf:.3}],threat:1.6},
+  {t:'clinic',n:['Urgent care','Hollow County clinic'],e:'🏥',w:6,rooms:[{n:'Exam room',noise:24,cats:['meds'],shelf:.3},{n:'Pharmacy cage',noise:36,cats:['meds'],shelf:.2},{n:'Supply closet',noise:34,cats:['meds','scrap'],shelf:.2}],threat:1.4},
+  {t:'hardware',n:['Hardware store','Lumber yard'],e:'🧰',w:8,rooms:[{n:'Tool wall',noise:30,cats:['scrap'],shelf:.3,gear:1.8},{n:'Yard',noise:38,cats:['scrap'],shelf:.2},{n:'Back office',noise:26,cats:['scrap','water'],shelf:.9}],threat:1.1},
+  {t:'surplus',n:['Army surplus','Hunting outfitter'],e:'🎖️',w:3,rooms:[{n:'Front racks',noise:30,cats:['ammo','food'],shelf:.3,gear:1.6},{n:'Gun counter',noise:40,cats:['ammo'],shelf:.2,gear:3},{n:'Back room',noise:34,cats:['scrap'],shelf:.5,gear:1}],threat:1.7},
+  {t:'camp',n:['Raider camp','Overpass camp','Junkyard camp'],e:'🔥',w:0,rooms:[{n:'Tents',noise:36,cats:['food','water','ammo'],shelf:.8,gear:1.2},{n:'Loot pile',noise:40,cats:['scrap','meds','ammo'],shelf:2,gear:2},{n:'Boss trailer',noise:44,cats:['ammo','meds'],shelf:3,gear:2.5}],threat:3,camp:true}
+];
+const DISTRICTS=[
+  {n:'Suburbs',dist:[350,650],loot:1,threat:1},{n:'Main Street',dist:[450,800],loot:1.15,threat:1.25},{n:'Old Town',dist:[500,900],loot:1.3,threat:1.5},
+  {n:'Hospital Row',dist:[600,1000],loot:1.5,threat:1.8},{n:'The Marina',dist:[700,1200],loot:1.75,threat:2.1},{n:'The Overpass',dist:[800,1400],loot:2,threat:2.5}
+];
+const ENEMIES={
+  walker:{n:'Walker',e:'🧟',hp:24,dmg:[5,9],hit:.7,xp:8,w:10},
+  runner:{n:'Runner',e:'🏃',hp:18,dmg:[6,10],hit:.8,xp:12,w:4,fast:true},
+  bloater:{n:'Bloater',e:'🫃',hp:55,dmg:[11,16],hit:.65,xp:22,w:2,burst:12},
+  screamer:{n:'Screamer',e:'😱',hp:26,dmg:[5,9],hit:.7,xp:16,w:2,scream:.4},
+  raider:{n:'Raider',e:'🔪',hp:44,dmg:[11,17],hit:.8,xp:20,w:0,dodge:.2,human:true},
+  gunner:{n:'Raider gunner',e:'🔫',hp:38,dmg:[15,22],hit:.7,xp:26,w:0,dodge:.1,human:true},
+  boss:{n:'Raider boss',e:'💀',hp:80,dmg:[17,25],hit:.8,xp:50,w:0,dodge:.25,human:true,boss:true}
+};
+const ROLES={
+  brawler:{n:'Brawler',e:'🥊',d:(l)=>'Throws a '+(9+l*2)+'-'+(15+l*3)+' damage punch every round'},
+  medic:{n:'Medic',e:'🩺',d:(l)=>'Patches you for '+(6+l*3)+' HP every round, and heals 20 when you stash'},
+  scout:{n:'Scout',e:'🔭',d:(l)=>'You always strike first, ambushes drop by '+(20+l*8)+'%, and one room is scouted before you enter'},
+  engineer:{n:'Engineer',e:'🛠️',d:(l)=>'Builds cost '+(15+l*5)+'% less scrap; repairs melee gear at base'},
+  hunter:{n:'Hunter',e:'🏹',d:(l)=>'Finds '+(1+Math.floor(l/2))+' extra round(s) per ammo box and shoots for '+(10+l*3)+' every round if you carry ammo'},
+  quartermaster:{n:'Quartermaster',e:'📦',d:(l)=>'+'+(3+l)+' pack capacity and +'+(8+l*4)+'% stash value'}
+};
+const CREW_NAMES=['Jules','Dev','Marisol','Kenji','Ada','Booker','Tam','Rosa','Isaiah','Yuki','Cal','Nadine','Omar','Sasha','Wren','Elias','Priya','Dom','Lena','Rook'];
+const CREW_AV=['🧑‍🦱','👩‍🦰','🧔','👩','🧑','👨‍🦲','👩‍🦳','🧑‍🦰','👨','👱‍♀️'];
+const PETS={dog:{n:'Dog',e:'🐕',d:'Takes a hit for you 25% of the time and growls raiders off'},cat:{n:'Cat',e:'🐈‍⬛',d:'+15% XP. Does nothing else. Worth it.'}};
+const BUILD={
+  walls:{n:'Walls',e:'🧱',lv:3,def:[6,12,20],cost:[15,30,50],d:'Defense against raids'},
+  tower:{n:'Watchtower',e:'🗼',lv:2,def:[5,10],cost:[20,40],d:'Defense, and you see raids coming'},
+  traps:{n:'Traps',e:'🪤',lv:2,def:[4,9],cost:[12,28],d:'Defense; raiders sometimes die on the way in'},
+  bunk:{n:'Bunkhouse',e:'🛏️',lv:2,def:[0,0],cost:[25,45],d:'+1 active crew slot per level'},
+  armory:{n:'Armory',e:'🔧',lv:1,def:[2],cost:[20],d:'Repair melee gear for 3 scrap'},
+  clinic:{n:'Clinic',e:'🏥',lv:1,def:[0],cost:[25],d:'Stashing heals you to full for 1 meds'},
+  garden:{n:'Garden',e:'🥬',lv:2,def:[0,0],cost:[20,35],d:'+3 food per level every morning'},
+  radio:{n:'Ham radio',e:'📻',lv:1,def:[0],cost:[30],d:'Rival intel and one supply drop a day'},
+  generator:{n:'Generator',e:'⚡',lv:1,def:[6],cost:[40],d:'Lights. Zombies avoid it: -30% raid odds'}
+};
+const TIERS=[{n:'Drifter',e:'🔰',mult:1},{n:'Scavenger',e:'🎒',mult:1.3},{n:'Ranger',e:'🏹',mult:1.65},{n:'Warlord',e:'⚔️',mult:2.1},{n:'Legend',e:'☠️',mult:2.7}];
+const RIVALS=[
+  {id:'maya',n:'Maya\'s crew',av:'🧕',pace:[6800,6800,6800,6800,6800,6800,6800],blurb:'Steady. Same loop every day.'},
+  {id:'theo',n:'Theo\'s crew',av:'🧔',pace:[9500,9000,9200,8800,8500,2500,3000],blurb:'Sprints all week, sleeps in on weekends.'},
+  {id:'nadia',n:'Nadia\'s crew',av:'👩‍🦰',pace:[4200,4500,4200,4400,5000,12500,11500],blurb:'Quiet all week, then two huge weekend hauls.'}
+];
+const PTS_PER_STEP=0.085;
+const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic comes pre-built',gas:'Generator comes pre-built',grocery:'Garden comes pre-built',police:'Armory comes pre-built and walls start at level 1',clinic:'Clinic comes pre-built',hardware:'Walls start at level 1 and builds cost 10% less',surplus:'Armory comes pre-built, traps start at level 1',camp:'Raiders want it back: +40% raid odds, but the loot pile respawns weekly'};
+
+/* ================= state ================= */
+let S=null;
+function fresh(){return {v:2,created:Date.now(),name:'',onboarded:false,
+  steps:{total:0,today:0,date:todayStr(),lastSync:0,lastSyncDate:''},
+  walk:{toNext:0,dist:500,district:0,houses:0,progress:0,banked:0},
+  loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,
+  gear:[],eq:{melee:null,ranged:null,armor:null,head:null,bag:null},
+  crew:[],active:[],pet:null,
+  base:null,stock:{food:5,water:5,meds:1,scrap:0,ammo:0},shelf:[],
+  goal:6000,streak:{days:0,last:''},
+  league:{week:weekId(),score:0,tier:0,history:[],seen:''},
+  raids:[],raidPending:null,campCleared:'',
+  journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0,raidTrips:0}};}
+function save(){try{localStorage.setItem('deadmiles.v2',JSON.stringify(S));}catch(e){}}
+function load(){try{const r=localStorage.getItem('deadmiles.v2');if(r){const o=JSON.parse(r);if(o&&o.v===2)return o;}}catch(e){}return null;}
+function log(m){S.journal.unshift({t:Date.now(),m});S.journal=S.journal.slice(0,40);}
+function toast(m,c){const t=document.createElement('div');t.className='toast'+(c?' '+c:'');t.textContent=m;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),2600);}
+
+/* ================= player ================= */
+const maxHp=()=>100+(S.lvl-1)*10;
+const eqItem=(slot)=>S.eq[slot]?S.gear.find(g=>g.uid===S.eq[slot]):null;
+const dr=()=>(eqItem('armor')?eqItem('armor').dr:0)+(eqItem('head')?eqItem('head').dr:0);
+const capacity=()=>10+(eqItem('bag')?eqItem('bag').cap:0)+(roleLvl('quartermaster')?3+roleLvl('quartermaster'):0);
+const baseDmg=()=>[3+S.lvl,6+S.lvl];
+function addXp(n){if(S.pet==='cat')n=Math.round(n*1.15);S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'.');toast('Level '+S.lvl,'a');}}
+const activeCrew=()=>S.active.map(id=>S.crew.find(c=>c.id===id)).filter(Boolean);
+function roleLvl(role){let b=0;for(const c of activeCrew())if(c.role===role)b=Math.max(b,c.lvl);return b;}
+function crewSlots(){return 1+(S.base&&S.base.rooms.bunk?S.base.rooms.bunk:0);}
+function crewXp(n){for(const c of activeCrew()){c.xp+=n;if(c.xp>=c.lvl*6&&c.lvl<5){c.xp-=c.lvl*6;c.lvl++;log(c.name+' is now level '+c.lvl+'.');}}}
+function newCrew(role){const used=S.crew.map(c=>c.name);const names=CREW_NAMES.filter(n=>!used.includes(n));return {id:uid(),name:names.length?pick(names):pick(CREW_NAMES),av:pick(CREW_AV),role:role||pick(Object.keys(ROLES)),lvl:1,xp:0};}
+
+/* ================= world ================= */
+const district=()=>DISTRICTS[Math.min(S.walk.district,DISTRICTS.length-1)];
+function newDistance(){const d=district();S.walk.dist=rint(d.dist[0],d.dist[1]);S.walk.progress=0;S.walk.toNext=S.walk.dist;}
+function makeLoc(){
+  let type;
+  if(S.walk.district>=1&&Math.random()<0.12&&S.campCleared!==weekId())type=LOCS.find(l=>l.t==='camp');else type=wpick(LOCS.filter(l=>l.w>0),'w');
+  const rooms=type.rooms.map(r=>({n:r.n,noise:r.noise,cats:r.cats,shelf:r.shelf,gear:r.gear||0,done:false,items:null,peek:null}));
+  const loc={t:type.t,e:type.e,n:pick(type.n),rooms,noise:0,found:[],cleared:false,wave:0,threat:type.threat,camp:!!type.camp};
+  for(const r of rooms)r.items=rollRoom(r,loc);
+  if(roleLvl('scout')){const r=rooms[rint(0,rooms.length-1)];const best=r.items.slice().sort((a,b)=>b.pts-a.pts)[0];r.peek=best?best.e+' '+best.n:'looks empty';}
+  return loc;
+}
+function rollRoom(r,loc){
+  const lm=district().loot*(loc.camp?1.4:1);const list=table(r.cats,r.shelf,r.gear);const n=rint(1,3);const out=[];
+  for(let i=0;i<n;i++){const it=wpick(list,'w');if(it.gear)out.push({id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true});else out.push({id:it.id,n:it.n,e:it.e,pts:Math.round(it.pts*lm),cat:it.cat,qty:it.qty});}
+  return out;
+}
+function encounterFor(loc){
+  const th=district().threat*loc.threat;const rng=Math.random();
+  if(loc.camp){const list=[mk('raider'),mk('raider')];if(th>3.5)list.push(mk('gunner'));list.push(mk('boss'));return list;}
+  const ambushCut=roleLvl('scout')?0.2+roleLvl('scout')*0.08:0;
+  if(rng<0.32+ambushCut)return [];
+  const count=th<1.5?(Math.random()<0.3?2:1):th<2.5?rint(1,3):rint(2,3);const out=[];
+  for(let i=0;i<count;i++){if(S.walk.district>=1&&Math.random()<0.15)out.push(mk(Math.random()<0.7?'raider':'gunner'));else out.push(mk(wpick(Object.entries(ENEMIES).filter(([k,v])=>v.w>0).map(([k,v])=>({k,w:v.w})),'w').k));}
+  return out;
+}
+function mk(k){const e=ENEMIES[k];const scale=1+S.walk.district*0.12;return {k,n:e.n,e:e.e,hp:Math.round(e.hp*scale),max:Math.round(e.hp*scale),dmg:e.dmg.map(x=>Math.round(x*scale)),hit:e.hit,xp:e.xp,dodge:e.dodge||0,fast:!!e.fast,burst:e.burst||0,scream:e.scream||0,human:!!e.human,boss:!!e.boss,dead:false};}
+
+/* ================= steps ================= */
+function rollDay(){
+  const t=todayStr();if(S.steps.date===t)return;
+  S.steps.date=t;S.steps.today=0;S.steps.lastSync=0;S.steps.lastSyncDate='';S.flags.roadCheck=0;
+  S.hp=Math.min(maxHp(),S.hp+25+(S.base&&S.base.t==='house'?1:0));
+  if(S.base){const g=S.base.rooms.garden||0;if(g){S.stock.food+=3*g;log('The garden gave '+(3*g)+' food.');}}
+  log('Morning in Hollow County. You slept some.');
+}
+function rollWeek(){
+  const w=weekId();if(S.league.week===w)return;
+  const end=new Date(new Date(S.league.week+'T00:00:00').getTime()+7*86400000);
+  const rows=RIVALS.map(r=>({n:r.n,s:rivalScore(r,S.league.week,end,S.league.tier)}));
+  const all=[{n:'You',s:S.league.score,me:true},...rows].sort((a,b)=>b.s-a.s);const rank=all.findIndex(x=>x.me)+1;
+  let delta=0;if(rank===1&&S.league.tier<TIERS.length-1)delta=1;else if(rank===all.length&&S.league.tier>0)delta=-1;
+  S.league.history.unshift({week:S.league.week,score:S.league.score,rank,tier:S.league.tier,delta});
+  S.league.tier+=delta;S.league.week=w;S.league.score=0;S.league.seen='';
+}
+function addSteps(n,src){
+  n=Math.floor(n);if(!(n>0))return;rollDay();rollWeek();
+  S.steps.total+=n;S.steps.today+=n;S.lastAnim=Date.now();
+  if(S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');}
+  if(S.loc||S.combat){S.walk.banked=(S.walk.banked||0)+n;save();render();return;}
+  let left=n;
+  while(left>0){if(left>=S.walk.toNext){left-=S.walk.toNext;S.walk.progress=S.walk.dist;S.walk.toNext=0;arrive();break;}else{S.walk.toNext-=left;S.walk.progress=S.walk.dist-S.walk.toNext;left=0;}}
+  if(left>0)S.walk.banked=(S.walk.banked||0)+left;
+  if(!S.loc&&!S.combat&&S.flags.roadCheck<1&&Math.random()<Math.min(0.4,n/300*0.07)){S.flags.roadCheck++;save();render();setTimeout(()=>startCombat([mk(Math.random()<0.7?'walker':'runner')],'road'),400);return;}
+  save();render();
+}
+function arrive(){
+  S.loc=makeLoc();S.walk.houses++;
+  log('Reached '+S.loc.n+' ('+district().n+').');toast('Reached '+S.loc.e+' '+S.loc.n,'a');
+  if(navigator.vibrate)try{navigator.vibrate([60,40,60]);}catch(e){}
+}
+function enterLoc(){
+  const loc=S.loc;if(!loc||loc.cleared)return;
+  const en=encounterFor(loc);
+  if(!en.length){loc.cleared=true;log(loc.n+' is quiet. You slip in.');save();render();return;}
+  startCombat(en,'enter');
+}
+
+/* ================= combat ================= */
+let C=null; // live combat
+function startCombat(enemies,where){
+  C={enemies,where,turn:1,log:[],target:0,brace:false,over:false,fled:false,cool:{}};
+  S.combat=true;
+  const desc=where==='road'?'Something is in the road.':where==='wave'?'The noise brought more.':where==='raid'?'Raiders are at your walls.':'They were waiting inside '+S.loc.n+'.';
+  clog(desc+' '+enemies.length+' hostile'+(enemies.length>1?'s':'')+'.','sys');
+  if(!roleLvl('scout')&&where==='enter'&&Math.random()<0.15){clog('Ambush! They act first.','hit');enemyPhase();}
+  openCombat();
+}
+function clog(m,c){C.log.unshift({m,c:c||''});C.log=C.log.slice(0,14);}
+function alive(){return C.enemies.filter(e=>!e.dead);}
+function targetEnemy(){let t=C.enemies[C.target];if(!t||t.dead){const a=alive();t=a[0];C.target=C.enemies.indexOf(t);}return t;}
+function hurt(n,src){let d=Math.max(1,n-dr());if(C.brace)d=Math.ceil(d/2);if(S.pet==='dog'&&Math.random()<0.25){clog('Your dog lunges and takes the hit meant for you.','good');return;}S.hp-=d;clog(src+' hits you for '+d+'.','hit');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
+function act(kind){
+  if(!C||C.over)return;C.brace=false;
+  const t=targetEnemy();if(!t){endCombat(true);return;}
+  if(kind==='attack'){const w=eqItem('melee');const dm=w?w.dmg:baseDmg();const hitc=0.9;
+    if(Math.random()<t.dodge){clog(t.n+' sidesteps your swing.','');}
+    else if(Math.random()<hitc){const d=rint(dm[0],dm[1])+(S.lvl-1);t.hp-=d;clog('You hit '+t.n+' for '+d+(w?' with the '+w.n:' bare-handed')+'.','you');if(w){w.dur--;if(w.dur<=0){clog('The '+w.n+' breaks.','sys');S.gear=S.gear.filter(g=>g.uid!==w.uid);S.eq.melee=null;}}}
+    else clog('You miss.','');
+  }
+  else if(kind==='heavy'){const w=eqItem('melee');if(!w){toast('Need a melee weapon');return;}
+    if(Math.random()<t.dodge+0.1){clog(t.n+' ducks the big swing.','');}
+    else if(Math.random()<0.6){const d=Math.round(rint(w.dmg[0],w.dmg[1])*1.6)+(S.lvl-1);t.hp-=d;clog('Heavy swing lands for '+d+'.','you');}
+    else clog('The heavy swing goes wide.','');
+    w.dur-=2;if(w.dur<=0){clog('The '+w.n+' breaks.','sys');S.gear=S.gear.filter(g=>g.uid!==w.uid);S.eq.melee=null;}
+    if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+8);
+  }
+  else if(kind==='shoot'){const g=eqItem('ranged');if(!g){toast('No gun');return;}const ammoItem=S.pack.find(p=>p.cat==='ammo'&&p.id===g.ammo);const stockAmmo=g.ammo==='ammo'?S.stock.ammo:0;
+    if(!ammoItem&&stockAmmo<1){toast('No '+(g.ammo==='shells'?'shells':'rounds'));return;}
+    if(ammoItem){ammoItem.qty--;if(ammoItem.qty<=0)S.pack=S.pack.filter(p=>p!==ammoItem);}else S.stock.ammo--;
+    if(Math.random()<0.92){const d=rint(g.dmg[0],g.dmg[1])+(S.lvl-1);t.hp-=d;t.shot=true;clog('You fire the '+g.n+': '+d+' damage.','you');}else clog('The shot goes wide.','');
+    if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+25);
+  }
+  else if(kind==='brace'){C.brace=true;clog('You brace. Incoming damage halved this round.','you');}
+  else if(kind==='med'){const m=S.pack.find(p=>p.cat==='meds')||(S.stock.meds>0?{stock:true}:null);if(!m){toast('No meds');return;}const heal=m.id==='kit'?70:m.id==='abx'?45:35;if(m.stock)S.stock.meds--;else S.pack=S.pack.filter(p=>p!==m);S.hp=Math.min(maxHp(),S.hp+heal);clog('You patch up: +'+heal+' HP.','good');}
+  else if(kind==='flee'){if(C.where==='raid'){toast('Nowhere to run. This is your base.');return;}
+    if(Math.random()<0.7){C.fled=true;clog('You break away and run.','sys');const drop=Math.ceil(S.pack.length*0.25);for(let i=0;i<drop&&S.pack.length;i++)S.pack.splice(rint(0,S.pack.length-1),1);endCombat(false);return;}
+    else clog('You stumble. They close in.','hit');
+  }
+  // crew
+  const a=alive();
+  if(a.length){const bl=roleLvl('brawler');if(bl){const tt=targetEnemy();const d=rint(9+bl*2,15+bl*3);tt.hp-=d;clog(activeCrew().find(c=>c.role==='brawler').name+' punches '+tt.n+' for '+d+'.','you');}
+    const hl=roleLvl('hunter');if(hl&&(S.pack.some(p=>p.cat==='ammo')||S.stock.ammo>0)){const tt=targetEnemy();const d=10+hl*3;tt.hp-=d;clog(activeCrew().find(c=>c.role==='hunter').name+' fires: '+d+'.','you');}}
+  const ml=roleLvl('medic');if(ml&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+6+ml*3);clog(activeCrew().find(c=>c.role==='medic').name+' patches you: +'+(6+ml*3)+'.','good');}
+  // deaths
+  for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;S.kills++;addXp(e.xp);crewXp(1);clog(e.n+' goes down. +'+e.xp+' XP.','good');
+    if(e.burst&&!e.shot){hurt(e.burst+dr(),'The bloater bursts and');}
+    if(e.human){if(Math.random()<0.5){const g=pick(['pipe','bat','jacket','helmet','crowbar']);S.pack.length<capacity()&&S.gear.push({uid:uid(),id:g,...GEAR[g]});clog('It dropped a '+GEAR[g].n+'.','sys');}
+      if(Math.random()<0.5){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:3,n:'Rounds (x3)'});clog('You take 3 rounds off the body.','sys');}
+      if(e.boss){S.pack.push({id:'skull',...ITEMS.skull,uid:uid()});clog('The boss mask. Trophy.','sys');}}
+    else if(Math.random()<0.06){S.pack.push({id:'dogtag',...ITEMS.dogtag,uid:uid()});clog('A dog tag around its neck. Trophy.','sys');}}}
+  if(!alive().length){renderCombat();setTimeout(()=>endCombat(true),500);return;}
+  enemyPhase();
+  if(S.hp<=0){death();return;}
+  renderCombat();
+}
+function enemyPhase(){
+  for(const e of alive()){
+    if(e.scream&&Math.random()<e.scream){const w=mk('walker');C.enemies.push(w);clog('The screamer shrieks. Another walker shoves in.','hit');continue;}
+    const swings=e.fast&&C.turn%2===0?2:1;
+    for(let i=0;i<swings;i++){if(Math.random()<e.hit)hurt(rint(e.dmg[0],e.dmg[1]),e.n);else clog(e.n+' lunges and misses.','');}
+  }
+  C.turn++;
+}
+function death(){
+  C.over=true;S.combat=false;const lost=packPts();
+  const where=C.where;if(where==='raid'&&S.raidPending){const p=S.raidPending;resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;}S.pack=[];S.run=0;S.loc=null;newDistance();S.hp=Math.round(maxHp()*0.4);
+  const gearLost=S.gear.length&&Math.random()<0.5?S.gear.splice(rint(0,S.gear.length-1),1)[0]:null;if(gearLost){for(const k in S.eq)if(S.eq[k]===gearLost.uid)S.eq[k]=null;}
+  log('You went down. Your crew dragged you back to base. Pack lost ('+fmt(lost)+' pts)'+(gearLost?', and your '+gearLost.n+' is gone':'')+'.');
+  save();render();
+  openSheet(`<h2>You went down</h2><div class="big">💀</div><p>Your crew dragged you out before they finished you. Everything in the pack is gone${gearLost?', and you lost your '+esc(gearLost.n):''}. You wake up at base at ${Math.round(maxHp()*0.4)} HP.</p><button class="btn r wide" onclick="closeSheet()">Get up</button>`);
+  C=null;
+}
+function endCombat(won){
+  if(!C)return;C.over=true;S.combat=false;
+  const where=C.where;const fled=C.fled;
+  if(won){log('Cleared '+alive().length+' hostiles'+(where==='enter'&&S.loc?' inside '+S.loc.n:where==='road'?' on the road':'')+'.');
+    if(where==='enter'||where==='wave'){S.loc.cleared=true;if(S.loc.camp&&where==='enter'){S.campCleared=weekId();log('Raider camp cleared. The county is quieter for a while.');}}
+    if(where==='raid'){resolveRaidFight(true);}
+    crewXp(2);
+  }else{
+    if(where==='enter'){S.loc=null;S.run=0;newDistance();log('You fled '+'the place and lost part of the pack.');}
+    else if(where==='wave'){S.loc.rooms.forEach(r=>r.done=true);S.loc=null;newDistance();log('You fled the wave and lost part of the pack.');}
+    else log('You fled the road.');
+  }
+  const summary=won?`<h2>Clear</h2><div class="big">${where==='raid'?'🧱':'💥'}</div><p>${C.log.filter(l=>l.c==='good').slice(0,4).map(l=>esc(l.m)).join('<br>')||'They are down.'}</p>`:`<h2>You got away</h2><div class="big">💨</div><p>Dropped a quarter of the pack on the way out.</p>`;
+  const carry=S.walk.banked||0;S.walk.banked=0;
+  C=null;save();render();
+  openSheet(summary+`<button class="btn r wide" onclick="closeSheet()">Continue</button>`);
+  if(carry>0&&!S.loc)addSteps(carry,'carry');
+}
+function openCombat(){$('#modal').classList.add('on');$('#modal').dataset.lock='1';renderCombat();}
+function renderCombat(){
+  if(!C)return;const w=eqItem('melee'),g=eqItem('ranged');const t=targetEnemy();
+  const ammoN=(g?(S.pack.filter(p=>p.cat==='ammo'&&p.id===g.ammo).reduce((a,b)=>a+(b.qty||0),0)+(g.ammo==='ammo'?S.stock.ammo:0)):0);
+  const meds=S.pack.filter(p=>p.cat==='meds').length+S.stock.meds;
+  $('#sheet').innerHTML=`<h2>${C.where==='raid'?'Defend the base':C.where==='road'?'On the road':'Inside'} <span class="chip d" style="float:right">round ${C.turn}</span></h2>
+  <div class="hplab"><span>You · DR ${dr()}</span><span>${S.hp} / ${maxHp()}</span></div><div class="hpbar"><i style="width:${S.hp/maxHp()*100}%"></i></div>
+  <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>`<button class="enemy${e===t?' target':''}${e.dead?' dead':''}" onclick="C.target=${i};renderCombat()"><div class="e">${e.e}</div><div><div class="n">${e.n}${e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}</div></div></button>`).join('')}</div>
+  <div class="acts">
+    <button class="btn r" onclick="act('attack')">${w?w.e+' '+esc(w.n):'👊 Fists'}<small>${w?w.dmg[0]+'-'+w.dmg[1]+' · '+w.dur+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
+    <button class="btn" onclick="act('heavy')" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · 60% hit · noisy</small></button>
+    <button class="btn" onclick="act('shoot')" ${g&&ammoN?'':'disabled'}>${g?g.e+' '+esc(g.n):'🔫 No gun'}<small>${g?g.dmg[0]+'-'+g.dmg[1]+' · '+ammoN+' rounds · loud':'find one'}</small></button>
+    <button class="btn" onclick="act('brace')">🛡️ Brace<small>half damage this round</small></button>
+    <button class="btn" onclick="act('med')" ${meds?'':'disabled'}>🩹 Patch up<small>${meds} meds</small></button>
+    <button class="btn ghost" onclick="act('flee')" ${C.where==='raid'?'disabled':''}>🏃 Run<small>70% · drop 25% pack</small></button>
+  </div>
+  <ul class="clog" style="margin-top:10px">${C.log.map(l=>`<li class="${l.c}">${esc(l.m)}</li>`).join('')}</ul>`;
+}
+
+/* ================= looting ================= */
+function searchRoom(i){
+  const loc=S.loc;if(!loc||!loc.cleared)return;const r=loc.rooms[i];if(r.done)return;r.done=true;
+  const qm=roleLvl('quartermaster');
+  for(const it of r.items){
+    if(it.gear){S.gear.push({uid:uid(),id:it.id,...GEAR[it.id]});loc.found.push({...it});log('Found a '+it.n+'.');continue;}
+    if(S.pack.length>=capacity()){toast('Pack full. Left '+it.n+' behind.','d');continue;}
+    const item={...it,uid:uid()};if(item.cat==='ammo'){item.qty=(item.qty||6)+(roleLvl('hunter')?1+Math.floor(roleLvl('hunter')/2):0);}
+    S.pack.push(item);loc.found.push(item);
+  }
+  // meet a survivor
+  if(!loc.camp&&S.crew.length<8&&Math.random()<0.07){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was hiding in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${c.av}</div><p><b style="color:var(--bone)">${c.name}</b> was hiding in the ${esc(r.n.toLowerCase())}. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(1)}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
+  else if(!S.pet&&Math.random()<0.03){S.pet=Math.random()<0.6?'dog':'cat';log('A '+PETS[S.pet].n.toLowerCase()+' followed you out. It is yours now.');toast('A '+PETS[S.pet].n.toLowerCase()+' joins you '+PETS[S.pet].e,'a');}
+  loc.noise=Math.min(100,loc.noise+Math.max(6,r.noise+rint(-6,8)));
+  crewXp(1);save();render();
+  if(loc.noise>=100){loc.noise=55;loc.wave++;setTimeout(()=>startCombat([mk('walker'),mk(Math.random()<0.4?'runner':'walker')].concat(loc.wave>1?[mk('bloater')]:[]),'wave'),350);}
+}
+function leaveLoc(){
+  if(!S.loc)return;const loc=S.loc;if(loc.cleared)S.run++;S.loc=null;
+  log('Left '+loc.n+'. Run x'+(1+S.run*0.1).toFixed(1)+'.');
+  if(S.walk.houses%5===0&&S.walk.district<DISTRICTS.length-1){S.walk.district++;log('You crossed into '+district().n+'. Longer walks, better loot, worse company.');toast('New district: '+district().n,'a');}
+  newDistance();const carry=S.walk.banked||0;S.walk.banked=0;save();render();if(carry>0)addSteps(carry,'carry');
+}
+
+/* ================= base ================= */
+function claimBase(){
+  const loc=S.loc;if(!loc||!loc.cleared)return;
+  if(S.base&&S.stock.scrap<20){toast('Moving base costs 20 scrap');return;}
+  if(S.base)S.stock.scrap-=20;
+  const rooms={};
+  if(loc.t==='pharmacy'||loc.t==='clinic')rooms.clinic=1;if(loc.t==='gas')rooms.generator=1;if(loc.t==='grocery')rooms.garden=1;
+  if(loc.t==='police'){rooms.armory=1;rooms.walls=1;}if(loc.t==='hardware')rooms.walls=1;if(loc.t==='surplus'){rooms.armory=1;rooms.traps=1;}
+  S.base={t:loc.t,e:loc.e,n:loc.n,district:district().n,rooms,claimed:Date.now()};
+  loc.rooms.forEach(r=>r.done=true);
+  log('You claimed '+loc.n+' as your base. '+(BASE_PERK[loc.t]||''));toast('Base claimed','a');
+  save();render();leaveLoc();pushPlayer();
+}
+function defense(){if(!S.base)return 0;let d=0;for(const [k,l] of Object.entries(S.base.rooms)){if(!l)continue;d+=BUILD[k].def[l-1]||0;}return d;}
+function buildCost(k){const b=BUILD[k];const l=S.base.rooms[k]||0;if(l>=b.lv)return null;let c=b.cost[l];const el=roleLvl('engineer');if(el)c=Math.round(c*(1-(0.15+el*0.05)));if(S.base.t==='hardware')c=Math.round(c*0.9);return c;}
+function build(k){if(!S.base)return;const c=buildCost(k);if(c===null)return;if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}S.stock.scrap-=c;S.base.rooms[k]=(S.base.rooms[k]||0)+1;log('Built '+BUILD[k].n+' level '+S.base.rooms[k]+'.');toast(BUILD[k].n+' L'+S.base.rooms[k],'a');save();render();pushPlayer();}
+function packPts(){return S.pack.reduce((a,b)=>a+b.pts,0);}
+const runMult=()=>1+S.run*0.1;
+function bank(){
+  if(S.loc||S.combat){toast('Clear out first');return;}if(!S.pack.length){toast('Nothing to stash');return;}
+  if(!S.base){toast('Claim a base first: clear a place, then Claim it');return;}
+  const raw=packPts();const qm=roleLvl('quartermaster');const pts=Math.round(raw*runMult()*TIERS[S.league.tier].mult*(1+(qm?0.08+qm*0.04:0)));
+  for(const it of S.pack){if(it.cat==='shelf')S.shelf.push({id:it.id,n:it.n,e:it.e});else if(it.cat==='ammo')S.stock.ammo+=(it.qty||0);else if(S.stock[it.cat]!==undefined)S.stock[it.cat]++;}
+  rollWeek();S.league.score+=pts;
+  const eat=activeCrew().length;S.stock.food=Math.max(0,S.stock.food-eat);
+  S.hp=Math.min(maxHp(),S.hp+15);if(roleLvl('medic'))S.hp=Math.min(maxHp(),S.hp+20);
+  if(S.base.rooms.clinic&&S.stock.meds>0&&S.hp<maxHp()){S.stock.meds--;S.hp=maxHp();}
+  log('Stashed '+fmt(raw)+' x'+runMult().toFixed(1)+' = '+fmt(pts)+' league points.'+(eat?' Crew ate '+eat+' food.':''));toast('+'+fmt(pts)+' league points','a');
+  S.pack=[];S.run=0;save();render();pushPlayer();
+}
+function supplyDrop(){if(!S.base||!S.base.rooms.radio||S.flags.dropDate===S.steps.date)return;S.flags.dropDate=S.steps.date;const list=table(['food','water','meds','ammo'],0.3,0.4);const got=[];for(let i=0;i<3;i++){const it=wpick(list,'w');if(it.gear){S.gear.push({uid:uid(),id:it.id,...GEAR[it.id]});got.push(it.e+' '+it.n);}else if(S.pack.length<capacity()){S.pack.push({id:it.id,n:it.n,e:it.e,pts:it.pts,cat:it.cat,qty:it.qty,uid:uid()});got.push(it.e+' '+it.n);}}log('Supply drop: '+got.join(', ')+'. In your pack.');toast('Supply drop landed','z');save();render();}
+function heal(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.meds<1){toast('No meds in stash');return;}S.stock.meds--;S.hp=Math.min(maxHp(),S.hp+40);save();render();}
+function eat(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.food<1){toast('No food in stash');return;}S.stock.food--;S.hp=Math.min(maxHp(),S.hp+15);save();render();}
+function equip(uid){const g=S.gear.find(x=>x.uid===uid);if(!g)return;S.eq[g.slot]=S.eq[g.slot]===uid?null:uid;save();render();}
+function repair(uid){const g=S.gear.find(x=>x.uid===uid);if(!g||!(S.base&&S.base.rooms.armory)&&!roleLvl('engineer'))return;if(S.stock.scrap<3){toast('Need 3 scrap');return;}S.stock.scrap-=3;g.dur=Math.min(GEAR[g.id].dur,g.dur+3);toast(g.n+' repaired');save().render;render();}
+function dropGear(uid){S.gear=S.gear.filter(x=>x.uid!==uid);for(const k in S.eq)if(S.eq[k]===uid)S.eq[k]=null;save();render();}
+function toggleCrew(id){const i=S.active.indexOf(id);if(i>=0)S.active.splice(i,1);else{if(S.active.length>=crewSlots()){toast('No free slot. Build a bunkhouse.');return;}S.active.push(id);}save();render();}
+
+/* ================= raids (real clock) ================= */
+function stockValue(){return S.stock.food*5+S.stock.water*5+S.stock.meds*10+S.stock.scrap*4+S.stock.ammo*3;}
+function checkRaids(){
+  if(!S.base)return;const t=todayStr();if(S.flags.lastRaidCheck===t)return;
+  // one roll per day, seeded; raid lands at a seeded hour
+  const rng=mulberry(hash(t+'raid'+S.created));
+  const daysSince=Math.floor((Date.now()-S.base.claimed)/86400000);
+  if(daysSince<1){S.flags.lastRaidCheck=t;return;}
+  let odds=0.18+Math.min(0.4,stockValue()/600)+S.league.tier*0.05;
+  if(S.base.rooms.generator)odds*=0.7;if(S.base.t==='camp')odds*=1.4;if(S.campCleared===weekId())odds*=0.5;
+  const hour=8+Math.floor(rng()*13);const now=new Date();
+  if(rng()<odds){const power=Math.round(10+rng()*20+S.league.tier*6+daysSince*0.5);
+    if(now.getHours()>=hour){resolveRaid(power,hour,t);S.flags.lastRaidCheck=t;}
+    else{S.raidPending={date:t,hour,power};}
+  }else S.flags.lastRaidCheck=t;
+}
+function resolveRaid(power,hour,date){
+  const def=defense();let stolen={};let repelled=def>=power;
+  if(S.base.rooms.traps&&Math.random()<0.3){power=Math.round(power*0.7);repelled=def>=power;}
+  if(!repelled){const frac=clamp((power-def)/power*0.6,0.1,0.6);for(const k of ['food','water','meds','scrap','ammo']){const n=Math.floor(S.stock[k]*frac);if(n){S.stock[k]-=n;stolen[k]=n;}}
+    if(S.base.rooms.walls&&Math.random()<0.5){S.base.rooms.walls--;stolen.walls=1;}}
+  const entry={t:date+' '+String(hour).padStart(2,'0')+':00',power,def,repelled,stolen};
+  S.raids.unshift(entry);S.raids=S.raids.slice(0,12);S.raidPending=null;
+  log(repelled?'Raiders hit the base at '+hour+':00 and your defenses held ('+def+' vs '+power+').':'Raiders broke in at '+hour+':00 ('+power+' vs your '+def+') and took '+Object.entries(stolen).map(([k,v])=>v+' '+k).join(', ')+'.');
+  toast(repelled?'Raid repelled':'Base raided','d');
+}
+function resolveRaidFight(won){if(!S.raidPending)return;const p=S.raidPending;S.raids.unshift({t:p.date+' '+String(p.hour).padStart(2,'0')+':00',power:p.power,def:defense(),repelled:true,stolen:{},fought:true});S.raidPending=null;S.flags.lastRaidCheck=p.date;log('You held the base yourself. Raiders driven off.');addXp(30);S.stock.scrap+=rint(4,10);}
+function raidTick(){
+  if(!S.raidPending)return;const p=S.raidPending;const now=new Date();
+  if(todayStr()!==p.date){resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=todayStr();save();return;}
+  if(now.getHours()>=p.hour){ if(document.visibilityState==='visible'&&!S.combat&&!S.loc){openSheet(`<h2>Raiders at the walls</h2><div class="big">🔥</div><p>A crew of ${p.power>25?'six':p.power>18?'four':'three'} is coming over the fence. Your defenses: ${defense()} vs their ${p.power}. Fight them yourself, or let the walls decide.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveRaid(${p.power},${p.hour},'${p.date}');S.flags.lastRaidCheck='${p.date}';save();render()">Let the walls hold</button><button class="btn d" onclick="closeSheet();fightRaid()">Fight</button></div>`,true);}
+    else{resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;save();}}
+}
+function fightRaid(){const p=S.raidPending;const n=p.power>25?4:p.power>18?3:2;const en=[];for(let i=0;i<n;i++)en.push(mk(i===0&&p.power>22?'gunner':'raider'));startCombat(en,'raid');}
+
+/* ================= league ================= */
+function rivalScore(r,week,now,tier){const start=new Date(week+'T00:00:00');const rng=mulberry(hash(week+r.id));const mult=TIERS[tier].mult;let total=0;
+  for(let d=0;d<7;d++){const el=(now.getTime()-(start.getTime()+d*86400000))/86400000;if(el<=0)break;const pace=r.pace[d]*(0.85+rng()*0.35);const f=clamp((el-0.29)/0.63,0,1);total+=pace*f*PTS_PER_STEP*mult*(1+0.1*rng());}return Math.round(total);}
+function board(){const now=new Date();const rows=RIVALS.map(r=>({id:r.id,n:r.n,av:r.av,s:rivalScore(r,S.league.week,now,S.league.tier),blurb:r.blurb}));rows.push({id:'me',n:S.name||'You',av:'🧑‍🚒',s:S.league.score,me:true});return rows.sort((a,b)=>b.s-a.s);}
+function radioLines(){const now=new Date();const lines=[];const rng=mulberry(hash(S.league.week+todayStr()));const hrs=clamp(Math.floor((now.getHours()-7)/3),0,4);
+  const verbs=['cleared a pharmacy on','fought off raiders near','stashed a big haul from','lost a man at','found a shotgun in','burned a camp under','got chased off'];const places=['Maple St','the strip mall','Old Town','the marina','Hospital Row','the overpass','5th and Pine','the rail yard'];
+  for(let i=0;i<=hrs;i++){const r=RIVALS[Math.floor(rng()*3)];lines.push({t:'~'+String(8+i*3).padStart(2,'0')+':00',m:r.n+' '+verbs[Math.floor(rng()*verbs.length)]+' '+places[Math.floor(rng()*places.length)]+'.'});}
+  if(S.base&&S.base.rooms.radio){const b=board().filter(x=>!x.me);lines.unshift({t:'LIVE',m:b[0].n+' leads the rivals with '+fmt(b[0].s)+' pts. '+(RIVALS.find(r=>r.id===b[0].id)||{}).blurb});}
+  return lines.reverse();}
+
+/* ================= pedometer + auto sync ================= */
+let pedo={on:false,last:0,filt:0,count:0,got:false,wake:null};
+function pedoToggle(){
+  if(pedo.on){pedoStop();return;}const DM=window.DeviceMotionEvent;
+  if(!DM){$('#pedoStatus').textContent='No motion sensors in this browser.';return;}
+  const start=()=>{pedo.on=true;pedo.count=0;pedo.got=false;window.addEventListener('devicemotion',onMotion);$('#pedoBtn').textContent='Stop walk mode';$('#pedoStatus').textContent='Listening. Keep the screen on.';
+    if(navigator.wakeLock)navigator.wakeLock.request('screen').then(w=>pedo.wake=w).catch(()=>{});
+    setTimeout(()=>{if(pedo.on&&!pedo.got){$('#pedoStatus').textContent='Motion data is blocked here. Use the shortcut or Sync.';pedoStop(true);}},4000);};
+  if(typeof DM.requestPermission==='function'){DM.requestPermission().then(r=>{if(r==='granted')start();else $('#pedoStatus').textContent='Motion permission denied.';}).catch(()=>{$('#pedoStatus').textContent='Motion permission is blocked in this view.';});}else start();
+}
+function onMotion(e){pedo.got=true;const a=e.accelerationIncludingGravity;if(!a)return;const mag=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2);pedo.filt=pedo.filt*0.8+mag*0.2;const now=Date.now();
+  if(mag-pedo.filt>2.2&&now-pedo.last>280){pedo.last=now;pedo.count++;if(pedo.count%10===0)addSteps(10,'live');$('#pedoStatus').textContent='Counting: '+pedo.count+' steps this walk';}}
+function pedoStop(silent){pedo.on=false;window.removeEventListener('devicemotion',onMotion);const rem=pedo.count%10;if(rem)addSteps(rem,'live');if(pedo.wake){try{pedo.wake.release();}catch(e){}pedo.wake=null;}$('#pedoBtn').textContent='Walk mode';if(!silent)$('#pedoStatus').textContent=pedo.count?'Walk saved: '+pedo.count+' steps.':'';}
+function syncTotal(v,src){rollDay();let delta=(S.steps.lastSyncDate===S.steps.date)?v-S.steps.lastSync:v-S.steps.today;
+  if(delta<0){toast('That is fewer than the last sync ('+fmt(S.steps.lastSync)+').');return false;}
+  S.steps.lastSync=v;S.steps.lastSyncDate=S.steps.date;if(delta===0){toast('Already synced to '+fmt(v));save();render();return true;}
+  toast('+'+fmt(delta)+' steps ('+src+')','z');addSteps(delta,src);return true;}
+function autoSyncFromUrl(){
+  try{const q=new URLSearchParams(location.search);const h=new URLSearchParams(location.hash.replace(/^#/,''));const v=parseInt(q.get('steps')||h.get('steps'),10);
+    if(v>=0){syncTotal(v,'shortcut');history.replaceState(null,'',location.pathname);}}catch(e){}
+  try{const v=parseInt(document.referrer.split('steps=')[1],10);if(v>0)syncTotal(v,'shortcut');}catch(e){}
+}
+async function readClipboard(){try{const t=await navigator.clipboard.readText();const m=String(t).replace(/,/g,'').match(/\d{2,6}/);if(!m){toast('No step count on the clipboard');return;}syncTotal(parseInt(m[0],10),'clipboard');}catch(e){toast('Clipboard is blocked here. Type it in Sync.');}}
+
+
+/* ================= online (Supabase) ================= */
+const SB={url:'https://edejxfcsjqwedbgulygi.supabase.co',key:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkZWp4ZmNzanF3ZWRiZ3VseWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0NTExMzEsImV4cCI6MjEwNTAyNzEzMX0.Z0T954DSwTVlRM37i_fJLVtu_x2IrdOoJMx6ImInVKI'};
+const WEB_URL='https://celestenguyenn-design.github.io/dead-miles/';
+const onArtifact=/claude\.ai|claudeusercontent/.test(location.hostname);
+async function rpc(fn,args){
+  const r=await fetch(SB.url+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:SB.key,Authorization:'Bearer '+SB.key,'Content-Type':'application/json'},body:JSON.stringify(args||{})});
+  const t=await r.text();if(!r.ok)throw new Error(fn+' failed ('+r.status+'): '+t.slice(0,160));return t?JSON.parse(t):null;
+}
+const O=()=>S.online||(S.online={handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0,raidTrips:0});
+function slug(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,20);}
+async function goOnline(handle){
+  const o=O();handle=slug(handle||S.name);if(!handle){toast('Pick a handle first');return;}
+  if(!o.token)o.token=uid()+uid()+uid();
+  try{const ok=await rpc('register_player',{p_handle:handle,p_token:o.token,p_name:S.name||handle});
+    if(!ok){o.ok=false;o.err='The handle "'+handle+'" is taken by someone else. Pick another.';toast(o.err,'d');save();render();return;}
+    o.handle=handle;o.ok=true;o.err='';log('Online as @'+handle+'.');toast('Online as @'+handle,'z');save();render();
+    await pushPlayer();await pullRaids();await pullSteps();await loadFriends();
+  }catch(e){o.ok=false;o.err=e.message;save();render();}
+}
+function publicState(){return {public:{name:S.name,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',steps_today:S.steps.today,streak:S.streak.days},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:S.stock.ammo}};}
+let pushTimer=0;
+function pushPlayer(){const o=O();if(!o.ok)return Promise.resolve();clearTimeout(pushTimer);return new Promise(res=>{pushTimer=setTimeout(async()=>{try{rollWeek();await rpc('save_player',{p_handle:o.handle,p_token:o.token,p_name:S.name,p_tier:S.league.tier,p_week:S.league.week,p_score:S.league.score,p_state:publicState()});o.err='';}catch(e){o.err=e.message;}save();res();},400);});}
+async function pullSteps(){
+  const o=O();if(!o.ok)return;const since=new Date();since.setHours(0,0,0,0);
+  try{const rows=await rpc('get_steps',{p_handle:o.handle,p_token:o.token,p_since:since.toISOString()});o.lastPull=Date.now();
+    if(rows&&rows.length){const latest=rows[0].steps;const best=Math.max(...rows.map(r=>r.steps));const v=Math.max(latest,best);if(v>(S.steps.lastSyncDate===S.steps.date?S.steps.lastSync:-1)){o.lastPost=new Date(rows[0].posted_at).getTime();syncTotal(v,'phone');}}
+    o.err='';}catch(e){o.err=e.message;}
+  save();renderOnline();
+}
+async function pullRaids(){
+  const o=O();if(!o.ok)return;
+  try{const rows=await rpc('get_raids',{p_handle:o.handle,p_token:o.token});if(!rows||!rows.length)return;
+    let msgs=[];for(const r of rows){const when=new Date(r.at);if(r.won){for(const [k,v] of Object.entries(r.taken||{})){if(S.stock[k]!==undefined)S.stock[k]=Math.max(0,S.stock[k]-v);}
+        const t=Object.entries(r.taken||{}).map(([k,v])=>v+' '+k).join(', ')||'nothing';msgs.push(r.attacker_name+' raided your base at '+timeStr(when)+' ('+r.power+' vs your '+r.defense+') and took '+t+'.');S.raids.unshift({t:todayStr(when)+' '+timeStr(when),power:r.power,def:r.defense,repelled:false,stolen:r.taken||{},by:r.attacker_name});}
+      else{msgs.push(r.attacker_name+' tried your walls at '+timeStr(when)+' and bounced off ('+r.power+' vs '+r.defense+').');S.raids.unshift({t:todayStr(when)+' '+timeStr(when),power:r.power,def:r.defense,repelled:true,stolen:{},by:r.attacker_name});}}
+    S.raids=S.raids.slice(0,12);for(const m of msgs)log(m);await rpc('ack_raids',{p_handle:o.handle,p_token:o.token});save();render();
+    openSheet('<h2>While you were out</h2><div class="big">'+(rows.some(r=>r.won)?'🔥':'🧱')+'</div><p>'+msgs.map(esc).join('<br><br>')+'</p><button class="btn r wide" onclick="closeSheet()">Noted</button>');
+  }catch(e){o.err=e.message;save();}
+}
+let friends=[];
+async function loadFriends(){const o=O();if(!o.ok)return;try{rollWeek();friends=(await rpc('get_board',{p_week:S.league.week}))||[];o.err='';}catch(e){o.err=e.message;}renderFriends();}
+function raidPower(){const w=eqItem('melee');let p=(w?(w.dmg[0]+w.dmg[1])/2:5)+S.lvl*2+dr();const g=eqItem('ranged');if(g&&(S.stock.ammo>0||S.pack.some(x=>x.cat==='ammo')))p+=8;p+=roleLvl('brawler')*3+roleLvl('hunter')*2+activeCrew().length*2;if(S.pet==='dog')p+=2;return Math.round(p);}
+async function visitFriend(handle){
+  const o=O();if(!o.ok)return;let b;try{b=await rpc('get_base',{p_handle:handle});}catch(e){toast(e.message,'d');return;}
+  if(!b){toast('No such base');return;}const pub=b.public||{};const base=pub.base;
+  const rooms=base&&base.rooms?Object.entries(base.rooms).filter(([k,l])=>l).map(([k,l])=>BUILD[k].e+' '+BUILD[k].n+' L'+l).join(' · '):'nothing built';
+  openSheet(`<h2>${esc(b.name)}'s base</h2><div class="big">${base?base.e:'⛺'}</div><p><b style="color:var(--bone)">${base?esc(base.n)+' · '+esc(base.district):'No base claimed yet'}</b><br>${rooms}</p>
+  <div class="kv"><span>Defense</span><b>${pub.defense||0}</b><span>Level</span><b>${pub.lvl||1}</b><span>Crew</span><b>${pub.crew||0}</b><span>Weapon</span><b>${esc(pub.weapon||'?')}</b><span>Steps today</span><b>${fmt(pub.steps_today||0)}</b><span>Your raid power</span><b>${raidPower()}</b></div>
+  <p class="help" style="margin-top:10px">A raid costs 400 steps of road (you fall back on the way to your next place). Win and you carry off part of their stash. Lose and their guards work you over. One try per base per day.</p>
+  <div class="grid2"><button class="btn" onclick="closeSheet()">Just looking</button><button class="btn d" onclick="raidFriend('${esc(handle)}')" ${base?'':'disabled'}>Raid (${raidPower()} vs ${pub.defense||0})</button></div>`);
+}
+async function raidFriend(handle){
+  const o=O();if(!o.ok)return;if(S.loc||S.combat){toast('Clear out first');return;}
+  closeSheet();S.walk.toNext=Math.min(S.walk.dist,S.walk.toNext+400);S.walk.progress=S.walk.dist-S.walk.toNext;
+  let r;try{r=await rpc('raid_player',{p_handle:o.handle,p_token:o.token,p_target:handle,p_power:raidPower()});}catch(e){toast(e.message,'d');return;}
+  if(r.error){toast(r.error,'d');return;}
+  const map={food:'beans',water:'water',meds:'bandage',scrap:'scrap'};let got=[];
+  if(r.won){for(const [k,v] of Object.entries(r.taken||{})){if(k==='ammo'&&v>0){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:v,n:'Rounds (x'+v+')'});got.push(v+' rounds');continue;}
+      const id=map[k];if(!id)continue;let n=0;for(let i=0;i<v&&S.pack.length<capacity();i++){S.pack.push({id,...ITEMS[id],uid:uid()});n++;}if(n)got.push(n+' '+k);}
+    addXp(25);log('Raided @'+handle+' ('+raidPower()+' vs '+r.defense+'). Took '+(got.join(', ')||'nothing')+'.');
+    openSheet(`<h2>Raid won</h2><div class="big">🔥</div><p>Their defense was ${r.defense}. You got out with ${esc(got.join(', ')||'nothing worth carrying')}. It is in your pack now. Get it home.</p><button class="btn r wide" onclick="closeSheet()">Move</button>`);}
+  else{const dmg=rint(15,30);S.hp=Math.max(1,S.hp-dmg);log('Raid on @'+handle+' failed ('+raidPower()+' vs '+r.defense+'). Took '+dmg+' damage.');
+    openSheet(`<h2>Walls held</h2><div class="big">🧱</div><p>Their defense was ${r.defense}, you brought ${raidPower()}. Their crew chased you off. -${dmg} HP.</p><button class="btn wide" onclick="closeSheet()">Limp away</button>`);}
+  save();render();pushPlayer();loadFriends();
+}
+async function testOnline(){const o=O();const el=$('#onlineStatus');el.textContent='testing...';try{const t0=Date.now();await rpc('get_board',{p_week:S.league.week});o.err='';toast('Server answered in '+(Date.now()-t0)+' ms','z');}catch(e){o.err=e.message;toast('No answer: '+e.message,'d');}save();renderOnline();}
+function renderOnline(){
+  const o=O();const st=$('#onlineStatus');if(!st)return;
+  st.textContent=o.ok?'@'+o.handle:(o.err?'error':'off');
+  let body='';
+  if(onArtifact){body=`<p class="help">This is the offline copy on claude.ai, which cannot reach the server. For online play open the web link and add it to your home screen:</p><p><a href="${WEB_URL}" style="color:var(--amber);word-break:break-all">${WEB_URL}</a></p><p class="help">Your save on this device stays here; the web link starts fresh.</p>`;}
+  else if(!o.ok){body=`<div class="row"><input id="handleInput" type="text" maxlength="20" placeholder="handle, e.g. celeste" value="${esc(o.handle||slug(S.name))}" style="flex:1;min-width:140px"><button class="btn r" onclick="goOnline($('#handleInput').value)">Go online</button></div>${o.err?`<p class="help" style="color:#ff8a92">${esc(o.err)}</p>`:''}`;}
+  else{body=`<div class="kv"><span>Handle</span><b>@${esc(o.handle)}</b><span>Last phone sync</span><b>${o.lastPost?timeStr(o.lastPost)+' today':'none yet'}</b><span>Server</span><b>${o.err?'<span style="color:#ff8a92">'+esc(o.err)+'</span>':'ok'}</b></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pullSteps();pullRaids();loadFriends();toast('Syncing')">Sync now</button><button class="btn sm ghost" onclick="testOnline()">Test connection</button></div>`;}
+  $('#onlineBody').innerHTML=body;
+  const sh=$('#shortcutHelp');if(sh){sh.innerHTML=o.ok?`<b>iPhone, one time:</b> open <b>Shortcuts</b> → <b>Automation</b> → <b>+</b> → <b>Time of Day</b>, pick a time (make 3 or 4 of these: noon, 4 pm, 8 pm, 11 pm), choose <b>Run Immediately</b>. Then add these actions in order:<br>
+  1. <b>Find Health Samples</b> → Type: Steps · Start Date: Today at 12:00 AM · Group By: Day.<br>
+  2. <b>Get Contents of URL</b>: URL = <code style="color:var(--amber);word-break:break-all">${SB.url}/rest/v1/rpc/post_steps</code> · Method <b>POST</b> · Headers: <code>apikey</code> = <span style="color:var(--amber);word-break:break-all">${SB.key}</span> and <code>Content-Type</code> = <code>application/json</code> · Request Body: <b>JSON</b> with three fields: <code>p_handle</code> = <b>${esc(o.handle)}</b>, <code>p_token</code> = <b style="word-break:break-all">${esc(o.token)}</b>, <code>p_steps</code> = the <b>Health Samples</b> variable (as a Number).<br>
+  That is it. The shortcut posts your step total silently; the game catches up whenever you open it.<br><span class="help">Android: MacroDroid or Tasker can make the same POST from Google Fit.</span>`:'Go online first, then the recipe appears here with your handle and token filled in.';}
+}
+function renderFriends(){
+  const o=O();const el=$('#friends');if(!el)return;const sub=$('#friendsSub');const help=$('#friendsHelp');
+  if(onArtifact){sub.textContent='web link only';help.textContent='Friends and raids run on the web link (Settings, Online).';el.innerHTML='';return;}
+  if(!o.ok){sub.textContent='offline';help.textContent='Go online in Settings to see friends and raid their bases.';el.innerHTML='';return;}
+  sub.textContent=friends.length+' online';help.textContent=friends.length>1?'Everyone playing on your server this week. Tap a base to visit it.':'Share the web link. Anyone who goes online shows up here.';
+  el.innerHTML=friends.map((f,i)=>{const me=f.handle===o.handle;const pub=f.pub||{};return `<button class="lbrow${me?' me':''}" style="text-align:left;width:100%" onclick="${me?'':`visitFriend('${esc(f.handle)}')`}"><div class="rk">${i+1}</div><div class="av">${pub.base?pub.base.e:'⛺'}</div><div class="nm">${esc(f.name)}${me?' (you)':''}<small>@${esc(f.handle)} · def ${pub.defense||0} · lvl ${pub.lvl||1}${me?'':' · tap to visit'}</small></div><div class="sc">${fmt(f.score)}</div></button>`;}).join('')||'<p class="help">Nobody yet.</p>';
+}
+
+/* ================= scene ================= */
+const cv=$('#cv'),ctx=cv.getContext('2d');const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function drawScene(t){
+  const W=cv.width,H=cv.height;const prog=S.walk.dist?S.walk.progress/S.walk.dist:0;const walking=!reduced&&Date.now()-S.lastAnim<3500&&!S.loc;const bob=walking?Math.sin(t/140)*5:0;const scroll=S.walk.houses*1000+prog*1000;
+  const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#0e0e12');sky.addColorStop(.55,'#2a2226');sky.addColorStop(1,'#4a3126');ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#d9c9a6';ctx.globalAlpha=.85;ctx.beginPath();ctx.arc(W-150,90,40,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+  // smoke plumes
+  const r0=mulberry(3);ctx.fillStyle='rgba(60,50,55,.5)';for(let i=0;i<5;i++){let x=(i*260-scroll*0.15);x=((x%(W+300))+(W+300))%(W+300)-150;const dy=Math.sin(t/2000+i)*6;ctx.beginPath();ctx.ellipse(x,120+dy,50+r0()*30,22,0,0,Math.PI*2);ctx.fill();}
+  ctx.fillStyle='#17151a';const r2=mulberry(11);for(let i=0;i<14;i++){const bw=60+r2()*80,bh=60+r2()*130;let x=(i*140-scroll*0.25);x=((x%(W+200))+(W+200))%(W+200)-100;ctx.fillRect(x,290-bh,bw,bh);if(r2()<.3){ctx.fillStyle='#e0a530';ctx.globalAlpha=.5;ctx.fillRect(x+10,290-bh+20,8,8);ctx.globalAlpha=1;ctx.fillStyle='#17151a';}}
+  ctx.fillStyle='#2b2528';ctx.fillRect(0,290,W,H-290);ctx.fillStyle='#3a3335';ctx.fillRect(0,320,W,18);ctx.fillStyle='#1c1a1d';ctx.fillRect(0,338,W,H-338);
+  ctx.fillStyle='#5a5240';for(let i=0;i<12;i++){let x=(i*120-scroll)%(W+120);x=((x%(W+120))+(W+120))%(W+120)-60;ctx.fillRect(x,410,60,5);}
+  // wrecked cars
+  const r3=mulberry(S.walk.houses+21);for(let i=0;i<2;i++){let x=(i*520+r3()*300-scroll);x=((x%(W+300))+(W+300))%(W+300)-150;ctx.fillStyle=['#5b3a3a','#3a4a5b','#5b5240'][Math.floor(r3()*3)];ctx.fillRect(x,372,110,34);ctx.fillRect(x+20,356,60,20);ctx.fillStyle='#111';ctx.fillRect(x+12,400,20,10);ctx.fillRect(x+78,400,20,10);}
+  ctx.fillStyle='#3d3538';for(let i=0;i<40;i++){let x=(i*34-scroll*0.6);x=((x%(W+40))+(W+40))%(W+40)-20;ctx.fillRect(x,282,7,40);}ctx.fillRect(0,290,W,4);
+  const bx=W*0.55+(1-prog)*W*0.7;drawBuilding(bx,S.loc?S.loc.t:'house',S.loc?S.loc.e:'');
+  const rz=mulberry(S.walk.houses+3);for(let i=0;i<2;i++){const zx=bx+240+i*90+rz()*40;if(zx<W+40)drawZombie(zx,330,t,i);}
+  drawSurvivor(W*0.26,330+bob*0.3,t,walking);
+  if(activeCrew()[0])drawCrewSprite(W*0.26-60,338+bob*0.4,t,walking);
+  if(S.pet)drawPet(W*0.26+50,352+bob*0.5,t,walking,S.pet);
+  const fog=ctx.createLinearGradient(0,H-110,0,H);fog.addColorStop(0,'rgba(20,18,22,0)');fog.addColorStop(1,'rgba(20,18,22,.95)');ctx.fillStyle=fog;ctx.fillRect(0,H-110,W,110);
+}
+function drawBuilding(x,kind,emoji){const w=220,h=170,y=290-h;const col={house:'#4a3d44',pharmacy:'#2f4a5a',gas:'#5a4a2f',grocery:'#2f5a44',police:'#2f3a5a',clinic:'#5a2f3a',hardware:'#5a3f2f',surplus:'#3f4a2f',camp:'#5a2a22'}[kind]||'#4a3d44';
+  ctx.fillStyle='#0a0a0c';ctx.fillRect(x+8,y+8,w,h);ctx.fillStyle=col;ctx.fillRect(x,y,w,h);ctx.fillStyle='#1a1719';ctx.beginPath();ctx.moveTo(x-14,y);ctx.lineTo(x+w/2,y-64);ctx.lineTo(x+w+14,y);ctx.closePath();ctx.fill();
+  for(let i=0;i<3;i++)for(let j=0;j<2;j++){ctx.fillStyle=(i+j)%3===0?'#0d0c0e':'#161418';ctx.fillRect(x+24+i*66,y+28+j*66,36,36);ctx.strokeStyle='#0d0c0e';ctx.lineWidth=3;ctx.strokeRect(x+24+i*66,y+28+j*66,36,36);if((i*j)%2===1){ctx.strokeStyle='#5a4a3a';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x+20+i*66,y+36+j*66);ctx.lineTo(x+64+i*66,y+40+j*66);ctx.stroke();}}
+  ctx.fillStyle='#0d0c0e';ctx.fillRect(x+w/2-22,y+h-64,44,64);ctx.font='38px serif';ctx.textAlign='center';ctx.fillText(emoji||'',x+w/2,y-12);ctx.textAlign='start';}
+function drawSurvivor(x,y,t,walking){const leg=walking?Math.sin(t/120)*10:0;ctx.fillStyle='#2a2a30';ctx.fillRect(x-8,y+34,10,26+leg*0.3);ctx.fillRect(x+4,y+34,10,26-leg*0.3);ctx.fillStyle='#4a3a2a';ctx.fillRect(x-24,y-6,20,40);ctx.fillStyle='#8a3a2a';ctx.fillRect(x-12,y-12,32,50);ctx.fillStyle='#e8c9a8';ctx.beginPath();ctx.arc(x+4,y-30,18,0,Math.PI*2);ctx.fill();ctx.fillStyle='#2a1a14';ctx.beginPath();ctx.arc(x+4,y-36,18,Math.PI,0);ctx.fill();ctx.fillRect(x-14,y-36,6,20);ctx.fillStyle='#1a1020';ctx.fillRect(x+8,y-32,3,4);ctx.fillRect(x+16,y-32,3,4);const w=eqItem('melee');if(w){ctx.strokeStyle='#777';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x+22,y+10);ctx.lineTo(x+40,y-20);ctx.stroke();}}
+function drawCrewSprite(x,y,t,walking){const leg=walking?Math.sin(t/120+1)*9:0;ctx.fillStyle='#2f3a44';ctx.fillRect(x-8,y+30,9,24+leg*0.3);ctx.fillRect(x+3,y+30,9,24-leg*0.3);ctx.fillStyle='#3a5a4a';ctx.fillRect(x-11,y-10,28,44);ctx.fillStyle='#c9a887';ctx.beginPath();ctx.arc(x+3,y-26,15,0,Math.PI*2);ctx.fill();ctx.fillStyle='#111';ctx.fillRect(x+6,y-28,3,3);ctx.fillRect(x+12,y-28,3,3);}
+function drawPet(x,y,t,walking,kind){const b=walking?Math.abs(Math.sin(t/110))*5:0;y-=b;ctx.fillStyle=kind==='dog'?'#8a6a4a':'#222';ctx.beginPath();ctx.ellipse(x,y+14,22,12,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(x+18,y+2,11,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.moveTo(x+10,y-6);ctx.lineTo(x+13,y-18);ctx.lineTo(x+19,y-8);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(x+21,y-8);ctx.lineTo(x+26,y-18);ctx.lineTo(x+29,y-6);ctx.closePath();ctx.fill();ctx.fillStyle='#ffd166';ctx.fillRect(x+15,y,2,3);ctx.fillRect(x+22,y,2,3);}
+function drawZombie(x,y,t,i){const sway=Math.sin(t/400+i)*4;ctx.fillStyle='#3f5a3a';ctx.fillRect(x-8,y-30,18,40);ctx.fillStyle='#8fae6a';ctx.beginPath();ctx.arc(x+1,y-40+sway*0.3,13,0,Math.PI*2);ctx.fill();ctx.fillStyle='#1a1020';ctx.fillRect(x-4,y-43,3,3);ctx.fillRect(x+4,y-43,3,3);ctx.fillStyle='#3f5a3a';ctx.fillRect(x+10,y-24,22,7);ctx.fillRect(x-6,y+10,7,22);ctx.fillRect(x+4,y+10,7,22);}
+let raf=0;function animate(){cancelAnimationFrame(raf);const step=(t)=>{drawScene(t);if(!reduced&&Date.now()-S.lastAnim<3500)raf=requestAnimationFrame(step);};raf=requestAnimationFrame(step);}
+
+/* ================= render ================= */
+function render(){
+  rollDay();rollWeek();checkRaids();
+  $('#hpNum').textContent=S.hp+' / '+maxHp();$('#hpBar').style.width=clamp(S.hp/maxHp()*100,0,100)+'%';
+  $('#topSteps').textContent=fmt(S.steps.today);
+  $('#sceneTag').textContent=district().n+' · '+S.walk.houses+' places';$('#arriveTag').hidden=!S.loc;
+  $('#pbar').style.width=(S.loc?100:(S.walk.dist?S.walk.progress/S.walk.dist*100:0))+'%';
+  $('#pleft').innerHTML=S.loc?'<b>You are here.</b>':'Next place in <b>'+fmt(S.walk.toNext)+'</b> steps';
+  $('#pright').innerHTML='Run <b>x'+runMult().toFixed(1)+'</b> · Pack <b>'+fmt(packPts())+'</b> pts';
+  $('#syncHint').textContent=S.steps.lastSyncDate===S.steps.date&&S.steps.lastSync?'synced at '+fmt(S.steps.lastSync):'';
+  renderLoc();renderRaidCard();
+  $('#goalSub').textContent='streak '+S.streak.days;$('#goalBar').style.width=Math.min(100,S.steps.today/S.goal*100)+'%';$('#goalLeft').innerHTML='<b>'+fmt(S.steps.today)+'</b> / '+fmt(S.goal);$('#goalRight').textContent=S.steps.today>=S.goal?'Done. +2 food, +2 water, +15 XP.':fmt(S.goal-S.steps.today)+' to go';
+  $('#journal').innerHTML=S.journal.slice(0,12).map(j=>`<li><time>${timeStr(j.t)}</time><span>${esc(j.m)}</span></li>`).join('')||'<li><span class="help">Nothing yet.</span></li>';
+  // pack
+  $('#packSub').textContent=S.pack.length+' / '+capacity();$('#cap').textContent=S.pack.length+'/'+capacity();$('#runMult').textContent='x'+runMult().toFixed(1);$('#packPts').textContent=fmt(packPts());
+  $('#bankBtn').disabled=!!S.loc||!S.pack.length||!!S.combat;$('#bankBtn').textContent=S.base?'Stash it at '+S.base.n:'Claim a base first';
+  $('#packList').innerHTML=S.pack.length?S.pack.map(it=>`<div class="item${it.cat==='shelf'?' rare':''}"><span class="e">${it.e}</span>${esc(it.n)}${it.qty?' x'+it.qty:''}<span class="pt">+${it.pts}</span></div>`).join(''):'<p class="help">Empty.</p>';
+  const canRepair=(S.base&&S.base.rooms.armory)||roleLvl('engineer');
+  $('#gearList').innerHTML=S.gear.length?S.gear.map(g=>{const eq=S.eq[g.slot]===g.uid;const d=g.slot==='melee'?g.dmg[0]+'-'+g.dmg[1]+' dmg · '+g.dur+'/'+GEAR[g.id].dur+' durability':g.slot==='ranged'?g.dmg[0]+'-'+g.dmg[1]+' dmg · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';return `<div class="gear${eq?' eq':''}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d">${d}</div></div><div class="stack" style="gap:4px"><button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>${g.slot==='melee'&&canRepair&&g.dur<GEAR[g.id].dur?`<button class="btn sm" onclick="repair('${g.uid}')">Repair 3🔩</button>`:''}<button class="btn sm ghost" onclick="dropGear('${g.uid}')">Drop</button></div></div>`;}).join(''):'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
+  // crew
+  $('#lvlSub').textContent='level '+S.lvl;$('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?eqItem('melee').dmg[0]+'-'+eqItem('melee').dmg[1]:baseDmg()[0]+'-'+baseDmg()[1]} +${S.lvl-1}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>XP</span><b>${S.xp} / ${S.lvl*40}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n} · ${PETS[S.pet].d}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
+  $('#crewSub').textContent=S.active.length+' / '+crewSlots()+' active · '+S.crew.length+' total';
+  $('#crewList').innerHTML=S.crew.length?S.crew.map(c=>{const act=S.active.includes(c.id);return `<div class="crew${act?' active':''}"><div class="av">${c.av}</div><div><div class="nm">${esc(c.name)} <span class="chip a">Lv ${c.lvl}</span></div><div class="role">${ROLES[c.role].e} ${ROLES[c.role].n}</div><div class="tr">${ROLES[c.role].d(c.lvl)}</div><div class="xp"><i style="width:${Math.min(100,c.xp/(c.lvl*6)*100)}%"></i></div><div class="a2"><button class="btn sm ${act?'':'r'}" onclick="toggleCrew('${c.id}')">${act?'Leave at base':'Bring along'}</button></div></div></div>`;}).join(''):'<p class="help">Nobody yet. Survivors hide in the places you search.</p>';
+  // base
+  const bh=$('#baseHead');
+  if(!S.base){bh.className='card blood';bh.innerHTML='<h2>No base yet</h2><p>Clear any place, then tap <b>Claim as base</b> on it. Where you set up matters: a police station comes with an armory and walls, a pharmacy with a clinic, a gas station with a generator. You can move later for 20 scrap.</p>';}
+  else{bh.className='card';bh.innerHTML=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2><p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div></div></div>`;}
+  $('#baseAlert').hidden=!(S.raidPending&&S.base&&S.base.rooms.tower);
+  $('#stock').innerHTML=['food','water','meds','scrap','ammo'].map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦'}[k]}</div><b>${S.stock[k]}</b><span>${CAT_LABEL[k]}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`;
+  $('#dropRow').hidden=!(S.base&&S.base.rooms.radio);$('#dropBtn').disabled=S.flags.dropDate===S.steps.date;$('#dropHelp').textContent=S.flags.dropDate===S.steps.date?'Used today.':'Three free items into your pack.';
+  $('#build').innerHTML=S.base?Object.entries(BUILD).map(([k,b])=>{const l=S.base.rooms[k]||0;const c=buildCost(k);return `<div class="room2${l?' own':''}"><div class="e">${b.e}</div><div class="t"><b>${b.n}${l?' L'+l:''}${b.def[l-1]?' · +'+b.def[l-1]+' def':''}</b><span>${b.d}${c!==null?' · next: '+c+' scrap':' · maxed'}</span></div>${c!==null?`<button class="btn sm a" onclick="build('${k}')">Build</button>`:'<span class="chip z">max</span>'}</div>`;}).join(''):'<p class="help">Claim a base to build.</p>';
+  $('#raidLog').innerHTML=S.raids.length?S.raids.map(r=>`<li><time>${r.t.slice(5)}</time><span>${r.by?esc(r.by)+': ':''}${r.repelled?(r.fought?'You fought them off yourself.':'Held: '+r.def+' def vs '+r.power+'.'):'Broke in ('+r.power+' vs '+r.def+'). Took '+Object.entries(r.stolen).map(([k,v])=>v+' '+k).join(', ')+'.'}</span></li>`).join(''):'<li><span class="help">No raids yet. They start the day after you claim a base.</span></li>';
+  $('#shelfSub').textContent=S.shelf.length+' found';const shelfIds=Object.entries(ITEMS).filter(([k,v])=>v.cat==='shelf');const owned=S.shelf.reduce((m,x)=>{m[x.id]=(m[x.id]||0)+1;return m;},{});
+  $('#shelf').innerHTML=shelfIds.map(([k,v])=>`<div class="it${owned[k]?'':' locked'}"><div class="e">${v.e}</div><span>${v.n}${owned[k]>1?' x'+owned[k]:''}</span></div>`).join('');
+  $('#goalInput').value=S.goal;$('#nameInput').value=S.name;
+
+  // league
+  const tier=TIERS[S.league.tier];$('#tierBadge').textContent=tier.e;$('#tierName').textContent=tier.n;$('#tierSub').textContent='Tier '+(S.league.tier+1)+' of '+TIERS.length+' · stash x'+tier.mult;
+  const end=new Date(weekStart());end.setDate(end.getDate()+7);const left=Math.max(0,end-Date.now());$('#weekChip').textContent='Week of '+S.league.week;$('#resetChip').textContent=Math.floor(left/86400000)+'d '+Math.floor(left%86400000/3600000)+'h left';
+  const b=board();$('#board').innerHTML=b.map((r,i)=>`<div class="lbrow${r.me?' me':''}"><div class="rk">${i+1}</div><div class="av">${r.av}</div><div class="nm">${esc(r.n)}${r.me?' (you)':''}<small>${r.me?'stash runs to score':esc(r.blurb)}</small></div><div class="sc">${fmt(r.s)}</div></div>`).join('');
+  const myRank=b.findIndex(r=>r.me)+1;const lead=b[0].me?b[1]:b[0];$('#boardHelp').textContent=myRank===1?'You are in first. Hold it through Sunday night to move up.':'You are #'+myRank+', '+fmt(lead.s-S.league.score)+' behind '+lead.n+'. They keep walking while you sleep.';
+  $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
+  $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
+  if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
+  renderOnline();renderFriends();animate();raidTick();
+}
+function renderLoc(){
+  const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
+  if(!loc.cleared){el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.camp?'raider camp':'unknown'}</span></h2><p>${loc.camp?'Fires, tents, a trailer with a padlock. Raiders. Big loot if you can take them.':'Door is ajar. No telling what is inside.'} Threat here: ${'☠'.repeat(Math.min(5,Math.round(district().threat*loc.threat)))}</p><div class="grid2" style="margin-top:12px"><button class="btn r" onclick="enterLoc()">Go in</button><button class="btn" onclick="leaveLoc()">Keep walking</button></div>`;return;}
+  const done=loc.rooms.every(r=>r.done);
+  el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.rooms.filter(r=>r.done).length}/${loc.rooms.length} searched</span></h2>
+  <div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span><span class="help">${loc.noise>=70?'Something is stirring':loc.noise>=40?'Keep it down':'Quiet'}</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div>
+  <div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done?'disabled':''}><span class="n">${esc(r.n)}</span><span class="m">${r.done?'searched':'noise +'+r.noise}</span>${r.peek&&!r.done?`<span class="peek">🔭 ${esc(r.peek)}</span>`:''}</button>`).join('')}</div>
+  ${loc.found.length?`<div class="section-label" style="margin-top:12px">Found here</div><div class="loot" style="margin-top:6px">${loc.found.map(it=>`<div class="item${it.cat==='shelf'?' rare':it.gear?' gear':''}"><span class="e">${it.e}</span>${esc(it.n)}<span class="pt">+${it.pts}</span></div>`).join('')}</div>`:''}
+  <div class="grid2" style="margin-top:12px"><button class="btn ${done?'r':''}" onclick="leaveLoc()">${done?'Move on':'Leave the rest'}</button><button class="btn" onclick="claimBase()">${S.base?'Move base here (20 scrap)':'Claim as base'}</button></div>`;
+}
+function renderRaidCard(){const el=$('#raidCard');if(!S.raidPending||!S.base||!S.base.rooms.tower){el.hidden=true;return;}el.hidden=false;el.className='card blood';el.innerHTML=`<h2>🗼 Raiders spotted</h2><p>The watchtower saw a crew heading for ${esc(S.base.n)}. Expected around ${S.raidPending.hour}:00 today, strength ${S.raidPending.power} against your ${defense()} defense. Build now, or be home to fight.</p>`;}
+function openSheet(html,lock){$('#sheet').innerHTML=html;$('#modal').classList.add('on');$('#modal').dataset.lock=lock?'1':'';}
+function closeSheet(){if(C&&!C.over)return;$('#modal').classList.remove('on');}
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal'&&!$('#modal').dataset.lock)closeSheet();});
+
+/* ================= onboarding ================= */
+function onboard(){
+  const kits=[{n:'Bat & jacket',g:['bat','jacket'],d:'Balanced. Hit things, take less damage.'},{n:'Pistol & 6 rounds',g:['pistol'],ammo:6,d:'Loud, deadly, runs dry. Find more rounds.'},{n:'Crowbar & hiking pack',g:['crowbar','pack2'],d:'Durable weapon, bigger pack. Loot-first.'}];let chosen=0;
+  const draw=()=>{$('#sheet').innerHTML=`<h2>Hollow County</h2><p>The county fell three weeks ago. Every real step you take is a step down the road: houses to loot, walkers inside them, raiders who want what you carry. Pick a starting kit.</p>
+  <div class="starter">${kits.map((k,i)=>`<button class="${i===chosen?'on':''}" data-i="${i}"><span class="av">${GEAR[k.g[0]].e}</span><b>${k.n}</b></button>`).join('')}</div><p class="help" style="margin-top:8px">${kits[chosen].d}</p>
+  <label class="section-label">Your name</label><input id="obName" type="text" maxlength="18" placeholder="e.g. Celeste" style="margin:6px 0 12px" value="${esc($('#obName')?$('#obName').value:'')}"><button class="btn r wide" id="obGo">Start walking</button>`;
+    $('#sheet').querySelectorAll('.starter button').forEach(b=>b.onclick=()=>{chosen=+b.dataset.i;draw();});
+    $('#obGo').onclick=()=>{S.name=($('#obName').value||'Survivor').trim();const k=kits[chosen];for(const id of k.g){const g={uid:uid(),id,...GEAR[id]};S.gear.push(g);S.eq[g.slot]=g.uid;}if(k.ammo)S.stock.ammo=k.ammo;S.onboarded=true;newDistance();log('You left the shelter with a '+k.n.toLowerCase()+'.');save();$('#modal').classList.remove('on');render();};};
+  draw();$('#modal').classList.add('on');$('#modal').dataset.lock='1';
+}
+
+/* ================= wiring ================= */
+function wire(){
+  document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));$('#main').scrollTop=0;});
+  $('#syncBtn').onclick=()=>{const v=parseInt($('#syncInput').value,10);if(!(v>=0))return;if(syncTotal(v,'sync'))$('#syncInput').value='';};
+  $('#pedoBtn').onclick=pedoToggle;$('#clipBtn').onclick=readClipboard;$('#bankBtn').onclick=bank;$('#healBtn').onclick=heal;$('#eatBtn').onclick=eat;$('#dropBtn').onclick=supplyDrop;
+  $('#demoBtn').onclick=()=>{toast('+300 demo steps','z');addSteps(300,'demo');};
+  $('#resetBtn').onclick=()=>{openSheet('<h2>Reset everything?</h2><p>Base, crew, gear and league history on this device will be gone.</p><div class="grid2"><button class="btn" onclick="closeSheet()">Keep playing</button><button class="btn d" onclick="hardReset()">Reset</button></div>');};
+  $('#goalInput').onchange=()=>{const v=parseInt($('#goalInput').value,10);if(v>=1000){S.goal=v;save();render();}};
+  $('#nameInput').onchange=()=>{S.name=$('#nameInput').value.trim().slice(0,18);save();render();pushPlayer();};
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){render();if(O().ok){pullSteps();pullRaids();}}});
+}
+function hardReset(){try{localStorage.removeItem('deadmiles.v2');}catch(e){}S=fresh();$('#modal').classList.remove('on');render();onboard();}
+function start(hot){
+  S=(hot&&hot.S)||load()||fresh();S.combat=false;
+  if(!S.walk.dist)newDistance();
+  wire();render();
+  if(!S.onboarded)onboard();else autoSyncFromUrl();
+  if(O().ok){pullRaids().then(()=>pushPlayer());pullSteps();loadFriends();}
+  setInterval(()=>{if(document.visibilityState==='visible'&&!C){render();if(O().ok){pullSteps();}}},60000);
+  setInterval(()=>{if(document.visibilityState==='visible'&&O().ok){pullRaids();loadFriends();}},180000);
+}
+try{window.claude&&window.claude.hot&&window.claude.hot.snapshot&&window.claude.hot.snapshot(()=>({S}));}catch(e){}
+(window.claude&&window.claude.hot&&window.claude.hot.ready)?window.claude.hot.ready(start):start((window.claude&&window.claude.hot&&window.claude.hot.data)||{});
+</script>
