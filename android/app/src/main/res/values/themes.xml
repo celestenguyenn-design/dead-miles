@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.DeadMiles" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">#D0602E</item>
+        <item name="colorOnPrimary">#1A0A02</item>
+        <item name="colorSecondary">#E6A530</item>
+        <item name="android:colorBackground">#121214</item>
+        <item name="colorSurface">#232328</item>
+        <item name="colorOnSurface">#E8E0D0</item>
+        <item name="android:statusBarColor">#121214</item>
+    </style>
+</resources>

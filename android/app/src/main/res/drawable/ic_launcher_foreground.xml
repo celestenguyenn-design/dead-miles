@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- chibi walker head -->
+    <path android:fillColor="#8FAE6A" android:pathData="M36,50 q0,-22 18,-22 q18,0 18,22 v6 q0,14 -18,14 q-18,0 -18,-14z" />
+    <path android:fillColor="#3A4A2A" android:pathData="M38,46 q3,-14 16,-14 q13,0 16,14 q-6,-4 -10,-1 q-5,-5 -8,0 q-5,-4 -7,2 q-4,-5 -7,-1z" />
+    <path android:strokeColor="#1A1020" android:strokeWidth="2.2" android:strokeLineCap="round" android:pathData="M44,52 l4,4 M48,52 l-4,4 M60,52 l4,4 M64,52 l-4,4" />
+    <path android:strokeColor="#1A1020" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M49,63 q5,-3 10,0" />
+    <!-- shoes / footsteps -->
+    <path android:fillColor="#E6A530" android:pathData="M40,84 h10 v5 h-10z M58,80 h10 v5 h-10z" />
+</vector>
