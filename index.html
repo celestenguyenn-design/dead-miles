@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=3.8">
+<link rel="stylesheet" href="style.css?v=3.9">
 </head>
 <body>
 <div id="app">
@@ -28,6 +28,7 @@
       <div class="scene"><canvas id="cv" width="960" height="500"></canvas><div class="tag" id="sceneTag"></div><div class="wx" id="wxTag" hidden></div><div class="arrive" id="arriveTag" hidden>Arrived</div></div>
       <div class="progress"><div class="bar"><i id="pbar"></i></div><div class="row"><span id="pleft"></span><span id="pright"></span></div></div>
       <div class="card steel"><h2>Street mode <span class="sub">live map</span></h2><p>Out walking? Open the real map: the buildings around you become the places to loot, and your own home can be your base.</p><button class="btn z wide" style="margin-top:10px" id="streetBtn">Open the live map</button></div>
+      <div class="card blood"><h2>Watch duty <span class="sub" id="watchSub"></span></h2><p>No steps today? Take a job. Three fights a day that need no walking. Loot goes in your pack, scrap goes straight to the stash.</p><div class="stack" id="watch" style="margin-top:10px"></div></div>
       <div class="card" id="locCard" hidden></div>
       <div class="card" id="raidCard" hidden></div>
       <div class="card" id="contractsCard"><h2>Contracts <span class="sub" id="contractsSub"></span></h2><div class="stack" id="contracts" style="margin-top:10px"></div></div>
@@ -66,7 +67,7 @@
         <button class="btn a wide" style="margin-top:12px" id="bankBtn">Stash it at base</button>
       </div>
       <div class="card"><h2>Carrying</h2><div class="loot" id="packList" style="margin-top:10px"></div></div>
-      <div class="card"><h2>Gear <span class="sub">tap to equip</span></h2><div class="stack" id="gearList" style="margin-top:10px"></div></div>
+      <div class="card"><h2>Gear <span class="sub" id="gearSub"></span></h2><div class="tabs" id="gearTabs" style="margin-top:8px"></div><button class="btn sm ghost wide" id="salvageAll" onclick="salvageAll()" hidden style="margin-bottom:8px"></button><div class="stack" id="gearList"></div><p class="help" style="margin-top:8px">Gear never fills up, it just piles up. Salvage what you do not use for scrap, then spend the scrap with the trader at your base.</p></div>
     </section>
 
     <section class="view" id="v-you">
@@ -84,6 +85,7 @@
         <div class="row" style="margin-top:10px"><button class="btn sm" id="healBtn">Use medkit: +40 HP</button><button class="btn sm" id="eatBtn">Eat: +15 HP</button><span class="help">HP also recovers overnight.</span></div>
         <div class="row" style="margin-top:8px" id="dropRow" hidden><button class="btn sm z" id="dropBtn">📻 Call in today's supply drop</button><span class="help" id="dropHelp"></span></div>
       </div>
+      <div class="card steel"><h2>Trader</h2><p>Marlow's truck stops at any base with walls. Scrap in, supplies out. Salvage spare gear under Pack to get scrap.</p><div class="trade" id="trader" style="margin-top:10px"></div></div>
       <div class="card" id="eventCard" hidden></div>
       <div class="card"><h2>Build</h2><p>Scrap builds. Walls and towers are what raiders hit first.</p><div class="stack" id="build" style="margin-top:10px"></div></div>
       <div class="card"><h2>Raid log</h2><ul class="journal" id="raidLog" style="margin-top:8px"></ul></div>
@@ -135,8 +137,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=3.8"></script>
-<script src="street.js?v=3.8"></script>
-<script src="game.js?v=3.8"></script>
+<script src="art.js?v=3.9"></script>
+<script src="street.js?v=3.9"></script>
+<script src="game.js?v=3.9"></script>
 </body>
 </html>
