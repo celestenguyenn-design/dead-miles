@@ -11,54 +11,64 @@ const HATS={beanie:{n:'Beanie',r:'rare'},cap:{n:'Ball cap',r:'rare'},cowboy:{n:'
 const TOPS={hoodie:{n:'Hoodie',r:'common'},varsity:{n:'Varsity jacket',r:'rare'},raincoat:{n:'Yellow raincoat',r:'rare'},biker:{n:'Biker jacket',r:'epic'},scrubs:{n:'Nurse scrubs',r:'epic'},flannel:{n:'Flannel shirt',r:'rare'},tux:{n:'Ruined tuxedo',r:'epic'},sweater:{n:'Cozy sweater',r:'rare',c:9000},overalls:{n:'Overalls',r:'rare',c:10000},sailor:{n:'Sailor top',r:'epic',c:14000},sundress:{n:'Sundress',r:'epic',c:15000},pajamas:{n:'Pajamas',r:'rare',c:8000},labcoat:{n:'Lab coat',r:'epic',c:18000},skeleton:{n:'Skeleton hoodie',r:'epic'}};
 const ACCS={glasses:{n:'Round glasses',r:'rare'},scarf:{n:'Striped scarf',r:'rare'},eyepatch:{n:'Eyepatch',r:'epic'},shades:{n:'Aviators',r:'epic'},mask:{n:'Gas mask',r:'legendary'},bandaid:{n:'Cheek bandage',r:'rare',c:5000},choker:{n:'Choker',r:'rare',c:6000},stars:{n:'Star glasses',r:'epic',c:11000},flower:{n:'Hair flower',r:'rare',c:6000},blush:{n:'Extra blush',r:'rare',c:4000},freckles:{n:'Freckles',r:'rare',c:4000},wings:{n:'Bat wings',r:'legendary'}};
 
+/* ---------- head geometry (viewBox 0 0 100 130): head spans x 12-88, y 10-82; eyes at (35,55) and (65,55) ---------- */
+const CAP='M10 56 Q8 8 50 8 Q92 8 90 56';
+const SIDES=`M10 54 q-2 12 4 20 l8 -4 q-4 -8 -2 -16z M90 54 q2 12 -4 20 l-8 -4 q4 -8 2 -16z`;
 function hairBack(style,c){
+  const dome=`<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v10 h-80z" fill="${c}"/>`;
   switch(style){
-    case 'bob':return `<path d="M18 40 q0 -30 32 -30 q32 0 32 30 v24 q0 8 -8 8 h-48 q-8 0 -8 -8z" fill="${c}"/>`;
-    case 'long':return `<path d="M18 40 q0 -30 32 -30 q32 0 32 30 v48 q0 8 -8 8 h-48 q-8 0 -8 -8z" fill="${c}"/>`;
-    case 'ponytail':return `<path d="M20 40 q0 -30 30 -30 q30 0 30 30 v14 h-60z" fill="${c}"/><path d="M76 44 q16 6 12 34 q-2 10 -8 8 q4 -20 -6 -34z" fill="${c}"/>`;
-    case 'curly':return `<path d="M16 42 q2 -32 34 -32 q32 0 34 32 q6 10 -2 18 q-6 6 -10 0 q-4 8 -12 4 q-8 6 -12 0 q-6 6 -12 0 q-6 8 -12 2 q-8 6 -10 -4 q-8 -6 -2 -20z" fill="${c}"/>`;
-    case 'bun':return `<path d="M20 40 q0 -30 30 -30 q30 0 30 30 v14 h-60z" fill="${c}"/><circle cx="50" cy="8" r="10" fill="${c}"/>`;
-    case 'spiky':return `<path d="M20 44 l4 -22 l8 12 l6 -22 l8 14 l6 -20 l6 16 l6 -14 l4 22 l6 -8 l2 26 h-58z" fill="${c}"/>`;
-    case 'twintails':return `<path d="M20 40 q0 -30 30 -30 q30 0 30 30 v14 h-60z" fill="${c}"/><path d="M18 46 q-14 10 -8 40 q8 -4 12 2 q6 -22 4 -42z M82 46 q14 10 8 40 q-8 -4 -12 2 q-6 -22 -4 -42z" fill="${c}"/><circle cx="20" cy="50" r="4" fill="#ff8ab8"/><circle cx="80" cy="50" r="4" fill="#ff8ab8"/>`;
-    case 'braid':return `<path d="M18 40 q0 -30 32 -30 q32 0 32 30 v22 q0 8 -8 8 h-48 q-8 0 -8 -8z" fill="${c}"/><path d="M74 50 q10 10 6 30 q-2 12 -8 14 q4 -14 -2 -28z" fill="${c}"/><path d="M76 58 l4 4 M74 68 l4 4 M72 78 l4 4" stroke="rgba(0,0,0,.3)" stroke-width="2"/>`;
-    case 'spacebuns':return `<path d="M20 40 q0 -30 30 -30 q30 0 30 30 v14 h-60z" fill="${c}"/><circle cx="20" cy="16" r="11" fill="${c}"/><circle cx="80" cy="16" r="11" fill="${c}"/>`;
-    case 'wavy':return `<path d="M18 40 q0 -30 32 -30 q32 0 32 30 v40 q-4 8 -8 0 q-4 8 -8 0 q-4 8 -8 0 q-4 8 -8 0 q-4 8 -8 0 q-4 8 -8 0 q-4 8 -8 0 q-4 8 -8 0z" fill="${c}"/>`;
-    case 'mohawk':return `<path d="M26 40 q4 -18 24 -18 q20 0 24 18z" fill="${c}" opacity=".5"/><path d="M42 40 l2 -34 l6 10 l6 -10 l2 34z" fill="${c}"/>`;
-    case 'afro':return `<circle cx="50" cy="36" r="40" fill="${c}"/><circle cx="20" cy="40" r="12" fill="${c}"/><circle cx="80" cy="40" r="12" fill="${c}"/><circle cx="30" cy="12" r="12" fill="${c}"/><circle cx="70" cy="12" r="12" fill="${c}"/>`;
-    case 'wolfcut':return `<path d="M18 40 q0 -30 32 -30 q32 0 32 30 v22 l-6 8 l-4 -8 l-6 8 l-4 -8 l-6 8 l-4 -8 l-6 8 l-4 -8 l-6 8 l-4 -8 l-6 8z" fill="${c}"/>`;
-    case 'hime':return `<path d="M18 40 q0 -30 32 -30 q32 0 32 30 v56 h-12 v-40 h-40 v40 h-12z" fill="${c}"/>`;
-    default:return `<path d="M20 42 q0 -30 30 -30 q30 0 30 30 v12 h-60z" fill="${c}"/>`;
+    case 'buzz':return '';
+    case 'mohawk':return '';
+    case 'bob':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v20 q0 8 -8 8 h-64 q-8 0 -8 -8z" fill="${c}"/>`;
+    case 'long':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v54 q0 8 -8 8 h-64 q-8 0 -8 -8z" fill="${c}"/>`;
+    case 'wavy':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v46 q-5 8 -10 0 q-5 8 -10 0 q-5 8 -10 0 q-5 8 -10 0 q-5 8 -10 0 q-5 8 -10 0 q-5 8 -10 0 q-5 8 -10 0z" fill="${c}"/>`;
+    case 'wolfcut':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v30 l-7 10 l-6 -10 l-7 10 l-6 -10 l-7 10 l-7 -10 l-7 10 l-6 -10 l-7 10 l-6 -10 l-7 10 l-7 -10z" fill="${c}"/>`;
+    case 'hime':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v62 h-14 v-48 h-52 v48 h-14z" fill="${c}"/>`;
+    case 'ponytail':return dome+`<path d="M86 50 q20 8 14 40 q-4 12 -12 10 q6 -22 -6 -40z" fill="${c}"/>`;
+    case 'bun':return dome+`<circle cx="50" cy="6" r="13" fill="${c}"/>`;
+    case 'spacebuns':return dome+`<circle cx="14" cy="14" r="13" fill="${c}"/><circle cx="86" cy="14" r="13" fill="${c}"/>`;
+    case 'twintails':return dome+`<path d="M12 50 q-18 12 -10 48 q8 -6 14 2 q6 -26 4 -50z M88 50 q18 12 10 48 q-8 -6 -14 2 q-6 -26 -4 -50z" fill="${c}"/><circle cx="12" cy="56" r="5" fill="#ff8ab8"/><circle cx="88" cy="56" r="5" fill="#ff8ab8"/>`;
+    case 'braid':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v20 q0 8 -8 8 h-64 q-8 0 -8 -8z" fill="${c}"/><path d="M80 60 q14 12 8 40 q-2 12 -10 14 q6 -18 -2 -36z" fill="${c}"/><path d="M82 70 l5 4 M80 82 l5 4 M78 94 l5 4" stroke="rgba(0,0,0,.3)" stroke-width="2.5"/>`;
+    case 'afro':return `<circle cx="50" cy="40" r="46" fill="${c}"/><circle cx="14" cy="50" r="14" fill="${c}"/><circle cx="86" cy="50" r="14" fill="${c}"/><circle cx="26" cy="12" r="14" fill="${c}"/><circle cx="74" cy="12" r="14" fill="${c}"/>`;
+    case 'curly':return `<path d="M8 58 q0 -52 42 -52 q42 0 42 52 q6 10 -2 18 q-8 6 -12 -2 q-6 10 -14 4 q-8 8 -14 0 q-8 8 -14 0 q-8 8 -14 -2 q-8 6 -12 -4 q-8 -6 0 -14z" fill="${c}"/>`;
+    default:return dome;
   }
 }
 function hairFront(style,c){
+  const short=`<path d="${CAP} Q84 46 76 48 Q68 36 60 46 Q52 34 44 46 Q36 36 28 48 Q18 46 10 56z" fill="${c}"/><path d="${SIDES}" fill="${c}"/>`;
+  const straight=`<path d="${CAP} L86 48 Q50 40 14 48z" fill="${c}"/><path d="${SIDES}" fill="${c}"/>`;
+  const swept=`<path d="${CAP} Q80 44 62 46 Q40 40 20 50z" fill="${c}"/><path d="${SIDES}" fill="${c}"/>`;
   switch(style){
-    case 'buzz':return `<path d="M22 36 q4 -20 28 -20 q24 0 28 20 q-14 -10 -28 -8 q-14 -2 -28 8z" fill="${c}" opacity=".8"/>`;
-    case 'curly':return `<path d="M20 40 q4 -22 30 -22 q26 0 30 22 q-6 -8 -12 -2 q-6 -8 -12 -2 q-6 -8 -12 -2 q-6 -8 -12 -2 q-6 -6 -12 8z" fill="${c}"/>`;
-    case 'spiky':return `<path d="M22 40 q6 -18 28 -18 q22 0 28 18 q-8 -6 -14 2 q-6 -8 -14 -2 q-8 -6 -14 2 q-8 -4 -14 -2z" fill="${c}"/>`;
-    case 'bob':case 'long':case 'wavy':case 'wolfcut':case 'braid':return `<path d="M20 42 q2 -24 30 -24 q28 0 30 24 q-10 -10 -20 -6 q-10 -8 -20 -2 q-10 -6 -20 8z" fill="${c}"/>`;
-    case 'hime':return `<path d="M20 44 q2 -26 30 -26 q28 0 30 26 h-60z" fill="${c}"/>`;
-    case 'mohawk':return '';
-    case 'afro':return `<path d="M20 40 q4 -22 30 -22 q26 0 30 22 q-6 -6 -12 -2 q-6 -6 -12 -2 q-6 -6 -12 -2 q-6 -6 -12 -2 q-6 -6 -12 8z" fill="${c}"/>`;
-    default:return `<path d="M20 42 q2 -24 30 -24 q28 0 30 24 q-8 -10 -16 -8 q-8 -8 -16 -4 q-10 -6 -14 6 q-6 -8 -14 6z" fill="${c}"/>`;
+    case 'buzz':return `<path d="M14 50 Q14 14 50 14 Q86 14 86 50 Q50 40 14 50z" fill="${c}" opacity=".75"/>`;
+    case 'bob':case 'long':case 'wavy':case 'wolfcut':case 'braid':return straight;
+    case 'hime':return `<path d="${CAP} L86 46 Q50 40 14 46z" fill="${c}"/><path d="M10 48 v34 h12 v-30z M90 48 v34 h-12 v-30z" fill="${c}"/>`;
+    case 'ponytail':case 'bun':case 'spacebuns':return swept;
+    case 'curly':return `<path d="${CAP} q-5 -8 -10 0 q-5 -8 -10 0 q-5 -8 -10 0 q-5 -8 -10 0 q-5 -8 -10 0 q-5 -8 -10 0 q-5 -8 -10 0 q-5 -8 -10 0z" fill="${c}"/><path d="${SIDES}" fill="${c}"/>`;
+    case 'spiky':return `<path d="M12 40 l6 -26 l10 14 l6 -24 l8 16 l8 -22 l8 16 l6 -22 l8 16 l6 -18 l6 26 v14 Q50 40 12 54z" fill="${c}"/><path d="${SIDES}" fill="${c}"/>`;
+    case 'mohawk':return `<path d="M14 50 Q14 14 50 14 Q86 14 86 50 Q50 40 14 50z" fill="${c}" opacity=".35"/><path d="M40 36 l3 -34 l7 12 l7 -12 l3 34z" fill="${c}"/>`;
+    case 'afro':return short;
+    default:return short;
   }
 }
 function eyes(style,mood){
-  if(mood==='dead')return `<path d="M32 44 l8 8 m0 -8 l-8 8 M60 44 l8 8 m0 -8 l-8 8" stroke="#1a1020" stroke-width="3" stroke-linecap="round" fill="none"/>`;
-  if(mood==='angry')return `<ellipse cx="37" cy="48" rx="6" ry="6" fill="#fff"/><ellipse cx="63" cy="48" rx="6" ry="6" fill="#fff"/><circle cx="38" cy="49" r="3.4" fill="#c22b3a"/><circle cx="62" cy="49" r="3.4" fill="#c22b3a"/><path d="M29 40 l14 5 M71 40 l-14 5" stroke="#1a1020" stroke-width="3" stroke-linecap="round"/>`;
-  if(mood==='glow')return `<circle cx="37" cy="48" r="6" fill="#ffd166"/><circle cx="63" cy="48" r="6" fill="#ffd166"/><circle cx="37" cy="48" r="2.4" fill="#1a1020"/><circle cx="63" cy="48" r="2.4" fill="#1a1020"/>`;
-  if(style==='almond')return `<path d="M29 48 q8 -8 16 0 q-8 6 -16 0z M55 48 q8 -8 16 0 q-8 6 -16 0z" fill="#fff"/><circle cx="37" cy="47.5" r="3.4" fill="#2a1a14"/><circle cx="63" cy="47.5" r="3.4" fill="#2a1a14"/><circle cx="38.5" cy="46" r="1.2" fill="#fff"/><circle cx="64.5" cy="46" r="1.2" fill="#fff"/>`;
-  if(style==='heart')return `<path d="M37 55 l-9 -9 a5 5 0 0 1 9 -6 a5 5 0 0 1 9 6z M63 55 l-9 -9 a5 5 0 0 1 9 -6 a5 5 0 0 1 9 6z" fill="#ff5a8a"/>`;
-  if(style==='star')return `<path d="M37 40 l3 7 l7 0 l-6 4 l2 7 l-6 -4 l-6 4 l2 -7 l-6 -4 l7 0z M63 40 l3 7 l7 0 l-6 4 l2 7 l-6 -4 l-6 4 l2 -7 l-6 -4 l7 0z" fill="#ffd166"/><circle cx="37" cy="48" r="2" fill="#1a1020"/><circle cx="63" cy="48" r="2" fill="#1a1020"/>`;
-  if(style==='sleepy')return `<path d="M30 49 q7 6 14 0 M56 49 q7 6 14 0" stroke="#2a1a14" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M30 44 q7 -4 14 0 M56 44 q7 -4 14 0" stroke="#2a1a14" stroke-width="2" fill="none" opacity=".5"/>`;
-  if(style==='cat')return `<ellipse cx="37" cy="48" rx="7" ry="8" fill="#ffd166"/><ellipse cx="63" cy="48" rx="7" ry="8" fill="#ffd166"/><ellipse cx="37" cy="48" rx="2" ry="6.5" fill="#1a1020"/><ellipse cx="63" cy="48" rx="2" ry="6.5" fill="#1a1020"/><circle cx="35.5" cy="45" r="1.4" fill="#fff"/><circle cx="61.5" cy="45" r="1.4" fill="#fff"/>`;
-  if(style==='sparkle')return `<ellipse cx="37" cy="48" rx="7" ry="8" fill="#fff"/><ellipse cx="63" cy="48" rx="7" ry="8" fill="#fff"/><ellipse cx="37.5" cy="49" rx="4.6" ry="5.6" fill="#3a5aa8"/><ellipse cx="63.5" cy="49" rx="4.6" ry="5.6" fill="#3a5aa8"/><circle cx="35.5" cy="46" r="2" fill="#fff"/><circle cx="61.5" cy="46" r="2" fill="#fff"/><circle cx="39.5" cy="51" r="1" fill="#fff"/><circle cx="65.5" cy="51" r="1" fill="#fff"/>`;
-  return `<ellipse cx="37" cy="48" rx="6.5" ry="7.5" fill="#fff"/><ellipse cx="63" cy="48" rx="6.5" ry="7.5" fill="#fff"/><ellipse cx="37.5" cy="49" rx="4" ry="5" fill="#2a1a14"/><ellipse cx="63.5" cy="49" rx="4" ry="5" fill="#2a1a14"/><circle cx="36" cy="46.5" r="1.6" fill="#fff"/><circle cx="62" cy="46.5" r="1.6" fill="#fff"/>`;
+  const L=35,R=65,Y=55;
+  if(mood==='dead')return `<path d="M${L-7} ${Y-7} l14 14 m0 -14 l-14 14 M${R-7} ${Y-7} l14 14 m0 -14 l-14 14" stroke="#1a1020" stroke-width="3.5" stroke-linecap="round" fill="none"/>`;
+  if(mood==='angry')return `<ellipse cx="${L}" cy="${Y}" rx="8" ry="8" fill="#fff"/><ellipse cx="${R}" cy="${Y}" rx="8" ry="8" fill="#fff"/><circle cx="${L+1}" cy="${Y+1}" r="4.5" fill="#c22b3a"/><circle cx="${R-1}" cy="${Y+1}" r="4.5" fill="#c22b3a"/><path d="M${L-10} ${Y-13} l18 6 M${R+10} ${Y-13} l-18 6" stroke="#1a1020" stroke-width="3.5" stroke-linecap="round"/>`;
+  if(mood==='glow')return `<circle cx="${L}" cy="${Y}" r="8" fill="#ffd166"/><circle cx="${R}" cy="${Y}" r="8" fill="#ffd166"/><circle cx="${L}" cy="${Y}" r="3" fill="#1a1020"/><circle cx="${R}" cy="${Y}" r="3" fill="#1a1020"/>`;
+  const lash=`<path d="M${L-9} ${Y-9} q9 -7 18 0 M${R-9} ${Y-9} q9 -7 18 0" stroke="#2a1a14" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+  if(style==='heart')return `<path d="M${L} ${Y+9} l-11 -11 a6.5 6.5 0 0 1 11 -7 a6.5 6.5 0 0 1 11 7z M${R} ${Y+9} l-11 -11 a6.5 6.5 0 0 1 11 -7 a6.5 6.5 0 0 1 11 7z" fill="#ff5a8a"/><circle cx="${L-4}" cy="${Y-6}" r="2" fill="#fff"/><circle cx="${R-4}" cy="${Y-6}" r="2" fill="#fff"/>`;
+  if(style==='star')return `<path d="M${L} ${Y-11} l3.5 8 l8.5 0.5 l-6.5 5.5 l2.5 8.5 l-8 -5 l-8 5 l2.5 -8.5 l-6.5 -5.5 l8.5 -0.5z M${R} ${Y-11} l3.5 8 l8.5 0.5 l-6.5 5.5 l2.5 8.5 l-8 -5 l-8 5 l2.5 -8.5 l-6.5 -5.5 l8.5 -0.5z" fill="#ffd166"/><circle cx="${L}" cy="${Y+1}" r="2.5" fill="#1a1020"/><circle cx="${R}" cy="${Y+1}" r="2.5" fill="#1a1020"/>`;
+  if(style==='sleepy')return `<path d="M${L-9} ${Y+1} q9 8 18 0 M${R-9} ${Y+1} q9 8 18 0" stroke="#2a1a14" stroke-width="3.5" fill="none" stroke-linecap="round"/>`+lash;
+  if(style==='cat')return `<ellipse cx="${L}" cy="${Y}" rx="9" ry="11" fill="#ffd166"/><ellipse cx="${R}" cy="${Y}" rx="9" ry="11" fill="#ffd166"/><ellipse cx="${L}" cy="${Y}" rx="2.6" ry="9" fill="#1a1020"/><ellipse cx="${R}" cy="${Y}" rx="2.6" ry="9" fill="#1a1020"/><circle cx="${L-3}" cy="${Y-5}" r="2" fill="#fff"/><circle cx="${R-3}" cy="${Y-5}" r="2" fill="#fff"/>`+lash;
+  if(style==='almond')return `<path d="M${L-11} ${Y+1} q11 -14 22 0 q-11 10 -22 0z M${R-11} ${Y+1} q11 -14 22 0 q-11 10 -22 0z" fill="#fff"/><circle cx="${L+1}" cy="${Y}" r="5.5" fill="#2a1a14"/><circle cx="${R-1}" cy="${Y}" r="5.5" fill="#2a1a14"/><circle cx="${L-1}" cy="${Y-2.5}" r="2" fill="#fff"/><circle cx="${R-3}" cy="${Y-2.5}" r="2" fill="#fff"/>`+lash;
+  if(style==='sparkle')return `<ellipse cx="${L}" cy="${Y}" rx="9.5" ry="11.5" fill="#fff"/><ellipse cx="${R}" cy="${Y}" rx="9.5" ry="11.5" fill="#fff"/><ellipse cx="${L+0.5}" cy="${Y+1}" rx="7" ry="9" fill="#3a5aa8"/><ellipse cx="${R-0.5}" cy="${Y+1}" rx="7" ry="9" fill="#3a5aa8"/><ellipse cx="${L+0.5}" cy="${Y+3}" rx="4" ry="5.5" fill="#1a1020"/><ellipse cx="${R-0.5}" cy="${Y+3}" rx="4" ry="5.5" fill="#1a1020"/><circle cx="${L-3}" cy="${Y-4}" r="3.2" fill="#fff"/><circle cx="${R-3}" cy="${Y-4}" r="3.2" fill="#fff"/><circle cx="${L+4}" cy="${Y+5}" r="1.6" fill="#fff"/><circle cx="${R+4}" cy="${Y+5}" r="1.6" fill="#fff"/>`+lash;
+  return `<ellipse cx="${L}" cy="${Y}" rx="9" ry="11" fill="#fff"/><ellipse cx="${R}" cy="${Y}" rx="9" ry="11" fill="#fff"/><ellipse cx="${L+0.5}" cy="${Y+1}" rx="6" ry="8.5" fill="#2a1a14"/><ellipse cx="${R-0.5}" cy="${Y+1}" rx="6" ry="8.5" fill="#2a1a14"/><circle cx="${L-2.5}" cy="${Y-3}" r="2.6" fill="#fff"/><circle cx="${R-2.5}" cy="${Y-3}" r="2.6" fill="#fff"/><circle cx="${L+3}" cy="${Y+4}" r="1.3" fill="#fff"/><circle cx="${R+3}" cy="${Y+4}" r="1.3" fill="#fff"/>`+lash;
 }
 function mouth(mood){
-  if(mood==='dead')return `<path d="M42 62 q8 -4 16 0" stroke="#1a1020" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M44 58 l3 6 M52 58 l3 6" stroke="#1a1020" stroke-width="2"/>`;
-  if(mood==='scream')return `<ellipse cx="50" cy="63" rx="7" ry="9" fill="#3a0a10"/><path d="M45 58 h10" stroke="#fff" stroke-width="2"/>`;
-  if(mood==='angry')return `<path d="M42 63 q8 -5 16 0" stroke="#1a1020" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
-  return `<path d="M44 60 q6 6 12 0" stroke="#7a3a3a" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+  if(mood==='dead')return `<path d="M42 72 q8 -5 16 0" stroke="#1a1020" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M45 68 l3 7 M52 68 l3 7" stroke="#1a1020" stroke-width="2"/>`;
+  if(mood==='scream')return `<ellipse cx="50" cy="73" rx="7" ry="8" fill="#3a0a10"/><path d="M45 68 h10" stroke="#fff" stroke-width="2"/>`;
+  if(mood==='angry')return `<path d="M42 73 q8 -6 16 0" stroke="#1a1020" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+  return `<path d="M45 69 q5 5 10 0" stroke="#7a3a3a" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
 }
 function topShape(top,c){
   const base=`<rect x="30" y="76" width="40" height="32" rx="9" fill="${c}"/>`;
@@ -79,7 +89,8 @@ function topShape(top,c){
     default:return base+`<path d="M38 76 q12 8 24 0" stroke="rgba(0,0,0,.25)" stroke-width="3" fill="none"/>`;
   }
 }
-function hatShape(hat,hairC){
+function hatShape(hat,hairC){const g=hatRaw(hat,hairC);return g?`<g transform="translate(50,40) scale(1.14) translate(-50,-42)">${g}</g>`:'';}
+function hatRaw(hat,hairC){
   switch(hat){
     case 'beanie':return `<path d="M20 40 q2 -26 30 -26 q28 0 30 26 v4 h-60z" fill="#c22b3a"/><rect x="18" y="38" width="64" height="9" rx="4" fill="#8a1a26"/><circle cx="50" cy="13" r="5" fill="#e8e0d0"/>`;
     case 'cap':return `<path d="M20 40 q2 -26 30 -26 q28 0 30 26 v2 h-60z" fill="#2a3a6a"/><path d="M14 42 h56 q4 0 4 4 q-30 -4 -60 0 q0 -4 0 -4z" fill="#1a2a5a"/>`;
@@ -103,18 +114,18 @@ function hatShape(hat,hairC){
 }
 function accShape(acc){
   switch(acc){
-    case 'glasses':return `<circle cx="37" cy="48" r="9" fill="none" stroke="#2a1a14" stroke-width="2"/><circle cx="63" cy="48" r="9" fill="none" stroke="#2a1a14" stroke-width="2"/><path d="M46 48 h8" stroke="#2a1a14" stroke-width="2"/>`;
-    case 'shades':return `<path d="M27 44 h20 v8 q-10 6 -20 0z M53 44 h20 v8 q-10 6 -20 0z" fill="#1a1a1e"/><path d="M47 46 h6" stroke="#1a1a1e" stroke-width="2"/>`;
-    case 'scarf':return `<rect x="30" y="70" width="40" height="10" rx="5" fill="#c22b3a"/><rect x="34" y="72" width="32" height="2" fill="#e8e0d0"/><rect x="58" y="76" width="9" height="20" rx="4" fill="#c22b3a"/>`;
-    case 'eyepatch':return `<circle cx="63" cy="48" r="8" fill="#1a1a1e"/><path d="M22 36 q30 -6 62 8" stroke="#1a1a1e" stroke-width="2" fill="none"/>`;
-    case 'mask':return `<path d="M26 52 q24 -14 48 0 v12 q-24 12 -48 0z" fill="#3a3a44"/><circle cx="38" cy="58" r="5" fill="#8a8a94"/><circle cx="62" cy="58" r="5" fill="#8a8a94"/>`;
-    case 'bandaid':return `<rect x="60" y="56" width="14" height="6" rx="2" fill="#d9b48a" transform="rotate(-20 67 59)"/><path d="M63 58 h8" stroke="#c9a070" stroke-width="1" transform="rotate(-20 67 59)"/>`;
-    case 'choker':return `<rect x="34" y="72" width="32" height="5" rx="2" fill="#1a1a1e"/><circle cx="50" cy="75" r="2.5" fill="#ff8ab8"/>`;
-    case 'stars':return `<path d="M37 39 l3 7 l7 0 l-6 4 l2 7 l-6 -4 l-6 4 l2 -7 l-6 -4 l7 0z M63 39 l3 7 l7 0 l-6 4 l2 7 l-6 -4 l-6 4 l2 -7 l-6 -4 l7 0z" fill="none" stroke="#ff8ab8" stroke-width="2.5"/><path d="M46 47 h8" stroke="#ff8ab8" stroke-width="2"/>`;
-    case 'flower':return `<circle cx="74" cy="22" r="7" fill="#ff8ab8"/><circle cx="74" cy="22" r="3" fill="#ffd166"/>`;
-    case 'blush':return `<circle cx="30" cy="58" r="7" fill="#ff8ab8" opacity=".6"/><circle cx="70" cy="58" r="7" fill="#ff8ab8" opacity=".6"/>`;
-    case 'freckles':return `<circle cx="28" cy="56" r="1.2" fill="#a8704a"/><circle cx="33" cy="60" r="1.2" fill="#a8704a"/><circle cx="26" cy="62" r="1.2" fill="#a8704a"/><circle cx="72" cy="56" r="1.2" fill="#a8704a"/><circle cx="67" cy="60" r="1.2" fill="#a8704a"/><circle cx="74" cy="62" r="1.2" fill="#a8704a"/>`;
-    case 'wings':return `<path d="M30 84 q-26 -20 -28 4 q10 -6 14 4 q6 -8 14 0z M70 84 q26 -20 28 4 q-10 -6 -14 4 q-6 -8 -14 0z" fill="#2a1a3a" stroke="#7a4aa8" stroke-width="1.5"/>`;
+    case 'glasses':return `<circle cx="35" cy="55" r="11" fill="none" stroke="#2a1a14" stroke-width="2.2"/><circle cx="65" cy="55" r="11" fill="none" stroke="#2a1a14" stroke-width="2.2"/><path d="M46 55 h8" stroke="#2a1a14" stroke-width="2.2"/>`;
+    case 'shades':return `<path d="M23 49 h24 v10 q-12 7 -24 0z M53 49 h24 v10 q-12 7 -24 0z" fill="#1a1a1e"/><path d="M47 51 h6" stroke="#1a1a1e" stroke-width="2"/>`;
+    case 'scarf':return `<rect x="28" y="76" width="44" height="11" rx="5" fill="#c22b3a"/><rect x="32" y="79" width="36" height="2.5" fill="#e8e0d0"/><rect x="60" y="84" width="10" height="22" rx="4" fill="#c22b3a"/>`;
+    case 'eyepatch':return `<ellipse cx="65" cy="55" rx="10" ry="9" fill="#1a1a1e"/><path d="M14 40 q36 -8 76 10" stroke="#1a1a1e" stroke-width="2.2" fill="none"/>`;
+    case 'mask':return `<path d="M22 58 q28 -16 56 0 v14 q-28 14 -56 0z" fill="#3a3a44"/><circle cx="37" cy="66" r="6" fill="#8a8a94"/><circle cx="63" cy="66" r="6" fill="#8a8a94"/>`;
+    case 'bandaid':return `<rect x="62" y="64" width="16" height="7" rx="2.5" fill="#d9b48a" transform="rotate(-20 70 67)"/><path d="M65 67 h10" stroke="#c9a070" stroke-width="1.2" transform="rotate(-20 70 67)"/>`;
+    case 'choker':return `<rect x="32" y="79" width="36" height="5" rx="2.5" fill="#1a1a1e"/><circle cx="50" cy="81.5" r="2.8" fill="#ff8ab8"/>`;
+    case 'stars':return `<path d="M35 43 l4 9 l9 0.5 l-7 6 l2.5 9 l-8.5 -5.5 l-8.5 5.5 l2.5 -9 l-7 -6 l9 -0.5z M65 43 l4 9 l9 0.5 l-7 6 l2.5 9 l-8.5 -5.5 l-8.5 5.5 l2.5 -9 l-7 -6 l9 -0.5z" fill="none" stroke="#ff8ab8" stroke-width="2.5"/><path d="M46 54 h8" stroke="#ff8ab8" stroke-width="2"/>`;
+    case 'flower':return `<circle cx="80" cy="22" r="8" fill="#ff8ab8"/><circle cx="80" cy="22" r="3.5" fill="#ffd166"/>`;
+    case 'blush':return `<circle cx="24" cy="66" r="8" fill="#ff8ab8" opacity=".55"/><circle cx="76" cy="66" r="8" fill="#ff8ab8" opacity=".55"/>`;
+    case 'freckles':return `<circle cx="22" cy="64" r="1.3" fill="#a8704a"/><circle cx="28" cy="68" r="1.3" fill="#a8704a"/><circle cx="20" cy="70" r="1.3" fill="#a8704a"/><circle cx="78" cy="64" r="1.3" fill="#a8704a"/><circle cx="72" cy="68" r="1.3" fill="#a8704a"/><circle cx="80" cy="70" r="1.3" fill="#a8704a"/>`;
+    case 'wings':return `<path d="M30 86 q-28 -22 -30 4 q10 -6 15 4 q6 -8 15 0z M70 86 q28 -22 30 4 q-10 -6 -15 4 q-6 -8 -15 0z" fill="#2a1a3a" stroke="#7a4aa8" stroke-width="1.5"/>`;
     default:return '';
   }
 }
@@ -125,14 +136,14 @@ function avatarSVG(av,size,opts){
   const w=size||100,h=Math.round((size||100)*1.3);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 130" width="${w}" height="${h}" ${opts.attrs||''} aria-hidden="true">
   ${hairBack(style,hc)}
-  <rect x="35" y="104" width="12" height="22" rx="5" fill="#2a2a30"/><rect x="53" y="104" width="12" height="22" rx="5" fill="#2a2a30"/>
-  <rect x="33" y="120" width="16" height="8" rx="4" fill="#1a1a1e"/><rect x="51" y="120" width="16" height="8" rx="4" fill="#1a1a1e"/>
+  <rect x="36" y="100" width="11" height="22" rx="5" fill="#2a2a30"/><rect x="53" y="100" width="11" height="22" rx="5" fill="#2a2a30"/>
+  <rect x="34" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/><rect x="51" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/>
   ${topShape(av.top||'hoodie',tc)}
-  <rect x="22" y="80" width="11" height="24" rx="5" fill="${skin}"/><rect x="67" y="80" width="11" height="24" rx="5" fill="${skin}"/>
-  ${weapon==='melee'?`<path d="M74 100 l14 -30" stroke="#7a5a3a" stroke-width="5" stroke-linecap="round"/><path d="M86 74 l4 -8" stroke="#555" stroke-width="7" stroke-linecap="round"/>`:''}
-  ${weapon==='gun'?`<rect x="72" y="88" width="20" height="7" rx="2" fill="#333"/><rect x="74" y="94" width="6" height="8" rx="2" fill="#333"/>`:''}
-  <path d="M18 46 q0 -34 32 -34 q32 0 32 34 v8 q0 22 -32 22 q-32 0 -32 -22z" fill="${skin}"/>
-  <circle cx="30" cy="58" r="4.5" fill="#ff8ab8" opacity=".45"/><circle cx="70" cy="58" r="4.5" fill="#ff8ab8" opacity=".45"/>
+  <rect x="21" y="82" width="11" height="22" rx="5" fill="${skin}"/><rect x="68" y="82" width="11" height="22" rx="5" fill="${skin}"/>
+  ${weapon==='melee'?`<path d="M75 100 l14 -30" stroke="#7a5a3a" stroke-width="5" stroke-linecap="round"/><path d="M87 74 l4 -8" stroke="#555" stroke-width="7" stroke-linecap="round"/>`:''}
+  ${weapon==='gun'?`<rect x="73" y="90" width="20" height="7" rx="2" fill="#333"/><rect x="75" y="96" width="6" height="8" rx="2" fill="#333"/>`:''}
+  <path d="M12 50 q0 -40 38 -40 q38 0 38 40 v6 q0 26 -38 26 q-38 0 -38 -26z" fill="${skin}"/>
+  <circle cx="24" cy="66" r="6" fill="#ff8ab8" opacity=".45"/><circle cx="76" cy="66" r="6" fill="#ff8ab8" opacity=".45"/>
   ${eyes(av.eyes||'round',mood)}
   ${mouth(mood)}
   ${hairFront(style,hc)}
@@ -145,25 +156,25 @@ function zombieSVG(kind,size){
   const w=size||100,h=Math.round((size||100)*1.3);
   const skin={walker:'#8fae6a',runner:'#a6c27a',bloater:'#8a9a6a',screamer:'#9fb27a',raider:'#e0a97e',gunner:'#c68a5d',boss:'#9a6543'}[kind]||'#8fae6a';
   const human=kind==='raider'||kind==='gunner'||kind==='boss';
-  const body=kind==='bloater'?`<ellipse cx="50" cy="94" rx="30" ry="20" fill="#5a6a4a"/><path d="M30 90 q10 -6 20 0 q10 6 20 0" stroke="#3a4a2a" stroke-width="2" fill="none"/>`:
-    human?`<rect x="30" y="76" width="40" height="32" rx="9" fill="${kind==='boss'?'#1a1a1e':'#4a3a2a'}"/>${kind==='boss'?'<path d="M32 78 l4 -6 l4 6 M44 78 l4 -6 l4 6 M56 78 l4 -6 l4 6" stroke="#bbb" stroke-width="2" fill="none"/>':''}`:
-    `<rect x="30" y="76" width="40" height="32" rx="9" fill="#5a5a6a"/><path d="M34 100 l6 8 l4 -8 l6 8 l4 -8 l6 8 l4 -8" fill="#5a5a6a"/><path d="M40 80 l6 10 l6 -10" stroke="#3a3a4a" stroke-width="2" fill="none"/>`;
-  const arms=human?`<rect x="22" y="80" width="11" height="24" rx="5" fill="${skin}"/><rect x="67" y="80" width="11" height="24" rx="5" fill="${skin}"/>`:
-    `<rect x="14" y="84" width="24" height="10" rx="5" fill="${skin}" transform="rotate(-10 26 89)"/><rect x="62" y="84" width="24" height="10" rx="5" fill="${skin}" transform="rotate(10 74 89)"/>`;
-  const hair=human?(kind==='boss'?'':hairBack('short','#2a1b14')):`<path d="M22 40 q4 -20 28 -20 q24 0 28 20 q-10 -6 -18 -2 q-8 -8 -14 0 q-8 -6 -12 4 q-6 -8 -12 -2z" fill="#3a4a2a" opacity=".9"/>`;
-  const face=kind==='boss'?`<path d="M22 44 q0 -24 28 -24 q28 0 28 24 v14 q-4 12 -28 12 q-24 0 -28 -12z" fill="#e8e0d0"/><ellipse cx="38" cy="50" rx="7" ry="8" fill="#1a1a1e"/><ellipse cx="62" cy="50" rx="7" ry="8" fill="#1a1a1e"/><path d="M50 58 l-4 6 h8z" fill="#1a1a1e"/><path d="M38 68 h24 M42 66 v6 M50 66 v6 M58 66 v6" stroke="#1a1a1e" stroke-width="2"/>`:
-    (kind==='raider'||kind==='gunner')?`${eyes('almond','angry')}<path d="M24 56 q26 -10 52 0 v12 q-26 10 -52 0z" fill="${kind==='gunner'?'#3a3a44':'#c22b3a'}"/>`:
+  const body=kind==='bloater'?`<ellipse cx="50" cy="96" rx="30" ry="20" fill="#5a6a4a"/><path d="M30 92 q10 -6 20 0 q10 6 20 0" stroke="#3a4a2a" stroke-width="2" fill="none"/>`:
+    human?`<rect x="30" y="78" width="40" height="30" rx="9" fill="${kind==='boss'?'#1a1a1e':'#4a3a2a'}"/>${kind==='boss'?'<path d="M32 80 l4 -6 l4 6 M44 80 l4 -6 l4 6 M56 80 l4 -6 l4 6" stroke="#bbb" stroke-width="2" fill="none"/>':''}`:
+    `<rect x="30" y="78" width="40" height="30" rx="9" fill="#5a5a6a"/><path d="M34 102 l6 8 l4 -8 l6 8 l4 -8 l6 8 l4 -8" fill="#5a5a6a"/><path d="M40 82 l6 10 l6 -10" stroke="#3a3a4a" stroke-width="2" fill="none"/>`;
+  const arms=human?`<rect x="21" y="82" width="11" height="22" rx="5" fill="${skin}"/><rect x="68" y="82" width="11" height="22" rx="5" fill="${skin}"/>`:
+    `<rect x="12" y="86" width="26" height="10" rx="5" fill="${skin}" transform="rotate(-10 25 91)"/><rect x="62" y="86" width="26" height="10" rx="5" fill="${skin}" transform="rotate(10 75 91)"/>`;
+  const zhair=`<path d="M10 56 Q8 8 50 8 Q92 8 90 56 Q80 42 70 46 Q60 34 50 46 Q40 34 30 46 Q20 42 10 56z" fill="#3a4a2a" opacity=".9"/>`;
+  const face=kind==='boss'?`<path d="M16 50 q0 -34 34 -34 q34 0 34 34 v10 q-4 16 -34 16 q-30 0 -34 -16z" fill="#e8e0d0"/><ellipse cx="36" cy="54" rx="9" ry="10" fill="#1a1a1e"/><ellipse cx="64" cy="54" rx="9" ry="10" fill="#1a1a1e"/><path d="M50 62 l-4 7 h8z" fill="#1a1a1e"/><path d="M36 73 h28 M41 71 v7 M50 71 v7 M59 71 v7" stroke="#1a1a1e" stroke-width="2"/>`:
+    (kind==='raider'||kind==='gunner')?`${eyes('almond','angry')}<path d="M20 62 q30 -12 60 0 v12 q-30 12 -60 0z" fill="${kind==='gunner'?'#3a3a44':'#c22b3a'}"/>`:
     `${eyes('round',kind==='runner'?'angry':kind==='screamer'?'glow':'dead')}${mouth(kind==='screamer'?'scream':'dead')}`;
-  const extra=kind==='gunner'?`<rect x="72" y="88" width="22" height="7" rx="2" fill="#333"/><rect x="74" y="94" width="6" height="8" rx="2" fill="#333"/>`:kind==='raider'?`<path d="M76 100 l12 -30" stroke="#888" stroke-width="4" stroke-linecap="round"/>`:kind==='boss'?`<path d="M76 100 l14 -34" stroke="#7a5a3a" stroke-width="5" stroke-linecap="round"/><path d="M88 70 l6 -10" stroke="#aaa" stroke-width="9" stroke-linecap="round"/>`:'';
-  const wound=!human?`<path d="M28 60 l6 4" stroke="#7a2a2a" stroke-width="2"/><circle cx="66" cy="40" r="3" fill="#7a2a2a" opacity=".7"/>`:'';
+  const extra=kind==='gunner'?`<rect x="73" y="90" width="22" height="7" rx="2" fill="#333"/><rect x="75" y="96" width="6" height="8" rx="2" fill="#333"/>`:kind==='raider'?`<path d="M77 100 l12 -30" stroke="#888" stroke-width="4" stroke-linecap="round"/>`:kind==='boss'?`<path d="M77 100 l14 -34" stroke="#7a5a3a" stroke-width="5" stroke-linecap="round"/><path d="M89 70 l6 -10" stroke="#aaa" stroke-width="9" stroke-linecap="round"/>`:'';
+  const wound=!human?`<path d="M24 64 l7 4" stroke="#7a2a2a" stroke-width="2.5"/><circle cx="72" cy="40" r="3.5" fill="#7a2a2a" opacity=".7"/>`:'';
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 130" width="${w}" height="${h}" aria-hidden="true">
-  ${hair}
-  <rect x="35" y="104" width="12" height="22" rx="5" fill="#2a2a30"/><rect x="53" y="104" width="12" height="22" rx="5" fill="#2a2a30"/>
-  <rect x="33" y="120" width="16" height="8" rx="4" fill="#1a1a1e"/>${kind==='walker'?'':'<rect x="51" y="120" width="16" height="8" rx="4" fill="#1a1a1e"/>'}
+  ${human&&kind!=='boss'?hairBack('short','#2a1b14'):''}
+  <rect x="36" y="100" width="11" height="22" rx="5" fill="#2a2a30"/><rect x="53" y="100" width="11" height="22" rx="5" fill="#2a2a30"/>
+  <rect x="34" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/>${kind==='walker'?'':'<rect x="51" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/>'}
   ${body}${arms}${extra}
-  <path d="M18 46 q0 -34 32 -34 q32 0 32 34 v8 q0 22 -32 22 q-32 0 -32 -22z" fill="${skin}"/>
+  <path d="M12 50 q0 -40 38 -40 q38 0 38 40 v6 q0 26 -38 26 q-38 0 -38 -26z" fill="${skin}"/>
   ${wound}${face}
-  ${!human&&kind!=='boss'?`<path d="M22 40 q4 -20 28 -20 q24 0 28 20 q-10 -6 -18 -2 q-8 -8 -14 0 q-8 -6 -12 4 q-6 -8 -12 -2z" fill="#3a4a2a" opacity=".9"/>`:''}
+  ${!human?zhair:''}
   ${kind==='raider'?hatShape('bandana'):kind==='gunner'?hatShape('beanie'):''}
   </svg>`;
 }
