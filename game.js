@@ -1,5 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
+const VERSION='3.3';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -267,9 +268,9 @@ function rollWeek(){
 }
 function checkMilestones(){for(let i=1;i<DISTRICTS.length;i++){if(S.steps.total>=DISTRICTS[i].steps&&!S.milestones.includes(i)){S.milestones.push(i);S.sp++;S.keys++;log('Milestone: '+fmt(DISTRICTS[i].steps)+' lifetime steps. '+DISTRICTS[i].n+' is open. +1 skill point, +1 key.');toast(DISTRICTS[i].n+' unlocked · +1 skill point','l');SFX.play('legend');}}}
 function addSteps(n,src){
-  n=Math.floor(n);if(!(n>0))return;rollDay();rollWeek();
-  S.steps.total+=n;S.steps.today+=n;S.lastAnim=Date.now();ctEvent('steps',n);checkMilestones();
-  if(S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');}
+  n=Math.floor(n);if(!(n>0))return;rollDay();rollWeek();S.lastAnim=Date.now();
+  if(src!=='carry'){S.steps.total+=n;S.steps.today+=n;S.wallet=(S.wallet||0)+n;ctEvent('steps',n);checkMilestones();}
+  if(src!=='carry'&&S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');}
   if(S.loc||S.combat){S.walk.banked=(S.walk.banked||0)+n;if(src!=='carry'&&src!=='live')toast('+'+fmt(n)+' steps saved for after this stop','z');save();render();return;}
   let left=n;
   while(left>0){if(left>=S.walk.toNext){left-=S.walk.toNext;S.walk.progress=S.walk.dist;S.walk.toNext=0;arrive();break;}else{S.walk.toNext-=left;S.walk.progress=S.walk.dist-S.walk.toNext;left=0;}}
@@ -517,7 +518,14 @@ function equip(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;S.eq[g.sl
 function repair(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;if(!((S.base&&S.base.rooms.armory)||roleLvl('engineer')))return;if(S.stock.scrap<3){toast('Need 3 scrap');return;}S.stock.scrap-=3;g.dur=Math.min(GEAR[g.id].dur,g.dur+3);toast(g.n+' repaired');save();render();}
 function dropGear(uidv){S.gear=S.gear.filter(x=>x.uid!==uidv);for(const k in S.eq)if(S.eq[k]===uidv)S.eq[k]=null;save();render();}
 function toggleCrew(id){const i=S.active.indexOf(id);if(i>=0)S.active.splice(i,1);else{if(S.active.length>=crewSlots()){toast('No free slot. Build a bunkhouse.');return;}S.active.push(id);}save();render();}
-function wear(slot,key){if(key&&!(slot==='top'&&key==='hoodie')&&!S.cosmetics.includes(slot+':'+key))return;S.av[slot]=key;save();render();}
+function shopItems(){const out=[];for(const [k,v] of Object.entries(ART.HAIR_SHOP))out.push({id:'hair:'+k,slot:'hair',key:k,n:v.n,c:v.c,r:v.c>=12000?'epic':'rare'});for(const [k,v] of Object.entries(ART.EYES_SHOP))out.push({id:'eyes:'+k,slot:'eyes',key:k,n:v.n,c:v.c,r:'epic'});for(const [k,v] of Object.entries(ART.HATS))if(v.c)out.push({id:'hat:'+k,slot:'hat',key:k,n:v.n,c:v.c,r:v.r});for(const [k,v] of Object.entries(ART.TOPS))if(v.c)out.push({id:'top:'+k,slot:'top',key:k,n:v.n,c:v.c,r:v.r});for(const [k,v] of Object.entries(ART.ACCS))if(v.c)out.push({id:'acc:'+k,slot:'acc',key:k,n:v.n,c:v.c,r:v.r});return out;}
+function owns(slot,key){if(!key)return true;if(slot==='hair'&&ART.HAIR_STYLES.includes(key))return true;if(slot==='eyes'&&ART.EYES.includes(key))return true;if(slot==='top'&&key==='hoodie')return true;return S.cosmetics.includes(slot+':'+key);}
+function tryOn(id){const it=shopItems().find(x=>x.id===id);if(!it)return;const av=Object.assign({},S.av);av[it.slot]=it.key;const owned=S.cosmetics.includes(id);const can=(S.wallet||0)>=it.c;
+  openSheet(`<h2>${esc(it.n)}</h2><div style="text-align:center">${ART.avatarSVG(av,130)}</div><p style="text-align:center"><span class="rc-${it.r}">${RAR[it.r].n}</span> · ${owned?'yours':fmt(it.c)+' steps'}<br><span class="help">Wallet: ${fmt(S.wallet||0)} steps</span></p><div class="grid2"><button class="btn" onclick="closeSheet()">Back</button>${owned?`<button class="btn r" onclick="wear('${it.slot}','${it.key}');closeSheet()">Wear it</button>`:`<button class="btn a" onclick="buyLook('${id}')" ${can?'':'disabled'}>${can?'Buy for '+fmt(it.c):'Walk '+fmt(it.c-(S.wallet||0))+' more'}</button>`}</div>`);}
+function buyLook(id){const it=shopItems().find(x=>x.id===id);if(!it||S.cosmetics.includes(id))return;if((S.wallet||0)<it.c){toast('Not enough steps yet');return;}S.wallet-=it.c;S.cosmetics.push(id);S.av[it.slot]=it.key;SFX.play('legend');log('Unlocked '+it.n+' for '+fmt(it.c)+' steps.');toast(it.n+' unlocked and on','l');save();closeSheet();render();pushPlayer();}
+function renderShop(){const el=$('#shop');if(!el)return;$('#walletSub').textContent=fmt(S.wallet||0)+' steps to spend';const items=shopItems();const groups=[['hair','Hairstyles'],['eyes','Eyes'],['hat','Hats'],['top','Outfits'],['acc','Accessories']];
+  el.innerHTML=groups.map(([slot,label])=>`<div class="section-label" style="margin-top:8px">${label}</div><div class="shopgrid">${items.filter(i=>i.slot===slot).map(it=>{const av=Object.assign({},S.av);av[it.slot]=it.key;const owned=S.cosmetics.includes(it.id);return `<button class="shopit${owned?' own':''}" onclick="tryOn('${it.id}')">${ART.avatarSVG(av,54)}<b class="rc-${it.r}">${esc(it.n)}</b><span>${owned?'owned':fmt(it.c)}</span></button>`;}).join('')}</div>`).join('');}
+function wear(slot,key){if(!owns(slot,key))return;S.av[slot]=key;save();render();}
 
 /* ================= raids (real clock) ================= */
 function stockValue(){return S.stock.food*5+S.stock.water*5+S.stock.meds*10+S.stock.scrap*4+S.stock.ammo*3;}
@@ -711,7 +719,7 @@ function render(){
   // you
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
   $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+sk('heavyhands')*2)+'-'+(eqItem('melee').dmg[1]+sk('heavyhands')*2):baseDmg()[0]+'-'+baseDmg()[1]} +${S.lvl-1}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
-  $('#cosmeticCount').textContent=S.cosmetics.length+' cosmetics found';
+  $('#cosmeticCount').textContent=S.cosmetics.length+' looks unlocked';
   $('#spSub').textContent=S.sp+' point'+(S.sp===1?'':'s')+' to spend';$('#youAlert').hidden=!S.sp;$('#clsDesc').textContent=CLASSES[S.cls]?CLASSES[S.cls].e+' '+CLASSES[S.cls].n+'. One point per level and per county milestone. General skills are open to every class.':'';
   $('#skills').innerHTML=skillList().map(s=>{const r=sk(s.id);return `<div class="skill${r>=s.max?' max':''}"><div><b>${s.n} ${SKILLS.general.includes(s)?'<span class="chip" style="font-size:10px">general</span>':''}</b><span>${s.d(Math.max(1,r))}${r?' · now: '+s.d(r):''}</span><div class="pips">${Array.from({length:s.max},(_,i)=>`<i class="${i<r?'on':''}"></i>`).join('')}</div></div><button class="btn sm ${S.sp>0&&r<s.max?'a':''}" onclick="learn('${s.id}')" ${S.sp>0&&r<s.max?'':'disabled'}>${r>=s.max?'Max':'+'}</button></div>`;}).join('');
   $('#crewSub').textContent=S.active.length+' / '+crewSlots()+' active · '+S.crew.length+' total';
@@ -727,9 +735,9 @@ function render(){
   $('#raidLog').innerHTML=S.raids.length?S.raids.map(r=>`<li><time>${r.t.slice(5)}</time><span>${r.by?esc(r.by)+': ':''}${r.repelled?(r.fought?'You fought them off yourself.':'Held: '+r.def+' def vs '+r.power+'.'):'Broke in ('+r.power+' vs '+r.def+'). Took '+Object.entries(r.stolen).map(([k,v])=>v+' '+k).join(', ')+'.'}</span></li>`).join(''):'<li><span class="help">No raids yet. They start the day after you claim a base.</span></li>';
   $('#shelfSub').textContent=S.shelf.length+' found';const shelfIds=Object.entries(ITEMS).filter(([k,v])=>v.cat==='shelf');const owned=S.shelf.reduce((m,x)=>{m[x.id]=(m[x.id]||0)+1;return m;},{});
   $('#shelf').innerHTML=shelfIds.map(([k,v])=>`<div class="it${owned[k]?'':' locked'}"><div class="e">${v.e}</div><span class="rc-${v.r}">${v.n}${owned[k]>1?' x'+owned[k]:''}</span></div>`).join('');
-  $('#goalInput').value=S.goal;$('#nameInput').value=S.name;$('#sfxBtn').textContent=S.sfx?'On':'Off';
+  $('#goalInput').value=S.goal;$('#nameInput').value=S.name;$('#sfxBtn').textContent=S.sfx?'On':'Off';const vs=$('#verSub');if(vs)vs.textContent='v'+VERSION;
   // county
-  renderMap();renderParty();renderEvent();renderStory();
+  renderMap();renderParty();renderEvent();renderStory();renderShop();
   const tier=TIERS[S.league.tier];$('#tierBadge').textContent=tier.e;$('#tierName').textContent=tier.n;$('#tierSub').textContent='Tier '+(S.league.tier+1)+' of '+TIERS.length+' · stash x'+tier.mult;
   const end=new Date(weekStart());end.setDate(end.getDate()+7);const left=Math.max(0,end-Date.now());$('#weekChip').textContent='Week of '+S.league.week;$('#resetChip').textContent=Math.floor(left/86400000)+'d '+Math.floor(left%86400000/3600000)+'h left';
   const b=board();$('#board').innerHTML=b.map((r,i)=>`<div class="lbrow${r.me?' me':''}"><div class="rk">${i+1}</div><div class="av">${ART.avatarSVG(r.av,40)}</div><div class="nm">${esc(r.n)}${r.me?' (you)':''}<small>${r.me?'stash runs to score':esc(r.blurb)}</small></div><div class="sc">${fmt(r.s)}</div></div>`).join('');
@@ -848,11 +856,11 @@ function lookSheet(onDone){
     const hats=[['',{n:'None',r:'common'}]].concat(Object.entries(ART.HATS));const tops=Object.entries(ART.TOPS);const accs=[['',{n:'None',r:'common'}]].concat(Object.entries(ART.ACCS));
     $('#sheet').innerHTML=`<h2>Your look</h2><div style="text-align:center">${ART.avatarSVG(av,120)}</div>
     <div class="section-label">Skin</div><div class="opts" style="margin:6px 0 10px">${sw(ART.SKINS,av.skin,'skin')}</div>
-    <div class="section-label">Hair</div><div class="opts" style="margin:6px 0 10px">${opt(ART.HAIR_STYLES,av.hair,'hair')}</div>
+    <div class="section-label">Hair <span class="help">more in the Boutique</span></div><div class="opts" style="margin:6px 0 10px">${opt(ART.HAIR_STYLES.concat(Object.keys(ART.HAIR_SHOP).filter(k=>own('hair',k))),av.hair,'hair',v=>(ART.HAIR_SHOP[v]||{}).n||v)}</div>
     <div class="section-label">Hair color</div><div class="opts" style="margin:6px 0 10px">${sw(ART.HAIR_COLORS,av.hairColor,'hairColor')}</div>
-    <div class="section-label">Eyes</div><div class="opts" style="margin:6px 0 10px">${opt(ART.EYES,av.eyes,'eyes')}</div>
+    <div class="section-label">Eyes</div><div class="opts" style="margin:6px 0 10px">${opt(ART.EYES.concat(Object.keys(ART.EYES_SHOP).filter(k=>own('eyes',k))),av.eyes,'eyes',v=>(ART.EYES_SHOP[v]||{}).n||v)}</div>
     <div class="section-label">Hoodie color</div><div class="opts" style="margin:6px 0 10px">${sw(ART.TOP_COLORS,av.topColor,'topColor')}</div>
-    <div class="section-label">Outfit <span class="help">found in the world</span></div><div class="opts" style="margin:6px 0 10px">${tops.map(([k,v])=>`<button class="${av.top===k?'on':''}${k!=='hoodie'&&!own('top',k)?' locked':''}" data-set="top" data-v="${k}"><span class="rc-${v.r}">${v.n}</span></button>`).join('')}</div>
+    <div class="section-label">Outfit <span class="help">found in the world or bought with steps</span></div><div class="opts" style="margin:6px 0 10px">${tops.map(([k,v])=>`<button class="${av.top===k?'on':''}${k!=='hoodie'&&!own('top',k)?' locked':''}" data-set="top" data-v="${k}"><span class="rc-${v.r}">${v.n}</span></button>`).join('')}</div>
     <div class="section-label">Hat</div><div class="opts" style="margin:6px 0 10px">${hats.map(([k,v])=>`<button class="${(av.hat||'')===k?'on':''}${k&&!own('hat',k)?' locked':''}" data-set="hat" data-v="${k}"><span class="rc-${v.r}">${v.n}</span></button>`).join('')}</div>
     <div class="section-label">Accessory</div><div class="opts" style="margin:6px 0 10px">${accs.map(([k,v])=>`<button class="${(av.acc||'')===k?'on':''}${k&&!own('acc',k)?' locked':''}" data-set="acc" data-v="${k}"><span class="rc-${v.r}">${v.n}</span></button>`).join('')}</div>
     <div class="grid2"><button class="btn" id="lookRandom">Random</button><button class="btn r" id="lookDone">Done</button></div>`;
@@ -903,7 +911,7 @@ function whileYouWereOut(){
   openSheet(`<h2>While you were out</h2><p class="help">${hrs} hours away · ${esc(w)}</p><ul class="journal" style="margin:8px 0 12px">${items.length?items.map(m=>`<li><span>${esc(m)}</span></li>`).join(''):'<li><span>Quiet night. Nothing came over the fence.</span></li>'}</ul><p>${ct?ct+' contract'+(ct>1?'s':'')+' open today. ':''}${S.raidPending?'Raiders are expected today at '+S.raidPending.hour+':00. ':''}The Wanted boss this week is ${esc(bossName())}.</p><button class="btn r wide" onclick="closeSheet()">Back to the road</button>`);
 }
 function start(){
-  S=load()||fresh();S.combat=false;if(!S.walk.dist)newDistance();
+  S=load()||fresh();S.combat=false;if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
   wire();render();fetchWeather();
   if(!S.onboarded)onboard();else{if(!S.cls)classSheet();else whileYouWereOut();autoSyncFromUrl();}
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){S.lastOpen=Date.now();const bb=board();S.lastRank=bb.findIndex(r=>r.me)+1;save();}});

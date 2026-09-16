@@ -3,11 +3,13 @@ const ART=(()=>{
 const SKINS=['#ffe0c8','#f4c9a5','#e0a97e','#c68a5d','#9a6543','#6b4530'];
 const HAIR_COLORS=['#2a1b14','#5a3a24','#a86a3a','#e0b45a','#d94f3a','#e8e0d0','#7a4aa8','#3a7ad6','#ff8ab8','#58c7a0'];
 const HAIR_STYLES=['short','bob','ponytail','bun','curly','buzz','long','spiky'];
+const HAIR_SHOP={twintails:{n:'Twin tails',c:6000},braid:{n:'Side braid',c:7000},spacebuns:{n:'Space buns',c:8000},wavy:{n:'Beach waves',c:9000},mohawk:{n:'Mohawk',c:9000},afro:{n:'Afro',c:10000},wolfcut:{n:'Wolf cut',c:12000},hime:{n:'Hime cut',c:15000}};
 const EYES=['round','almond','sparkle'];
+const EYES_SHOP={heart:{n:'Heart eyes',c:12000},star:{n:'Star eyes',c:12000},sleepy:{n:'Sleepy eyes',c:8000},cat:{n:'Cat eyes',c:10000}};
 const TOP_COLORS=['#8a3a2a','#3a5a8a','#4a7a4a','#6a4a8a','#c9a04a','#3a3a44'];
-const HATS={beanie:{n:'Beanie',r:'rare'},cap:{n:'Ball cap',r:'rare'},cowboy:{n:'Cowboy hat',r:'epic'},catears:{n:'Cat-ear hood',r:'epic'},bandana:{n:'Bandana',r:'rare'},halo:{n:'Halo',r:'legendary'},crown:{n:'Tin crown',r:'legendary'},helmet:{n:'Bike helmet',r:'rare'},witch:{n:'Witch hat',r:'epic'},pumpkin:{n:'Pumpkin head',r:'legendary'}};
-const TOPS={hoodie:{n:'Hoodie',r:'common'},varsity:{n:'Varsity jacket',r:'rare'},raincoat:{n:'Yellow raincoat',r:'rare'},biker:{n:'Biker jacket',r:'epic'},scrubs:{n:'Nurse scrubs',r:'epic'},flannel:{n:'Flannel shirt',r:'rare'},tux:{n:'Ruined tuxedo',r:'epic'},skeleton:{n:'Skeleton hoodie',r:'epic'}};
-const ACCS={glasses:{n:'Round glasses',r:'rare'},scarf:{n:'Striped scarf',r:'rare'},eyepatch:{n:'Eyepatch',r:'epic'},shades:{n:'Aviators',r:'epic'},mask:{n:'Gas mask',r:'legendary'},wings:{n:'Bat wings',r:'legendary'}};
+const HATS={beanie:{n:'Beanie',r:'rare'},cap:{n:'Ball cap',r:'rare'},cowboy:{n:'Cowboy hat',r:'epic'},catears:{n:'Cat-ear hood',r:'epic'},bandana:{n:'Bandana',r:'rare'},halo:{n:'Halo',r:'legendary'},crown:{n:'Tin crown',r:'legendary'},helmet:{n:'Bike helmet',r:'rare'},beret:{n:'Beret',r:'rare',c:8000},bunny:{n:'Bunny ears',r:'epic',c:14000},flowers:{n:'Flower crown',r:'epic',c:12000},headphones:{n:'Headphones',r:'rare',c:9000},party:{n:'Party hat',r:'rare',c:6000},bearhood:{n:'Bear hood',r:'epic',c:16000},tiara:{n:'Tiara',r:'legendary',c:25000},witch:{n:'Witch hat',r:'epic'},pumpkin:{n:'Pumpkin head',r:'legendary'}};
+const TOPS={hoodie:{n:'Hoodie',r:'common'},varsity:{n:'Varsity jacket',r:'rare'},raincoat:{n:'Yellow raincoat',r:'rare'},biker:{n:'Biker jacket',r:'epic'},scrubs:{n:'Nurse scrubs',r:'epic'},flannel:{n:'Flannel shirt',r:'rare'},tux:{n:'Ruined tuxedo',r:'epic'},sweater:{n:'Cozy sweater',r:'rare',c:9000},overalls:{n:'Overalls',r:'rare',c:10000},sailor:{n:'Sailor top',r:'epic',c:14000},sundress:{n:'Sundress',r:'epic',c:15000},pajamas:{n:'Pajamas',r:'rare',c:8000},labcoat:{n:'Lab coat',r:'epic',c:18000},skeleton:{n:'Skeleton hoodie',r:'epic'}};
+const ACCS={glasses:{n:'Round glasses',r:'rare'},scarf:{n:'Striped scarf',r:'rare'},eyepatch:{n:'Eyepatch',r:'epic'},shades:{n:'Aviators',r:'epic'},mask:{n:'Gas mask',r:'legendary'},bandaid:{n:'Cheek bandage',r:'rare',c:5000},choker:{n:'Choker',r:'rare',c:6000},stars:{n:'Star glasses',r:'epic',c:11000},flower:{n:'Hair flower',r:'rare',c:6000},blush:{n:'Extra blush',r:'rare',c:4000},freckles:{n:'Freckles',r:'rare',c:4000},wings:{n:'Bat wings',r:'legendary'}};
 
 function hairBack(style,c){
   switch(style){
@@ -17,6 +19,14 @@ function hairBack(style,c){
     case 'curly':return `<path d="M16 42 q2 -32 34 -32 q32 0 34 32 q6 10 -2 18 q-6 6 -10 0 q-4 8 -12 4 q-8 6 -12 0 q-6 6 -12 0 q-6 8 -12 2 q-8 6 -10 -4 q-8 -6 -2 -20z" fill="${c}"/>`;
     case 'bun':return `<path d="M20 40 q0 -30 30 -30 q30 0 30 30 v14 h-60z" fill="${c}"/><circle cx="50" cy="8" r="10" fill="${c}"/>`;
     case 'spiky':return `<path d="M20 44 l4 -22 l8 12 l6 -22 l8 14 l6 -20 l6 16 l6 -14 l4 22 l6 -8 l2 26 h-58z" fill="${c}"/>`;
+    case 'twintails':return `<path d="M20 40 q0 -30 30 -30 q30 0 30 30 v14 h-60z" fill="${c}"/><path d="M18 46 q-14 10 -8 40 q8 -4 12 2 q6 -22 4 -42z M82 46 q14 10 8 40 q-8 -4 -12 2 q-6 -22 -4 -42z" fill="${c}"/><circle cx="20" cy="50" r="4" fill="#ff8ab8"/><circle cx="80" cy="50" r="4" fill="#ff8ab8"/>`;
+    case 'braid':return `<path d="M18 40 q0 -30 32 -30 q32 0 32 30 v22 q0 8 -8 8 h-48 q-8 0 -8 -8z" fill="${c}"/><path d="M74 50 q10 10 6 30 q-2 12 -8 14 q4 -14 -2 -28z" fill="${c}"/><path d="M76 58 l4 4 M74 68 l4 4 M72 78 l4 4" stroke="rgba(0,0,0,.3)" stroke-width="2"/>`;
+    case 'spacebuns':return `<path d="M20 40 q0 -30 30 -30 q30 0 30 30 v14 h-60z" fill="${c}"/><circle cx="20" cy="16" r="11" fill="${c}"/><circle cx="80" cy="16" r="11" fill="${c}"/>`;
+    case 'wavy':return `<path d="M18 40 q0 -30 32 -30 q32 0 32 30 v40 q-4 8 -8 0 q-4 8 -8 0 q-4 8 -8 0 q-4 8 -8 0 q-4 8 -8 0 q-4 8 -8 0 q-4 8 -8 0 q-4 8 -8 0z" fill="${c}"/>`;
+    case 'mohawk':return `<path d="M26 40 q4 -18 24 -18 q20 0 24 18z" fill="${c}" opacity=".5"/><path d="M42 40 l2 -34 l6 10 l6 -10 l2 34z" fill="${c}"/>`;
+    case 'afro':return `<circle cx="50" cy="36" r="40" fill="${c}"/><circle cx="20" cy="40" r="12" fill="${c}"/><circle cx="80" cy="40" r="12" fill="${c}"/><circle cx="30" cy="12" r="12" fill="${c}"/><circle cx="70" cy="12" r="12" fill="${c}"/>`;
+    case 'wolfcut':return `<path d="M18 40 q0 -30 32 -30 q32 0 32 30 v22 l-6 8 l-4 -8 l-6 8 l-4 -8 l-6 8 l-4 -8 l-6 8 l-4 -8 l-6 8 l-4 -8 l-6 8z" fill="${c}"/>`;
+    case 'hime':return `<path d="M18 40 q0 -30 32 -30 q32 0 32 30 v56 h-12 v-40 h-40 v40 h-12z" fill="${c}"/>`;
     default:return `<path d="M20 42 q0 -30 30 -30 q30 0 30 30 v12 h-60z" fill="${c}"/>`;
   }
 }
@@ -25,7 +35,10 @@ function hairFront(style,c){
     case 'buzz':return `<path d="M22 36 q4 -20 28 -20 q24 0 28 20 q-14 -10 -28 -8 q-14 -2 -28 8z" fill="${c}" opacity=".8"/>`;
     case 'curly':return `<path d="M20 40 q4 -22 30 -22 q26 0 30 22 q-6 -8 -12 -2 q-6 -8 -12 -2 q-6 -8 -12 -2 q-6 -8 -12 -2 q-6 -6 -12 8z" fill="${c}"/>`;
     case 'spiky':return `<path d="M22 40 q6 -18 28 -18 q22 0 28 18 q-8 -6 -14 2 q-6 -8 -14 -2 q-8 -6 -14 2 q-8 -4 -14 -2z" fill="${c}"/>`;
-    case 'bob':case 'long':return `<path d="M20 42 q2 -24 30 -24 q28 0 30 24 q-10 -10 -20 -6 q-10 -8 -20 -2 q-10 -6 -20 8z" fill="${c}"/>`;
+    case 'bob':case 'long':case 'wavy':case 'wolfcut':case 'braid':return `<path d="M20 42 q2 -24 30 -24 q28 0 30 24 q-10 -10 -20 -6 q-10 -8 -20 -2 q-10 -6 -20 8z" fill="${c}"/>`;
+    case 'hime':return `<path d="M20 44 q2 -26 30 -26 q28 0 30 26 h-60z" fill="${c}"/>`;
+    case 'mohawk':return '';
+    case 'afro':return `<path d="M20 40 q4 -22 30 -22 q26 0 30 22 q-6 -6 -12 -2 q-6 -6 -12 -2 q-6 -6 -12 -2 q-6 -6 -12 -2 q-6 -6 -12 8z" fill="${c}"/>`;
     default:return `<path d="M20 42 q2 -24 30 -24 q28 0 30 24 q-8 -10 -16 -8 q-8 -8 -16 -4 q-10 -6 -14 6 q-6 -8 -14 6z" fill="${c}"/>`;
   }
 }
@@ -34,6 +47,10 @@ function eyes(style,mood){
   if(mood==='angry')return `<ellipse cx="37" cy="48" rx="6" ry="6" fill="#fff"/><ellipse cx="63" cy="48" rx="6" ry="6" fill="#fff"/><circle cx="38" cy="49" r="3.4" fill="#c22b3a"/><circle cx="62" cy="49" r="3.4" fill="#c22b3a"/><path d="M29 40 l14 5 M71 40 l-14 5" stroke="#1a1020" stroke-width="3" stroke-linecap="round"/>`;
   if(mood==='glow')return `<circle cx="37" cy="48" r="6" fill="#ffd166"/><circle cx="63" cy="48" r="6" fill="#ffd166"/><circle cx="37" cy="48" r="2.4" fill="#1a1020"/><circle cx="63" cy="48" r="2.4" fill="#1a1020"/>`;
   if(style==='almond')return `<path d="M29 48 q8 -8 16 0 q-8 6 -16 0z M55 48 q8 -8 16 0 q-8 6 -16 0z" fill="#fff"/><circle cx="37" cy="47.5" r="3.4" fill="#2a1a14"/><circle cx="63" cy="47.5" r="3.4" fill="#2a1a14"/><circle cx="38.5" cy="46" r="1.2" fill="#fff"/><circle cx="64.5" cy="46" r="1.2" fill="#fff"/>`;
+  if(style==='heart')return `<path d="M37 55 l-9 -9 a5 5 0 0 1 9 -6 a5 5 0 0 1 9 6z M63 55 l-9 -9 a5 5 0 0 1 9 -6 a5 5 0 0 1 9 6z" fill="#ff5a8a"/>`;
+  if(style==='star')return `<path d="M37 40 l3 7 l7 0 l-6 4 l2 7 l-6 -4 l-6 4 l2 -7 l-6 -4 l7 0z M63 40 l3 7 l7 0 l-6 4 l2 7 l-6 -4 l-6 4 l2 -7 l-6 -4 l7 0z" fill="#ffd166"/><circle cx="37" cy="48" r="2" fill="#1a1020"/><circle cx="63" cy="48" r="2" fill="#1a1020"/>`;
+  if(style==='sleepy')return `<path d="M30 49 q7 6 14 0 M56 49 q7 6 14 0" stroke="#2a1a14" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M30 44 q7 -4 14 0 M56 44 q7 -4 14 0" stroke="#2a1a14" stroke-width="2" fill="none" opacity=".5"/>`;
+  if(style==='cat')return `<ellipse cx="37" cy="48" rx="7" ry="8" fill="#ffd166"/><ellipse cx="63" cy="48" rx="7" ry="8" fill="#ffd166"/><ellipse cx="37" cy="48" rx="2" ry="6.5" fill="#1a1020"/><ellipse cx="63" cy="48" rx="2" ry="6.5" fill="#1a1020"/><circle cx="35.5" cy="45" r="1.4" fill="#fff"/><circle cx="61.5" cy="45" r="1.4" fill="#fff"/>`;
   if(style==='sparkle')return `<ellipse cx="37" cy="48" rx="7" ry="8" fill="#fff"/><ellipse cx="63" cy="48" rx="7" ry="8" fill="#fff"/><ellipse cx="37.5" cy="49" rx="4.6" ry="5.6" fill="#3a5aa8"/><ellipse cx="63.5" cy="49" rx="4.6" ry="5.6" fill="#3a5aa8"/><circle cx="35.5" cy="46" r="2" fill="#fff"/><circle cx="61.5" cy="46" r="2" fill="#fff"/><circle cx="39.5" cy="51" r="1" fill="#fff"/><circle cx="65.5" cy="51" r="1" fill="#fff"/>`;
   return `<ellipse cx="37" cy="48" rx="6.5" ry="7.5" fill="#fff"/><ellipse cx="63" cy="48" rx="6.5" ry="7.5" fill="#fff"/><ellipse cx="37.5" cy="49" rx="4" ry="5" fill="#2a1a14"/><ellipse cx="63.5" cy="49" rx="4" ry="5" fill="#2a1a14"/><circle cx="36" cy="46.5" r="1.6" fill="#fff"/><circle cx="62" cy="46.5" r="1.6" fill="#fff"/>`;
 }
@@ -52,6 +69,12 @@ function topShape(top,c){
     case 'scrubs':return `<rect x="30" y="76" width="40" height="32" rx="9" fill="#5fb3c9"/><path d="M42 76 l8 8 l8 -8" stroke="#3a7a8a" stroke-width="2" fill="none"/><rect x="56" y="88" width="9" height="9" rx="1" fill="#e8f4f8"/><path d="M60.5 89.5 v6 M57.5 92.5 h6" stroke="#c22b3a" stroke-width="1.6"/>`;
     case 'flannel':return `<rect x="30" y="76" width="40" height="32" rx="9" fill="#a83a2a"/><path d="M30 86 h40 M30 96 h40 M40 76 v32 M50 76 v32 M60 76 v32" stroke="#4a1a14" stroke-width="2" opacity=".6"/>`;
     case 'tux':return `<rect x="30" y="76" width="40" height="32" rx="9" fill="#1a1a1e"/><path d="M42 76 l8 12 l8 -12z" fill="#fff"/><path d="M46 80 l4 4 l4 -4 l-4 -2z" fill="#c22b3a"/>`;
+    case 'sweater':return `<rect x="28" y="76" width="44" height="34" rx="11" fill="#d9b48a"/><path d="M28 86 h44 M28 94 h44 M28 102 h44" stroke="rgba(0,0,0,.12)" stroke-width="3"/><path d="M40 76 q10 8 20 0" stroke="#b58a5a" stroke-width="4" fill="none"/>`;
+    case 'overalls':return `<rect x="30" y="76" width="40" height="32" rx="9" fill="#f2c230"/><rect x="34" y="84" width="32" height="24" rx="4" fill="#3a5a8a"/><rect x="36" y="76" width="6" height="12" fill="#3a5a8a"/><rect x="58" y="76" width="6" height="12" fill="#3a5a8a"/><rect x="44" y="92" width="12" height="8" rx="2" fill="#2a4a7a"/>`;
+    case 'sailor':return `<rect x="30" y="76" width="40" height="32" rx="9" fill="#f6f2ea"/><path d="M30 76 h40 l-10 14 h-20z" fill="#2a3a6a"/><path d="M46 84 l4 6 l4 -6" fill="#c22b3a"/><path d="M30 104 h40" stroke="#2a3a6a" stroke-width="3"/>`;
+    case 'sundress':return `<path d="M32 76 h36 l6 40 h-48z" fill="#ff8ab8"/><circle cx="42" cy="90" r="2" fill="#fff"/><circle cx="56" cy="98" r="2" fill="#fff"/><circle cx="48" cy="106" r="2" fill="#fff"/><path d="M40 76 q10 6 20 0" stroke="#c9557f" stroke-width="3" fill="none"/>`;
+    case 'pajamas':return `<rect x="30" y="76" width="40" height="32" rx="9" fill="#5fb3c9"/><circle cx="40" cy="84" r="2.5" fill="#fff"/><circle cx="60" cy="88" r="2.5" fill="#fff"/><circle cx="46" cy="98" r="2.5" fill="#fff"/><circle cx="58" cy="102" r="2.5" fill="#fff"/><path d="M50 78 v28" stroke="rgba(255,255,255,.5)" stroke-width="2"/>`;
+    case 'labcoat':return `<rect x="28" y="76" width="44" height="36" rx="8" fill="#f6f2ea"/><path d="M42 76 l8 10 l8 -10" stroke="#5fb3c9" stroke-width="3" fill="none"/><rect x="54" y="90" width="10" height="8" fill="#5fb3c9"/><path d="M50 86 v26" stroke="#ddd" stroke-width="1.5"/>`;
     case 'skeleton':return `<rect x="30" y="76" width="40" height="32" rx="9" fill="#1a1a1e"/><path d="M50 78 v28 M36 84 h28 M38 92 h24 M40 100 h20" stroke="#e8e0d0" stroke-width="3" stroke-linecap="round"/>`;
     default:return base+`<path d="M38 76 q12 8 24 0" stroke="rgba(0,0,0,.25)" stroke-width="3" fill="none"/>`;
   }
@@ -65,6 +88,13 @@ function hatShape(hat,hairC){
     case 'bandana':return `<path d="M20 42 q2 -24 30 -24 q28 0 30 24 v2 h-60z" fill="#c22b3a"/><path d="M78 42 l10 -8 l-4 12z" fill="#c22b3a"/>`;
     case 'halo':return `<ellipse cx="50" cy="8" rx="20" ry="5" fill="none" stroke="#ffd166" stroke-width="3"/>`;
     case 'crown':return `<path d="M28 40 v-14 l8 8 l8 -12 l6 12 l6 -12 l8 12 l8 -8 v14z" fill="#e6a530"/><circle cx="50" cy="30" r="2.5" fill="#c22b3a"/>`;
+    case 'beret':return `<path d="M18 40 q6 -24 36 -22 q28 2 30 20 q-6 -4 -14 -1 q-16 -6 -34 0 q-10 -2 -18 3z" fill="#c22b3a"/><circle cx="52" cy="17" r="3" fill="#8a1a26"/>`;
+    case 'bunny':return `<path d="M28 40 q-8 -40 4 -46 q10 4 8 44z M72 40 q8 -40 -4 -46 q-10 4 -8 44z" fill="#f6f2ea"/><path d="M31 36 q-4 -28 2 -34 q4 6 4 32z M69 36 q4 -28 -2 -34 q-4 6 -4 32z" fill="#ff8ab8"/>`;
+    case 'flowers':return `<path d="M18 40 q32 -10 64 0" stroke="#4a7a2a" stroke-width="4" fill="none"/><circle cx="24" cy="40" r="5" fill="#ff8ab8"/><circle cx="38" cy="35" r="5" fill="#ffd166"/><circle cx="52" cy="33" r="5" fill="#ff8ab8"/><circle cx="66" cy="35" r="5" fill="#fff"/><circle cx="78" cy="40" r="5" fill="#ffd166"/>`;
+    case 'headphones':return `<path d="M18 48 q0 -36 32 -36 q32 0 32 36" stroke="#3a3a44" stroke-width="5" fill="none"/><rect x="12" y="42" width="12" height="18" rx="4" fill="#3a3a44"/><rect x="76" y="42" width="12" height="18" rx="4" fill="#3a3a44"/><rect x="14" y="46" width="8" height="10" rx="2" fill="#ff8ab8"/><rect x="78" y="46" width="8" height="10" rx="2" fill="#ff8ab8"/>`;
+    case 'party':return `<path d="M50 -2 l16 44 h-32z" fill="#7a4aa8"/><path d="M42 30 h16 M38 40 h24" stroke="#ffd166" stroke-width="3"/><circle cx="50" cy="0" r="4" fill="#ff8ab8"/>`;
+    case 'bearhood':return `<path d="M16 44 q2 -32 34 -32 q32 0 34 32 v4 h-68z" fill="#8a6a4a"/><circle cx="22" cy="18" r="10" fill="#8a6a4a"/><circle cx="78" cy="18" r="10" fill="#8a6a4a"/><circle cx="22" cy="18" r="5" fill="#d9b48a"/><circle cx="78" cy="18" r="5" fill="#d9b48a"/>`;
+    case 'tiara':return `<path d="M26 40 v-8 l8 4 l8 -12 l8 8 l8 -8 l8 12 l8 -4 v8z" fill="#e8e0d0"/><circle cx="50" cy="28" r="3" fill="#5aa9e6"/><circle cx="34" cy="34" r="2" fill="#ff8ab8"/><circle cx="66" cy="34" r="2" fill="#ff8ab8"/>`;
     case 'witch':return `<path d="M16 44 q34 -6 68 0 q-4 6 -34 6 q-30 0 -34 -6z" fill="#1a1a1e"/><path d="M28 42 l18 -40 l16 40z" fill="#1a1a1e"/><path d="M30 40 h40" stroke="#7a4aa8" stroke-width="4"/>`;
     case 'pumpkin':return `<ellipse cx="50" cy="46" rx="36" ry="30" fill="#e8842a"/><path d="M50 16 v-10" stroke="#4a7a2a" stroke-width="5" stroke-linecap="round"/><path d="M30 40 l8 -8 l4 8z M70 40 l-8 -8 l-4 8z" fill="#1a1a1e"/><path d="M34 56 l6 6 l6 -6 l4 6 l4 -6 l6 6 l6 -6" stroke="#1a1a1e" stroke-width="3" fill="none"/>`;
     case 'helmet':return `<path d="M18 44 q2 -30 32 -30 q30 0 32 30 v2 h-64z" fill="#3a7ad6"/><path d="M18 44 h64" stroke="#1a3a7a" stroke-width="3"/><path d="M30 24 q20 -10 40 0" stroke="#fff" stroke-width="2" fill="none" opacity=".5"/>`;
@@ -78,6 +108,12 @@ function accShape(acc){
     case 'scarf':return `<rect x="30" y="70" width="40" height="10" rx="5" fill="#c22b3a"/><rect x="34" y="72" width="32" height="2" fill="#e8e0d0"/><rect x="58" y="76" width="9" height="20" rx="4" fill="#c22b3a"/>`;
     case 'eyepatch':return `<circle cx="63" cy="48" r="8" fill="#1a1a1e"/><path d="M22 36 q30 -6 62 8" stroke="#1a1a1e" stroke-width="2" fill="none"/>`;
     case 'mask':return `<path d="M26 52 q24 -14 48 0 v12 q-24 12 -48 0z" fill="#3a3a44"/><circle cx="38" cy="58" r="5" fill="#8a8a94"/><circle cx="62" cy="58" r="5" fill="#8a8a94"/>`;
+    case 'bandaid':return `<rect x="60" y="56" width="14" height="6" rx="2" fill="#d9b48a" transform="rotate(-20 67 59)"/><path d="M63 58 h8" stroke="#c9a070" stroke-width="1" transform="rotate(-20 67 59)"/>`;
+    case 'choker':return `<rect x="34" y="72" width="32" height="5" rx="2" fill="#1a1a1e"/><circle cx="50" cy="75" r="2.5" fill="#ff8ab8"/>`;
+    case 'stars':return `<path d="M37 39 l3 7 l7 0 l-6 4 l2 7 l-6 -4 l-6 4 l2 -7 l-6 -4 l7 0z M63 39 l3 7 l7 0 l-6 4 l2 7 l-6 -4 l-6 4 l2 -7 l-6 -4 l7 0z" fill="none" stroke="#ff8ab8" stroke-width="2.5"/><path d="M46 47 h8" stroke="#ff8ab8" stroke-width="2"/>`;
+    case 'flower':return `<circle cx="74" cy="22" r="7" fill="#ff8ab8"/><circle cx="74" cy="22" r="3" fill="#ffd166"/>`;
+    case 'blush':return `<circle cx="30" cy="58" r="7" fill="#ff8ab8" opacity=".6"/><circle cx="70" cy="58" r="7" fill="#ff8ab8" opacity=".6"/>`;
+    case 'freckles':return `<circle cx="28" cy="56" r="1.2" fill="#a8704a"/><circle cx="33" cy="60" r="1.2" fill="#a8704a"/><circle cx="26" cy="62" r="1.2" fill="#a8704a"/><circle cx="72" cy="56" r="1.2" fill="#a8704a"/><circle cx="67" cy="60" r="1.2" fill="#a8704a"/><circle cx="74" cy="62" r="1.2" fill="#a8704a"/>`;
     case 'wings':return `<path d="M30 84 q-26 -20 -28 4 q10 -6 14 4 q6 -8 14 0z M70 84 q26 -20 28 4 q-10 -6 -14 4 q-6 -8 -14 0z" fill="#2a1a3a" stroke="#7a4aa8" stroke-width="1.5"/>`;
     default:return '';
   }
@@ -139,5 +175,5 @@ function petSVG(kind,size){
 const imgCache=new Map();
 function spriteImg(svg){let i=imgCache.get(svg);if(i)return i;i=new Image();i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);imgCache.set(svg,i);if(imgCache.size>60){const k=imgCache.keys().next().value;imgCache.delete(k);}return i;}
 function randomAv(){return {skin:Math.floor(Math.random()*SKINS.length),hair:HAIR_STYLES[Math.floor(Math.random()*HAIR_STYLES.length)],hairColor:Math.floor(Math.random()*HAIR_COLORS.length),eyes:EYES[Math.floor(Math.random()*EYES.length)],top:'hoodie',topColor:Math.floor(Math.random()*TOP_COLORS.length),hat:'',acc:''};}
-return {SKINS,HAIR_COLORS,HAIR_STYLES,EYES,TOP_COLORS,HATS,TOPS,ACCS,avatarSVG,zombieSVG,petSVG,spriteImg,randomAv};
+return {SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,avatarSVG,zombieSVG,petSVG,spriteImg,randomAv};
 })();

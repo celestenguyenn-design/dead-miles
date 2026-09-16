@@ -196,6 +196,13 @@ a{color:var(--amber)}
 .shelf{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .shelf .it{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:6px;background:var(--ash2);border:1px solid var(--line);font-size:11px;text-align:center}
 .shelf .it .e{font-size:22px}.shelf .it.locked{opacity:.3;filter:grayscale(1)}
+.shopgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
+.shopit{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);font-size:11px;text-align:center}
+.shopit svg{display:block}
+.shopit b{font-family:'Barlow';font-weight:700;font-size:12px;line-height:1.2}
+.shopit span{color:var(--muted);font-variant-numeric:tabular-nums}
+.shopit.own{border-color:var(--rot2)}
+.shopit.own span{color:var(--rot)}
 .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:10px}
 .tabs button{padding:8px 12px;font-weight:700;font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);border-bottom:2px solid transparent}
 .tabs button.on{color:var(--bone);border-bottom-color:var(--amber)}
