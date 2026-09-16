@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='5.9';
+const VERSION='6.0';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -252,6 +252,36 @@ function restoreSnapshot(i){
   snapshot('before going back');
   const keep=S.online;S=Object.assign(fresh(),s.s);S.online=(keep&&keep.ok)?keep:(s.s.online||keep);S.combat=false;ensureState();
   log('Went back to the save from '+ago(s.t)+'.');save();render();toast('Earlier save restored','z');pushPlayer();
+}
+
+// ---- cloud restore points (server-side history, v6.0) ----
+let CLOUD_SNAPS=null;
+async function loadCloudSnaps(){
+  const o=O();const el=$('#cloudSnapList');
+  if(!o.ok){if(el)el.innerHTML='<p class="help">Go online first (Base tab, Settings) and these appear.</p>';return;}
+  if(el)el.innerHTML='<p class="help">Checking the server...</p>';
+  try{const rows=await rpc('list_saves',{p_handle:o.handle,p_token:o.token});
+    CLOUD_SNAPS=rows||[];renderCloudSnaps();
+  }catch(e){if(el)el.innerHTML='<p class="help">Could not reach the server: '+esc(e.message)+'</p>';}
+}
+function renderCloudSnaps(){
+  const el=$('#cloudSnapList');if(!el)return;
+  if(!CLOUD_SNAPS||!CLOUD_SNAPS.length){el.innerHTML='<p class="help">No server restore points yet. They start building up from now on.</p>';return;}
+  el.innerHTML=CLOUD_SNAPS.map((r,i)=>{const t=new Date(r.at).getTime();
+    return '<div class="lbrow"><div class="rk">'+(i+1)+'</div><div class="nm">Level '+(r.lvl||1)+'<small>'+fmt(r.steps_total||0)+' lifetime steps · '+esc(ago(t))+(r.why&&r.why!=='auto'?' · '+esc(r.why):'')+'</small></div><div class="sc"><button class="btn xs" onclick="restoreCloudSnap('+r.id+')">Go back</button></div></div>';}).join('');
+}
+async function restoreCloudSnap(id){
+  const o=O();if(!o.ok)return;
+  const r=(CLOUD_SNAPS||[]).find(x=>x.id===id);
+  if(!confirm('Go back to the server save from '+(r?ago(new Date(r.at).getTime()):'that time')+'?'+(r?' (level '+(r.lvl||1)+', '+fmt(r.steps_total||0)+' steps.)':'')+' What is on this phone right now is kept as a restore point.'))return;
+  try{const st=await rpc('get_save',{p_handle:o.handle,p_token:o.token,p_id:id});
+    const cs=st&&st.public&&st.public.save;
+    if(!cs||!cs.onboarded){toast('That restore point has no character in it.','d');return;}
+    snapshot('before a server restore');
+    const keep=S.online;S=Object.assign(fresh(),cs);S.online=keep;S.combat=false;S.journal=[];ensureState();
+    log('Restored the server save from '+ago(new Date((r&&r.at)||Date.now()).getTime())+'.');
+    save();render();toast('Save restored','z');pushPlayer();
+  }catch(e){toast(e.message,'d');}
 }
 function save(quiet){try{
   if(S&&S.pets&&S.petActive){const ap=S.pets.find(p=>p.id===S.petActive);if(ap){ap.xp=S.petXp||0;ap.name=S.petName||ap.name;}}
@@ -1047,7 +1077,7 @@ function render(){
   $('#shelfSub').textContent=S.shelf.length+' found';const shelfIds=Object.entries(ITEMS).filter(([k,v])=>v.cat==='shelf');const owned=S.shelf.reduce((m,x)=>{m[x.id]=(m[x.id]||0)+1;return m;},{});
   $('#shelf').innerHTML=shelfIds.map(([k,v])=>`<div class="it${owned[k]?'':' locked'}"><div class="e">${v.e}</div><span class="rc-${v.r}">${v.n}${owned[k]>1?' x'+owned[k]:''}</span></div>`).join('');
   $('#goalInput').value=S.goal;$('#nameInput').value=S.name;$('#sfxBtn').textContent=S.sfx?'On':'Off';const vs=$('#verSub');if(vs)vs.textContent='v'+VERSION;const bi=backupInfo();const ub=$('#undoRow');if(ub){ub.hidden=!bi;if(bi)$('#undoBtn').textContent='Undo restore (put back the save from '+ago(bi.t)+')';}
-  const snList=snapshots();const snEl=$('#snapList');if(snEl)snEl.innerHTML=snList.length?snList.map((s,i)=>`<div class="lbrow"><div class="rk">${i+1}</div><div class="nm">${esc(s.name||'Survivor')} · level ${s.lvl}<small>${fmt(s.steps)} lifetime steps · ${esc(ago(s.t))}${s.why&&s.why!=='auto'?' · '+esc(s.why):''}</small></div><div class="sc"><button class="btn xs" onclick="restoreSnapshot(${i})">Go back</button></div></div>`).join(''):'<p class="help">None yet. The game keeps one an hour, plus one before anything risky.</p>';
+  const snList=snapshots();const snEl=$('#snapList');if(snEl)snEl.innerHTML=snList.length?snList.map((s,i)=>`<div class="lbrow"><div class="rk">${i+1}</div><div class="nm">${esc(s.name||'Survivor')} · level ${s.lvl}<small>${fmt(s.steps)} lifetime steps · ${esc(ago(s.t))}${s.why&&s.why!=='auto'?' · '+esc(s.why):''}</small></div><div class="sc"><button class="btn xs" onclick="restoreSnapshot(${i})">Go back</button></div></div>`).join(''):'<p class="help">None yet. The game keeps one an hour, plus one before anything risky.</p>';if(CLOUD_SNAPS===null&&O().ok)loadCloudSnaps();else renderCloudSnaps();
   // county
   renderMap();renderParty();renderBoss();renderDeal();renderEvent();renderStory();renderShop();renderPet();
   const tier=TIERS[S.league.tier];$('#tierBadge').textContent=tier.e;$('#tierName').textContent=tier.n;$('#tierSub').textContent='Tier '+(S.league.tier+1)+' of '+TIERS.length+' · stash x'+tier.mult;
