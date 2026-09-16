@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='5.5';
+const VERSION='5.6';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -832,22 +832,42 @@ function b64ToU8(b){const pad='='.repeat((4-b.length%4)%4);const raw=atob((b+pad
 function pushSupported(){return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;}
 async function pushState(){if(!pushSupported())return 'unsupported';if(Notification.permission==='denied')return 'blocked';
   try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();return sub?'on':'off';}catch(e){return 'off';}}
+let PUSH_MSG='';
+function pushSay(m){PUSH_MSG=m;renderPush();}
 async function pushOn(){
-  const o=O();if(!o.ok){toast('Go online first, up in Settings');return;}
-  if(!pushSupported()){toast('This browser cannot do notifications. On iPhone, add the game to your home screen first.','d');return;}
+  const o=O();
+  if(!o.ok){pushSay('Go online first, in the Online box just below this one. Notifications are tied to your handle.');return;}
+  if(!pushSupported()){pushSay(isIOS()?'On an iPhone this only works from the home-screen icon. Add the game to your home screen from the Safari share menu, then open it from the icon and try again.':'This browser does not support notifications.');return;}
+  pushSay('Asking your phone for permission...');
   let perm=Notification.permission;
-  if(perm==='default')perm=await Notification.requestPermission();
-  if(perm!=='granted'){toast(perm==='denied'?'Notifications are blocked. Turn them on for this site in your phone settings.':'Not now, then.','d');renderPush();return;}
+  try{if(perm==='default')perm=await Notification.requestPermission();}catch(e){pushSay('Your phone refused the permission prompt: '+e.message);return;}
+  if(perm!=='granted'){pushSay(perm==='denied'?'You (or the phone) said no. Open your phone settings for this site and allow notifications, then come back.':'The prompt was dismissed. Tap the button again and choose Allow.');return;}
+  let reg,sub;
+  try{pushSay('Permission given. Setting up...');reg=await navigator.serviceWorker.ready;}
+  catch(e){pushSay('The game background worker did not start: '+e.message+'. Close the app fully and reopen it.');return;}
   try{
-    const reg=await navigator.serviceWorker.ready;
-    let sub=await reg.pushManager.getSubscription();
+    sub=await reg.pushManager.getSubscription();
     if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(VAPID_PUBLIC)});
-    const j=sub.toJSON();
+  }catch(e){pushSay('Your phone would not create the subscription: '+e.message);return;}
+  const j=sub.toJSON();
+  try{
     const ok=await rpc('save_push_sub',{p_handle:o.handle,p_token:o.token,p_endpoint:sub.endpoint,p_p256dh:j.keys.p256dh,p_auth:j.keys.auth,p_tz:-new Date().getTimezoneOffset()});
-    if(ok){S.push=true;save();toast('Notifications on','z');log('Notifications turned on for this phone.');}
-    else toast('The server did not accept it. Try Go online again.','d');
-  }catch(e){toast('Could not turn on notifications: '+e.message,'d');}
+    if(ok){S.push=true;save();PUSH_MSG='';toast('Notifications on','z');log('Notifications turned on for this phone.');}
+    else pushSay('The server said no to your handle and key. Try Go online again below, then retry.');
+  }catch(e){
+    const m=String(e.message||'');
+    if(m.indexOf('404')>=0||m.toLowerCase().indexOf('could not find')>=0)pushSay('The notification setup has not been added to the database yet. That is the SQL paste in round six of the setup page. Everything else on your phone is ready.');
+    else pushSay('The server could not be reached: '+m);
+    return;
+  }
   renderPush();
+}
+function isIOS(){return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}
+async function pushTest(){
+  try{const reg=await navigator.serviceWorker.ready;
+    await reg.showNotification('Dead Miles',{body:'This is what a nudge looks like. The real ones come from the server.',icon:'./icon.png',tag:'test'});
+    pushSay('Sent a test to this phone. If you did not see it, notifications are muted for this app in your phone settings.');
+  }catch(e){pushSay('Could not show a test notification: '+e.message);}
 }
 async function pushOff(){
   const o=O();try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
@@ -857,12 +877,15 @@ async function pushOff(){
 }
 async function renderPush(){
   const el=$('#pushBody');if(!el)return;const st=await pushState();const o=O();
-  if(st==='unsupported'){el.innerHTML='<p class="help">This browser cannot send notifications. On an iPhone, add the game to your home screen and open it from there.</p>';return;}
-  if(st==='blocked'){el.innerHTML='<p class="help">Notifications are blocked for this site. Turn them back on in your phone\'s settings for this site, then come back.</p>';return;}
-  if(!o.ok){el.innerHTML='<p class="help">Go online above first. Notifications are tied to your handle.</p>';return;}
-  el.innerHTML=st==='on'
-    ?`<p class="help">On for this phone. You will hear about horde night an hour before, raids, a streak about to break, and your rival passing you.</p><div class="row" style="margin-top:8px"><button class="btn sm ghost" onclick="pushOff()">Turn off</button></div>`
-    :`<p class="help">Get a nudge for horde night, raids, a streak about to break, and when your rival passes you. Nothing else.</p><div class="row" style="margin-top:8px"><button class="btn sm r" onclick="pushOn()">Turn on notifications</button></div>`;
+  const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+  const note=PUSH_MSG?`<p class="help" style="color:var(--amber);border-left:3px solid var(--amber);padding-left:8px;margin:8px 0">${esc(PUSH_MSG)}</p>`:'';
+  const diag=`<p class="help" style="font-size:11px;margin-top:8px;opacity:.8">v${VERSION} · ${standalone?'home-screen app':'browser tab'} · permission ${typeof Notification==='undefined'?'n/a':Notification.permission} · push ${('PushManager' in window)?'available':'missing'} · account ${o.ok?'@'+esc(o.handle):'offline'}</p>`;
+  if(st==='unsupported'){el.innerHTML=`<p class="help">${isIOS()&&!standalone?'On an iPhone, notifications only work from the home-screen icon. Tap the Safari share button, Add to Home Screen, then open the game from that icon.':'This browser does not support notifications.'}</p>${note}${diag}`;return;}
+  if(st==='blocked'){el.innerHTML=`<p class="help">Notifications are switched off for this app in your phone settings. On Android: long-press the icon, App info, Notifications, turn on. On iPhone: Settings, Notifications, Dead Miles, Allow.</p>${note}${diag}`;return;}
+  if(!o.ok){el.innerHTML=`<p class="help">Go online in the Online box below first. Notifications are tied to your handle.</p>${note}${diag}`;return;}
+  el.innerHTML=(st==='on'
+    ?`<p class="help">On for this phone. You will hear about horde night an hour before, raids, a streak about to break, and your rival passing you.</p><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pushTest()">Send a test</button><button class="btn sm ghost" onclick="pushOff()">Turn off</button></div>`
+    :`<p class="help">Get a nudge for horde night, raids, a streak about to break, and when your rival passes you. Nothing else.</p><div class="row" style="margin-top:8px"><button class="btn sm r" onclick="pushOn()">Turn on notifications</button></div>`)+note+diag;
 }
 let updateReady=false;
 async function applyUpdate(){try{const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister();const ks=await caches.keys();for(const k of ks)await caches.delete(k);}catch(e){}location.href=location.pathname+'?r='+Date.now();}
