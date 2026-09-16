@@ -39,7 +39,7 @@ const GEAR={
   nightingale:{n:'Nightingale',e:'🦺',slot:'armor',dr:4,w:0,pts:85,r:'legendary',legend:'Heals 5 HP every combat round'}
 };
 const LEGEND_IDS=['mercy','lastword','oldreliable','whisper','nightingale'];
-const CAT_LABEL={food:'Food',water:'Water',meds:'Meds',scrap:'Scrap',ammo:'Ammo',shelf:'Trophy',key:'Key',chest:'Chest',gear:'Gear',cosmetic:'Cosmetic'};
+const CAT_LABEL={food:'Food',water:'Water',meds:'Meds',scrap:'Scrap',ammo:'Ammo',shelf:'Trophy',key:'Key',chest:'Chest',gear:'Gear',cosmetic:'Cosmetic',candy:'Candy'};
 const byCat=(c)=>Object.entries(ITEMS).filter(([k,v])=>v.cat===c&&v.w>0).map(([k,v])=>({id:k,...v}));
 function table(cats,shelfW,gearW){const out=[];for(const c of cats)out.push(...byCat(c));if(shelfW)out.push(...byCat('shelf').map(x=>({...x,w:x.w*shelfW})));if(gearW)out.push(...Object.entries(GEAR).filter(([k,v])=>v.w>0).map(([k,v])=>({id:k,gear:true,...v,w:v.w*gearW})));return out;}
 function cosmeticPool(){const out=[];for(const [k,v] of Object.entries(ART.HATS))out.push({id:'hat:'+k,slot:'hat',key:k,n:v.n,r:v.r});for(const [k,v] of Object.entries(ART.TOPS))if(v.r!=='common')out.push({id:'top:'+k,slot:'top',key:k,n:v.n,r:v.r});for(const [k,v] of Object.entries(ART.ACCS))out.push({id:'acc:'+k,slot:'acc',key:k,n:v.n,r:v.r});return out;}
@@ -69,6 +69,22 @@ const ENEMIES={
   gunner:{n:'Raider gunner',hp:38,dmg:[15,22],hit:.7,xp:26,w:0,dodge:.1,human:true},
   boss:{n:'Raider boss',hp:80,dmg:[17,25],hit:.8,xp:50,w:0,dodge:.25,human:true,boss:true}
 };
+const BOSS_GIMMICK={'Mad Dog Reyes':'reinforce','Sister Ash':'shield','The Butcher of Elm St':'bleed','Two-Tooth Tully':'steal','Queen Wasp':'dodgy','Preacher Cole':'heal','Ghost Delacroix':'flee','Big Sal':'slow','The Widow Marsh':'poison','Cutter Vance':'crit','The Gourd King':'reinforce'};
+const GIMMICK_TEXT={reinforce:'whistles for backup at half health',shield:'starts behind a riot shield: 30 damage soaks in before you touch him',bleed:'her cleaver makes you bleed for 3 rounds',steal:'picks your pack on every hit',dodgy:'fast and slippery: dodges 45% of swings',heal:'prays back 10 HP every round',flee:'bolts at a quarter health with the bounty',slow:'moves every other round, but hits like a truck',poison:'her hits sap your strength for 3 rounds',crit:'one swing in five lands double'};
+const STORY=[
+ {id:'s1',t:'Static',need:s=>true,txt:'A voice on 146.52 MHz, cutting in and out: "...anyone left in Hollow County, the bridge at the Overpass is still standing. We are holding the north side. Bring what you can carry."'},
+ {id:'s2',t:'Day one, again',need:s=>s.steps.total>=5000,txt:'A woman calling herself Marisol Vega: "Three weeks ago it was a fever. Two days later the clinics locked their doors. Whoever tells you this started at the hospital is lying. It started at the rail yard."'},
+ {id:'s3',t:'The raiders have a name',need:s=>s.kills>=15,txt:'"They call themselves the Tolls. Every crew that crosses Main Street pays or bleeds. Their bosses rotate weekly; the one on the posters is the one running things that week."'},
+ {id:'s4',t:'Main Street',need:s=>s.steps.total>=25000,txt:'"You made it past the Suburbs. Good. From here the Tolls own every intersection. Hit their strongholds and the roads open up for everyone, a week at a time."'},
+ {id:'s5',t:'The first head',need:s=>!!s.bossKilled,txt:'Marisol, quieter than usual: "That was one of theirs. They will not forget it. But two crews came through the checkpoint tonight without paying. That was you."'},
+ {id:'s6',t:'Old Town',need:s=>s.steps.total>=60000,txt:'"Old Town has the cathedral. The Tolls use the bell tower to watch the roads. Someone with a rifle up there would change things. Someone with a wrench could take the bell down."'},
+ {id:'s7',t:'What the rail yard held',need:s=>s.kills>=80,txt:'"I found the manifest. Forty crates, medical, marked for the county hospital. They never arrived. The fever did. Draw your own line between those two facts."'},
+ {id:'s8',t:'Hospital Row',need:s=>s.steps.total>=120000,txt:'"The hospital is standing. Third floor is where the crates went. The Tolls sealed it and put a boss on the door. If you get in there, you get the truth and a lot of meds."'},
+ {id:'s9',t:'The Marina',need:s=>s.steps.total>=200000,txt:'"Boats. Real ones, with fuel. The Tolls are loading them. If they leave with the crates, this county stays dead. The Overpass crossing is the only road to the docks."'},
+ {id:'s10',t:'The Overpass',need:s=>s.steps.total>=320000,txt:'"This is Marisol. If you can hear this, you walked the whole county. The north side is open. Come across. We could use someone who does not quit."'}
+];
+function eventNow(){const d=new Date();const m=d.getMonth()+1,day=d.getDate();if((m===10&&day>=15)||(m===11&&day<=2))return 'halloween';return '';}
+const HALLOWEEN_SHOP=[{id:'hat:witch',n:'Witch hat',c:40},{id:'hat:pumpkin',n:'Pumpkin head',c:60},{id:'top:skeleton',n:'Skeleton hoodie',c:50},{id:'acc:wings',n:'Bat wings',c:80}];
 const BOSS_NAMES=['Mad Dog Reyes','Sister Ash','The Butcher of Elm St','Two-Tooth Tully','Queen Wasp','Preacher Cole','Ghost Delacroix','Big Sal','The Widow Marsh','Cutter Vance'];
 const ROLES={
   brawler:{n:'Brawler',e:'🥊',d:(l)=>'Throws a '+(9+l*2)+'-'+(15+l*3)+' damage punch every round'},
@@ -198,7 +214,7 @@ function lootMult(){let m=district().loot;if(wxKind()==='snow')m*=1.1;if(wxKind(
 const district=()=>DISTRICTS[Math.min(S.walk.district,DISTRICTS.length-1)];
 function unlockedDistrict(){let d=0;for(let i=0;i<DISTRICTS.length;i++)if(S.steps.total>=DISTRICTS[i].steps)d=i;return d;}
 function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06));if(wxKind()==='snow')dist=Math.round(dist*1.1);S.walk.dist=dist;S.walk.progress=0;S.walk.toNext=dist;}
-function bossName(){return BOSS_NAMES[hash(weekId()+'boss')%BOSS_NAMES.length];}
+function bossName(){if(eventNow()==='halloween')return 'The Gourd King';return BOSS_NAMES[hash(weekId()+'boss')%BOSS_NAMES.length];}
 function makeLoc(){
   let type;
   if(S.walk.district>=1&&Math.random()<0.12&&S.campCleared!==weekId())type=LOCS.find(l=>l.t==='stronghold');else type=wpick(LOCS.filter(l=>l.w>0),'w');
@@ -215,6 +231,7 @@ function rollRoom(r,loc){
   if(Math.random()<0.07)out.push({id:'chest',...ITEMS.chest});
   if(Math.random()<(r.keyish?0.06:0.025))out.push({id:'key',...ITEMS.key});
   if(Math.random()<0.04){const c=rollCosmetic();if(c)out.push(c);}
+  if(eventNow()==='halloween'&&Math.random()<0.3)out.push({id:'candy',n:'Halloween candy',e:'🍬',pts:3,cat:'candy',r:'uncommon',qty:rint(2,5)});
   return out;
 }
 function rollCosmetic(){const pool=cosmeticPool().map(c=>({...c,w:(COS_W[c.r]||1)*rarW(c)}));const c=wpick(pool,'w');return {id:c.id,n:c.n,e:c.slot==='hat'?'🎩':c.slot==='top'?'👕':'🕶️',pts:c.r==='legendary'?60:c.r==='epic'?30:18,cat:'cosmetic',r:c.r,slot:c.slot,key:c.key};}
@@ -228,7 +245,7 @@ function encounterFor(loc){
   for(let i=0;i<count;i++){if(S.walk.district>=1&&Math.random()<0.15)out.push(mk(Math.random()<0.7?'raider':'gunner'));else{const k=wpick(Object.entries(ENEMIES).filter(([k,v])=>v.w>0).map(([k,v])=>({k,w:v.w*(isNight()&&k==='runner'?2:1)})),'w').k;out.push(mk(k));}}
   return out;
 }
-function strongholdStage(st){if(st===1)return [mk('raider'),mk('raider')];if(st===2)return [mk('raider'),mk('gunner'),mk('raider')];const b=mk('boss');b.n=bossName();b.hp=Math.round(b.hp*1.5);b.max=b.hp;b.wanted=true;return [mk('gunner'),b];}
+function strongholdStage(st){if(st===1)return [mk('raider'),mk('raider')];if(st===2)return [mk('raider'),mk('gunner'),mk('raider')];const b=mk('boss');b.n=bossName();b.hp=Math.round(b.hp*1.5);b.max=b.hp;b.wanted=true;b.g=BOSS_GIMMICK[b.n]||'crit';if(b.g==='shield')b.shield=30;if(b.g==='dodgy'){b.dodge=0.45;b.hp=Math.round(b.hp*0.7);b.max=b.hp;}if(b.g==='slow'){b.dmg=b.dmg.map(x=>Math.round(x*1.4));}return [mk('gunner'),b];}
 function mk(k){const e=ENEMIES[k];const scale=1+S.walk.district*0.12;return {k,n:e.n,hp:Math.round(e.hp*scale),max:Math.round(e.hp*scale),dmg:e.dmg.map(x=>Math.round(x*scale)),hit:e.hit,xp:e.xp,dodge:e.dodge||0,fast:!!e.fast,burst:e.burst||0,scream:e.scream||0,human:!!e.human,boss:!!e.boss,dead:false,stun:0};}
 
 /* ================= steps ================= */
@@ -262,8 +279,19 @@ function addSteps(n,src){
 }
 function arrive(){
   S.loc=makeLoc();S.walk.houses++;
+  if(!S.loc.stronghold&&S.walk.houses>2&&Math.random()<0.12){S.loc.rival=pick(RIVALS).id;}
   log('Reached '+S.loc.n+' ('+district().n+').');toast('Reached '+S.loc.e+' '+S.loc.n,'a');SFX.play('arrive');
   if(navigator.vibrate)try{navigator.vibrate([60,40,60]);}catch(e){}
+}
+function rivalAct(kind){
+  const loc=S.loc;if(!loc||!loc.rival)return;const r=RIVALS.find(x=>x.id===loc.rival);const first=r.n.split("'")[0];
+  if(kind==='race'){const p=0.5+(S.lvl-1)*0.03+roleLvl('scout')*0.05;if(Math.random()<p){loc.rival='';loc.rooms.forEach(rm=>rm.items.forEach(it=>{if(it.pts)it.pts=Math.round(it.pts*1.3);}));log('You beat '+first+' through the door. First pick of everything.');toast('You got there first','a');SFX.play('win');}
+    else{loc.rival='';loc.rooms.forEach(rm=>{rm.items=rm.items.slice(0,1);});log(first+' got in first and stripped the place. Scraps left.');toast(first+' beat you to it','d');}}
+  else if(kind==='wait'){loc.rival='';loc.cleared=true;S.walk.toNext=Math.min(S.walk.dist,S.walk.toNext+150);S.walk.progress=S.walk.dist-S.walk.toNext;log('You waited out '+first+'. They cleared the walkers for you; it cost you 150 steps of daylight.');ctEvent('places',1);}
+  else if(kind==='trade'){if(S.pack.filter(x=>x.cat==='food').length<3){toast('Maya wants 3 food from your pack');return;}let n=0;S.pack=S.pack.filter(x=>{if(x.cat==='food'&&n<3){n++;return false;}return true;});for(let i=0;i<2;i++)S.pack.push({id:'abx',...ITEMS.abx,uid:uid()});loc.rival='';log('Traded 3 food to Maya for 2 antibiotics.');toast('Trade done','z');}
+  else if(kind==='fight'){loc.rival='';const en=[mk('raider'),mk('raider')];en.forEach(e=>{e.n="Nadia's scout";e.hp=Math.round(e.hp*0.8);e.max=e.hp;});startCombat(en,'rival');return;}
+  else if(kind==='slip'){loc.rival='';S.walk.toNext=Math.min(S.walk.dist,S.walk.toNext+100);S.walk.progress=S.walk.dist-S.walk.toNext;log('You slipped past Nadia\'s scouts. Cost you 100 steps.');}
+  save();render();
 }
 function enterLoc(){
   const loc=S.loc;if(!loc||loc.cleared)return;
@@ -278,7 +306,7 @@ let C=null;
 function startCombat(enemies,where){
   C={enemies,where,turn:1,log:[],target:0,brace:false,over:false,fled:false};
   S.combat=true;SFX.play('growl');
-  const desc=where==='road'?'Something is in the road.':where==='wave'?'The noise brought more.':where==='raid'?'Raiders are at your walls.':S.loc&&S.loc.stronghold?['','At the gate.','Into the yard.','The boss trailer. '+bossName()+' is home.'][S.loc.stage+1]:'They were waiting inside '+S.loc.n+'.';
+  const desc=where==='rival'?'Nadia\'s scouts step out of the dark.':where==='road'?'Something is in the road.':where==='wave'?'The noise brought more.':where==='raid'?'Raiders are at your walls.':S.loc&&S.loc.stronghold?['','At the gate.','Into the yard.','The boss trailer. '+bossName()+' is home.'][S.loc.stage+1]:'They were waiting inside '+(S.loc?S.loc.n:'the dark')+'.';
   clog(desc+' '+enemies.length+' hostile'+(enemies.length>1?'s':'')+'.','sys');
   let amb=0.15;if(wxKind()==='fog')amb+=0.1;if(roleLvl('scout')||sk('quickdraw'))amb=0;
   if(where==='enter'&&Math.random()<amb){clog('Ambush! They act first.','hit');enemyPhase();}
@@ -288,7 +316,7 @@ function clog(m,c){C.log.unshift({m,c:c||''});C.log=C.log.slice(0,14);}
 function alive(){return C.enemies.filter(e=>!e.dead);}
 function targetEnemy(){let t=C.enemies[C.target];if(!t||t.dead){const a=alive();t=a[0];C.target=C.enemies.indexOf(t);}return t;}
 function hurt(n,src){let d=Math.max(1,n-dr());if(C.brace)d=Math.ceil(d*(1-(sk('steady')?0.6+sk('steady')*0.1:0.5)));if(S.pet==='dog'&&Math.random()<0.25){clog('Your dog lunges and takes the hit meant for you.','good');return;}S.hp-=d;C.pfx={d,t:Date.now()};clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
-function dealTo(t,d,label){t.hp-=d;t.fx={d,t:Date.now()};C.lunge=Date.now();clog(label+' for '+d+'.','you');if(t.wanted)ctEvent('boss',d);}
+function dealTo(t,d,label){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));if(t.shield>0){const s=Math.min(t.shield,d);t.shield-=s;d-=s;clog('The shield soaks '+s+'.'+(t.shield<=0?' It cracks apart.':''),'');if(d<=0){t.fx={d:0,t:Date.now()};C.lunge=Date.now();return;}}t.hp-=d;t.fx={d,t:Date.now()};C.lunge=Date.now();clog(label+' for '+d+'.','you');if(t.wanted)ctEvent('boss',d);}
 function breakWeapon(w){if(w.id==='oldreliable')return;if(w.dur<=0){clog('The '+w.n+' breaks.','sys');S.gear=S.gear.filter(g=>g.uid!==w.uid);S.eq.melee=null;}}
 function act(kind){
   if(!C||C.over)return;C.brace=false;
@@ -333,7 +361,7 @@ function act(kind){
     if(e.human){if(Math.random()<0.5){const g=pick(['pipe','bat','jacket','helmet','crowbar']);S.gear.push({uid:uid(),id:g,...GEAR[g]});clog('It dropped a '+GEAR[g].n+'.','sys');}
       if(Math.random()<0.5){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:3,n:'Rounds (x3)'});clog('You take 3 rounds off the body.','sys');}
       if(e.boss){S.keys++;S.pack.push({id:'skull',...ITEMS.skull,uid:uid()});clog('The boss mask, and a key from the belt.','sys');
-        if(e.wanted){S.bossKilled=weekId();S.pack.push({id:'wanted',...ITEMS.wanted,uid:uid()});clog('Bounty claimed: '+e.n+'. The poster comes off the wall.','good');ctEvent('bounty',1);if(Math.random()<0.3)dropLegend('The boss was carrying something.');}}}
+        if(e.wanted&&!e.fled){S.bossKilled=weekId();S.pack.push({id:'wanted',...ITEMS.wanted,uid:uid()});clog('Bounty claimed: '+e.n+'. The poster comes off the wall.','good');ctEvent('bounty',1);if(Math.random()<0.3)dropLegend('The boss was carrying something.');}}}
     else if(Math.random()<0.06){S.pack.push({id:'dogtag',...ITEMS.dogtag,uid:uid()});clog('A dog tag around its neck. Trophy.','sys');}}}
   if(!alive().length){renderCombat();setTimeout(()=>endCombat(true),500);return;}
   enemyPhase();
@@ -344,9 +372,20 @@ function enemyPhase(){
   for(const e of alive()){
     if(e.stun>0){e.stun--;clog(e.n+' is still down.','');continue;}
     if(e.scream&&Math.random()<e.scream){const w=mk('walker');C.enemies.push(w);clog('The screamer shrieks. Another walker shoves in.','hit');continue;}
+    if(e.g){
+      if(e.g==='reinforce'&&!e.called&&e.hp<e.max/2){e.called=true;C.enemies.push(mk('raider'));clog(e.n+' whistles. Another raider drops off the trailer.','hit');}
+      if(e.g==='heal'&&e.hp<e.max){e.hp=Math.min(e.max,e.hp+10);clog(e.n+' mutters a prayer and stands straighter. +10.','');}
+      if(e.g==='flee'&&e.hp<e.max/4){e.dead=true;e.hp=0;e.fled=true;clog(e.n+' vaults the fence and is gone. The bounty walks with him, but he dropped his bag.','sys');S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:6});S.keys++;continue;}
+      if(e.g==='slow'&&C.turn%2===1){clog(e.n+' winds up.','');continue;}
+    }
     const swings=e.fast&&C.turn%2===0?2:1;
-    for(let i=0;i<swings;i++){if(Math.random()<e.hit-sk('adrenaline')*0.06)hurt(rint(e.dmg[0],e.dmg[1]),e.n);else clog(e.n+' lunges and misses.','');}
+    for(let i=0;i<swings;i++){if(Math.random()<e.hit-sk('adrenaline')*0.06){let d=rint(e.dmg[0],e.dmg[1]);if(e.g==='crit'&&Math.random()<0.2){d*=2;clog('A brutal swing.','hit');}hurt(d,e.n);
+        if(e.g==='bleed'){C.bleed=3;}if(e.g==='poison'){C.poison=3;}
+        if(e.g==='steal'&&S.pack.length&&Math.random()<0.3){const it=S.pack.splice(rint(0,S.pack.length-1),1)[0];clog(e.n+' lifts your '+it.n+' mid-swing.','hit');}}
+      else clog(e.n+' lunges and misses.','');}
   }
+  if(C.bleed>0){C.bleed--;S.hp-=4;clog('You are bleeding. -4.','hit');}
+  if(C.poison>0){C.poison--;if(C.poison===0)clog('Your strength comes back.','good');}
   C.turn++;
 }
 function dropLegend(why){const id=pick(LEGEND_IDS);S.gear.push({uid:uid(),id,...GEAR[id]});clog((why||'')+' LEGENDARY: '+GEAR[id].n+'. '+GEAR[id].legend+'.','good');toast('Legendary: '+GEAR[id].n,'l');SFX.play('legend');log('Found the legendary '+GEAR[id].n+'.');}
@@ -367,6 +406,7 @@ function endCombat(won){
     log('Cleared '+C.enemies.length+' hostiles'+(where==='enter'&&S.loc?' inside '+S.loc.n:where==='road'?' on the road':'')+'.');
     if(where==='enter'||where==='wave'){if(S.loc.stronghold&&where==='enter'){S.loc.stage++;S.loc.cleared=true;if(S.loc.stage>=3){S.campCleared=weekId();log('Stronghold cleared. The county is quieter for a while.');ctEvent('stronghold',1);}}else{S.loc.cleared=true;}if(where==='enter')ctEvent('places',1);}
     if(where==='raid'){resolveRaidFight(true);}
+    if(where==='rival'){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:6});for(let i=0;i<3&&S.pack.length<capacity();i++)S.pack.push({id:'scrap',...ITEMS.scrap,uid:uid()});log('Nadia\'s scouts ran. You took their ammo and scrap.');}
     crewXp(2);
   }else{
     if(where==='enter'){S.loc=null;S.run=0;newDistance();log('You fled and lost part of the pack.');}
@@ -387,7 +427,7 @@ function renderCombat(){
   const now=Date.now();const phurt=C.pfx&&now-C.pfx.t<600;const plunge=C.lunge&&now-C.lunge<400;
   $('#sheet').innerHTML=`<h2>${C.where==='raid'?'Defend the base':C.where==='road'?'On the road':'Inside'} <span class="chip d" style="float:right">round ${C.turn}</span></h2>
   <div class="pbox${phurt?' hurt':''}"><div class="sp${plunge?' lunge':''}">${ART.avatarSVG(S.av,60,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',mood:S.hp<maxHp()*0.3?'angry':''})}</div><div><div class="hplab"><span>You · DR ${dr()}</span><span>${S.hp} / ${maxHp()}</span></div><div class="hpbar"><i style="width:${S.hp/maxHp()*100}%"></i></div></div>${phurt?`<span class="dmg">-${C.pfx.d}</span>`:''}</div>
-  <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
+  <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
   <div class="acts">
     <button class="btn r" onclick="act('attack')">${w?w.e+' '+esc(w.n):'👊 Fists'}<small>${w?(w.dmg[0]+sk('heavyhands')*2)+'-'+(w.dmg[1]+sk('heavyhands')*2)+' · '+(w.id==='oldreliable'?'∞':w.dur)+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
     <button class="btn" onclick="act('heavy')" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · ${60+sk('bruiser')*12}% hit · noisy</small></button>
@@ -461,7 +501,7 @@ function bank(){
   if(S.loc||S.combat){toast('Clear out first');return;}if(!S.pack.length){toast('Nothing to stash');return;}
   if(!S.base){toast('Claim a base first: clear a place, then Claim it');return;}
   const raw=packPts();const qm=roleLvl('quartermaster');const pts=Math.round(raw*runMult()*TIERS[S.league.tier].mult*(1+(qm?0.08+qm*0.04:0)+sk('haggler')*0.05));
-  let meds=0;for(const it of S.pack){if(it.cat==='shelf')S.shelf.push({id:it.id,n:it.n,e:it.e});else if(it.cat==='ammo')S.stock.ammo+=(it.qty||0);else if(it.cat==='chest'){S.stock.scrap+=5;}else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;if(it.cat==='meds')meds++;}}
+  let meds=0;for(const it of S.pack){if(it.cat==='shelf')S.shelf.push({id:it.id,n:it.n,e:it.e});else if(it.cat==='candy')S.stock.candy=(S.stock.candy||0)+(it.qty||1);else if(it.cat==='ammo')S.stock.ammo+=(it.qty||0);else if(it.cat==='chest'){S.stock.scrap+=5;}else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;if(it.cat==='meds')meds++;}}
   rollWeek();S.league.score+=pts;ctEvent('stash',pts);if(meds)ctEvent('meds',meds);
   const eat=activeCrew().length;S.stock.food=Math.max(0,S.stock.food-eat);
   S.hp=Math.min(maxHp(),S.hp+15);if(roleLvl('medic'))S.hp=Math.min(maxHp(),S.hp+20);
@@ -470,6 +510,7 @@ function bank(){
   S.pack=[];S.run=0;save();render();pushPlayer();
 }
 function supplyDrop(){if(!S.base||!S.base.rooms.radio||S.flags.dropDate===S.steps.date)return;S.flags.dropDate=S.steps.date;const list=table(['food','water','meds','ammo'],0.3,0.4);const got=[];for(let i=0;i<3;i++){const it=wpick(list,'w');const item=it.gear?{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}:{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:it.cat,qty:it.qty,uid:uid(),r:it.r};if(takeItem(item,null))got.push(it.e+' '+it.n);}log('Supply drop: '+got.join(', ')+'. In your pack.');SFX.play('chest');save();render();openSheet(`<h2>Supply drop</h2><div class="big">📦</div><p>It came down two streets over. In your pack now:<br><b style="color:var(--bone)">${esc(got.join(', ')||'nothing usable')}</b></p><button class="btn a wide" onclick="closeSheet()">Grab it</button>`);}
+function buyCandy(id,c){S.stock.candy=S.stock.candy||0;if(S.cosmetics.includes(id)){toast('Already yours');return;}if(S.stock.candy<c){toast('Need '+c+' candy');return;}S.stock.candy-=c;S.cosmetics.push(id);SFX.play('legend');toast('Yours. Put it on under You.','l');save();render();}
 function heal(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.meds<1){toast('No meds in stash');return;}S.stock.meds--;S.hp=Math.min(maxHp(),S.hp+40+sk('fielddressing')*10);save();render();}
 function eat(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.food<1){toast('No food in stash');return;}S.stock.food--;S.hp=Math.min(maxHp(),S.hp+15);save();render();}
 function equip(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;S.eq[g.slot]=S.eq[g.slot]===uidv?null:uidv;SFX.play('ui');save();render();}
@@ -519,7 +560,7 @@ function board(){const now=new Date();const rows=RIVALS.map(r=>({id:r.id,n:r.n,a
 function radioLines(){const now=new Date();const lines=[];const rng=mulberry(hash(S.league.week+todayStr()));const hrs=clamp(Math.floor((now.getHours()-7)/3),0,4);
   const verbs=['cleared a pharmacy on','fought off raiders near','stashed a big haul from','lost a man at','found a shotgun in','burned a camp under','got chased off'];const places=['Maple St','the strip mall','Old Town','the marina','Hospital Row','the overpass','5th and Pine','the rail yard'];
   for(let i=0;i<=hrs;i++){const r=RIVALS[Math.floor(rng()*3)];lines.push({t:'~'+String(8+i*3).padStart(2,'0')+':00',m:r.n+' '+verbs[Math.floor(rng()*verbs.length)]+' '+places[Math.floor(rng()*places.length)]+'.'});}
-  lines.push({t:'WANTED',m:bossName()+' is holed up in a stronghold this week. Bounty: a key, a trophy, and a shot at a legendary.'});
+  lines.push({t:'WANTED',m:bossName()+' is holed up in a stronghold this week: '+(GIMMICK_TEXT[BOSS_GIMMICK[bossName()]]||'')+'. Bounty: a key, a trophy, and a shot at a legendary.'});
   if(S.base&&S.base.rooms.radio){const b=board().filter(x=>!x.me);lines.unshift({t:'LIVE',m:b[0].n+' leads the rivals with '+fmt(b[0].s)+' pts. '+(RIVALS.find(r=>r.id===b[0].id)||{}).blurb});}
   return lines.reverse();}
 
@@ -529,6 +570,7 @@ function makeDaily(date){const rng=mulberry(hash(date+'daily'));const pool=[{t:'
   while(out.length<3){const p=pool[Math.floor(rng()*pool.length)];if(used.has(p.t))continue;used.add(p.t);const goal=p.g[Math.floor(rng()*p.g.length)];out.push({id:date+'-'+p.t,t:p.t,goal,n:0,done:false,reward:{scrap:6+Math.floor(rng()*8),xp:30+Math.floor(rng()*30),key:out.length===0&&rng()<0.5?1:0}});}
   return out;}
 function makeWeekly(week){const rng=mulberry(hash(week+'weekly'));return {id:week,goals:[{t:'steps',goal:30000+Math.floor(rng()*3)*5000,n:0},{t:'kills',goal:30,n:0},{t:'bounty',goal:1,n:0}],done:false,reward:{key:1,cosmetic:1,pts:200}};}
+function storyCheck(){if(!S.story)S.story=[];for(const s of STORY){if(!S.story.includes(s.id)&&s.need(S)){S.story.push(s.id);log('Radio: '+s.t+'.');toast('📻 New radio message: '+s.t,'a');if(S.story.length>1)SFX.play('rare');}}}
 function ctRoll(){const t=todayStr(),w=weekId();if(S.ct.date!==t){S.ct.date=t;S.ct.daily=makeDaily(t);}if(S.ct.week!==w){S.ct.week=w;S.ct.weekly=makeWeekly(w);}}
 function ctEvent(type,n){
   if(!S.ct)return;ctRoll();
@@ -647,7 +689,7 @@ function animateOnce(){if(!raf)animate();else drawScene(performance.now());}
 
 /* ================= render ================= */
 function render(){
-  rollDay();rollWeek();ctRoll();checkRaids();
+  rollDay();rollWeek();ctRoll();checkRaids();storyCheck();
   $('#hpNum').textContent=S.hp+' / '+maxHp();$('#hpBar').style.width=clamp(S.hp/maxHp()*100,0,100)+'%';
   $('#topSteps').textContent=fmt(S.steps.today);
   $('#sceneTag').textContent=district().n+' · '+S.walk.houses+' places';$('#arriveTag').hidden=!S.loc;
@@ -677,9 +719,9 @@ function render(){
   // base
   const bh=$('#baseHead');
   if(!S.base){bh.className='card blood';bh.innerHTML='<h2>No base yet</h2><p>Clear any place, then tap <b>Claim as base</b> on it. Where you set up matters: a police station comes with an armory and walls, a pharmacy with a clinic, a gas station with a generator. You can move later for 20 scrap.</p>';}
-  else{bh.className='card';bh.innerHTML=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2><p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div></div></div>`;}
+  else{bh.className='card';bh.innerHTML=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2>${baseScene()}<p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div></div></div>`;}
   $('#baseAlert').hidden=!(S.raidPending&&S.base&&S.base.rooms.tower);
-  $('#stock').innerHTML=['food','water','meds','scrap','ammo'].map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦'}[k]}</div><b>${S.stock[k]}</b><span>${CAT_LABEL[k]}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`;
+  $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',candy:'🍬'}[k]}</div><b>${S.stock[k]||0}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`;
   $('#dropRow').hidden=!(S.base&&S.base.rooms.radio);$('#dropBtn').disabled=S.flags.dropDate===S.steps.date;$('#dropHelp').textContent=S.flags.dropDate===S.steps.date?'Used today.':'Three free items into your pack.';
   $('#build').innerHTML=S.base?Object.entries(BUILD).map(([k,b])=>{const l=S.base.rooms[k]||0;const c=buildCost(k);return `<div class="room2${l?' own':''}"><div class="e">${b.e}</div><div class="t"><b>${b.n}${l?' L'+l:''}${b.def[l-1]?' · +'+b.def[l-1]+' def':''}</b><span>${b.d}${c!==null?' · next: '+c+' scrap':' · maxed'}</span></div>${c!==null?`<button class="btn sm a" onclick="build('${k}')">Build</button>`:'<span class="chip z">max</span>'}</div>`;}).join(''):'<p class="help">Claim a base to build.</p>';
   $('#raidLog').innerHTML=S.raids.length?S.raids.map(r=>`<li><time>${r.t.slice(5)}</time><span>${r.by?esc(r.by)+': ':''}${r.repelled?(r.fought?'You fought them off yourself.':'Held: '+r.def+' def vs '+r.power+'.'):'Broke in ('+r.power+' vs '+r.def+'). Took '+Object.entries(r.stolen).map(([k,v])=>v+' '+k).join(', ')+'.'}</span></li>`).join(''):'<li><span class="help">No raids yet. They start the day after you claim a base.</span></li>';
@@ -687,7 +729,7 @@ function render(){
   $('#shelf').innerHTML=shelfIds.map(([k,v])=>`<div class="it${owned[k]?'':' locked'}"><div class="e">${v.e}</div><span class="rc-${v.r}">${v.n}${owned[k]>1?' x'+owned[k]:''}</span></div>`).join('');
   $('#goalInput').value=S.goal;$('#nameInput').value=S.name;$('#sfxBtn').textContent=S.sfx?'On':'Off';
   // county
-  renderMap();renderParty();
+  renderMap();renderParty();renderEvent();renderStory();
   const tier=TIERS[S.league.tier];$('#tierBadge').textContent=tier.e;$('#tierName').textContent=tier.n;$('#tierSub').textContent='Tier '+(S.league.tier+1)+' of '+TIERS.length+' · stash x'+tier.mult;
   const end=new Date(weekStart());end.setDate(end.getDate()+7);const left=Math.max(0,end-Date.now());$('#weekChip').textContent='Week of '+S.league.week;$('#resetChip').textContent=Math.floor(left/86400000)+'d '+Math.floor(left%86400000/3600000)+'h left';
   const b=board();$('#board').innerHTML=b.map((r,i)=>`<div class="lbrow${r.me?' me':''}"><div class="rk">${i+1}</div><div class="av">${ART.avatarSVG(r.av,40)}</div><div class="nm">${esc(r.n)}${r.me?' (you)':''}<small>${r.me?'stash runs to score':esc(r.blurb)}</small></div><div class="sc">${fmt(r.s)}</div></div>`).join('');
@@ -705,6 +747,11 @@ function renderLoc(){
     ${loc.stage>0?`<div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div><div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done||r.stage>loc.stage?'disabled':''}><span class="n">${esc(r.n)}</span><span class="m">${r.done?'searched':r.stage>loc.stage?'locked: stage '+r.stage:'noise +'+r.noise}</span></button>`).join('')}</div>`:''}
     ${loc.found.length?`<div class="section-label" style="margin-top:12px">Found here</div><div class="loot" style="margin-top:6px">${loc.found.map(it=>`<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span>${esc(it.n)}<span class="pt">+${it.pts}</span></div>`).join('')}</div>`:''}
     ${bankedLine()}<div class="grid2" style="margin-top:12px">${next?`<button class="btn d" onclick="pushStage()">Push to ${next}</button>`:`<button class="btn" onclick="claimBase()">${S.base?'Move base here (20 scrap)':'Claim as base'}</button>`}<button class="btn ${next?'':'r'}" onclick="leaveLoc()">${loc.stage?'Take the loot and go':'Keep walking'}</button></div>`;return;}
+  if(loc.rival){const r=RIVALS.find(x=>x.id===loc.rival);const first=r.n.split("'")[0];
+    const body=loc.rival==='theo'?`<p><b style="color:var(--bone)">${esc(r.n)}</b> is jogging up the other side of the street toward the same door. Theo grins at you.</p><div class="grid2" style="margin-top:12px"><button class="btn r" onclick="rivalAct('race')">Race them in (${Math.round((0.5+(S.lvl-1)*0.03+roleLvl('scout')*0.05)*100)}%)</button><button class="btn" onclick="rivalAct('wait')">Let them go first</button></div><p class="help" style="margin-top:8px">Win the race: first pick, 30% more loot. Lose: scraps. Wait: they clear the walkers for you, costs 150 steps.</p>`
+      :loc.rival==='maya'?`<p><b style="color:var(--bone)">${esc(r.n)}</b> has a fire going out front. Maya waves you over: "Three food for two antibiotics. Fair?"</p><div class="grid2" style="margin-top:12px"><button class="btn a" onclick="rivalAct('trade')">Trade (3 food → 2 antibiotics)</button><button class="btn" onclick="S.loc.rival='';save();render()">No thanks</button></div>`
+      :`<p><b style="color:var(--bone)">${esc(r.n)}</b>. Two of Nadia's scouts are watching the door from a truck bed. They have seen you.</p><div class="grid2" style="margin-top:12px"><button class="btn d" onclick="rivalAct('fight')">Take them on</button><button class="btn" onclick="rivalAct('slip')">Slip past (100 steps)</button></div><p class="help" style="margin-top:8px">Beat them: their ammo and scrap are yours.</p>`;
+    el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">rival crew</span></h2>`+body;return;}
   if(!loc.cleared){el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">unknown</span></h2><p>Door is ajar. No telling what is inside. Threat here: ${'☠'.repeat(Math.min(5,Math.round(district().threat*loc.threat+(isNight()?1:0))))}${isNight()?' · horde night':''}</p>${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn r" onclick="enterLoc()">Go in</button><button class="btn" onclick="leaveLoc()">Keep walking</button></div>`;return;}
   const done=loc.rooms.every(r=>r.done);
   el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.rooms.filter(r=>r.done).length}/${loc.rooms.length} searched</span></h2>
@@ -714,6 +761,31 @@ function renderLoc(){
   ${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn ${done?'r':''}" onclick="leaveLoc()">${done?'Move on':'Leave the rest'}</button><button class="btn" onclick="claimBase()">${S.base?'Move base here (20 scrap)':'Claim as base'}</button></div>`;
 }
 function bankedLine(){const b=S.walk.banked||0;if(!b)return '';const d=district();const avg=(d.dist[0]+d.dist[1])/2;const n=Math.floor(b/avg);return `<p class="help" style="margin-top:10px">🚶 <b style="color:var(--bone)">${fmt(b)} steps saved</b> while you stop here. They carry you onward the moment you leave${n>=1?' (about '+n+' more place'+(n>1?'s':'')+' already reached)':''}.</p>`;}
+function baseScene(){
+  const r=S.base.rooms;const night=isNight();const col={house:'#4a3d44',pharmacy:'#2f4a5a',gas:'#5a4a2f',grocery:'#2f5a44',police:'#2f3a5a',clinic:'#5a2f3a',hardware:'#5a3f2f',surplus:'#3f4a2f',stronghold:'#5a2a22'}[S.base.t]||'#4a3d44';
+  let s=`<svg viewBox="0 0 360 170" style="width:100%;display:block;border-radius:8px;margin-top:10px;background:${night?'#0b0b10':'#22202a'}" role="img" aria-label="Your base">`;
+  s+=`<rect x="0" y="120" width="360" height="50" fill="${night?'#17151a':'#2b2528'}"/>`;
+  if(r.generator)s+=`<circle cx="180" cy="60" r="140" fill="#e6a530" opacity=".07"/>`;
+  s+=`<rect x="120" y="40" width="120" height="82" fill="${col}"/><path d="M110 40 L180 8 L250 40z" fill="#1a1719"/><rect x="168" y="86" width="24" height="36" fill="#0d0c0e"/><rect x="136" y="56" width="20" height="18" fill="${r.generator?'#ffd98a':'#161418'}"/><rect x="204" y="56" width="20" height="18" fill="${r.generator?'#ffd98a':'#161418'}"/>`;
+  s+=`<text x="180" y="34" text-anchor="middle" font-size="16">${S.base.e}</text>`;
+  const wl=r.walls||0;if(wl){const hh=10+wl*8;for(let x=8;x<352;x+=16){if(x>110&&x<250)continue;s+=`<rect x="${x}" y="${120-hh}" width="10" height="${hh}" fill="${wl>=3?'#6a6a74':'#5a4a3a'}"/>`;}s+=`<rect x="0" y="${120-hh-3}" width="112" height="4" fill="#3a3a44"/><rect x="248" y="${120-hh-3}" width="112" height="4" fill="#3a3a44"/>`;}
+  if(r.tower){const th=(r.tower||1)*22+30;s+=`<rect x="300" y="${120-th}" width="8" height="${th}" fill="#5a4a3a"/><rect x="292" y="${120-th-14}" width="24" height="16" fill="#3a3335"/><circle cx="304" cy="${120-th-8}" r="3" fill="#ffd166"/>`;}
+  if(r.traps){for(let i=0;i<r.traps*4;i++){const x=20+i*14;s+=`<path d="M${x} 120 l4 -9 l4 9z" fill="#8a8a94"/>`;}}
+  if(r.garden){for(let i=0;i<r.garden*3;i++){const x=258+i*16;s+=`<rect x="${x}" y="108" width="12" height="12" fill="#3a2a1a"/><circle cx="${x+6}" cy="106" r="5" fill="#7fbf4d"/>`;}}
+  if(r.radio)s+=`<path d="M232 40 v-30 M226 16 h12 M228 24 h8" stroke="#8fb3c9" stroke-width="2"/><circle cx="232" cy="10" r="2" fill="#ff5a6a"/>`;
+  if(r.generator)s+=`<rect x="96" y="104" width="22" height="16" fill="#3a3a44"/><rect x="100" y="98" width="6" height="8" fill="#555"/>`;
+  if(r.bunk)s+=`<path d="M40 120 l18 -22 l18 22z" fill="#4a5a44"/><rect x="54" y="106" width="8" height="14" fill="#1a1a1e"/>`;
+  if(r.clinic)s+=`<rect x="126" y="44" width="10" height="10" fill="#e8f4f8"/><path d="M131 45 v8 M127 49 h8" stroke="#c22b3a" stroke-width="2"/>`;
+  if(r.armory)s+=`<rect x="256" y="104" width="18" height="16" fill="#5a4a3a"/><path d="M256 112 h18" stroke="#2a1a0a" stroke-width="2"/>`;
+  const crew=activeCrew().slice(0,3);crew.forEach((c,i)=>{s+=`<svg x="${28+i*30}" y="86" width="26" height="34" viewBox="0 0 100 130">${ART.avatarSVG(c.av,100).replace(/<svg[^>]*>|<\/svg>/g,'')}</svg>`;});
+  s+=`<svg x="150" y="80" width="30" height="40" viewBox="0 0 100 130">${ART.avatarSVG(S.av,100).replace(/<svg[^>]*>|<\/svg>/g,'')}</svg>`;
+  if(S.pet)s+=`<svg x="185" y="100" width="20" height="20" viewBox="0 0 64 64">${ART.petSVG(S.pet,64).replace(/<svg[^>]*>|<\/svg>/g,'')}</svg>`;
+  if(night)s+=`<circle cx="40" cy="26" r="12" fill="#e8e0d0" opacity=".8"/>`;
+  s+='</svg>';return s;
+}
+function renderEvent(){const el=$('#eventCard');if(!el)return;const ev=eventNow();if(ev!=='halloween'){el.hidden=true;return;}el.hidden=false;el.className='card amber';const candy=S.stock.candy||0;
+  el.innerHTML=`<h2>🎃 Hollow-een <span class="sub">until Nov 2</span></h2><p>Candy turns up in rooms all event long, and the Gourd King holds every stronghold. Spend candy on costumes that stay forever.</p><div class="row" style="margin:8px 0"><span class="chip a">🍬 ${candy} candy</span></div><div class="stack">${HALLOWEEN_SHOP.map(x=>`<div class="room2${S.cosmetics.includes(x.id)?' own':''}"><div class="e">🎃</div><div class="t"><b>${x.n}</b><span>${S.cosmetics.includes(x.id)?'yours':x.c+' candy'}</span></div>${S.cosmetics.includes(x.id)?'<span class="chip z">owned</span>':`<button class="btn sm a" onclick="buyCandy('${x.id}',${x.c})">Buy</button>`}</div>`).join('')}</div>`;}
+function renderStory(){const el=$('#story');if(!el)return;const got=STORY.filter(s=>(S.story||[]).includes(s.id));el.innerHTML=got.length?got.slice().reverse().map(s=>`<li><time>${esc(s.t)}</time><span>${esc(s.txt)}</span></li>`).join(''):'<li><span class="help">Only static so far.</span></li>';$('#storySub').textContent=got.length+' / '+STORY.length;}
 function renderRaidCard(){const el=$('#raidCard');if(!S.raidPending||!S.base||!S.base.rooms.tower){el.hidden=true;return;}el.hidden=false;el.className='card blood';el.innerHTML=`<h2>🗼 Raiders spotted</h2><p>The watchtower saw a crew heading for ${esc(S.base.n)}. Expected around ${S.raidPending.hour}:00 today, strength ${S.raidPending.power} against your ${defense()} defense. Build now, or be home to fight.</p>`;}
 function renderContracts(){
   const d=S.ct.daily||[];const w=S.ct.weekly;$('#contractsSub').textContent=d.filter(c=>c.done).length+'/'+d.length+' today';
@@ -819,10 +891,22 @@ function wire(){
   document.addEventListener('pointerdown',()=>SFX.init(),{once:true});
 }
 function hardReset(){try{localStorage.removeItem('deadmiles.v3');localStorage.removeItem('deadmiles.v2');}catch(e){}S=fresh();$('#modal').classList.remove('on');render();onboard();}
+function whileYouWereOut(){
+  const last=S.lastOpen||0;const away=Date.now()-last;S.lastOpen=Date.now();
+  if(!last||away<4*3600000)return;
+  const items=S.journal.filter(j=>j.t>last).map(j=>j.m).slice(0,8);
+  const b=board();const rank=b.findIndex(r=>r.me)+1;const lead=b[0].me?null:b[0];
+  if(S.lastRank&&rank>S.lastRank&&lead)items.unshift(lead.n+' passed you in the league. You are #'+rank+'.');else if(S.lastRank&&rank<S.lastRank)items.unshift('You climbed to #'+rank+' in the league.');
+  S.lastRank=rank;
+  const hrs=Math.round(away/3600000);const w=wxLabel();
+  const ct=(S.ct.daily||[]).filter(c=>!c.done).length;
+  openSheet(`<h2>While you were out</h2><p class="help">${hrs} hours away · ${esc(w)}</p><ul class="journal" style="margin:8px 0 12px">${items.length?items.map(m=>`<li><span>${esc(m)}</span></li>`).join(''):'<li><span>Quiet night. Nothing came over the fence.</span></li>'}</ul><p>${ct?ct+' contract'+(ct>1?'s':'')+' open today. ':''}${S.raidPending?'Raiders are expected today at '+S.raidPending.hour+':00. ':''}The Wanted boss this week is ${esc(bossName())}.</p><button class="btn r wide" onclick="closeSheet()">Back to the road</button>`);
+}
 function start(){
   S=load()||fresh();S.combat=false;if(!S.walk.dist)newDistance();
   wire();render();fetchWeather();
-  if(!S.onboarded)onboard();else{if(!S.cls)classSheet();autoSyncFromUrl();}
+  if(!S.onboarded)onboard();else{if(!S.cls)classSheet();else whileYouWereOut();autoSyncFromUrl();}
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){S.lastOpen=Date.now();const bb=board();S.lastRank=bb.findIndex(r=>r.me)+1;save();}});
   if(O().ok){pullSteps();loadFriends();partySync();pushPlayer();}
   setInterval(()=>{if(document.visibilityState==='visible'&&!C){render();if(O().ok){pullSteps();partySync();}}},60000);
   setInterval(()=>{if(document.visibilityState==='visible'&&O().ok){loadFriends();pushPlayer();}},180000);

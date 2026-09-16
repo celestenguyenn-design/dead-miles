@@ -5,9 +5,9 @@ const HAIR_COLORS=['#2a1b14','#5a3a24','#a86a3a','#e0b45a','#d94f3a','#e8e0d0','
 const HAIR_STYLES=['short','bob','ponytail','bun','curly','buzz','long','spiky'];
 const EYES=['round','almond','sparkle'];
 const TOP_COLORS=['#8a3a2a','#3a5a8a','#4a7a4a','#6a4a8a','#c9a04a','#3a3a44'];
-const HATS={beanie:{n:'Beanie',r:'rare'},cap:{n:'Ball cap',r:'rare'},cowboy:{n:'Cowboy hat',r:'epic'},catears:{n:'Cat-ear hood',r:'epic'},bandana:{n:'Bandana',r:'rare'},halo:{n:'Halo',r:'legendary'},crown:{n:'Tin crown',r:'legendary'},helmet:{n:'Bike helmet',r:'rare'}};
-const TOPS={hoodie:{n:'Hoodie',r:'common'},varsity:{n:'Varsity jacket',r:'rare'},raincoat:{n:'Yellow raincoat',r:'rare'},biker:{n:'Biker jacket',r:'epic'},scrubs:{n:'Nurse scrubs',r:'epic'},flannel:{n:'Flannel shirt',r:'rare'},tux:{n:'Ruined tuxedo',r:'epic'}};
-const ACCS={glasses:{n:'Round glasses',r:'rare'},scarf:{n:'Striped scarf',r:'rare'},eyepatch:{n:'Eyepatch',r:'epic'},shades:{n:'Aviators',r:'epic'},mask:{n:'Gas mask',r:'legendary'}};
+const HATS={beanie:{n:'Beanie',r:'rare'},cap:{n:'Ball cap',r:'rare'},cowboy:{n:'Cowboy hat',r:'epic'},catears:{n:'Cat-ear hood',r:'epic'},bandana:{n:'Bandana',r:'rare'},halo:{n:'Halo',r:'legendary'},crown:{n:'Tin crown',r:'legendary'},helmet:{n:'Bike helmet',r:'rare'},witch:{n:'Witch hat',r:'epic'},pumpkin:{n:'Pumpkin head',r:'legendary'}};
+const TOPS={hoodie:{n:'Hoodie',r:'common'},varsity:{n:'Varsity jacket',r:'rare'},raincoat:{n:'Yellow raincoat',r:'rare'},biker:{n:'Biker jacket',r:'epic'},scrubs:{n:'Nurse scrubs',r:'epic'},flannel:{n:'Flannel shirt',r:'rare'},tux:{n:'Ruined tuxedo',r:'epic'},skeleton:{n:'Skeleton hoodie',r:'epic'}};
+const ACCS={glasses:{n:'Round glasses',r:'rare'},scarf:{n:'Striped scarf',r:'rare'},eyepatch:{n:'Eyepatch',r:'epic'},shades:{n:'Aviators',r:'epic'},mask:{n:'Gas mask',r:'legendary'},wings:{n:'Bat wings',r:'legendary'}};
 
 function hairBack(style,c){
   switch(style){
@@ -52,6 +52,7 @@ function topShape(top,c){
     case 'scrubs':return `<rect x="30" y="76" width="40" height="32" rx="9" fill="#5fb3c9"/><path d="M42 76 l8 8 l8 -8" stroke="#3a7a8a" stroke-width="2" fill="none"/><rect x="56" y="88" width="9" height="9" rx="1" fill="#e8f4f8"/><path d="M60.5 89.5 v6 M57.5 92.5 h6" stroke="#c22b3a" stroke-width="1.6"/>`;
     case 'flannel':return `<rect x="30" y="76" width="40" height="32" rx="9" fill="#a83a2a"/><path d="M30 86 h40 M30 96 h40 M40 76 v32 M50 76 v32 M60 76 v32" stroke="#4a1a14" stroke-width="2" opacity=".6"/>`;
     case 'tux':return `<rect x="30" y="76" width="40" height="32" rx="9" fill="#1a1a1e"/><path d="M42 76 l8 12 l8 -12z" fill="#fff"/><path d="M46 80 l4 4 l4 -4 l-4 -2z" fill="#c22b3a"/>`;
+    case 'skeleton':return `<rect x="30" y="76" width="40" height="32" rx="9" fill="#1a1a1e"/><path d="M50 78 v28 M36 84 h28 M38 92 h24 M40 100 h20" stroke="#e8e0d0" stroke-width="3" stroke-linecap="round"/>`;
     default:return base+`<path d="M38 76 q12 8 24 0" stroke="rgba(0,0,0,.25)" stroke-width="3" fill="none"/>`;
   }
 }
@@ -64,6 +65,8 @@ function hatShape(hat,hairC){
     case 'bandana':return `<path d="M20 42 q2 -24 30 -24 q28 0 30 24 v2 h-60z" fill="#c22b3a"/><path d="M78 42 l10 -8 l-4 12z" fill="#c22b3a"/>`;
     case 'halo':return `<ellipse cx="50" cy="8" rx="20" ry="5" fill="none" stroke="#ffd166" stroke-width="3"/>`;
     case 'crown':return `<path d="M28 40 v-14 l8 8 l8 -12 l6 12 l6 -12 l8 12 l8 -8 v14z" fill="#e6a530"/><circle cx="50" cy="30" r="2.5" fill="#c22b3a"/>`;
+    case 'witch':return `<path d="M16 44 q34 -6 68 0 q-4 6 -34 6 q-30 0 -34 -6z" fill="#1a1a1e"/><path d="M28 42 l18 -40 l16 40z" fill="#1a1a1e"/><path d="M30 40 h40" stroke="#7a4aa8" stroke-width="4"/>`;
+    case 'pumpkin':return `<ellipse cx="50" cy="46" rx="36" ry="30" fill="#e8842a"/><path d="M50 16 v-10" stroke="#4a7a2a" stroke-width="5" stroke-linecap="round"/><path d="M30 40 l8 -8 l4 8z M70 40 l-8 -8 l-4 8z" fill="#1a1a1e"/><path d="M34 56 l6 6 l6 -6 l4 6 l4 -6 l6 6 l6 -6" stroke="#1a1a1e" stroke-width="3" fill="none"/>`;
     case 'helmet':return `<path d="M18 44 q2 -30 32 -30 q30 0 32 30 v2 h-64z" fill="#3a7ad6"/><path d="M18 44 h64" stroke="#1a3a7a" stroke-width="3"/><path d="M30 24 q20 -10 40 0" stroke="#fff" stroke-width="2" fill="none" opacity=".5"/>`;
     default:return '';
   }
@@ -75,6 +78,7 @@ function accShape(acc){
     case 'scarf':return `<rect x="30" y="70" width="40" height="10" rx="5" fill="#c22b3a"/><rect x="34" y="72" width="32" height="2" fill="#e8e0d0"/><rect x="58" y="76" width="9" height="20" rx="4" fill="#c22b3a"/>`;
     case 'eyepatch':return `<circle cx="63" cy="48" r="8" fill="#1a1a1e"/><path d="M22 36 q30 -6 62 8" stroke="#1a1a1e" stroke-width="2" fill="none"/>`;
     case 'mask':return `<path d="M26 52 q24 -14 48 0 v12 q-24 12 -48 0z" fill="#3a3a44"/><circle cx="38" cy="58" r="5" fill="#8a8a94"/><circle cx="62" cy="58" r="5" fill="#8a8a94"/>`;
+    case 'wings':return `<path d="M30 84 q-26 -20 -28 4 q10 -6 14 4 q6 -8 14 0z M70 84 q26 -20 28 4 q-10 -6 -14 4 q-6 -8 -14 0z" fill="#2a1a3a" stroke="#7a4aa8" stroke-width="1.5"/>`;
     default:return '';
   }
 }
