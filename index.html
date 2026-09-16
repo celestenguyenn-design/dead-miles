@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=5.4">
+<link rel="stylesheet" href="style.css?v=5.5">
 </head>
 <body>
 <div id="app">
@@ -106,6 +106,7 @@
           <label class="row" style="justify-content:space-between">Daily step target <input id="goalInput" type="number" inputmode="numeric" min="1000" step="500" style="width:120px"></label>
           <label class="row" style="justify-content:space-between">Your name <input id="nameInput" type="text" maxlength="18" style="width:160px"></label>
           <label class="row" style="justify-content:space-between">Sounds <button class="btn sm" id="sfxBtn">On</button></label>
+          <div class="card" style="background:var(--ash2)"><h2>Notifications <span class="sub">phone nudges</span></h2><div id="pushBody" style="margin-top:8px"></div></div>
           <div class="card" style="background:var(--ash2)" id="onlineCard">
             <h2>Online <span class="sub" id="onlineStatus">off</span></h2>
             <p id="onlineHelp">Online turns on silent step sync from your phone, the friends board, and party contracts.</p>
@@ -149,8 +150,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=5.4"></script>
-<script src="street.js?v=5.4"></script>
-<script src="game.js?v=5.4"></script>
+<script src="art.js?v=5.5"></script>
+<script src="street.js?v=5.5"></script>
+<script src="game.js?v=5.5"></script>
 </body>
 </html>
