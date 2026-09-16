@@ -37,7 +37,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site
-          cp index.html style.css art.js game.js sw.js icon.png README.md _site/
+          cp index.html style.css art.js street.js game.js sw.js icon.png README.md _site/
           grep -o "const VERSION='[0-9.]*'" game.js | grep -o '[0-9.]*' > _site/version.txt
           cat _site/version.txt
       - uses: actions/download-artifact@v4

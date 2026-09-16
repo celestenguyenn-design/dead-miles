@@ -11,7 +11,8 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%98%A0%EF%B8%8F%3C/text%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=3.5">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="style.css?v=3.6">
 </head>
 <body>
 <div id="app">
@@ -26,6 +27,7 @@
     <section class="view on" id="v-street">
       <div class="scene"><canvas id="cv" width="960" height="500"></canvas><div class="tag" id="sceneTag"></div><div class="wx" id="wxTag" hidden></div><div class="arrive" id="arriveTag" hidden>Arrived</div></div>
       <div class="progress"><div class="bar"><i id="pbar"></i></div><div class="row"><span id="pleft"></span><span id="pright"></span></div></div>
+      <div class="card steel"><h2>Street mode <span class="sub">live map</span></h2><p>Out walking? Open the real map: the buildings around you become the places to loot, and your own home can be your base.</p><button class="btn z wide" style="margin-top:10px" id="streetBtn">Open the live map</button></div>
       <div class="card" id="locCard" hidden></div>
       <div class="card" id="raidCard" hidden></div>
       <div class="card" id="contractsCard"><h2>Contracts <span class="sub" id="contractsSub"></span></h2><div class="stack" id="contracts" style="margin-top:10px"></div></div>
@@ -49,6 +51,13 @@
       <div class="card"><h2>Log</h2><ul class="journal" id="journal" style="margin-top:8px"></ul></div>
     </section>
 
+    <section class="view" id="v-map">
+      <div id="map" class="mapbox"></div>
+      <div class="row" id="mapInfo"></div>
+      <p class="help" id="mapStatus"></p>
+      <div class="row"><button class="btn sm a" id="homeBtn">Set my home here</button><button class="btn sm" id="refreshPois">Refresh places</button><button class="btn sm ghost" id="mapBack">Back to the road</button></div>
+      <p class="help">Walk up to a marker and tap it. Glowing = within reach. Dim = picked clean today. 🏴 = a stronghold on a park or school. Zombies wander toward you; keep moving.</p>
+    </section>
     <section class="view" id="v-pack">
       <div class="card amber">
         <h2>Pack <span class="sub" id="packSub"></span></h2>
@@ -125,7 +134,9 @@
 </div>
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
-<script src="art.js?v=3.5"></script>
-<script src="game.js?v=3.5"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="art.js?v=3.6"></script>
+<script src="street.js?v=3.6"></script>
+<script src="game.js?v=3.6"></script>
 </body>
 </html>
