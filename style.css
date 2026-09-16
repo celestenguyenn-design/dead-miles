@@ -211,7 +211,7 @@ a{color:var(--amber)}
 @media (max-width:380px){.stock{grid-template-columns:repeat(3,1fr)}.you{grid-template-columns:90px 1fr}}
 
 /* street mode */
-.mapbox{width:100%;height:52vh;min-height:300px;border-radius:10px;border:1px solid var(--line);background:#111;overflow:hidden}
+.mapbox{width:100%;height:52vh;min-height:300px;border-radius:10px;border:1px solid var(--line);background:#111;overflow:hidden;position:relative;z-index:0;isolation:isolate}
 .leaflet-container{background:#111;font-family:inherit}
 .poi-wrap,.me-icon,.z-icon{background:none;border:0}
 .poi{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:18px;background:rgba(35,35,40,.92);border:2px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,.6)}
