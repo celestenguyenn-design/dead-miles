@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='5.8';
+const VERSION='5.9';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1260,6 +1260,32 @@ function wire(){
 function backupInfo(){try{const b=JSON.parse(localStorage.getItem('deadmiles.backup')||'null');if(b&&b.s&&Date.now()-b.t<7*86400000)return b;}catch(e){}return null;}
 function undoRestore(){const b=backupInfo();if(!b)return;if(!confirm('Put back the save from '+ago(b.t)+' ('+(b.s.name||'Survivor')+', level '+(b.s.lvl||1)+', '+fmt((b.s.steps&&b.s.steps.total)||0)+' steps)? The current one becomes the backup instead.'))return;
   try{localStorage.setItem('deadmiles.backup',JSON.stringify({t:Date.now(),why:'before undo',s:S}));}catch(e){}const keep=S.online;S=Object.assign(fresh(),b.s);S.online=(keep&&keep.ok)?keep:(b.s.online||keep);S.combat=false;ensureState();log('Put back the earlier save.');save();render();toast('Earlier save is back','z');pushPlayer();}
+function exportSave(){
+  try{
+    const data=JSON.stringify({game:'dead-miles',v:VERSION,at:Date.now(),save:S},null,0);
+    const blob=new Blob([data],{type:'application/json'});
+    const name='dead-miles-'+(S.name||'survivor').toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+todayStr()+'.json';
+    const f=new File([blob],name,{type:'application/json'});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:'Dead Miles save'}).catch(()=>{});return;}
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+    toast('Save file made. Keep it somewhere safe.','a');
+  }catch(e){toast('Could not make the file: '+e.message,'d');}
+}
+function importSave(input){
+  const file=input&&input.files&&input.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    let o=null;try{o=JSON.parse(r.result);}catch(e){toast('That file is not a Dead Miles save.','d');return;}
+    const s=o&&(o.save||(o.onboarded?o:null));
+    if(!s||!s.onboarded){toast('That file does not have a character in it.','d');return;}
+    if(!confirm('Load '+(s.name||'Survivor')+', level '+(s.lvl||1)+', '+fmt((s.steps&&s.steps.total)||0)+' lifetime steps? What is on this phone now becomes a restore point.'))return;
+    snapshot('before loading a file');
+    const keep=S.online;S=Object.assign(fresh(),s);S.online=(keep&&keep.ok)?keep:(s.online||keep);S.combat=false;ensureState();
+    S.savedAt=Date.now();log('Loaded a save from a file.');save();render();toast('Save loaded','z');pushPlayer();
+  };
+  r.readAsText(file);input.value='';
+}
 function hardReset(){try{if(S&&S.onboarded)localStorage.setItem('deadmiles.backup',JSON.stringify({t:Date.now(),why:'before reset',s:S}));localStorage.removeItem('deadmiles.v3');localStorage.removeItem('deadmiles.v2');}catch(e){}S=fresh();$('#modal').classList.remove('on');render();onboard();}
 /* ================= county boss (shared with the party, own loot each) ================= */
 const BOSS_FIGHTS_PER_DAY=2;
