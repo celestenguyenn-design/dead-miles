@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='3.4';
+const VERSION='3.5';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -633,6 +633,11 @@ async function partySync(){const o=O();if(!o.ok||!S.party.code)return;const w=we
       if(r.progress&&PARTY_GOALS.every(g=>(r.progress[g.t]||0)>=g.goal)&&S.party.claimed!==w){S.party.claimed=w;S.keys++;S.league.score+=300;log('Party contract complete. +1 key, +300 points.');toast('Party contract complete!','l');SFX.play('legend');}}
     save();renderParty();}catch(e){}}
 
+/* ================= self-update ================= */
+let updateReady=false;
+async function applyUpdate(){try{const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister();const ks=await caches.keys();for(const k of ks)await caches.delete(k);}catch(e){}location.href=location.pathname+'?r='+Date.now();}
+async function checkUpdate(){try{const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=(await r.text()).trim();if(v&&v!==VERSION){updateReady=v;const b=$('#updateBar');if(b){b.hidden=false;b.textContent='Version '+v+' is ready. Tap to update.';}}}catch(e){}}
+function maybeAutoUpdate(){if(updateReady&&!C&&!$('#modal').classList.contains('on')){toast('Updating to v'+updateReady,'z');setTimeout(applyUpdate,800);}}
 /* ================= pedometer + sync ================= */
 let pedo={on:false,last:0,filt:0,count:0,got:false,wake:null};
 function pedoToggle(){
@@ -892,11 +897,11 @@ function wire(){
   $('#pedoBtn').onclick=pedoToggle;$('#clipBtn').onclick=readClipboard;$('#bankBtn').onclick=bank;$('#healBtn').onclick=heal;$('#eatBtn').onclick=eat;$('#dropBtn').onclick=supplyDrop;
   $('#lookBtn').onclick=()=>lookSheet();$('#respecBtn').onclick=respec;$('#sfxBtn').onclick=()=>{S.sfx=!S.sfx;save();render();if(S.sfx)SFX.play('ui');};
   $('#demoBtn').onclick=()=>{toast('+300 demo steps','z');addSteps(300,'demo');};
-  $('#updateBtn').onclick=async()=>{toast('Fetching the latest version');try{const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister();const ks=await caches.keys();for(const k of ks)await caches.delete(k);}catch(e){}location.href=location.pathname+'?r='+Date.now();};
+  $('#updateBtn').onclick=()=>{toast('Fetching the latest version');applyUpdate();};$('#updateBar').onclick=applyUpdate;
   $('#resetBtn').onclick=()=>{openSheet('<h2>Reset everything?</h2><p>Base, crew, gear, skills and league history on this device will be gone.</p><div class="grid2"><button class="btn" onclick="closeSheet()">Keep playing</button><button class="btn d" onclick="hardReset()">Reset</button></div>');};
   $('#goalInput').onchange=()=>{const v=parseInt($('#goalInput').value,10);if(v>=1000){S.goal=v;save();render();}};
   $('#nameInput').onchange=()=>{S.name=$('#nameInput').value.trim().slice(0,18);save();render();pushPlayer();};
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){render();fetchWeather();if(O().ok){pullSteps();partySync();}}});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){render();fetchWeather();if(O().ok){pullSteps();partySync();}maybeAutoUpdate();checkUpdate();}});
   document.addEventListener('pointerdown',()=>SFX.init(),{once:true});
 }
 function hardReset(){try{localStorage.removeItem('deadmiles.v3');localStorage.removeItem('deadmiles.v2');}catch(e){}S=fresh();$('#modal').classList.remove('on');render();onboard();}
@@ -920,5 +925,6 @@ function start(){
   setInterval(()=>{if(document.visibilityState==='visible'&&!C){render();if(O().ok){pullSteps();partySync();}}},60000);
   setInterval(()=>{if(document.visibilityState==='visible'&&O().ok){loadFriends();pushPlayer();}},180000);
   if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+  checkUpdate();setInterval(checkUpdate,600000);
 }
 start();

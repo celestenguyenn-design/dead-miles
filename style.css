@@ -27,6 +27,7 @@ a{color:var(--amber)}
 .hpbar i{display:block;height:100%;background:linear-gradient(90deg,var(--blood),#e2503f);transition:width .4s}
 .hpbar.en i{background:linear-gradient(90deg,var(--rot2),var(--rot))}
 .hplab{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
+.updatebar{display:block;width:100%;padding:10px 16px;background:var(--rot);color:#0b1a04;font-weight:800;font-size:14px;text-align:center;border:0}
 .main{flex:1;overflow-y:auto;padding:0 16px 16px}
 .view{display:none;flex-direction:column;gap:14px;padding-top:14px}
 .view.on{display:flex}
