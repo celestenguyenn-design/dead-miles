@@ -408,7 +408,7 @@ function takeItem(it,loc){
   const item={...it,uid:uid()};if(item.cat==='ammo'){item.qty=(item.qty||6)+(roleLvl('hunter')?1+Math.floor(roleLvl('hunter')/2):0)+sk('scrounger');}
   S.pack.push(item);if(loc)loc.found.push(item);rarToast(it);return true;
 }
-function searchRoom(i){
+function searchRoom(i){pushSoon();
   const loc=S.loc;if(!loc||!loc.cleared)return;const r=loc.rooms[i];if(r.done)return;if(loc.stronghold&&r.stage>loc.stage){toast('Push deeper first');return;}r.done=true;
   for(const it of r.items)takeItem(it,loc);
   ctEvent('rooms',1);
@@ -551,11 +551,15 @@ async function goOnline(handle,token){
   try{const ok=await rpc('register_player',{p_handle:handle,p_token:o.token,p_name:S.name||handle});
     if(!ok){o.ok=false;o.err='The handle "'+handle+'" is already registered. If it is yours from another browser, paste that browser\'s account key below. Otherwise pick another handle.';toast(o.err,'d');save();render();return;}
     o.handle=handle;o.ok=true;o.err='';log('Online as @'+handle+'.');toast('Online as @'+handle,'z');save();render();
+    if(token&&token.trim()){try{const b=await rpc('get_base',{p_handle:handle});const cs=b&&b.public&&b.public.save;
+      if(cs&&cs.onboarded){openSheet(`<h2>Found your save</h2><div class="big">${ART.avatarSVG(cs.av||S.av,70)}</div><p><b style="color:var(--bone)">${esc(cs.name||handle)}</b>, level ${cs.lvl||1}, ${fmt((cs.steps&&cs.steps.total)||0)} lifetime steps${cs.base?', base at '+esc(cs.base.n):''}. Restore it here? What is on this device right now gets replaced.</p><div class="grid2"><button class="btn" onclick="closeSheet();pushPlayer()">Keep this one</button><button class="btn r" id="restoreBtn">Restore my save</button></div>`,true);
+        $('#restoreBtn').onclick=()=>{const keep=S.online;S=Object.assign(fresh(),cs);S.online=keep;S.combat=false;S.journal=[];log('Restored your save from the cloud.');save();closeSheet();render();toast('Save restored','z');pushPlayer();};return;}}catch(e){}}
     await pushPlayer();await pullSteps();await loadFriends();await partySync();
   }catch(e){o.ok=false;o.err=e.message;save();render();}
 }
-function publicState(){return {public:{name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',steps_today:S.steps.today,streak:S.streak.days,party:S.party.code},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:S.stock.ammo}};}
-let pushTimer=0;
+function compactSave(){const c=JSON.parse(JSON.stringify(S));delete c.online;delete c.journal;delete c.wx;delete c.combat;if(c.party)delete c.party.data;return c;}
+function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',steps_today:S.steps.today,streak:S.streak.days,party:S.party.code},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:S.stock.ammo}};}
+let pushTimer=0;let pushSoonTimer=0;function pushSoon(){clearTimeout(pushSoonTimer);pushSoonTimer=setTimeout(()=>pushPlayer(),20000);}
 function pushPlayer(){const o=O();if(!o.ok)return Promise.resolve();clearTimeout(pushTimer);return new Promise(res=>{pushTimer=setTimeout(async()=>{try{rollWeek();await rpc('save_player',{p_handle:o.handle,p_token:o.token,p_name:S.name,p_tier:S.league.tier,p_week:S.league.week,p_score:S.league.score,p_state:publicState()});o.err='';}catch(e){o.err=e.message;}save();res();},400);});}
 async function pullSteps(){
   const o=O();if(!o.ok)return;const since=new Date();since.setHours(0,0,0,0);
@@ -731,7 +735,7 @@ function renderOnline(){
   st.textContent=o.ok?'@'+o.handle:(o.err?'error':'off');
   let body='';
   if(!o.ok){body=`<div class="row"><input id="handleInput" type="text" maxlength="20" placeholder="handle, e.g. celeste" value="${esc(o.handle||slug(S.name))}" style="flex:1;min-width:140px"><button class="btn r" onclick="goOnline($('#handleInput').value,$('#tokenInput').value)">Go online</button></div><input id="tokenInput" type="text" placeholder="account key (only if moving from another browser)" style="margin-top:8px;font-size:12px">${o.err?`<p class="help" style="color:#ff8a92">${esc(o.err)}</p>`:''}`;}
-  else{body=`<div class="kv"><span>Handle</span><b>@${esc(o.handle)}</b><span>Last phone sync</span><b>${o.lastPost?timeStr(o.lastPost)+' today':'none yet'}</b><span>Server</span><b>${o.err?'<span style="color:#ff8a92">'+esc(o.err)+'</span>':'ok'}</b></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pullSteps();loadFriends();partySync();toast('Syncing')">Sync now</button><button class="btn sm ghost" onclick="testOnline()">Test connection</button><button class="btn sm ghost" onclick="copyText(O().token,'')">Copy account key</button></div><p class="help">Account key = how to use this handle in another browser. Paste it there under Online.</p>`;}
+  else{body=`<div class="kv"><span>Handle</span><b>@${esc(o.handle)}</b><span>Last phone sync</span><b>${o.lastPost?timeStr(o.lastPost)+' today':'none yet'}</b><span>Server</span><b>${o.err?'<span style="color:#ff8a92">'+esc(o.err)+'</span>':'ok'}</b></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pullSteps();loadFriends();partySync();toast('Syncing')">Sync now</button><button class="btn sm ghost" onclick="testOnline()">Test connection</button><button class="btn sm ghost" onclick="copyText(O().token,'')">Copy account key</button></div><p class="help">Account key = how to move to another browser or phone. There, type this handle, paste the key, and your save comes with it.</p>`;}
   $('#onlineBody').innerHTML=body;
   const sh=$('#shortcutHelp');if(sh){const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=o.handle+'|'+o.token+'|';sh.innerHTML=o.ok?`<b>iPhone, one time.</b> Two things to copy:<br>
   <div class="section-label" style="margin-top:8px">A. The address</div><input id="syncUrl" readonly value="${esc(url)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncUrl').value,'syncUrl')">Copy address</button>
@@ -812,7 +816,7 @@ function start(){
   if(!S.onboarded)onboard();else{if(!S.cls)classSheet();autoSyncFromUrl();}
   if(O().ok){pullSteps();loadFriends();partySync();pushPlayer();}
   setInterval(()=>{if(document.visibilityState==='visible'&&!C){render();if(O().ok){pullSteps();partySync();}}},60000);
-  setInterval(()=>{if(document.visibilityState==='visible'&&O().ok){loadFriends();}},180000);
+  setInterval(()=>{if(document.visibilityState==='visible'&&O().ok){loadFriends();pushPlayer();}},180000);
   if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
 }
 start();
