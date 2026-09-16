@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='4.9';
+const VERSION='5.0';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -131,7 +131,24 @@ const CLASSES={
   scavenger:{n:'Scavenger',e:'🎒',d:'Finds more, carries more, opens locks. Starts with a crowbar and a hiking pack.',kit:['crowbar','pack2']},
   medic:{n:'Medic',e:'🩺',d:'Tough and hard to kill. Starts with a pipe, a jacket, a trauma kit and nurse scrubs.',kit:['pipe','jacket'],extra:'kit',cos:'top:scrubs'}
 };
+const BACKGROUNDS={
+  farmer:{n:'Farmer',e:'🌾',d:'The garden gives +2 food per level and food heals more.',kit:'3 beans and 3 water in the stash'},
+  engineer:{n:'Engineer',e:'⚙️',d:'Buildings cost 10% less scrap and 15% less walking.',kit:'15 scrap'},
+  chef:{n:'Chef',e:'🍳',d:'Eating heals +10. Your crew eats less.',kit:'3 food and a beef jerky'},
+  firefighter:{n:'Firefighter',e:'🚒',d:'+10 max HP and you start with a fire axe.',kit:'a fire axe'},
+  carpenter:{n:'Carpenter',e:'🔨',d:'Walls and traps cost 20% less scrap and walking.',kit:'20 scrap'},
+  mechanic:{n:'Mechanic',e:'🔧',d:'Repairs cost 1 scrap instead of 3.',kit:'a crowbar and a car battery'},
+  gamer:{n:'Gamer',e:'🎮',d:'Weaker (-10 HP, -1 damage) but knows the genre: +25% XP, sees every boss gimmick before the fight, legendary chance climbs faster, contracts pay 25% more scrap.',kit:'an extra skill point'}
+};
 const SKILLS={
+  farmer:[{id:'greenthumb',n:'Green Thumb',max:3,d:r=>'Garden gives +'+r+' more food per level'},{id:'earlyriser',n:'Early Riser',max:2,d:r=>'+'+(5*r)+' HP recovered overnight'},{id:'harvest',n:'Harvest',max:2,d:r=>'Every stash adds +'+r+' food'}],
+  engineer:[{id:'efficient',n:'Efficient',max:3,d:r=>'Building takes '+(8*r)+'% less walking'},{id:'fortify',n:'Fortify',max:3,d:r=>'Each wall level gives +'+(2*r)+' more defense'},{id:'tinkerer',n:'Tinkerer',max:3,d:r=>'Repairs cost '+r+' less scrap'}],
+  chef:[{id:'comfortfood',n:'Comfort Food',max:3,d:r=>'Eating heals +'+(5*r)+' more'},{id:'rationing',n:'Rationing',max:1,d:r=>'Crew eat half as much when you stash'},{id:'sharpknife',n:'Sharp Knife',max:3,d:r=>'+'+r+' melee damage'}],
+  firefighter:[{id:'axeman',n:'Axeman',max:3,d:r=>'+'+(2*r)+' melee damage'},{id:'thickskin',n:'Thick Skin',max:3,d:r=>'+'+(8*r)+' max HP'},{id:'lungs',n:'Good Lungs',max:1,d:r=>'Bloater bursts hurt half as much'},{id:'brave',n:'Brave',max:1,d:r=>'You are never ambushed'}],
+  carpenter:[{id:'framing',n:'Framing',max:3,d:r=>'Each wall level gives +'+(3*r)+' more defense'},{id:'trapmaker',n:'Trapmaker',max:3,d:r=>'Each trap level gives +'+(2*r)+' more defense'},{id:'boards',n:'Boarded Up',max:3,d:r=>'Raiders that break in take '+(10*r)+'% less'}],
+  mechanic:[{id:'tuneup',n:'Tune-up',max:3,d:r=>'Repairs restore +'+(2*r)+' more durability'},{id:'juryrig',n:'Jury-rig',max:3,d:r=>(20*r)+'% chance a breaking weapon holds together'},{id:'gennie',n:'Generator Whisperer',max:2,d:r=>'Generator cuts raid odds another '+(5*r)+'%'}],
+  gamer:[{id:'metaknowledge',n:'Meta Knowledge',max:3,d:r=>'+'+(5*r)+'% XP'},{id:'speedrunner',n:'Speedrunner',max:3,d:r=>'Places are '+(5*r)+'% closer'},{id:'lore',n:'Lore',max:2,d:r=>'Boss legendary chance climbs +'+r+'% more per phase'},{id:'rng',n:'RNG Manipulation',max:2,d:r=>'Rare finds '+(10*r)+'% more likely'}],
+
   brawler:[{id:'heavyhands',n:'Heavy Hands',max:3,d:r=>'+'+(2*r)+' melee damage'},{id:'irongrip',n:'Iron Grip',max:3,d:r=>(25*r)+'% chance a swing costs no durability'},{id:'secondwind',n:'Second Wind',max:3,d:r=>'Heal '+(6*r)+' HP when a fight ends'},{id:'bruiser',n:'Bruiser',max:2,d:r=>'Heavy swing hits '+(12*r)+'% more often'},{id:'cleave',n:'Cleave',max:2,d:r=>(20*r)+'% chance a swing also hits a second enemy for half'}],
   marksman:[{id:'steadyaim',n:'Steady Aim',max:3,d:r=>'+'+(3*r)+' gun damage'},{id:'scrounger',n:'Scrounger',max:3,d:r=>'+'+r+' round in every ammo box you find'},{id:'silencer',n:'Silencer',max:3,d:r=>'Shots make '+(8*r)+' less noise'},{id:'headshot',n:'Headshot',max:3,d:r=>(10*r)+'% chance a shot does double damage'},{id:'quickdraw',n:'Quick Draw',max:1,d:r=>'You are never ambushed'}],
   scavenger:[{id:'deeppockets',n:'Deep Pockets',max:3,d:r=>'+'+(2*r)+' pack capacity'},{id:'eagleeye',n:'Eagle Eye',max:3,d:r=>'Rare finds '+(15*r)+'% more likely'},{id:'lightstep',n:'Light Step',max:3,d:r=>'Every search makes '+(4*r)+' less noise'},{id:'lockpick',n:'Lockpick',max:3,d:r=>(30*r)+'% chance to open a chest with no key'},{id:'haggler',n:'Haggler',max:2,d:r=>'+'+(5*r)+'% stash value'}],
@@ -218,18 +235,20 @@ const SFX={ctx:null,
 
 /* ================= player ================= */
 function sk(id){return S.skills[id]||0;}
-const maxHp=()=>100+(S.lvl-1)*10+sk('tough')*10;
+const maxHp=()=>Math.max(60,100+(S.lvl-1)*10+sk('tough')*10+sk('thickskin')*8+(bg('firefighter')?10:0)-(bg('gamer')?10:0));
 const eqItem=(slot)=>S.eq[slot]?S.gear.find(g=>g.uid===S.eq[slot]):null;
 const dr=()=>(eqItem('armor')?eqItem('armor').dr:0)+(eqItem('head')?eqItem('head').dr:0);
 const capacity=()=>10+(eqItem('bag')?eqItem('bag').cap:0)+(roleLvl('quartermaster')?3+roleLvl('quartermaster'):0)+sk('deeppockets')*2;
 const baseDmg=()=>[3+S.lvl,6+S.lvl];
-function addXp(n){if(S.pet==='cat')n=Math.round(n*petXpMult());S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
+function addXp(n){if(S.pet==='cat')n=Math.round(n*petXpMult());if(bg('gamer'))n=Math.round(n*(1.25+sk('metaknowledge')*0.05));S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
 const activeCrew=()=>S.active.map(id=>S.crew.find(c=>c.id===id)).filter(Boolean);
 function roleLvl(role){let b=0;for(const c of activeCrew())if(c.role===role)b=Math.max(b,c.lvl+sk('leader'));return b;}
 function crewSlots(){return 1+(S.base&&S.base.rooms.bunk?S.base.rooms.bunk:0);}
 function crewXp(n){for(const c of activeCrew()){c.xp+=n;if(c.xp>=c.lvl*6&&c.lvl<5){c.xp-=c.lvl*6;c.lvl++;log(c.name+' is now level '+c.lvl+'.');}}}
 function newCrew(role){const used=S.crew.map(c=>c.name);const names=CREW_NAMES.filter(n=>!used.includes(n));return {id:uid(),name:names.length?pick(names):pick(CREW_NAMES),av:ART.randomAv(),role:role||pick(Object.keys(ROLES)),lvl:1,xp:0};}
-function skillList(){return (SKILLS[S.cls]||[]).concat(SKILLS.general);}
+function skillList(){return (SKILLS[S.cls]||[]).concat(SKILLS[S.bg]||[]).concat(SKILLS.general);}
+const bg=(id)=>S&&S.bg===id;
+function dmgBonus(){return sk('heavyhands')*2+sk('axeman')*2+sk('sharpknife')-(bg('gamer')?1:0);}
 function learn(id){const def=skillList().find(s=>s.id===id);if(!def||S.sp<1||sk(id)>=def.max)return;S.skills[id]=sk(id)+1;S.sp--;SFX.play('ui');log('Learned '+def.n+' '+S.skills[id]+'.');save();render();}
 function respec(){if(S.stock.scrap<15){toast('Need 15 scrap');return;}S.stock.scrap-=15;S.sp+=Object.values(S.skills).reduce((a,b)=>a+b,0);S.skills={};toast('Skills reset');save();render();}
 
@@ -249,7 +268,7 @@ function lootMult(){let m=district().loot;if(wxKind()==='snow')m*=1.1;if(wxKind(
 /* ================= world ================= */
 const district=()=>DISTRICTS[Math.min(S.walk.district,DISTRICTS.length-1)];
 function unlockedDistrict(){let d=0;for(let i=0;i<DISTRICTS.length;i++)if(S.steps.total>=DISTRICTS[i].steps)d=i;return d;}
-function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06));if(wxKind()==='snow')dist=Math.round(dist*1.1);S.walk.dist=dist;S.walk.progress=0;S.walk.toNext=dist;}
+function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05));if(wxKind()==='snow')dist=Math.round(dist*1.1);S.walk.dist=dist;S.walk.progress=0;S.walk.toNext=dist;}
 function bossName(){if(eventNow()==='halloween')return 'The Gourd King';return BOSS_NAMES[hash(weekId()+'boss')%BOSS_NAMES.length];}
 function makeLoc(force,nameOverride){
   let type;
@@ -260,7 +279,7 @@ function makeLoc(force,nameOverride){
   if(roleLvl('scout')&&wxKind()!=='fog'){const r=rooms[rint(0,rooms.length-1)];const best=r.items.slice().sort((a,b)=>b.pts-a.pts)[0];r.peek=best?best.e+' '+best.n:'looks empty';}
   return loc;
 }
-function rarW(it){const r=RAR[it.r||'common'].w;return r>=3?1+sk('eagleeye')*0.15:1;}
+function rarW(it){const r=RAR[it.r||'common'].w;return r>=3?1+sk('eagleeye')*0.15+sk('rng')*0.1:1;}
 function rollRoom(r,loc){
   const lm=lootMult()*(loc.stronghold?1.4:1);const list=table(r.cats,r.shelf,r.gear).map(x=>({...x,w:x.w*rarW(x)}));const n=rint(1,3);const out=[];
   for(let i=0;i<n;i++){const it=wpick(list,'w');if(it.gear)out.push({id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r});else out.push({id:it.id,n:it.n,e:it.e,pts:Math.round(it.pts*lm),cat:it.cat,qty:it.qty,r:it.r});}
@@ -311,8 +330,8 @@ function nextStreakReward(){return STREAK_REWARDS.find(x=>x.d>S.streak.days);}
 function rollDay(){
   const t=todayStr();if(S.steps.date===t)return;
   S.steps.date=t;S.steps.today=0;S.steps.lastSync=0;S.steps.lastSyncDate='';S.flags.roadCheck=0;
-  S.hp=Math.min(maxHp(),S.hp+25+sk('longhaul')*10+(S.base&&S.base.t==='house'?1:0));
-  if(S.base){const g=S.base.rooms.garden||0;if(g){S.stock.food+=3*g;log('The garden gave '+(3*g)+' food.');}if(S.base.t==='diner'){S.stock.food+=2;}}
+  S.hp=Math.min(maxHp(),S.hp+25+sk('longhaul')*10+sk('earlyriser')*5+(S.base&&S.base.t==='house'?1:0));
+  if(S.base){const g=S.base.rooms.garden||0;if(g){const per=3+(bg('farmer')?2:0)+sk('greenthumb');S.stock.food+=per*g;log('The garden gave '+(per*g)+' food.');}if(S.base.t==='diner'){S.stock.food+=2;}}
   const y=new Date();y.setDate(y.getDate()-1);const yd=todayStr(y);
   if(S.streak&&S.streak.days>0&&S.streak.last!==yd&&S.streak.last!==t){const lost=Math.min(15,Math.floor(S.stock.scrap*0.1));S.stock.scrap-=lost;log('You skipped a day. Streak of '+S.streak.days+' broken'+(lost?', and a walker got into the scrap pile: -'+lost+' scrap':'')+'.');S.streak.days=0;}
   S.today={date:t,kills:0,places:0};
@@ -371,7 +390,8 @@ function startCombat(enemies,where,job){
   S.combat=true;SFX.play('growl');
   const desc=where==='rival'?'Nadia\'s scouts step out of the dark.':where==='road'?'Something is in the road.':where==='boss'?bossName()+' steps out. Phase '+(S.bossFightsToday)+' of the week\'s hunt.':where==='watch'?'Watch duty. '+(WATCH_JOBS[C.job]?WATCH_JOBS[C.job].n+'.':''):where==='wave'?'The noise brought more.':where==='raid'?'Raiders are at your walls.':where==='horde'?'Horde night. They are over the fence.':S.loc&&S.loc.stronghold?['','At the gate.','Into the yard.','The boss trailer. '+bossName()+' is home.'][S.loc.stage+1]:'They were waiting inside '+(S.loc?S.loc.n:'the dark')+'.';
   clog(desc+' '+enemies.length+' hostile'+(enemies.length>1?'s':'')+'.','sys');
-  let amb=0.15;if(wxKind()==='fog')amb+=0.1;if(roleLvl('scout')||sk('quickdraw'))amb=0;
+  if(bg('gamer')){const bz=enemies.find(e=>e.boss&&e.g);if(bz)clog('Gamer instinct: '+bz.n+' - '+(GIMMICK_TEXT[bz.g]||bz.g)+'.','good');}
+  let amb=0.15;if(wxKind()==='fog')amb+=0.1;if(roleLvl('scout')||sk('quickdraw')||sk('brave'))amb=0;
   if(where==='enter'&&Math.random()<amb){clog('Ambush! They act first.','hit');enemyPhase();}
   openCombat();
 }
@@ -386,15 +406,15 @@ function act(kind){
   const t=targetEnemy();if(!t){endCombat(true);return;}
   if(kind==='attack'){const w=eqItem('melee');const dm=w?w.dmg:baseDmg();
     if(Math.random()<t.dodge){clog(t.n+' sidesteps your swing.','');SFX.play('miss');}
-    else if(Math.random()<0.9){let d=rint(dm[0],dm[1])+(S.lvl-1)+(w?sk('heavyhands')*2:0);dealTo(t,d,'You hit '+t.n+(w?' with the '+w.n:' bare-handed'));SFX.play('hit');
+    else if(Math.random()<0.9){let d=rint(dm[0],dm[1])+(S.lvl-1)+(w?dmgBonus():0);dealTo(t,d,'You hit '+t.n+(w?' with the '+w.n:' bare-handed'));SFX.play('hit');
       if(w&&w.id==='lastword'&&Math.random()<0.3){t.stun=1;clog(t.n+' is knocked flat. It loses its next turn.','good');}
       if(sk('cleave')&&Math.random()<sk('cleave')*0.2){const o=alive().find(e=>e!==t);if(o){dealTo(o,Math.round(d/2),'The swing carries into '+o.n);}}
-      if(w&&!(Math.random()<sk('irongrip')*0.25)){w.dur--;breakWeapon(w);}}
+      if(w&&!(Math.random()<sk('irongrip')*0.25)){w.dur--;if(w.dur<=0&&Math.random()<sk('juryrig')*0.2){w.dur=1;clog('You jury-rig the '+w.n+' back together.','good');}breakWeapon(w);}}
     else{clog('You miss.','');SFX.play('miss');}
   }
   else if(kind==='heavy'){const w=eqItem('melee');if(!w){toast('Need a melee weapon');return;}
     if(Math.random()<t.dodge+0.1){clog(t.n+' ducks the big swing.','');SFX.play('miss');}
-    else if(Math.random()<0.6+sk('bruiser')*0.12){const d=Math.round((rint(w.dmg[0],w.dmg[1])+sk('heavyhands')*2)*1.6)+(S.lvl-1);dealTo(t,d,'Heavy swing lands');SFX.play('hit');}
+    else if(Math.random()<0.6+sk('bruiser')*0.12){const d=Math.round((rint(w.dmg[0],w.dmg[1])+dmgBonus())*1.6)+(S.lvl-1);dealTo(t,d,'Heavy swing lands');SFX.play('hit');}
     else{clog('The heavy swing goes wide.','');SFX.play('miss');}
     w.dur-=2;breakWeapon(w);
     if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+8);
@@ -420,7 +440,7 @@ function act(kind){
   if(sk('triage')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('triage')*4);}
   if(eqItem('armor')&&eqItem('armor').id==='nightingale'&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+5);}
   for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);clog(e.n+' goes down. +'+e.xp+' XP.','good');
-    if(e.burst&&!e.shot){hurt(e.burst+dr(),'The bloater bursts and');}
+    if(e.burst&&!e.shot){hurt(Math.round((e.burst+dr())*(sk('lungs')?0.5:1)),'The bloater bursts and');}
     if(e.human){if(Math.random()<0.5){const g=pick(['pipe','bat','jacket','helmet','crowbar']);S.gear.push({uid:uid(),id:g,...GEAR[g]});clog('It dropped a '+GEAR[g].n+'.','sys');}
       if(Math.random()<0.5){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:3,n:'Rounds (x3)'});clog('You take 3 rounds off the body.','sys');}
       if(e.boss){S.keys++;S.pack.push({id:'skull',...ITEMS.skull,uid:uid()});clog('The boss mask, and a key from the belt.','sys');
@@ -498,7 +518,7 @@ function renderCombat(){
   <div class="pbox${phurt?' hurt':''}"><div class="sp${plunge?' lunge':''}">${ART.avatarSVG(S.av,60,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',mood:S.hp<maxHp()*0.3?'angry':''})}</div><div><div class="hplab"><span>You · DR ${dr()}</span><span>${S.hp} / ${maxHp()}</span></div><div class="hpbar"><i style="width:${S.hp/maxHp()*100}%"></i></div></div>${phurt?`<span class="dmg">-${C.pfx.d}</span>`:''}</div>
   <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
   <div class="acts">
-    <button class="btn r" onclick="act('attack')">${w?w.e+' '+esc(w.n):'👊 Fists'}<small>${w?(w.dmg[0]+sk('heavyhands')*2)+'-'+(w.dmg[1]+sk('heavyhands')*2)+' · '+(w.id==='oldreliable'?'∞':w.dur)+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
+    <button class="btn r" onclick="act('attack')">${w?w.e+' '+esc(w.n):'👊 Fists'}<small>${w?(w.dmg[0]+dmgBonus())+'-'+(w.dmg[1]+dmgBonus())+' · '+(w.id==='oldreliable'?'∞':w.dur)+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
     <button class="btn" onclick="act('heavy')" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · ${60+sk('bruiser')*12}% hit · noisy</small></button>
     <button class="btn" onclick="act('shoot')" ${g&&(ammoN||g.id==='mercy')?'':'disabled'}>${g?g.e+' '+esc(g.n):'🔫 No gun'}<small>${g?(g.dmg[0]+sk('steadyaim')*3)+'-'+(g.dmg[1]+sk('steadyaim')*3)+' · '+ammoN+' rounds':'find one'}</small></button>
     <button class="btn" onclick="act('brace')">🛡️ Brace<small>${sk('steady')?60+sk('steady')*10:50}% less damage this round</small></button>
@@ -565,9 +585,9 @@ function claimBase(){
   log('You claimed '+loc.n+' as your base. '+(BASE_PERK[loc.t]||''));toast('Base claimed','a');SFX.play('win');
   save();render();leaveLoc();pushPlayer();
 }
-function defense(){if(!S.base)return 0;let d=0;for(const [k,l] of Object.entries(S.base.rooms)){if(!l)continue;d+=BUILD[k].def[l-1]||0;}return d;}
-function buildCost(k){const b=BUILD[k];const l=S.base.rooms[k]||0;if(l>=b.lv)return null;let c=b.cost[l];const el=roleLvl('engineer');if(el)c=Math.round(c*(1-(0.15+el*0.05)));if(S.base.t==='hardware')c=Math.round(c*0.9);return c;}
-function buildLabor(k){const b=BUILD[k];const l=S.base.rooms[k]||0;if(l>=b.lv)return null;let n=b.labor[l];const el=roleLvl('engineer');if(el)n=Math.round(n*(1-(0.1+el*0.05)));return n;}
+function defense(){if(!S.base)return 0;let d=0;for(const [k,l] of Object.entries(S.base.rooms)){if(!l)continue;d+=BUILD[k].def[l-1]||0;}d+=(S.base.rooms.walls||0)*(sk('framing')*3+sk('fortify')*2)+(S.base.rooms.traps||0)*sk('trapmaker')*2;return d;}
+function buildCost(k){const b=BUILD[k];const l=S.base.rooms[k]||0;if(l>=b.lv)return null;let c=b.cost[l];const el=roleLvl('engineer');if(el)c=Math.round(c*(1-(0.15+el*0.05)));if(S.base.t==='hardware')c=Math.round(c*0.9);if(bg('engineer'))c=Math.round(c*0.9);if(bg('carpenter')&&(k==='walls'||k==='traps'))c=Math.round(c*0.8);return c;}
+function buildLabor(k){const b=BUILD[k];const l=S.base.rooms[k]||0;if(l>=b.lv)return null;let n=b.labor[l];const el=roleLvl('engineer');if(el)n=Math.round(n*(1-(0.1+el*0.05)));if(bg('engineer'))n=Math.round(n*0.85);n=Math.round(n*(1-sk('efficient')*0.08));if(bg('carpenter')&&(k==='walls'||k==='traps'))n=Math.round(n*0.8);return n;}
 function build(k){if(!S.base)return;if(S.work){toast('Finish '+BUILD[S.work.k].n+' first, or cancel it');return;}const c=buildCost(k);if(c===null)return;if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}
   S.stock.scrap-=c;S.work={k,lvl:(S.base.rooms[k]||0)+1,need:buildLabor(k),done:0,scrap:c,started:Date.now()};log('Started on '+BUILD[k].n+' level '+S.work.lvl+'. '+fmt(S.work.need)+' steps of work to do.');toast(BUILD[k].n+': walk '+fmt(S.work.need)+' steps to finish it','a');SFX.play('ui');save();render();}
 function cancelWork(){if(!S.work)return;const w=S.work;S.stock.scrap+=w.scrap;S.work=null;log('Stopped work on '+BUILD[w.k].n+'. Scrap refunded.');save();render();}
@@ -581,7 +601,7 @@ function bank(){
   const raw=packPts();const qm=roleLvl('quartermaster');const pts=Math.round(raw*runMult()*TIERS[S.league.tier].mult*(1+(qm?0.08+qm*0.04:0)+sk('haggler')*0.05)*dealMod('pts'));
   let meds=0;for(const it of S.pack){if(it.cat==='shelf')S.shelf.push({id:it.id,n:it.n,e:it.e});else if(it.cat==='candy')S.stock.candy=(S.stock.candy||0)+(it.qty||1);else if(it.cat==='ammo')S.stock.ammo+=(it.qty||0);else if(it.cat==='chest'){S.stock.scrap+=5;}else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;if(it.cat==='meds')meds++;}}
   rollWeek();S.league.score+=pts;ctEvent('stash',pts);if(meds)ctEvent('meds',meds);
-  const eat=activeCrew().length;S.stock.food=Math.max(0,S.stock.food-eat);
+  let eat=activeCrew().length;if(sk('rationing'))eat=Math.ceil(eat/2);S.stock.food=Math.max(0,S.stock.food-eat);if(sk('harvest'))S.stock.food+=sk('harvest');
   S.hp=Math.min(maxHp(),S.hp+15);if(roleLvl('medic'))S.hp=Math.min(maxHp(),S.hp+20);
   if(S.base.rooms.clinic&&S.stock.meds>0&&S.hp<maxHp()){S.stock.meds--;S.hp=maxHp();}
   log('Stashed '+fmt(raw)+' x'+runMult().toFixed(1)+' = '+fmt(pts)+' league points.'+(eat?' Crew ate '+eat+' food.':''));toast('+'+fmt(pts)+' league points','a');SFX.play('win');
@@ -594,9 +614,9 @@ function trade(id){const t=TRADE.find(x=>x.id===id);if(!t)return;if(!S.base){toa
 function renderTrader(){const el=$('#trader');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first. The trader only stops where there are walls.</p>';return;}
   el.innerHTML=TRADE.map(t=>{let c=t.c;if(sk('haggler'))c=Math.max(1,Math.round(c*(1-sk('haggler')*0.1)));return `<button class="tr${S.stock.scrap<c?' off':''}" onclick="trade('${t.id}')"><span class="e">${t.e}</span><b>${t.n}</b><span class="chip a">${c}🔩</span></button>`;}).join('');}
 function heal(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.meds<1){toast('No meds in stash');return;}S.stock.meds--;S.hp=Math.min(maxHp(),S.hp+40+sk('fielddressing')*10);save();render();}
-function eat(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.food<1){toast('No food in stash');return;}S.stock.food--;S.hp=Math.min(maxHp(),S.hp+15);save();render();}
+function eat(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.food<1){toast('No food in stash');return;}S.stock.food--;S.hp=Math.min(maxHp(),S.hp+15+sk('comfortfood')*5+(bg('chef')?10:0)+(bg('farmer')?5:0));save();render();}
 function equip(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;S.eq[g.slot]=S.eq[g.slot]===uidv?null:uidv;SFX.play('ui');save();render();}
-function repair(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;if(!((S.base&&S.base.rooms.armory)||roleLvl('engineer')))return;if(S.stock.scrap<3){toast('Need 3 scrap');return;}S.stock.scrap-=3;g.dur=Math.min(GEAR[g.id].dur,g.dur+3);toast(g.n+' repaired');save();render();}
+function repair(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;if(!((S.base&&S.base.rooms.armory)||roleLvl('engineer')))return;const rc=Math.max(0,3-sk('tinkerer')-(bg('mechanic')?2:0));if(S.stock.scrap<rc){toast('Need '+rc+' scrap');return;}S.stock.scrap-=rc;g.dur=Math.min(GEAR[g.id].dur,g.dur+3+sk('tuneup')*2);toast(g.n+' repaired');save();render();}
 let GEAR_TAB='all';function gearTab(k){GEAR_TAB=k;SFX.play('ui');render();}
 const SALV={common:3,uncommon:6,rare:12,epic:20,legendary:35};
 function salvageValue(g){const ws=S.base&&S.base.rooms.workshop||0;return Math.round((SALV[g.r||'common']||3)*(1+0.25*ws));}
@@ -628,7 +648,7 @@ function checkRaids(){
   const daysSince=Math.floor((Date.now()-S.base.claimed)/86400000);
   if(daysSince<1){S.flags.lastRaidCheck=t;return;}
   let odds=0.18+Math.min(0.4,stockValue()/600)+S.league.tier*0.05;
-  if(S.base.rooms.generator)odds*=S.base.rooms.generator>=2?0.55:0.7;if(S.base.t==='stronghold')odds*=1.4;if(S.campCleared===weekId())odds*=0.5;
+  if(S.base.rooms.generator)odds*=(S.base.rooms.generator>=2?0.55:0.7)*(1-sk('gennie')*0.05);if(S.base.t==='stronghold')odds*=1.4;if(S.campCleared===weekId())odds*=0.5;
   const hour=8+Math.floor(rng()*13);const now=new Date();
   if(rng()<odds){const power=Math.round((10+rng()*20+S.league.tier*6+daysSince*0.5+(S.bossKills||0)*2)*dealMod('raid'));
     if(now.getHours()>=hour){resolveRaid(power,hour,t);S.flags.lastRaidCheck=t;}
@@ -638,7 +658,7 @@ function checkRaids(){
 function resolveRaid(power,hour,date){
   const def=defense();let stolen={};let repelled=def>=power;
   if(S.base.rooms.traps&&Math.random()<0.3){power=Math.round(power*0.7);repelled=def>=power;}
-  if(!repelled){let frac=clamp((power-def)/power*0.6,0.1,0.6);const vl=S.base.rooms.vault||0;if(vl)frac*=vl>=2?0.2:0.5;for(const k of ['food','water','meds','scrap','ammo']){const n=Math.floor(S.stock[k]*frac);if(n){S.stock[k]-=n;stolen[k]=n;}}
+  if(!repelled){let frac=clamp((power-def)/power*0.6,0.1,0.6);const vl=S.base.rooms.vault||0;if(vl)frac*=vl>=2?0.2:0.5;frac*=1-sk('boards')*0.1;for(const k of ['food','water','meds','scrap','ammo']){const n=Math.floor(S.stock[k]*frac);if(n){S.stock[k]-=n;stolen[k]=n;}}
     if(S.base.rooms.walls&&Math.random()<0.5){S.base.rooms.walls--;stolen.walls=1;}}
   const entry={t:date+' '+String(hour).padStart(2,'0')+':00',power,def,repelled,stolen};
   S.raids.unshift(entry);S.raids=S.raids.slice(0,12);S.raidPending=null;
@@ -652,7 +672,7 @@ function hordeState(){if(!S.base)return null;if(!S.horde||!S.horde.next){let nx=
 function hordePower(){const h=hordeState();return Math.round((28+12*(h?h.n:0)+S.walk.district*10+S.league.tier*5)*dealMod('raid'));}
 function hordeDefense(){return defense()+activeCrew().length*3+(S.base&&S.base.rooms.bell?activeCrew().length*2:0);}
 function resolveHorde(fought,won){const h=hordeState();if(!h)return;const power=hordePower();const def=hordeDefense();const repelled=fought?won:def>=power;const stolen={};
-  if(!repelled){let frac=clamp((power-Math.max(0,fought?def*0.5:def))/power*0.8,0.25,0.7);const vl=S.base.rooms.vault||0;if(vl)frac*=vl>=2?0.2:0.5;
+  if(!repelled){let frac=clamp((power-Math.max(0,fought?def*0.5:def))/power*0.8,0.25,0.7);const vl=S.base.rooms.vault||0;if(vl)frac*=vl>=2?0.2:0.5;frac*=1-sk('boards')*0.1;
     for(const k of ['food','water','meds','scrap','ammo']){const n=Math.floor(S.stock[k]*frac);if(n){S.stock[k]-=n;stolen[k]=n;}}
     if(S.base.rooms.walls){S.base.rooms.walls--;stolen.walls=1;}if(S.base.rooms.traps&&Math.random()<0.5){S.base.rooms.traps--;stolen.traps=1;}}
   else if(fought){S.stock.scrap+=25;S.keys++;addXp(40);}
@@ -706,7 +726,7 @@ function storyCheck(){if(!S.story)S.story=[];for(const s of STORY){if(!S.story.i
 function ctRoll(){const t=todayStr(),w=weekId();if(S.ct.date!==t){S.ct.date=t;S.ct.daily=makeDaily(t);}if(S.ct.week!==w){S.ct.week=w;S.ct.weekly=makeWeekly(w);}}
 function ctEvent(type,n){
   if(!S.ct)return;ctRoll();
-  for(const c of S.ct.daily){if(c.t===type&&!c.done){c.n+=n;if(c.n>=c.goal){c.done=true;S.stock.scrap+=c.reward.scrap;addXp(c.reward.xp);if(c.reward.key)S.keys+=c.reward.key;log('Contract done: '+CT_TYPES[c.t].n+' '+c.goal+'. +'+c.reward.scrap+' scrap, +'+c.reward.xp+' XP'+(c.reward.key?', +1 key':'')+'.');toast('Contract done: +'+c.reward.scrap+' scrap','a');SFX.play('chest');}}}
+  for(const c of S.ct.daily){if(c.t===type&&!c.done){c.n+=n;if(c.n>=c.goal){c.done=true;if(bg('gamer'))c.reward.scrap=Math.round(c.reward.scrap*1.25);S.stock.scrap+=c.reward.scrap;addXp(c.reward.xp);if(c.reward.key)S.keys+=c.reward.key;log('Contract done: '+CT_TYPES[c.t].n+' '+c.goal+'. +'+c.reward.scrap+' scrap, +'+c.reward.xp+' XP'+(c.reward.key?', +1 key':'')+'.');toast('Contract done: +'+c.reward.scrap+' scrap','a');SFX.play('chest');}}}
   if(type==='kills'||type==='places'){if(S.today.date!==todayStr())S.today={date:todayStr(),kills:0,places:0};S.today[type]+=n;}
   const w=S.ct.weekly;if(w&&!w.done){for(const g of w.goals)if(g.t===type)g.n+=n;if(w.goals.every(g=>g.n>=g.goal)){w.done=true;S.keys+=1;S.league.score+=200;const cs=rollCosmetic();takeItem(cs,null);log('Weekly contract done. +1 key, +200 points, and '+cs.n+'.');toast('Weekly contract done','l');SFX.play('legend');}}
   const pp=S.party.pending;pp[type]=(pp[type]||0)+n;
@@ -857,9 +877,9 @@ function render(){
   $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=g.slot==='melee'?g.dmg[0]+'-'+g.dmg[1]+' dmg · '+(g.id==='oldreliable'?'never breaks':g.dur+'/'+GEAR[g.id].dur+' durability'):g.slot==='ranged'?g.dmg[0]+'-'+g.dmg[1]+' dmg · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';return `<div class="gear${eq?' eq':''}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px"><button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>${g.slot==='melee'&&canRepair&&g.dur<GEAR[g.id].dur&&g.id!=='oldreliable'?`<button class="btn sm" onclick="repair('${g.uid}')">Repair 3🔩</button>`:''}${S.base&&S.base.rooms.forge&&(g.up||0)<3?`<button class="btn sm" onclick="upgrade('${g.uid}')">Forge +${(g.up||0)+1} · ${UPG_COST[g.up||0]}🔩</button>`:''}<button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
   // you
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
-  $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+sk('heavyhands')*2)+'-'+(eqItem('melee').dmg[1]+sk('heavyhands')*2):baseDmg()[0]+'-'+baseDmg()[1]} +${S.lvl-1}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
+  $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):baseDmg()[0]+'-'+baseDmg()[1]} +${S.lvl-1}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
   $('#cosmeticCount').textContent=S.cosmetics.length+' looks unlocked';
-  $('#spSub').textContent=S.sp+' point'+(S.sp===1?'':'s')+' to spend';$('#youAlert').hidden=!S.sp;$('#clsDesc').textContent=CLASSES[S.cls]?CLASSES[S.cls].e+' '+CLASSES[S.cls].n+'. One point per level and per county milestone. General skills are open to every class.':'';
+  $('#spSub').textContent=S.sp+' point'+(S.sp===1?'':'s')+' to spend';$('#youAlert').hidden=!S.sp;$('#clsDesc').textContent=(CLASSES[S.cls]?CLASSES[S.cls].e+' '+CLASSES[S.cls].n:'')+(S.bg&&BACKGROUNDS[S.bg]?' · '+BACKGROUNDS[S.bg].e+' '+BACKGROUNDS[S.bg].n+' background':'')+'. One point per level and per county milestone. General skills are open to every class.';
   $('#skills').innerHTML=skillList().map(s=>{const r=sk(s.id);return `<div class="skill${r>=s.max?' max':''}"><div><b>${s.n} ${SKILLS.general.includes(s)?'<span class="chip" style="font-size:10px">general</span>':''}</b><span>${s.d(Math.max(1,r))}${r?' · now: '+s.d(r):''}</span><div class="pips">${Array.from({length:s.max},(_,i)=>`<i class="${i<r?'on':''}"></i>`).join('')}</div></div><button class="btn sm ${S.sp>0&&r<s.max?'a':''}" onclick="learn('${s.id}')" ${S.sp>0&&r<s.max?'':'disabled'}>${r>=s.max?'Max':'+'}</button></div>`;}).join('');
   $('#crewSub').textContent=S.active.length+' / '+crewSlots()+' active · '+S.crew.length+' total';
   $('#crewList').innerHTML=S.crew.length?S.crew.map(c=>{const act=S.active.includes(c.id);return `<div class="crew${act?' active':''}"><div class="av">${ART.avatarSVG(c.av,70)}</div><div><div class="nm">${esc(c.name)} <span class="chip a">Lv ${c.lvl}</span></div><div class="role">${ROLES[c.role].e} ${ROLES[c.role].n}</div><div class="tr">${ROLES[c.role].d(c.lvl+sk('leader'))}</div><div class="xp"><i style="width:${Math.min(100,c.xp/(c.lvl*6)*100)}%"></i></div><div class="a2"><button class="btn sm ${act?'':'r'}" onclick="toggleCrew('${c.id}')">${act?'Leave at base':'Bring along'}</button></div></div></div>`;}).join(''):'<p class="help">Nobody yet. Survivors hide in the places you search.</p>';
@@ -1022,15 +1042,26 @@ function lookSheet(onDone){
 /* ================= onboarding ================= */
 function restoreSheet(){openSheet(`<h2>Restore a save</h2><p>Type the handle you played under and paste the <b>account key</b> from Settings on the phone or browser you played on before (Base tab, Settings, Copy account key). If that copy is gone, ask Celeste for a fresh key.</p><input id="rsHandle" type="text" maxlength="20" placeholder="handle, e.g. bel" style="width:100%;margin:6px 0"><input id="rsKey" type="text" placeholder="account key" style="width:100%;margin:6px 0 12px;font-size:12px"><div class="grid2"><button class="btn ghost" onclick="onboard()">Back</button><button class="btn r" onclick="goOnline($('#rsHandle').value,$('#rsKey').value)">Find my save</button></div>`,true);}
 function onboard(){
-  let cls='brawler';
+  let cls='brawler';let bgSel='farmer';
   const draw=()=>{$('#sheet').innerHTML=`<h2>Hollow County</h2><p>The county fell three weeks ago. Every real step you take is a step down the road: houses to loot, walkers inside them, raiders who want what you carry. Pick a class.</p>
   <div class="starter">${Object.entries(CLASSES).map(([k,c])=>`<button class="${k===cls?'on':''}" data-k="${k}"><span class="av">${c.e}</span><b>${c.n}</b><span class="help">${c.d}</span></button>`).join('')}</div>
+  <div class="section-label" style="margin-top:12px">What were you before? <span class="help">a bonus, a gift, and three extra skills</span></div>${bgGrid(bgSel)}
   <label class="section-label" style="display:block;margin-top:12px">Your name</label><input id="obName" type="text" maxlength="18" placeholder="e.g. Celeste" style="margin:6px 0 12px" value="${esc($('#obName')?$('#obName').value:'')}"><button class="btn r wide" id="obGo">Next: your look</button><button class="btn ghost wide" style="margin-top:8px" onclick="restoreSheet()">I already have a character on another phone or browser</button>`;
-    $('#sheet').querySelectorAll('.starter button').forEach(b=>b.onclick=()=>{cls=b.dataset.k;draw();});
+    $('#sheet').querySelectorAll('.starter button[data-k]').forEach(b=>b.onclick=()=>{cls=b.dataset.k;draw();});$('#sheet').querySelectorAll('[data-bg]').forEach(b=>b.onclick=()=>{bgSel=b.dataset.bg;draw();});
     $('#obGo').onclick=()=>{S.name=($('#obName').value||'Survivor').trim();S.cls=cls;S.sp=1;const k=CLASSES[cls];for(const id of k.kit){const g={uid:uid(),id,...GEAR[id]};S.gear.push(g);S.eq[g.slot]=g.uid;}if(k.ammo)S.stock.ammo=k.ammo;if(k.extra)S.pack.push({id:k.extra,...ITEMS[k.extra],uid:uid()});if(k.cos){S.cosmetics.push(k.cos);S.av.top=k.cos.split(':')[1];}
-      S.onboarded=true;newDistance();log('You left the shelter as a '+k.n.toLowerCase()+'.');save();lookSheet(()=>{render();});};};
+      S.bg=bgSel;giveBgKit(bgSel);S.onboarded=true;newDistance();log('You left the shelter as a '+k.n.toLowerCase()+' who used to be a '+BACKGROUNDS[bgSel].n.toLowerCase()+'.');save();lookSheet(()=>{render();});};};
   draw();$('#modal').classList.add('on');$('#modal').dataset.lock='1';
 }
+function giveBgKit(id){if(S.bgKit)return;S.bgKit=true;const k=id;
+  if(k==='farmer'){S.stock.food+=3;S.stock.water+=3;}else if(k==='engineer'){S.stock.scrap+=15;}else if(k==='chef'){S.stock.food+=3;if(S.pack.length<capacity())S.pack.push({id:'jerky',...ITEMS.jerky,uid:uid()});}
+  else if(k==='firefighter'){const g={uid:uid(),id:'axe',...GEAR.axe};S.gear.push(g);if(!S.eq.melee)S.eq.melee=g.uid;}else if(k==='carpenter'){S.stock.scrap+=20;}else if(k==='mechanic'){const g={uid:uid(),id:'crowbar',...GEAR.crowbar};S.gear.push(g);if(!S.eq.melee)S.eq.melee=g.uid;S.stock.scrap+=10;}else if(k==='gamer'){S.sp+=1;}}
+function setBackground(id,first){const old=S.bg;if(!BACKGROUNDS[id])return;if(old&&old!==id){for(const s of SKILLS[old]||[]){S.sp+=sk(s.id);delete S.skills[s.id];}}S.bg=id;if(first){S.sp+=1;giveBgKit(id);}
+  S.hp=Math.min(S.hp,maxHp());log('Background: '+BACKGROUNDS[id].n+'.');save();render();pushPlayer();}
+function bgGrid(sel){return `<div class="starter">${Object.entries(BACKGROUNDS).map(([k,c])=>`<button class="${k===sel?'on':''}" data-bg="${k}"><span class="av">${c.e}</span><b>${c.n}</b><span class="help">${c.d}</span></button>`).join('')}</div>`;}
+function bgSheet(first){let sel=S.bg||'farmer';const draw=()=>{$('#sheet').innerHTML=`<h2>${first?'What were you before?':'Change background'}</h2><p>${first?'Your class is how you fight. Your background is what you did before the county fell: a bonus, a starter gift, and three extra skills. Plus a skill point for choosing.':'Costs 30 scrap. Points spent on your old background come back to you. No new gift.'}</p>${bgGrid(sel)}<button class="btn r wide" style="margin-top:12px" id="bgGo">${first?'That was me':'Change (30 scrap)'}</button>${first?'':'<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet()">Never mind</button>'}`;
+    $('#sheet').querySelectorAll('[data-bg]').forEach(b=>b.onclick=()=>{sel=b.dataset.bg;draw();});
+    $('#bgGo').onclick=()=>{if(!first){if(sel===S.bg){closeSheet();return;}if(S.stock.scrap<30){toast('Need 30 scrap');return;}S.stock.scrap-=30;}setBackground(sel,first);closeSheet();toast(BACKGROUNDS[sel].e+' '+BACKGROUNDS[sel].n,'a');};};
+  draw();$('#modal').classList.add('on');$('#modal').dataset.lock=first?'1':'';}
 function classSheet(){let cls='brawler';const draw=()=>{$('#sheet').innerHTML=`<h2>Pick a class</h2><p>Your save is from before classes existed. Choose one; your skill points are waiting.</p><div class="starter">${Object.entries(CLASSES).map(([k,c])=>`<button class="${k===cls?'on':''}" data-k="${k}"><span class="av">${c.e}</span><b>${c.n}</b><span class="help">${c.d.split('.')[0]}.</span></button>`).join('')}</div><button class="btn r wide" style="margin-top:12px" id="clsGo">Done</button>`;
   $('#sheet').querySelectorAll('.starter button').forEach(b=>b.onclick=()=>{cls=b.dataset.k;draw();});$('#clsGo').onclick=()=>{S.cls=cls;S.sp+=1;if(CLASSES[cls].cos&&!S.cosmetics.includes(CLASSES[cls].cos))S.cosmetics.push(CLASSES[cls].cos);save();closeSheet();lookSheet();};};draw();$('#modal').classList.add('on');$('#modal').dataset.lock='1';}
 
@@ -1039,7 +1070,7 @@ function wire(){
   document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{SFX.play('ui');if(typeof STREET!=='undefined'&&STREET.on){STREET.on=false;if(STREET.watch!==null){navigator.geolocation.clearWatch(STREET.watch);STREET.watch=null;}clearInterval(STREET.timer);$('#v-street').insertBefore($('#locCard'),$('#raidCard'));}document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));$('#main').scrollTop=0;if(b.dataset.v==='street')animate();});
   $('#syncBtn').onclick=()=>{const v=parseInt($('#syncInput').value,10);if(!(v>=0))return;if(syncTotal(v,'sync'))$('#syncInput').value='';};
   $('#pedoBtn').onclick=pedoToggle;$('#clipBtn').onclick=readClipboard;$('#bankBtn').onclick=bank;$('#healBtn').onclick=heal;$('#eatBtn').onclick=eat;$('#dropBtn').onclick=supplyDrop;
-  $('#lookBtn').onclick=()=>lookSheet();$('#respecBtn').onclick=respec;$('#sfxBtn').onclick=()=>{S.sfx=!S.sfx;save();render();if(S.sfx)SFX.play('ui');};
+  $('#lookBtn').onclick=()=>lookSheet();$('#respecBtn').onclick=respec;$('#bgBtn').onclick=()=>bgSheet(false);$('#sfxBtn').onclick=()=>{S.sfx=!S.sfx;save();render();if(S.sfx)SFX.play('ui');};
   $('#demoBtn').onclick=()=>{toast('+300 demo steps','z');addSteps(300,'demo');};$('#shareBtn').onclick=shareCard;
   $('#streetBtn').onclick=streetStart;$('#mapBack').onclick=streetStop;$('#homeBtn').onclick=setHomeHere;$('#refreshPois').onclick=()=>{if(STREET.pos){STREET.lastFetch=null;try{Object.keys(localStorage).filter(k=>k.startsWith('dm.pois.')).forEach(k=>localStorage.removeItem(k));}catch(e){}fetchPois(STREET.pos);}};
   $('#updateBtn').onclick=()=>{toast('Fetching the latest version');applyUpdate();};$('#updateBar').onclick=applyUpdate;
@@ -1059,7 +1090,7 @@ function bossMembers(){const d=S.party&&S.party.data;return S.party&&S.party.cod
 function bossMaxHp(){const m=bossMembers();const base=m>1?900+700*m:1400;return Math.round(base*(1+0.15*(S.bossKills||0))*dealMod('bossHp'));}
 function bossState(){const w=weekId();if(!S.boss||S.boss.week!==w){S.boss={week:w,hp:bossMaxHp(),max:bossMaxHp(),my:0,killed:false,claimed:false,hits:{},killer:null,srv:false};}
   if(S.bossFightDate!==todayStr()){S.bossFightDate=todayStr();S.bossFightsToday=0;}return S.boss;}
-function bossChance(){return Math.min(1,0.06+0.03*(S.bossPity||0));}
+function bossChance(){return Math.min(1,0.06+(0.03+(bg('gamer')?0.01:0)+sk('lore')*0.01)*(S.bossPity||0));}
 function bossPhaseHp(){return 110+S.walk.district*35+(S.bossKills||0)*15;}
 let PENDING_FIGHT=null;
 function runPending(){const f=PENDING_FIGHT;PENDING_FIGHT=null;if(f)f();}
@@ -1132,7 +1163,7 @@ function whileYouWereOut(){
 function start(){
   S=load()||fresh();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
   wire();render();fetchWeather();
-  if(!S.onboarded)onboard();else{if(!S.cls)classSheet();else whileYouWereOut();autoSyncFromUrl();}
+  if(!S.onboarded)onboard();else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else whileYouWereOut();autoSyncFromUrl();}
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){S.lastOpen=Date.now();const bb=board();S.lastRank=bb.findIndex(r=>r.me)+1;save();}});
   if(O().ok){pullSteps();loadFriends();partySync();pushPlayer();bossSync();}
   setInterval(()=>{if(document.visibilityState==='visible'&&!C){render();if(O().ok){pullSteps();partySync();}}},60000);
