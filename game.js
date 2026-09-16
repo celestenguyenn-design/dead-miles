@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='5.6';
+const VERSION='5.7';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -223,7 +223,44 @@ function migrate(o){
     return m;}
   return null;
 }
-function save(quiet){try{if(S&&S.pets&&S.petActive){const ap=S.pets.find(p=>p.id===S.petActive);if(ap){ap.xp=S.petXp||0;ap.name=S.petName||ap.name;}}if(!quiet)S.savedAt=Date.now();localStorage.setItem('deadmiles.v3',JSON.stringify(S));if(!quiet&&S.onboarded&&S.online&&S.online.ok&&typeof pushSoon==='function')pushSoon();}catch(e){}}
+function storedSave(){try{const r=localStorage.getItem('deadmiles.v3');return r?JSON.parse(r):null;}catch(e){return null;}}
+/* Another copy of the game (a second tab, or the browser alongside the home-screen app) can hold an OLD
+   state in memory and write it over a newer one. Never let the older copy win. */
+let STALE=false;
+function staleCheck(){
+  if(!S||!S.onboarded)return false;const o=storedSave();if(!o||!o.onboarded)return false;
+  const theirs=o.savedAt||0,mine=S.savedAt||0;
+  const theirSteps=(o.steps&&o.steps.total)||0,mySteps=(S.steps&&S.steps.total)||0;
+  return theirs>mine+2000||theirSteps>mySteps+50;
+}
+function staleStop(){
+  if(STALE)return;STALE=true;
+  try{openSheet('<h2>Opened somewhere else</h2><p>This copy of the game is behind a newer one, so it stopped saving rather than undo that progress. This happens when the game is open in two places at once.</p><p class="help">Reloading will pick up the newest save. Use one copy from now on, ideally the home-screen icon.</p><button class="btn r wide" onclick="location.reload()">Reload the newest save</button>',true);}catch(e){}
+}
+function snapshot(why){
+  try{const arr=JSON.parse(localStorage.getItem('deadmiles.snaps')||'[]');
+    if(why==='auto'&&arr[0]&&Date.now()-arr[0].t<3600000)return;
+    const copy=JSON.parse(JSON.stringify(S));copy.journal=[];delete copy.wx;if(copy.party)delete copy.party.data;
+    arr.unshift({t:Date.now(),why,name:S.name,lvl:S.lvl,steps:(S.steps&&S.steps.total)||0,s:copy});
+    localStorage.setItem('deadmiles.snaps',JSON.stringify(arr.slice(0,5)));
+  }catch(e){try{localStorage.removeItem('deadmiles.snaps');}catch(e2){}}
+}
+function snapshots(){try{return JSON.parse(localStorage.getItem('deadmiles.snaps')||'[]');}catch(e){return [];}}
+function restoreSnapshot(i){
+  const arr=snapshots();const s=arr[i];if(!s)return;
+  if(!confirm('Go back to the save from '+ago(s.t)+'? ('+(s.s.name||'Survivor')+', level '+s.lvl+', '+fmt(s.steps)+' steps.) The current one is kept as a restore point.'))return;
+  snapshot('before going back');
+  const keep=S.online;S=Object.assign(fresh(),s.s);S.online=(keep&&keep.ok)?keep:(s.s.online||keep);S.combat=false;ensureState();
+  log('Went back to the save from '+ago(s.t)+'.');save();render();toast('Earlier save restored','z');pushPlayer();
+}
+function save(quiet){try{
+  if(S&&S.pets&&S.petActive){const ap=S.pets.find(p=>p.id===S.petActive);if(ap){ap.xp=S.petXp||0;ap.name=S.petName||ap.name;}}
+  if(!quiet&&staleCheck()){staleStop();return;}
+  if(!quiet)S.savedAt=Date.now();
+  localStorage.setItem('deadmiles.v3',JSON.stringify(S));
+  if(!quiet)snapshot('auto');
+  if(!quiet&&S.onboarded&&S.online&&S.online.ok&&typeof pushSoon==='function')pushSoon();
+}catch(e){}}
 function load(){try{let r=localStorage.getItem('deadmiles.v3');if(r){const o=JSON.parse(r);if(o&&o.v===3)return o;}r=localStorage.getItem('deadmiles.v2');if(r){const o=migrate(JSON.parse(r));if(o)return o;}}catch(e){}return null;}
 function log(m){S.journal.unshift({t:Date.now(),m});S.journal=S.journal.slice(0,40);}
 function toast(m,c){const t=document.createElement('div');t.className='toast'+(c?' '+c:'');t.textContent=m;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),2600);}
@@ -363,6 +400,7 @@ function streakReward(){S.streakBest=Math.max(S.streakBest||0,S.streak.days);con
 function nextStreakReward(){return STREAK_REWARDS.find(x=>x.d>S.streak.days);}
 function rollDay(){
   const t=todayStr();if(S.steps.date===t)return;
+  snapshot('start of the day');
   S.steps.date=t;S.steps.today=0;S.steps.src={phone:0,typed:0,walk:0};S.steps.lastSync=0;S.steps.lastSyncDate='';S.flags.roadCheck=0;
   S.hp=Math.min(maxHp(),S.hp+25+sk('longhaul')*10+sk('earlyriser')*5+(S.base&&S.base.t==='house'?1:0));
   if(S.base){const br=S.base.rooms.barrel||0;if(br){const w=br+(wxKind()==='rain'||wxKind()==='storm'?3:0);S.stock.water+=w;log('The rain barrel gave '+w+' water.');}
@@ -803,7 +841,7 @@ async function goOnline(handle,token){
 function compactSave(){const c=JSON.parse(JSON.stringify(S));delete c.online;delete c.journal;delete c.wx;delete c.combat;if(c.party)delete c.party.data;return c;}
 function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:S.stock.ammo}};}
 let pushTimer=0;let pushSoonTimer=0;function pushSoon(){clearTimeout(pushSoonTimer);pushSoonTimer=setTimeout(()=>pushPlayer(),8000);}
-function pushPlayer(){const o=O();if(!o.ok||!S.onboarded)return Promise.resolve();clearTimeout(pushTimer);return new Promise(res=>{pushTimer=setTimeout(async()=>{try{rollWeek();await rpc('save_player',{p_handle:o.handle,p_token:o.token,p_name:S.name,p_tier:S.league.tier,p_week:S.league.week,p_score:S.league.score,p_state:publicState()});o.err='';o.lastPush=Date.now();}catch(e){o.err=e.message;}save(true);res();},400);});}
+function pushPlayer(){const o=O();if(!o.ok||!S.onboarded||STALE)return Promise.resolve();clearTimeout(pushTimer);return new Promise(res=>{pushTimer=setTimeout(async()=>{try{rollWeek();await rpc('save_player',{p_handle:o.handle,p_token:o.token,p_name:S.name,p_tier:S.league.tier,p_week:S.league.week,p_score:S.league.score,p_state:publicState()});o.err='';o.lastPush=Date.now();}catch(e){o.err=e.message;}save(true);res();},400);});}
 async function pullSteps(){
   const o=O();if(!o.ok)return;const since=new Date();since.setHours(0,0,0,0);
   try{const rows=await rpc('get_steps',{p_handle:o.handle,p_token:o.token,p_since:since.toISOString()});o.lastPull=Date.now();
@@ -1009,6 +1047,7 @@ function render(){
   $('#shelfSub').textContent=S.shelf.length+' found';const shelfIds=Object.entries(ITEMS).filter(([k,v])=>v.cat==='shelf');const owned=S.shelf.reduce((m,x)=>{m[x.id]=(m[x.id]||0)+1;return m;},{});
   $('#shelf').innerHTML=shelfIds.map(([k,v])=>`<div class="it${owned[k]?'':' locked'}"><div class="e">${v.e}</div><span class="rc-${v.r}">${v.n}${owned[k]>1?' x'+owned[k]:''}</span></div>`).join('');
   $('#goalInput').value=S.goal;$('#nameInput').value=S.name;$('#sfxBtn').textContent=S.sfx?'On':'Off';const vs=$('#verSub');if(vs)vs.textContent='v'+VERSION;const bi=backupInfo();const ub=$('#undoRow');if(ub){ub.hidden=!bi;if(bi)$('#undoBtn').textContent='Undo restore (put back the save from '+ago(bi.t)+')';}
+  const snList=snapshots();const snEl=$('#snapList');if(snEl)snEl.innerHTML=snList.length?snList.map((s,i)=>`<div class="lbrow"><div class="rk">${i+1}</div><div class="nm">${esc(s.name||'Survivor')} · level ${s.lvl}<small>${fmt(s.steps)} lifetime steps · ${esc(ago(s.t))}${s.why&&s.why!=='auto'?' · '+esc(s.why):''}</small></div><div class="sc"><button class="btn xs" onclick="restoreSnapshot(${i})">Go back</button></div></div>`).join(''):'<p class="help">None yet. The game keeps one an hour, plus one before anything risky.</p>';
   // county
   renderMap();renderParty();renderBoss();renderDeal();renderEvent();renderStory();renderShop();renderPet();
   const tier=TIERS[S.league.tier];$('#tierBadge').textContent=tier.e;$('#tierName').textContent=tier.n;$('#tierSub').textContent='Tier '+(S.league.tier+1)+' of '+TIERS.length+' · stash x'+tier.mult;
