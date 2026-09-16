@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=5.1">
+<link rel="stylesheet" href="style.css?v=5.2">
 </head>
 <body>
 <div id="app">
@@ -30,6 +30,7 @@
       <div class="card steel"><h2>Street mode <span class="sub">live map</span></h2><p>Out walking? Open the real map: the buildings around you become the places to loot, and your own home can be your base.</p><button class="btn z wide" style="margin-top:10px" id="streetBtn">Open the live map</button></div>
       <div class="card blood"><h2>Watch duty <span class="sub" id="watchSub"></span></h2><p>No steps today? Take a job. Three fights a day that need no walking. Loot goes in your pack, scrap goes straight to the stash.</p><div class="stack" id="watch" style="margin-top:10px"></div></div>
       <div class="card" id="locCard" hidden></div>
+      <div class="card steel" id="rivalCard" hidden></div>
       <div class="card" id="raidCard" hidden></div>
       <div class="card" id="contractsCard"><h2>Contracts <span class="sub" id="contractsSub"></span></h2><div class="stack" id="contracts" style="margin-top:10px"></div></div>
       <div class="card">
@@ -125,7 +126,7 @@
         <p style="margin-top:10px">Three rival crews scavenge Hollow County all week on a real clock. First place on Sunday night moves you up a tier. Last place drops you. Only stashed points count.</p>
         <div class="row" style="margin-top:8px"><div class="chip z" id="weekChip"></div><div class="chip" id="resetChip"></div></div>
       </div>
-      <div class="card"><h2>Friends <span class="sub" id="friendsSub"></span></h2><p class="help" id="friendsHelp"></p><div class="lb" id="friends" style="margin-top:10px"></div></div>
+      <div class="card"><h2>Leaderboard <span class="sub" id="friendsSub"></span></h2><p class="help" id="friendsHelp"></p><div class="tabs" id="lbTabs" style="margin-top:8px"></div><div class="lb" id="friends"></div></div>
       <div class="card"><h2>Rival crews</h2><div class="lb" id="board" style="margin-top:10px"></div><p class="help" id="boardHelp" style="margin-top:8px"></p></div>
       <div class="card"><h2>Marisol on the radio <span class="sub" id="storySub"></span></h2><div id="dealBox" style="margin-top:8px"></div><ul class="journal" id="story" style="margin-top:8px"></ul></div>
       <div class="card"><h2>Radio chatter</h2><ul class="journal" id="radio" style="margin-top:8px"></ul></div>
@@ -143,8 +144,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=5.1"></script>
-<script src="street.js?v=5.1"></script>
-<script src="game.js?v=5.1"></script>
+<script src="art.js?v=5.2"></script>
+<script src="street.js?v=5.2"></script>
+<script src="game.js?v=5.2"></script>
 </body>
 </html>

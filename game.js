@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='5.1';
+const VERSION='5.2';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -213,7 +213,7 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   ct:{date:'',daily:[],week:'',weekly:null,pending:{}},party:{code:'',data:null,pending:{}},wx:null,
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
 function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
-  if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};S.bossFightDate=S.bossFightDate||'';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};}
+  if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};}
 function migrate(o){
   if(!o)return null;if(o.v===3)return o;
   if(o.v===2){const f=fresh();const m=Object.assign(f,o);m.v=3;m.av=ART.randomAv();m.cosmetics=[];m.cls='';m.sp=Math.max(0,(o.lvl||1)-1);m.skills={};m.sfx=true;m.keys=0;m.milestones=[];m.ct=f.ct;m.party=f.party;m.wx=null;m.bossKilled='';
@@ -347,7 +347,7 @@ function streakReward(){S.streakBest=Math.max(S.streakBest||0,S.streak.days);con
 function nextStreakReward(){return STREAK_REWARDS.find(x=>x.d>S.streak.days);}
 function rollDay(){
   const t=todayStr();if(S.steps.date===t)return;
-  S.steps.date=t;S.steps.today=0;S.steps.lastSync=0;S.steps.lastSyncDate='';S.flags.roadCheck=0;
+  S.steps.date=t;S.steps.today=0;S.steps.src={phone:0,typed:0,walk:0};S.steps.lastSync=0;S.steps.lastSyncDate='';S.flags.roadCheck=0;
   S.hp=Math.min(maxHp(),S.hp+25+sk('longhaul')*10+sk('earlyriser')*5+(S.base&&S.base.t==='house'?1:0));
   if(S.base){const g=S.base.rooms.garden||0;if(g){const per=3+(bg('farmer')?2:0)+sk('greenthumb');S.stock.food+=per*g;log('The garden gave '+(per*g)+' food.');}if(S.base.t==='diner'){S.stock.food+=2;}}
   const y=new Date();y.setDate(y.getDate()-1);const yd=todayStr(y);
@@ -368,7 +368,7 @@ function rollWeek(){
 function checkMilestones(){for(let i=1;i<DISTRICTS.length;i++){if(S.steps.total>=DISTRICTS[i].steps&&!S.milestones.includes(i)){S.milestones.push(i);S.sp++;S.keys++;log('Milestone: '+fmt(DISTRICTS[i].steps)+' lifetime steps. '+DISTRICTS[i].n+' is open. +1 skill point, +1 key.');toast(DISTRICTS[i].n+' unlocked · +1 skill point','l');SFX.play('legend');}}}
 function addSteps(n,src){
   n=Math.floor(n);if(!(n>0))return;rollDay();rollWeek();S.lastAnim=Date.now();
-  if(src!=='carry'){S.steps.total+=n;S.steps.today+=n;S.wallet=(S.wallet||0)+n;workSteps(n);if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
+  if(src!=='carry'){S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
   if(src!=='carry'&&S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');streakReward();}
   if(S.loc||S.combat){S.walk.banked=(S.walk.banked||0)+n;if(src!=='carry'&&src!=='live')toast('+'+fmt(n)+' steps saved for after this stop','z');save();render();return;}
   let left=n;
@@ -778,7 +778,7 @@ async function goOnline(handle,token){
   }catch(e){o.ok=false;o.err=e.message;save();render();}
 }
 function compactSave(){const c=JSON.parse(JSON.stringify(S));delete c.online;delete c.journal;delete c.wx;delete c.combat;if(c.party)delete c.party.data;return c;}
-function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',steps_today:S.steps.today,streak:S.streak.days,party:S.party.code},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:S.stock.ammo}};}
+function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:S.stock.ammo}};}
 let pushTimer=0;let pushSoonTimer=0;function pushSoon(){clearTimeout(pushSoonTimer);pushSoonTimer=setTimeout(()=>pushPlayer(),8000);}
 function pushPlayer(){const o=O();if(!o.ok||!S.onboarded)return Promise.resolve();clearTimeout(pushTimer);return new Promise(res=>{pushTimer=setTimeout(async()=>{try{rollWeek();await rpc('save_player',{p_handle:o.handle,p_token:o.token,p_name:S.name,p_tier:S.league.tier,p_week:S.league.week,p_score:S.league.score,p_state:publicState()});o.err='';o.lastPush=Date.now();}catch(e){o.err=e.message;}save(true);res();},400);});}
 async function pullSteps(){
@@ -930,7 +930,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderFriends();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();
+  renderOnline();renderFriends();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -1030,11 +1030,36 @@ function renderOnline(){
 }
 function visitFriend(i){const f=friends[i];if(!f)return;const pub=f.pub||{};const sv=pub.save||{};const st={base:sv.base||(pub.base?{...pub.base}:null),shelf:sv.shelf||[],av:sv.av||pub.av||S.av,pet:sv.pet||null,petCoat:sv.petCoat||null,active:sv.active||[],crew:sv.crew||[]};
   openSheet(`<h2>${esc(f.name)}'s place</h2>${st.base?baseScene(st):'<p class="help">No base claimed yet.</p>'}<div class="kv" style="margin-top:10px"><span>Level</span><b>${pub.lvl||1}</b><span>Kills</span><b>${fmt(pub.kills||0)}</b><span>Defense</span><b>${pub.defense||0}</b><span>Streak</span><b>${pub.streak||0}</b><span>Trophies</span><b>${st.shelf.length}</b><span>Companion</span><b>${st.pet?(sv.petName||PETS[st.pet].n)+' the '+ART.coatInfo(st.pet,st.petCoat).n.toLowerCase()+' L'+Math.min(10,Math.floor((sv.petXp||0)/4000)+1)+((sv.pets||[]).length>1?' (+'+((sv.pets||[]).length-1)+' more)':''):'none'}</b><span>Weapon</span><b>${esc(pub.weapon||'fists')}</b></div><button class="btn r wide" style="margin-top:10px" onclick="closeSheet()">Head back</button>`);}
+let LB_TAB='today';function lbTab(t){LB_TAB=t;SFX.play('ui');render();}
+function hideFriend(h){if(!S.hidden.includes(h))S.hidden.push(h);if(S.rival===h)S.rival='';save();render();}
+function unhideFriend(h){S.hidden=S.hidden.filter(x=>x!==h);save();render();}
+function setRival(h){S.rival=S.rival===h?'':h;SFX.play('ui');save();render();}
+const LB_TABS=[['today','Steps today',f=>(f.pub||{}).steps_today||0],['week','This week',f=>(f.pub||{}).steps_week||0],['score','League pts',f=>f.score||0],['kills','Kills',f=>(f.pub||{}).kills||0]];
+function lbVal(f){return (LB_TABS.find(t=>t[0]===LB_TAB)||LB_TABS[0])[2](f);}
+function typedShare(pub){const s=pub.src||{};const tot=(s.phone||0)+(s.typed||0)+(s.walk||0);if(!tot)return null;return {typed:s.typed||0,pct:Math.round((s.typed||0)/tot*100)};}
+function rivalRow(){const el=$('#rivalCard');if(!el)return;const o=O();
+  if(!o.ok||!S.rival){el.hidden=true;return;}
+  const f=friends.find(x=>x.handle===S.rival);if(!f){el.hidden=true;return;}
+  el.hidden=false;const pub=f.pub||{};const mine=S.steps.today,theirs=pub.steps_today||0;const mw=(S.steps.weekId===weekId()?S.steps.week||0:0),tw=pub.steps_week||0;
+  const ahead=mine-theirs,aheadW=mw-tw;
+  el.innerHTML=`<h2>You vs ${esc(f.name)} <span class="sub">${ahead===0?'dead even today':ahead>0?'you lead by '+fmt(ahead):'behind by '+fmt(-ahead)}</span></h2>
+  <div class="vs"><div class="side"><div>${ART.avatarSVG(S.av,54)}</div><b>You</b><span class="num">${fmt(mine)}</span><span class="help">${fmt(mw)} this week</span></div>
+  <div class="vsmid">${ahead>0?'🥇':ahead<0?'🥈':'🤝'}</div>
+  <div class="side"><div>${pub.av?ART.avatarSVG(pub.av,54):'🧍'}</div><b>${esc(f.name)}</b><span class="num">${fmt(theirs)}</span><span class="help">${fmt(tw)} this week</span></div></div>
+  <div class="bar" style="height:8px;border-radius:4px;background:var(--ash2);overflow:hidden;margin-top:8px"><i style="display:block;height:100%;width:${mine+theirs?Math.round(mine/(mine+theirs)*100):50}%;background:linear-gradient(90deg,var(--rot2),var(--rot))"></i></div>
+  <p class="help" style="margin-top:6px">This week: ${aheadW===0?'level':aheadW>0?'you are '+fmt(aheadW)+' ahead':'you are '+fmt(-aheadW)+' behind'}. Tap their name on the County tab to change rival.</p>`;}
 function renderFriends(){
   const o=O();const el=$('#friends');if(!el)return;const sub=$('#friendsSub');const help=$('#friendsHelp');
   if(!o.ok){sub.textContent='offline';help.textContent='Go online in Settings to see who else is walking Hollow County.';el.innerHTML='';return;}
-  sub.textContent=friends.length+' online';help.textContent=friends.length>1?'Everyone on your server this week.':'Share the link. Anyone who goes online shows up here.';
-  el.innerHTML=friends.map((f,i)=>{const me=f.handle===o.handle;const pub=f.pub||{};return `<div class="lbrow${me?' me':''}"><div class="rk">${i+1}</div><div class="av">${pub.av?ART.avatarSVG(pub.av,40):'🧍'}</div><div class="nm">${esc(f.name)}${me?' (you)':''}<small>@${esc(f.handle)} · lvl ${pub.lvl||1} · ${pub.base?esc(pub.base.n):'no base'} · def ${pub.defense||0}${pub.party?' · party '+esc(pub.party):''}</small></div><div class="sc">${fmt(f.score)}${me?'':`<br><button class="btn xs" onclick="visitFriend(${i})">Visit</button>`}</div></div>`;}).join('')||'<p class="help">Nobody yet.</p>';
+  const shown=friends.filter(f=>!S.hidden.includes(f.handle)).slice().sort((a,b)=>lbVal(b)-lbVal(a));
+  const hid=friends.filter(f=>S.hidden.includes(f.handle));
+  sub.textContent=shown.length+' on the board';help.textContent='Tap a name to make them your rival. Hide anyone you do not want on your board.';
+  $('#lbTabs').innerHTML=LB_TABS.map(([k,n])=>`<button class="${LB_TAB===k?'on':''}" onclick="lbTab('${k}')">${n}</button>`).join('');
+  el.innerHTML=shown.map((f)=>{const me=f.handle===o.handle;const pub=f.pub||{};const idx=friends.indexOf(f);const ts=typedShare(pub);
+    return `<div class="lbrow${me?' me':''}${S.rival===f.handle?' rival':''}"><div class="rk">${shown.indexOf(f)+1}</div><div class="av">${pub.av?ART.avatarSVG(pub.av,40):'🧍'}</div>
+    <div class="nm"><button class="linkish" onclick="${me?'':`setRival('${f.handle}')`}">${esc(f.name)}${me?' (you)':''}${pub.crowns?' 👑'+pub.crowns:''}${S.rival===f.handle?' · rival':''}</button><small>@${esc(f.handle)} · lvl ${pub.lvl||1} · ${fmt(pub.steps_today||0)} today · ${fmt(pub.steps_week||0)} this week${pub.streak?' · streak '+pub.streak:''}${ts&&ts.typed?` · <span style="color:var(--amber)">${fmt(ts.typed)} typed in (${ts.pct}%)</span>`:ts?' · phone-synced':''}</small></div>
+    <div class="sc">${fmt(lbVal(f))}${me?'':`<br><button class="btn xs" onclick="visitFriend(${idx})">Visit</button><br><button class="btn xs ghost" onclick="hideFriend('${f.handle}')">Hide</button>`}</div></div>`;}).join('')||'<p class="help">Nobody yet.</p>';
+  if(hid.length)el.innerHTML+=`<div class="section-label" style="margin-top:12px">Hidden</div>`+hid.map(f=>`<div class="lbrow" style="opacity:.6"><div class="rk">·</div><div class="av">🚫</div><div class="nm">${esc(f.name)}<small>@${esc(f.handle)}</small></div><div class="sc"><button class="btn xs" onclick="unhideFriend('${f.handle}')">Unhide</button></div></div>`).join('');
 }
 function openSheet(html,lock){$('#sheet').innerHTML=html;$('#modal').classList.add('on');$('#modal').dataset.lock=lock?'1':'';}
 function closeSheet(){if(C&&!C.over)return;$('#modal').classList.remove('on');}
