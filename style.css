@@ -222,3 +222,6 @@ a{color:var(--amber)}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
 .leaflet-control-attribution{background:rgba(0,0,0,.5)!important;color:#888!important;font-size:9px}
 .leaflet-control-attribution a{color:#aaa!important}
+
+/* OSM tiles are light; invert them so the street map matches the game's dark look */
+.dm-tiles{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.6)}
