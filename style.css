@@ -102,6 +102,21 @@ a{color:var(--amber)}
 .shake{animation:shake .35s}
 @keyframes shake{0%,100%{transform:none}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
 .flash{animation:flash .5s}
+.pbox{position:relative;display:grid;grid-template-columns:64px 1fr;gap:10px;align-items:center;padding:6px 8px;border-radius:8px;background:var(--ash2);border:1px solid var(--line)}
+.pbox .sp svg{display:block}
+.pbox.hurt{animation:hitflash .5s}
+.pbox.hurt .sp{animation:hitshake .4s}
+.sp.lunge{animation:lunge .35s}
+@keyframes lunge{0%{transform:none}40%{transform:translateX(22px) scale(1.06)}100%{transform:none}}
+.enemy{position:relative}
+.enemy.hit{animation:hitflash .45s}
+.enemy.hit .sp{animation:hitshake .4s}
+@keyframes hitshake{0%,100%{transform:none}25%{transform:translateX(-6px) rotate(-5deg)}75%{transform:translateX(6px) rotate(5deg)}}
+@keyframes hitflash{0%{background:#5a1a22;border-color:#ff5a6a}100%{background:var(--ash2)}}
+.dmg{position:absolute;right:12px;top:6px;font-family:'Bebas Neue';font-size:26px;color:#ff8a92;text-shadow:0 2px 6px rgba(0,0,0,.6);animation:floatup .8s forwards;pointer-events:none}
+.pbox .dmg{color:#ff5a6a}
+@keyframes floatup{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-30px)}}
+.item.fresh{animation:pop .45s cubic-bezier(.2,1.4,.4,1) both}
 @keyframes flash{0%{box-shadow:0 0 0 0 rgba(255,176,32,.8)}100%{box-shadow:0 0 0 30px rgba(255,176,32,0)}}
 /* crew + you */
 .crew{display:grid;grid-template-columns:70px 1fr;gap:12px;align-items:center;padding:12px;border-radius:8px;background:var(--panel);border:1px solid var(--line)}
