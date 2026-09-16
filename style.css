@@ -266,3 +266,17 @@ a{color:var(--amber)}
 .vs .side .num{font-family:'Bebas Neue';font-size:26px;color:var(--amber)}
 .vs .side svg{display:block}
 .vsmid{font-size:26px}
+
+/* v5.4 combat motion */
+.hpbar i,.hpbar.en i,.xp i,.hpbar2 i{transition:width .35s ease}
+.enemy .sp,.pbox .sp{position:relative}
+.enemy.dead .sp{animation:fall .6s forwards}
+@keyframes fall{to{transform:rotate(78deg) translateY(8px);opacity:.35}}
+.enemy.dead svg{animation:none}
+.spark,.muzzle{position:absolute;left:50%;top:50%;font-size:30px;pointer-events:none;line-height:1;z-index:2}
+.spark{animation:sparkpop .5s forwards}
+@keyframes sparkpop{0%{opacity:1;transform:translate(-50%,-50%) scale(.4) rotate(-10deg)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.7) rotate(22deg)}}
+.muzzle{left:86%;top:62%;font-size:24px;animation:muzzlepop .32s forwards}
+@keyframes muzzlepop{0%{opacity:1;transform:translate(-50%,-50%) scale(.5)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5)}}
+.clog li{animation:slidein .25s ease}
+@keyframes slidein{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
