@@ -8,7 +8,17 @@ const EYES=['round','almond','sparkle'];
 const EYES_SHOP={heart:{n:'Heart eyes',c:12000},star:{n:'Star eyes',c:12000},sleepy:{n:'Sleepy eyes',c:8000},cat:{n:'Cat eyes',c:10000}};
 const TOP_COLORS=['#8a3a2a','#3a5a8a','#4a7a4a','#6a4a8a','#c9a04a','#3a3a44'];
 const HATS={streakband:{n:"Runner's headband",r:'epic',lock:'streak'},beanie:{n:'Beanie',r:'rare'},cap:{n:'Ball cap',r:'rare'},cowboy:{n:'Cowboy hat',r:'epic'},catears:{n:'Cat-ear hood',r:'epic'},bandana:{n:'Bandana',r:'rare'},halo:{n:'Halo',r:'legendary'},crown:{n:'Tin crown',r:'legendary'},helmet:{n:'Bike helmet',r:'rare'},beret:{n:'Beret',r:'rare',c:8000},bunny:{n:'Bunny ears',r:'epic',c:14000},flowers:{n:'Flower crown',r:'epic',c:12000},headphones:{n:'Headphones',r:'rare',c:9000},party:{n:'Party hat',r:'rare',c:6000},bearhood:{n:'Bear hood',r:'epic',c:16000},tiara:{n:'Tiara',r:'legendary',c:25000},witch:{n:'Witch hat',r:'epic'},pumpkin:{n:'Pumpkin head',r:'legendary'}};
-const TOPS={hoodie:{n:'Hoodie',r:'common'},varsity:{n:'Varsity jacket',r:'rare'},raincoat:{n:'Yellow raincoat',r:'rare'},biker:{n:'Biker jacket',r:'epic'},scrubs:{n:'Nurse scrubs',r:'epic'},flannel:{n:'Flannel shirt',r:'rare'},tux:{n:'Ruined tuxedo',r:'epic'},sweater:{n:'Cozy sweater',r:'rare',c:9000},overalls:{n:'Overalls',r:'rare',c:10000},sailor:{n:'Sailor top',r:'epic',c:14000},sundress:{n:'Sundress',r:'epic',c:15000},pajamas:{n:'Pajamas',r:'rare',c:8000},labcoat:{n:'Lab coat',r:'epic',c:18000},skeleton:{n:'Skeleton hoodie',r:'epic'}};
+const TOPS={hoodie:{n:'Hoodie',r:'common'},varsity:{n:'Varsity jacket',r:'rare'},raincoat:{n:'Yellow raincoat',r:'rare'},biker:{n:'Biker jacket',r:'epic'},scrubs:{n:'Nurse scrubs',r:'epic'},flannel:{n:'Flannel shirt',r:'rare'},tux:{n:'Ruined tuxedo',r:'epic'},sweater:{n:'Cozy sweater',r:'rare',c:9000},overalls:{n:'Overalls',r:'rare',c:10000},sailor:{n:'Sailor top',r:'epic',c:14000},sundress:{n:'Sundress',r:'epic',c:15000,kind:'dress',c1:'#ff8ab8',dots:'#fff'},dress_black:{n:'Little black dress',r:'rare',kind:'dress',c1:'#1c1c22'},dress_floral:{n:'Floral dress',r:'rare',kind:'dress',c1:'#5fb3c9',dots:'#fff5a0'},dress_plaid:{n:'Plaid pinafore',r:'epic',kind:'dress',c1:'#a83a2a',plaid:true},dress_nurse:{n:'Nurse dress',r:'epic',kind:'dress',c1:'#f6f2ea',cross:true},dress_gown:{n:'Ball gown',r:'legendary',kind:'dress',c1:'#b38cff',gown:true},pajamas:{n:'Pajamas',r:'rare',c:8000},labcoat:{n:'Lab coat',r:'epic',c:18000},skeleton:{n:'Skeleton hoodie',r:'epic'},
+  onesie_cow:{n:'Cow onesie',r:'rare',kind:'onesie',base:'#f4f0ea',belly:'#f6b3c3',pat:'cow',ears:'round',earIn:'#f6b3c3'},
+  onesie_frog:{n:'Frog onesie',r:'rare',kind:'onesie',base:'#6fbf5a',belly:'#d8f0c0',ears:'frogeyes'},
+  onesie_bear:{n:'Bear onesie',r:'rare',kind:'onesie',base:'#8a5a3a',belly:'#d9b48a',ears:'round',earIn:'#d9b48a'},
+  onesie_bunny:{n:'Bunny onesie',r:'epic',kind:'onesie',base:'#ffd6e4',belly:'#fff',ears:'long',earIn:'#ff8ab8'},
+  onesie_shark:{n:'Shark onesie',r:'epic',kind:'onesie',base:'#6a8aa8',belly:'#e8f0f6',ears:'fin',teeth:true},
+  onesie_dino:{n:'Dino onesie',r:'epic',kind:'onesie',base:'#5aa86a',belly:'#e0d890',ears:'spikes'},
+  onesie_snowfox:{n:'Snow fox onesie',r:'epic',kind:'onesie',base:'#f4f0ea',belly:'#fff',ears:'pointy',earIn:'#ff9ab0'},
+  onesie_sparkmouse:{n:'Sparkmouse onesie',r:'legendary',kind:'onesie',base:'#f5d642',belly:'#f5d642',ears:'longblack',earIn:'#f5d642',cheeks:'#e63e3e',bolt:true},
+  onesie_flamefox:{n:'Flamefox onesie',r:'legendary',kind:'onesie',base:'#f08a3a',belly:'#fbe3b8',ears:'pointy',earIn:'#fbe3b8',flame:true}};
+function outfitKind(top){const t=TOPS[top];return t&&t.kind||'top';}
 const ACCS={glasses:{n:'Round glasses',r:'rare'},scarf:{n:'Striped scarf',r:'rare'},eyepatch:{n:'Eyepatch',r:'epic'},shades:{n:'Aviators',r:'epic'},mask:{n:'Gas mask',r:'legendary'},bandaid:{n:'Cheek bandage',r:'rare',c:5000},choker:{n:'Choker',r:'rare',c:6000},stars:{n:'Star glasses',r:'epic',c:11000},flower:{n:'Hair flower',r:'rare',c:6000},blush:{n:'Extra blush',r:'rare',c:4000},freckles:{n:'Freckles',r:'rare',c:4000},wings:{n:'Bat wings',r:'legendary'}};
 
 /* ---------- head geometry (viewBox 0 0 100 130): head spans x 12-88, y 10-82; eyes at (35,55) and (65,55) ---------- */
@@ -72,6 +82,19 @@ function mouth(mood){
 }
 function topShape(top,c){
   const base=`<rect x="30" y="76" width="40" height="32" rx="9" fill="${c}"/>`;
+  const t=TOPS[top];
+  if(t&&t.kind==='dress'){const w=t.gown?58:50;let s=`<path d="M32 76 h36 l${(w-36)/2} 40 h-${w}z" fill="${t.c1}"/><path d="M40 76 q10 6 20 0" stroke="rgba(0,0,0,.25)" stroke-width="3" fill="none"/>`;
+    if(t.dots)s+=`<circle cx="42" cy="90" r="2" fill="${t.dots}"/><circle cx="56" cy="98" r="2" fill="${t.dots}"/><circle cx="48" cy="106" r="2" fill="${t.dots}"/><circle cx="60" cy="110" r="2" fill="${t.dots}"/>`;
+    if(t.plaid)s+=`<path d="M30 88 h40 M28 100 h44 M42 76 v40 M56 76 v40" stroke="rgba(0,0,0,.35)" stroke-width="2"/><rect x="40" y="76" width="20" height="10" fill="#f6f2ea"/>`;
+    if(t.cross)s+=`<rect x="44" y="84" width="12" height="12" fill="#fff" stroke="#ddd"/><path d="M50 86 v8 M46 90 h8" stroke="#c22b3a" stroke-width="2.4"/><path d="M32 76 h36" stroke="#5fb3c9" stroke-width="4"/>`;
+    if(t.gown)s+=`<path d="M25 116 q25 -10 50 0" stroke="#fff" stroke-width="2" fill="none" opacity=".7"/><path d="M50 78 l3 6 l6 1 l-4 4 l1 6 l-6 -3 l-6 3 l1 -6 l-4 -4 l6 -1z" fill="#fff" opacity=".9"/><path d="M27 104 q23 -8 46 0" stroke="#fff" stroke-width="1.5" fill="none" opacity=".5"/>`;
+    return s;}
+  if(t&&t.kind==='onesie'){let s=`<rect x="27" y="76" width="46" height="36" rx="13" fill="${t.base}"/><ellipse cx="50" cy="96" rx="12" ry="13" fill="${t.belly}"/><path d="M50 78 v12" stroke="rgba(0,0,0,.25)" stroke-width="2"/>`;
+    if(t.pat==='cow')s+=`<ellipse cx="35" cy="86" rx="5" ry="4" fill="#2c2c36"/><ellipse cx="64" cy="102" rx="5" ry="4" fill="#2c2c36"/>`;
+    if(t.teeth)s+=`<path d="M40 80 l3 5 l3 -5 l3 5 l3 -5 l3 5 l3 -5 l3 5 l3 -5" stroke="#fff" stroke-width="2" fill="none"/>`;
+    if(t.bolt)s+=`<path d="M52 84 l-6 10 h5 l-3 9 l8 -12 h-5 l3 -7z" fill="#8a5a1a"/>`;
+    if(t.flame)s+=`<path d="M50 84 q-6 6 0 12 q6 -6 0 -12z" fill="#ff5a3a"/><path d="M50 88 q-3 3 0 6 q3 -3 0 -6z" fill="#ffd166"/>`;
+    return s;}
   switch(top){
     case 'varsity':return `<rect x="30" y="76" width="40" height="32" rx="9" fill="#2a3a6a"/><rect x="30" y="80" width="10" height="26" rx="5" fill="#e8e0d0"/><rect x="60" y="80" width="10" height="26" rx="5" fill="#e8e0d0"/><text x="50" y="98" font-size="10" text-anchor="middle" fill="#e8e0d0" font-family="sans-serif" font-weight="700">H</text>`;
     case 'raincoat':return `<rect x="28" y="76" width="44" height="34" rx="10" fill="#f2c230"/><path d="M50 76 v34" stroke="#c99a10" stroke-width="2"/><circle cx="50" cy="86" r="1.8" fill="#8a6a00"/><circle cx="50" cy="96" r="1.8" fill="#8a6a00"/>`;
@@ -131,24 +154,62 @@ function accShape(acc){
   }
 }
 // av = {skin,hair,hairColor,eyes,top,topColor,hat,acc}
+let AV_STYLE='sticker';
+function setStyle(s){AV_STYLE=s;}
+function bodyParts(style,skin,tc,top,weapon){
+  // returns {back, body} : back = things drawn behind the head (legs, torso, arms), body-level sleeves included
+  const wpn=weapon==='melee'?`<path d="M75 100 l14 -30" stroke="#7a5a3a" stroke-width="5" stroke-linecap="round"/><path d="M87 74 l4 -8" stroke="#555" stroke-width="7" stroke-linecap="round"/>`:weapon==='gun'?`<rect x="73" y="90" width="20" height="7" rx="2" fill="#333"/><rect x="75" y="96" width="6" height="8" rx="2" fill="#333"/>`:'';
+  const dressy=['sundress','onesie'].includes(top)||String(top).startsWith('dress')||String(top).startsWith('onesie');
+  if(style==='plush'){
+    const legs=`<rect x="37" y="100" width="12" height="18" rx="6" fill="${dressy?skin:'#2a2a30'}"/><rect x="51" y="100" width="12" height="18" rx="6" fill="${dressy?skin:'#2a2a30'}"/><path d="M34 114 h16 v8 q0 4 -4 4 h-8 q-4 0 -4 -4z M50 114 h16 v8 q0 4 -4 4 h-8 q-4 0 -4 -4z" fill="#1a1a1e"/>`;
+    const arms=`<rect x="19" y="80" width="13" height="20" rx="6.5" fill="${tc}"/><rect x="68" y="80" width="13" height="20" rx="6.5" fill="${tc}"/><circle cx="25.5" cy="101" r="5.5" fill="${skin}"/><circle cx="74.5" cy="101" r="5.5" fill="${skin}"/>`;
+    return {back:legs+topShape(top,tc)+arms+wpn,head:`<path d="M12 50 q0 -40 38 -40 q38 0 38 40 v8 q0 24 -38 24 q-38 0 -38 -24z" fill="${skin}"/><ellipse cx="25" cy="67" rx="7" ry="4.5" fill="#ff8ab8" opacity=".5"/><ellipse cx="75" cy="67" rx="7" ry="4.5" fill="#ff8ab8" opacity=".5"/><path d="M48 63 q2 2 4 0" stroke="#d09080" stroke-width="1.6" fill="none" stroke-linecap="round"/>`};
+  }
+  if(style==='bean'){
+    const o='stroke="#2a1a14" stroke-width="1.6"';
+    const legs=`<rect x="39" y="98" width="10" height="16" rx="5" fill="${dressy?skin:'#2a2a30'}" ${o}/><rect x="51" y="98" width="10" height="16" rx="5" fill="${dressy?skin:'#2a2a30'}" ${o}/><ellipse cx="43" cy="116" rx="8" ry="4" fill="#1a1a1e" ${o}/><ellipse cx="57" cy="116" rx="8" ry="4" fill="#1a1a1e" ${o}/>`;
+    const torso=`<g ${o}>${topShape(top,tc).replace(/<rect x="30" y="76" width="40" height="32" rx="9"/g,'<rect x="33" y="78" width="34" height="26" rx="10"')}</g>`;
+    const arms=`<rect x="23" y="80" width="11" height="17" rx="5.5" fill="${tc}" ${o}/><rect x="66" y="80" width="11" height="17" rx="5.5" fill="${tc}" ${o}/><circle cx="28.5" cy="98" r="4.5" fill="${skin}" ${o}/><circle cx="71.5" cy="98" r="4.5" fill="${skin}" ${o}/>`;
+    return {back:legs+torso+arms+wpn,head:`<path d="M12 50 q0 -40 38 -40 q38 0 38 40 v6 q0 26 -38 26 q-38 0 -38 -26z" fill="${skin}" ${o}/><ellipse cx="24" cy="66" rx="6.5" ry="4" fill="#ff8ab8" opacity=".55"/><ellipse cx="76" cy="66" rx="6.5" ry="4" fill="#ff8ab8" opacity=".55"/><path d="M48 62 l2 2 l2 -2" stroke="#b07868" stroke-width="1.5" fill="none" stroke-linecap="round"/>`};
+  }
+  if(style==='sticker'){
+    const o='stroke="#1e1418" stroke-width="2.6" stroke-linejoin="round"';const kind=outfitKind(top);const od=TOPS[top]||{};
+    const legCol=kind==='onesie'?od.base:kind==='dress'?skin:'#2a2a30';
+    const legs=kind==='onesie'?`<rect x="36" y="100" width="12" height="20" rx="6" fill="${od.base}" ${o}/><rect x="52" y="100" width="12" height="20" rx="6" fill="${od.base}" ${o}/><ellipse cx="42" cy="121" rx="9" ry="5" fill="${od.belly}" ${o}/><ellipse cx="58" cy="121" rx="9" ry="5" fill="${od.belly}" ${o}/>`
+      :`<rect x="36" y="100" width="12" height="18" rx="6" fill="${legCol}" ${o}/><rect x="52" y="100" width="12" height="18" rx="6" fill="${legCol}" ${o}/><path d="M33 113 h17 v9 q0 4 -4 4 h-9 q-4 0 -4 -4z M50 113 h17 v9 q0 4 -4 4 h-9 q-4 0 -4 -4z" fill="${kind==='dress'?'#3a2a44':'#1a1a1e'}" ${o}/>`;
+    const torso=`<g ${o}>${topShape(top,tc)}</g>`;
+    const sleeve=kind==='onesie'?od.base:kind==='dress'?skin:tc;const hand=kind==='onesie'?od.belly:skin;
+    const arms=`<rect x="18" y="79" width="14" height="21" rx="7" fill="${sleeve}" ${o}/><rect x="68" y="79" width="14" height="21" rx="7" fill="${sleeve}" ${o}/><circle cx="25" cy="101" r="6" fill="${hand}" ${o}/><circle cx="75" cy="101" r="6" fill="${hand}" ${o}/>`;
+    return {back:legs+torso+arms+`<g ${o}>${wpn}</g>`,head:`<path d="M12 50 q0 -40 38 -40 q38 0 38 40 v7 q0 25 -38 25 q-38 0 -38 -25z" fill="${skin}" ${o}/><ellipse cx="24" cy="67" rx="7" ry="4.5" fill="#ff8ab8" opacity=".6"/><ellipse cx="76" cy="67" rx="7" ry="4.5" fill="#ff8ab8" opacity=".6"/><path d="M20 26 l2 -5 l2 5 l5 2 l-5 2 l-2 5 l-2 -5 l-5 -2z" fill="#fff" opacity=".9"/>`};
+  }
+  // classic
+  return {back:`<rect x="36" y="100" width="11" height="22" rx="5" fill="#2a2a30"/><rect x="53" y="100" width="11" height="22" rx="5" fill="#2a2a30"/><rect x="34" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/><rect x="51" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/>${topShape(top,tc)}<rect x="21" y="82" width="11" height="22" rx="5" fill="${skin}"/><rect x="68" y="82" width="11" height="22" rx="5" fill="${skin}"/>${wpn}`,
+    head:`<path d="M12 50 q0 -40 38 -40 q38 0 38 40 v6 q0 26 -38 26 q-38 0 -38 -26z" fill="${skin}"/><circle cx="24" cy="66" r="6" fill="#ff8ab8" opacity=".45"/><circle cx="76" cy="66" r="6" fill="#ff8ab8" opacity=".45"/>`};
+}
+function onesieEars(top,o){const t=TOPS[top];if(!t||t.kind!=='onesie')return '';const b=t.base,i=t.earIn||t.belly;
+  switch(t.ears){
+    case 'round':return `<g ${o}><circle cx="19" cy="17" r="9" fill="${b}"/><circle cx="19" cy="17" r="4.5" fill="${i}"/><circle cx="81" cy="17" r="9" fill="${b}"/><circle cx="81" cy="17" r="4.5" fill="${i}"/></g>`;
+    case 'long':return `<g ${o}><ellipse cx="27" cy="6" rx="6.5" ry="15" fill="${b}"/><ellipse cx="27" cy="7" rx="3" ry="10" fill="${i}"/><ellipse cx="73" cy="6" rx="6.5" ry="15" fill="${b}"/><ellipse cx="73" cy="7" rx="3" ry="10" fill="${i}"/></g>`;
+    case 'longblack':return `<g ${o}><path d="M22 20 l-6 -26 l14 18z" fill="${b}"/><path d="M17 -2 l-1 -4 l7 9z" fill="#1e1418"/><path d="M78 20 l6 -26 l-14 18z" fill="${b}"/><path d="M83 -2 l1 -4 l-7 9z" fill="#1e1418"/><path d="M18 2 l-2 -8 l8 10z M82 2 l2 -8 l-8 10z" fill="#1e1418"/></g>`;
+    case 'pointy':return `<g ${o}><path d="M18 22 l-2 -18 l14 12z" fill="${b}"/><path d="M20 18 l-1 -9 l7 6z" fill="${i}"/><path d="M82 22 l2 -18 l-14 12z" fill="${b}"/><path d="M80 18 l1 -9 l-7 6z" fill="${i}"/></g>`;
+    case 'fin':return `<g ${o}><path d="M44 12 q6 -16 14 -4 l-2 8z" fill="${b}"/></g>`;
+    case 'spikes':return `<g ${o}><path d="M30 14 l5 -12 l6 10z M46 10 l5 -12 l6 10z M62 14 l5 -12 l6 10z" fill="${t.belly}"/></g>`;
+    case 'frogeyes':return `<g ${o}><circle cx="30" cy="12" r="8" fill="${b}"/><circle cx="30" cy="12" r="4.5" fill="#fff"/><circle cx="31" cy="12" r="2.2" fill="#1e1418"/><circle cx="70" cy="12" r="8" fill="${b}"/><circle cx="70" cy="12" r="4.5" fill="#fff"/><circle cx="69" cy="12" r="2.2" fill="#1e1418"/></g>`;
+  }return '';}
 function avatarSVG(av,size,opts){
   av=av||{};opts=opts||{};const skin=SKINS[av.skin||0]||SKINS[0];const hc=HAIR_COLORS[av.hairColor||0]||HAIR_COLORS[0];const style=av.hair||'short';const tc=TOP_COLORS[av.topColor||0]||TOP_COLORS[0];
-  const mood=opts.mood||'';const weapon=opts.weapon||'';
-  const w=size||100,h=Math.round((size||100)*1.3);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 130" width="${w}" height="${h}" ${opts.attrs||''} aria-hidden="true">
-  ${hairBack(style,hc)}
-  <rect x="36" y="100" width="11" height="22" rx="5" fill="#2a2a30"/><rect x="53" y="100" width="11" height="22" rx="5" fill="#2a2a30"/>
-  <rect x="34" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/><rect x="51" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/>
-  ${topShape(av.top||'hoodie',tc)}
-  <rect x="21" y="82" width="11" height="22" rx="5" fill="${skin}"/><rect x="68" y="82" width="11" height="22" rx="5" fill="${skin}"/>
-  ${weapon==='melee'?`<path d="M75 100 l14 -30" stroke="#7a5a3a" stroke-width="5" stroke-linecap="round"/><path d="M87 74 l4 -8" stroke="#555" stroke-width="7" stroke-linecap="round"/>`:''}
-  ${weapon==='gun'?`<rect x="73" y="90" width="20" height="7" rx="2" fill="#333"/><rect x="75" y="96" width="6" height="8" rx="2" fill="#333"/>`:''}
-  <path d="M12 50 q0 -40 38 -40 q38 0 38 40 v6 q0 26 -38 26 q-38 0 -38 -26z" fill="${skin}"/>
-  <circle cx="24" cy="66" r="6" fill="#ff8ab8" opacity=".45"/><circle cx="76" cy="66" r="6" fill="#ff8ab8" opacity=".45"/>
+  const mood=opts.mood||'';const weapon=opts.weapon||'';const bs=opts.style||AV_STYLE;
+  const w=size||100,h=Math.round((size||100)*1.3);const bp=bodyParts(bs,skin,tc,av.top||'hoodie',weapon);
+  const o=bs==='sticker'?'stroke="#1e1418" stroke-width="2.2" stroke-linejoin="round"':bs==='bean'?'stroke="#2a1a14" stroke-width="1.4" stroke-linejoin="round"':'';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -8 100 138" width="${w}" height="${h}" ${opts.attrs||''} aria-hidden="true">
+  ${o?`<g ${o}>${hairBack(style,hc)}</g>`:hairBack(style,hc)}
+  ${bp.back}
+  ${bp.head}
   ${eyes(av.eyes||'round',mood)}
   ${mouth(mood)}
-  ${hairFront(style,hc)}
-  ${hatShape(av.hat,hc)}
+  ${o?`<g ${o}>${hairFront(style,hc)}</g>`:hairFront(style,hc)}
+  ${av.hat?'':onesieEars(av.top||'hoodie',o)}
+  ${o?`<g ${o}>${hatShape(av.hat,hc)}</g>`:hatShape(av.hat,hc)}
   ${accShape(av.acc)}
   </svg>`;
 }
@@ -257,5 +318,5 @@ function petSVG(kind,size,coat,opts){
 const imgCache=new Map();
 function spriteImg(svg){let i=imgCache.get(svg);if(i)return i;i=new Image();i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);imgCache.set(svg,i);if(imgCache.size>60){const k=imgCache.keys().next().value;imgCache.delete(k);}return i;}
 function randomAv(){return {skin:Math.floor(Math.random()*SKINS.length),hair:HAIR_STYLES[Math.floor(Math.random()*HAIR_STYLES.length)],hairColor:Math.floor(Math.random()*HAIR_COLORS.length),eyes:EYES[Math.floor(Math.random()*EYES.length)],top:'hoodie',topColor:Math.floor(Math.random()*TOP_COLORS.length),hat:'',acc:''};}
-return {SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,CAT_COATS,DOG_COATS,randomCoat,coatInfo,avatarSVG,zombieSVG,petSVG,spriteImg,randomAv};
+return {SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,CAT_COATS,DOG_COATS,randomCoat,coatInfo,avatarSVG,setStyle,bodyParts,zombieSVG,petSVG,spriteImg,randomAv};
 })();
