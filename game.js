@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='5.0';
+const VERSION='5.1';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -149,11 +149,29 @@ const SKILLS={
   mechanic:[{id:'tuneup',n:'Tune-up',max:3,d:r=>'Repairs restore +'+(2*r)+' more durability'},{id:'juryrig',n:'Jury-rig',max:3,d:r=>(20*r)+'% chance a breaking weapon holds together'},{id:'gennie',n:'Generator Whisperer',max:2,d:r=>'Generator cuts raid odds another '+(5*r)+'%'}],
   gamer:[{id:'metaknowledge',n:'Meta Knowledge',max:3,d:r=>'+'+(5*r)+'% XP'},{id:'speedrunner',n:'Speedrunner',max:3,d:r=>'Places are '+(5*r)+'% closer'},{id:'lore',n:'Lore',max:2,d:r=>'Boss legendary chance climbs +'+r+'% more per phase'},{id:'rng',n:'RNG Manipulation',max:2,d:r=>'Rare finds '+(10*r)+'% more likely'}],
 
-  brawler:[{id:'heavyhands',n:'Heavy Hands',max:3,d:r=>'+'+(2*r)+' melee damage'},{id:'irongrip',n:'Iron Grip',max:3,d:r=>(25*r)+'% chance a swing costs no durability'},{id:'secondwind',n:'Second Wind',max:3,d:r=>'Heal '+(6*r)+' HP when a fight ends'},{id:'bruiser',n:'Bruiser',max:2,d:r=>'Heavy swing hits '+(12*r)+'% more often'},{id:'cleave',n:'Cleave',max:2,d:r=>(20*r)+'% chance a swing also hits a second enemy for half'}],
-  marksman:[{id:'steadyaim',n:'Steady Aim',max:3,d:r=>'+'+(3*r)+' gun damage'},{id:'scrounger',n:'Scrounger',max:3,d:r=>'+'+r+' round in every ammo box you find'},{id:'silencer',n:'Silencer',max:3,d:r=>'Shots make '+(8*r)+' less noise'},{id:'headshot',n:'Headshot',max:3,d:r=>(10*r)+'% chance a shot does double damage'},{id:'quickdraw',n:'Quick Draw',max:1,d:r=>'You are never ambushed'}],
-  scavenger:[{id:'deeppockets',n:'Deep Pockets',max:3,d:r=>'+'+(2*r)+' pack capacity'},{id:'eagleeye',n:'Eagle Eye',max:3,d:r=>'Rare finds '+(15*r)+'% more likely'},{id:'lightstep',n:'Light Step',max:3,d:r=>'Every search makes '+(4*r)+' less noise'},{id:'lockpick',n:'Lockpick',max:3,d:r=>(30*r)+'% chance to open a chest with no key'},{id:'haggler',n:'Haggler',max:2,d:r=>'+'+(5*r)+'% stash value'}],
-  medic:[{id:'fielddressing',n:'Field Dressing',max:3,d:r=>'Meds heal '+(10*r)+' more'},{id:'tough',n:'Tough',max:3,d:r=>'+'+(10*r)+' max HP'},{id:'triage',n:'Triage',max:3,d:r=>'Heal '+(4*r)+' HP every combat round'},{id:'adrenaline',n:'Adrenaline',max:3,d:r=>'Enemies miss you '+(6*r)+'% more'},{id:'steady',n:'Steady',max:2,d:r=>'Brace blocks '+(60+10*r)+'% instead of 50%'}],
-  general:[{id:'longhaul',n:'Long Haul',max:2,d:r=>'+'+(10*r)+' HP recovered overnight'},{id:'pathfinder',n:'Pathfinder',max:3,d:r=>'Places are '+(6*r)+'% closer'},{id:'leader',n:'Leader',max:1,d:r=>'Active crew act as one level higher'}]
+  brawler:[{id:'heavyhands',n:'Heavy Hands',max:3,d:r=>'+'+(2*r)+' melee damage'},{id:'irongrip',n:'Iron Grip',max:3,d:r=>(25*r)+'% chance a swing costs no durability'},{id:'secondwind',n:'Second Wind',max:3,d:r=>'Heal '+(6*r)+' HP when a fight ends'},{id:'bruiser',n:'Bruiser',max:2,d:r=>'Heavy swing hits '+(12*r)+'% more often'},{id:'cleave',n:'Cleave',max:2,d:r=>(20*r)+'% chance a swing also hits a second enemy for half'},
+    {id:'intimidate',n:'Intimidate',max:2,req:6,d:r=>'Raiders and other people hit you '+(8*r)+'% less'},
+    {id:'rampage',n:'Rampage',max:3,req:9,d:r=>'+'+(2*r)+' damage for every enemy already down this fight'},
+    {id:'ironjaw',n:'Iron Jaw',max:1,req:14,d:r=>'Once a fight, a killing blow leaves you at 1 HP instead'}],
+  marksman:[{id:'steadyaim',n:'Steady Aim',max:3,d:r=>'+'+(3*r)+' gun damage'},{id:'scrounger',n:'Scrounger',max:3,d:r=>'+'+r+' round in every ammo box you find'},{id:'silencer',n:'Silencer',max:3,d:r=>'Shots make '+(8*r)+' less noise'},{id:'headshot',n:'Headshot',max:3,d:r=>(10*r)+'% chance a shot does double damage'},{id:'quickdraw',n:'Quick Draw',max:1,d:r=>'You are never ambushed'},
+    {id:'coldbarrel',n:'Cold Barrel',max:1,req:6,d:r=>'The first shot of every fight does half again as much'},
+    {id:'doubletap',n:'Double Tap',max:3,req:9,d:r=>(10*r)+'% chance a shot fires twice'},
+    {id:'ammosense',n:'Ammo Sense',max:2,req:13,d:r=>(12*r)+'% chance a shot uses no ammo'}],
+  scavenger:[{id:'deeppockets',n:'Deep Pockets',max:3,d:r=>'+'+(2*r)+' pack capacity'},{id:'eagleeye',n:'Eagle Eye',max:3,d:r=>'Rare finds '+(15*r)+'% more likely'},{id:'lightstep',n:'Light Step',max:3,d:r=>'Every search makes '+(4*r)+' less noise'},{id:'lockpick',n:'Lockpick',max:3,d:r=>(30*r)+'% chance to open a chest with no key'},{id:'haggler',n:'Haggler',max:2,d:r=>'+'+(5*r)+'% stash value'},
+    {id:'appraiser',n:'Appraiser',max:3,req:6,d:r=>'Salvage gives another '+(20*r)+'% scrap'},
+    {id:'packrat',n:'Pack Rat',max:3,req:9,d:r=>'+'+(2*r)+' more pack capacity'},
+    {id:'shadow',n:'Shadow',max:2,req:13,d:r=>(12*r)+'% chance to slip past a road encounter'}],
+  medic:[{id:'fielddressing',n:'Field Dressing',max:3,d:r=>'Meds heal '+(10*r)+' more'},{id:'tough',n:'Tough',max:3,d:r=>'+'+(10*r)+' max HP'},{id:'triage',n:'Triage',max:3,d:r=>'Heal '+(4*r)+' HP every combat round'},{id:'adrenaline',n:'Adrenaline',max:3,d:r=>'Enemies miss you '+(6*r)+'% more'},{id:'steady',n:'Steady',max:2,d:r=>'Brace blocks '+(60+10*r)+'% instead of 50%'},
+    {id:'clotting',n:'Clotting',max:2,req:6,d:r=>'Bleeding hurts '+(25*r)+'% less and bleed/poison end '+r+' round sooner'},
+    {id:'transfusion',n:'Transfusion',max:3,req:9,d:r=>'Heal '+(3*r)+' HP every time an enemy goes down'},
+    {id:'fieldsurgeon',n:'Field Surgeon',max:2,req:13,d:r=>'Wake at '+(40+15*r)+'% HP after going down, and keep '+(25*r)+'% of the pack'}],
+  general:[{id:'longhaul',n:'Long Haul',max:2,d:r=>'+'+(10*r)+' HP recovered overnight'},{id:'pathfinder',n:'Pathfinder',max:3,d:r=>'Places are '+(6*r)+'% closer'},{id:'leader',n:'Leader',max:1,d:r=>'Active crew act as one level higher'},
+    {id:'scrapper',n:'Scrapper',max:3,req:4,d:r=>'Salvage gives '+(15*r)+'% more scrap'},
+    {id:'trader',n:'Trader',max:2,req:6,d:r=>'The trader charges '+(15*r)+'% less'},
+    {id:'nightowl',n:'Night Owl',max:2,req:7,d:r=>'+'+(10*r)+'% loot after dark'},
+    {id:'marathoner',n:'Marathoner',max:3,req:9,d:r=>'+'+(4*r)+'% stash value'},
+    {id:'wellstocked',n:'Well Stocked',max:1,req:11,d:r=>'+1 watch job every day'},
+    {id:'survivalist',n:'Survivalist',max:3,req:13,d:r=>'+'+(5*r)+' max HP'}]
 };
 const BUILD={
   walls:{n:'Walls',e:'🧱',lv:5,def:[6,12,20,30,42],labor:[1500,3000,5000,8000,12000],cost:[15,30,50,90,140],d:'Defense against raids. L4+ is concrete.'},
@@ -235,10 +253,10 @@ const SFX={ctx:null,
 
 /* ================= player ================= */
 function sk(id){return S.skills[id]||0;}
-const maxHp=()=>Math.max(60,100+(S.lvl-1)*10+sk('tough')*10+sk('thickskin')*8+(bg('firefighter')?10:0)-(bg('gamer')?10:0));
+const maxHp=()=>Math.max(60,100+(S.lvl-1)*10+sk('tough')*10+sk('thickskin')*8+sk('survivalist')*5+(bg('firefighter')?10:0)-(bg('gamer')?10:0));
 const eqItem=(slot)=>S.eq[slot]?S.gear.find(g=>g.uid===S.eq[slot]):null;
 const dr=()=>(eqItem('armor')?eqItem('armor').dr:0)+(eqItem('head')?eqItem('head').dr:0);
-const capacity=()=>10+(eqItem('bag')?eqItem('bag').cap:0)+(roleLvl('quartermaster')?3+roleLvl('quartermaster'):0)+sk('deeppockets')*2;
+const capacity=()=>10+(eqItem('bag')?eqItem('bag').cap:0)+(roleLvl('quartermaster')?3+roleLvl('quartermaster'):0)+sk('deeppockets')*2+sk('packrat')*2;
 const baseDmg=()=>[3+S.lvl,6+S.lvl];
 function addXp(n){if(S.pet==='cat')n=Math.round(n*petXpMult());if(bg('gamer'))n=Math.round(n*(1.25+sk('metaknowledge')*0.05));S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
 const activeCrew=()=>S.active.map(id=>S.crew.find(c=>c.id===id)).filter(Boolean);
@@ -248,8 +266,8 @@ function crewXp(n){for(const c of activeCrew()){c.xp+=n;if(c.xp>=c.lvl*6&&c.lvl<
 function newCrew(role){const used=S.crew.map(c=>c.name);const names=CREW_NAMES.filter(n=>!used.includes(n));return {id:uid(),name:names.length?pick(names):pick(CREW_NAMES),av:ART.randomAv(),role:role||pick(Object.keys(ROLES)),lvl:1,xp:0};}
 function skillList(){return (SKILLS[S.cls]||[]).concat(SKILLS[S.bg]||[]).concat(SKILLS.general);}
 const bg=(id)=>S&&S.bg===id;
-function dmgBonus(){return sk('heavyhands')*2+sk('axeman')*2+sk('sharpknife')-(bg('gamer')?1:0);}
-function learn(id){const def=skillList().find(s=>s.id===id);if(!def||S.sp<1||sk(id)>=def.max)return;S.skills[id]=sk(id)+1;S.sp--;SFX.play('ui');log('Learned '+def.n+' '+S.skills[id]+'.');save();render();}
+function dmgBonus(){let d=sk('heavyhands')*2+sk('axeman')*2+sk('sharpknife')-(bg('gamer')?1:0);if(sk('rampage')&&C)d+=sk('rampage')*2*C.enemies.filter(e=>e.dead).length;return d;}
+function learn(id){const def=skillList().find(s=>s.id===id);if(!def||S.sp<1||sk(id)>=def.max)return;if(def.req&&S.lvl<def.req){toast(def.n+' unlocks at level '+def.req);return;}S.skills[id]=sk(id)+1;S.sp--;SFX.play('ui');log('Learned '+def.n+' '+S.skills[id]+'.');save();render();}
 function respec(){if(S.stock.scrap<15){toast('Need 15 scrap');return;}S.stock.scrap-=15;S.sp+=Object.values(S.skills).reduce((a,b)=>a+b,0);S.skills={};toast('Skills reset');save();render();}
 
 /* ================= weather (real sky over New York) ================= */
@@ -263,7 +281,7 @@ async function fetchWeather(){
 function isNight(){const h=new Date().getHours();return h>=20||h<6||(S.wx&&!S.wx.day&&h>=18);}
 function wxKind(){return S.wx?S.wx.kind:'clear';}
 function wxLabel(){const k=wxKind();const e={clear:'☀️',cloudy:'☁️',fog:'🌫️',rain:'🌧️',snow:'❄️',storm:'⛈️'}[k];let fx=[];if(k==='rain')fx.push('noise -10');if(k==='snow')fx.push('loot +10%, longer walks');if(k==='fog')fx.push('ambush +10%');if(k==='storm')fx.push('horde: +1 enemy, loot x1.3');if(isNight())fx.push('horde night: +1 enemy, loot x1.5');return (isNight()?'🌙 ':'')+e+' '+(S.wx?S.wx.temp+'°F ':'')+(k==='clear'?'':k)+(fx.length?' · '+fx.join(' · '):'');}
-function lootMult(){let m=district().loot;if(wxKind()==='snow')m*=1.1;if(wxKind()==='storm')m*=1.3;if(isNight())m*=1.5;return m;}
+function lootMult(){let m=district().loot;if(wxKind()==='snow')m*=1.1;if(wxKind()==='storm')m*=1.3;if(isNight())m*=1.5+sk('nightowl')*0.1;return m;}
 
 /* ================= world ================= */
 const district=()=>DISTRICTS[Math.min(S.walk.district,DISTRICTS.length-1)];
@@ -310,7 +328,7 @@ const WATCH_JOBS={
   horde:{n:'Hold the corner',e:'🧟',d:'Three at once. Big payout if you are still standing.',enemies:()=>[mk('walker'),mk(pick(['walker','runner','screamer'])),mk(Math.random()<0.3?'bloater':'walker')],reward:{items:4,scrap:8}},
   strays:{n:'Clear the strays',e:'🐕',d:'Runners have been circling the base at night. Two of them, quick ones.',enemies:()=>[mk('runner'),mk('runner')],reward:{items:2,scrap:4}}
 };
-function watchMax(){return 3+(S.base&&S.base.rooms.tower?S.base.rooms.tower:0)+(S.base&&S.base.rooms.bell?1:0)+dealMod('watch');}
+function watchMax(){return 3+(S.base&&S.base.rooms.tower?S.base.rooms.tower:0)+(S.base&&S.base.rooms.bell?1:0)+sk('wellstocked')+dealMod('watch');}
 function watchState(){const t=todayStr();if(!S.watch||S.watch.date!==t){const keys=Object.keys(WATCH_JOBS);const jobs=[];while(jobs.length<3){const k=pick(keys);if(!jobs.includes(k))jobs.push(k);}S.watch={date:t,used:0,jobs};}return S.watch;}
 function takeWatch(k){const w=watchState();if(S.loc||S.combat){toast('Finish what you are doing first');return;}if(w.used>=watchMax()){toast('No watches left today');return;}
   const j=WATCH_JOBS[k];if(!j||!w.jobs.includes(k)){return;}if(S.hp<25&&!confirm('You are at '+S.hp+' HP. Take the job anyway?'))return;
@@ -356,7 +374,7 @@ function addSteps(n,src){
   let left=n;
   while(left>0){if(left>=S.walk.toNext){left-=S.walk.toNext;S.walk.progress=S.walk.dist;S.walk.toNext=0;arrive();break;}else{S.walk.toNext-=left;S.walk.progress=S.walk.dist-S.walk.toNext;left=0;}}
   if(left>0)S.walk.banked=(S.walk.banked||0)+left;
-  if(!S.loc&&!S.combat&&S.flags.roadCheck<1&&Math.random()<Math.min(0.5,n/300*0.07*dealMod('road'))){S.flags.roadCheck++;save();render();setTimeout(()=>startCombat([mk(Math.random()<0.7?'walker':'runner')],'road'),400);return;}
+  if(!S.loc&&!S.combat&&S.flags.roadCheck<1&&Math.random()<Math.min(0.5,n/300*0.07*dealMod('road'))){S.flags.roadCheck++;if(Math.random()<sk('shadow')*0.12){log('Something moved in the treeline. You went around it.');save();render();return;}save();render();setTimeout(()=>startCombat([mk(Math.random()<0.7?'walker':'runner')],'road'),400);return;}
   save();render();
 }
 function arrive(){
@@ -398,7 +416,8 @@ function startCombat(enemies,where,job){
 function clog(m,c){C.log.unshift({m,c:c||''});C.log=C.log.slice(0,14);}
 function alive(){return C.enemies.filter(e=>!e.dead);}
 function targetEnemy(){let t=C.enemies[C.target];if(!t||t.dead){const a=alive();t=a[0];C.target=C.enemies.indexOf(t);}return t;}
-function hurt(n,src){let d=Math.max(1,n-dr());if(C.brace)d=Math.ceil(d*(1-(sk('steady')?0.6+sk('steady')*0.1:0.5)));if(S.pet==='dog'&&Math.random()<petBlock()){clog(S.petName+' lunges and takes the hit meant for you.','good');return;}S.hp-=d;C.pfx={d,t:Date.now()};clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
+function hurt(n,src){let d=Math.max(1,n-dr());if(C.brace)d=Math.ceil(d*(1-(sk('steady')?0.6+sk('steady')*0.1:0.5)));if(S.pet==='dog'&&Math.random()<petBlock()){clog(S.petName+' lunges and takes the hit meant for you.','good');return;}if(sk('ironjaw')&&!C.jaw&&S.hp-d<=0){C.jaw=true;d=S.hp-1;clog('Iron Jaw. You stay on your feet at 1 HP.','good');}
+  S.hp-=d;C.pfx={d,t:Date.now()};clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
 function dealTo(t,d,label){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));if(t.shield>0){const s=Math.min(t.shield,d);t.shield-=s;d-=s;clog('The shield soaks '+s+'.'+(t.shield<=0?' It cracks apart.':''),'');if(d<=0){t.fx={d:0,t:Date.now()};C.lunge=Date.now();return;}}t.hp-=d;t.fx={d,t:Date.now()};C.lunge=Date.now();clog(label+' for '+d+'.','you');if(t.wanted)ctEvent('boss',d);}
 function breakWeapon(w){if(w.id==='oldreliable')return;if(w.dur<=0){clog('The '+w.n+' breaks.','sys');S.gear=S.gear.filter(g=>g.uid!==w.uid);S.eq.melee=null;}}
 function act(kind){
@@ -422,9 +441,12 @@ function act(kind){
   else if(kind==='shoot'){const g=eqItem('ranged');if(!g){toast('No gun');return;}const ammoItem=S.pack.find(p=>p.cat==='ammo'&&p.id===g.ammo);const stockAmmo=g.ammo==='ammo'?S.stock.ammo:0;
     const free=g.id==='mercy'&&Math.random()<0.35;
     if(!free&&!ammoItem&&stockAmmo<1){toast('No '+(g.ammo==='shells'?'shells':'rounds'));return;}
-    if(!free){if(ammoItem){ammoItem.qty--;if(ammoItem.qty<=0)S.pack=S.pack.filter(p=>p!==ammoItem);}else S.stock.ammo--;}else clog('Mercy fires on an empty chamber. Somehow.','good');
+    const noAmmo=Math.random()<sk('ammosense')*0.12;if(noAmmo)clog('Ammo Sense: the chamber had one you forgot about.','good');
+    if(!free&&!noAmmo){if(ammoItem){ammoItem.qty--;if(ammoItem.qty<=0)S.pack=S.pack.filter(p=>p!==ammoItem);}else S.stock.ammo--;}else clog('Mercy fires on an empty chamber. Somehow.','good');
     SFX.play('shot');
-    if(Math.random()<0.92){let d=rint(g.dmg[0],g.dmg[1])+(S.lvl-1)+sk('steadyaim')*3;if(Math.random()<sk('headshot')*0.1){d*=2;clog('Headshot.','good');}t.shot=true;dealTo(t,d,'You fire the '+g.n);}else clog('The shot goes wide.','');
+    const shots=1+((Math.random()<sk('doubletap')*0.1)?1:0);if(shots>1)clog('Double tap.','good');
+    for(let s=0;s<shots;s++){const tt=targetEnemy();if(!tt)break;
+      if(Math.random()<0.92){let d=rint(g.dmg[0],g.dmg[1])+(S.lvl-1)+sk('steadyaim')*3;if(sk('coldbarrel')&&!C.fired){d=Math.round(d*1.5);clog('Cold barrel. The first shot bites.','good');}if(Math.random()<sk('headshot')*0.1){d*=2;clog('Headshot.','good');}C.fired=true;tt.shot=true;dealTo(tt,d,'You fire the '+g.n);}else{C.fired=true;clog('The shot goes wide.','');}}
     if(S.loc&&g.id!=='whisper')S.loc.noise=Math.min(100,S.loc.noise+Math.max(5,25-sk('silencer')*8));
   }
   else if(kind==='brace'){C.brace=true;clog('You brace.','you');}
@@ -439,7 +461,7 @@ function act(kind){
   const ml=roleLvl('medic');if(ml&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+6+ml*3);clog(activeCrew().find(c=>c.role==='medic').name+' patches you: +'+(6+ml*3)+'.','good');}
   if(sk('triage')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('triage')*4);}
   if(eqItem('armor')&&eqItem('armor').id==='nightingale'&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+5);}
-  for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);clog(e.n+' goes down. +'+e.xp+' XP.','good');
+  for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);if(sk('transfusion')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('transfusion')*3);clog('You patch up as '+e.n+' drops. +'+(sk('transfusion')*3)+' HP.','good');}clog(e.n+' goes down. +'+e.xp+' XP.','good');
     if(e.burst&&!e.shot){hurt(Math.round((e.burst+dr())*(sk('lungs')?0.5:1)),'The bloater bursts and');}
     if(e.human){if(Math.random()<0.5){const g=pick(['pipe','bat','jacket','helmet','crowbar']);S.gear.push({uid:uid(),id:g,...GEAR[g]});clog('It dropped a '+GEAR[g].n+'.','sys');}
       if(Math.random()<0.5){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:3,n:'Rounds (x3)'});clog('You take 3 rounds off the body.','sys');}
@@ -462,12 +484,12 @@ function enemyPhase(){
       if(e.g==='slow'&&C.turn%2===1){clog(e.n+' winds up.','');continue;}
     }
     const swings=e.fast&&C.turn%2===0?2:1;
-    for(let i=0;i<swings;i++){if(Math.random()<e.hit-sk('adrenaline')*0.06){let d=rint(e.dmg[0],e.dmg[1]);if(e.g==='crit'&&Math.random()<0.2){d*=2;clog('A brutal swing.','hit');}hurt(d,e.n);
-        if(e.g==='bleed'){C.bleed=3;}if(e.g==='poison'){C.poison=3;}
+    for(let i=0;i<swings;i++){if(Math.random()<e.hit-sk('adrenaline')*0.06-(e.human?sk('intimidate')*0.08:0)){let d=rint(e.dmg[0],e.dmg[1]);if(e.g==='crit'&&Math.random()<0.2){d*=2;clog('A brutal swing.','hit');}hurt(d,e.n);
+        if(e.g==='bleed'){C.bleed=Math.max(1,3-sk('clotting'));}if(e.g==='poison'){C.poison=Math.max(1,3-sk('clotting'));}
         if(e.g==='steal'&&S.pack.length&&Math.random()<0.3){const it=S.pack.splice(rint(0,S.pack.length-1),1)[0];clog(e.n+' lifts your '+it.n+' mid-swing.','hit');}}
       else clog(e.n+' lunges and misses.','');}
   }
-  if(C.bleed>0){C.bleed--;S.hp-=4;clog('You are bleeding. -4.','hit');}
+  if(C.bleed>0){C.bleed--;const bd=Math.max(1,Math.round(4*(1-sk('clotting')*0.25)));S.hp-=bd;clog('You are bleeding. -'+bd+'.','hit');}
   if(C.poison>0){C.poison--;if(C.poison===0)clog('Your strength comes back.','good');}
   C.turn++;
 }
@@ -476,7 +498,7 @@ function death(){
   C.over=true;S.combat=false;const lost=packPts();SFX.play('dead');
   const where=C.where;if(where==='raid'&&S.raidPending){const p=S.raidPending;resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;}
   if(where==='boss')bossAfter(false);if(where==='horde')resolveHorde(true,false);
-  S.pack=[];S.run=0;S.loc=null;newDistance();S.hp=Math.round(maxHp()*0.4);
+  const keepFrac=sk('fieldsurgeon')*0.25;const kept=keepFrac?S.pack.slice(0,Math.floor(S.pack.length*keepFrac)):[];S.pack=kept;S.run=0;S.loc=null;newDistance();S.hp=Math.round(maxHp()*(0.4+sk('fieldsurgeon')*0.15));
   const gearLost=S.gear.length&&Math.random()<0.5?S.gear.splice(rint(0,S.gear.length-1),1)[0]:null;if(gearLost){for(const k in S.eq)if(S.eq[k]===gearLost.uid)S.eq[k]=null;}
   log('You went down. Your crew dragged you back to base. Pack lost ('+fmt(lost)+' pts)'+(gearLost?', and your '+gearLost.n+' is gone':'')+'.');
   save();render();
@@ -598,7 +620,7 @@ function bank(){
   if(S.loc||S.combat){toast('Clear out first');return;}if(!S.pack.length){toast('Nothing to stash');return;}
   if(!S.base){toast('Claim a base first: clear a place, then Claim it');return;}
   if(typeof STREET!=='undefined'&&STREET.on&&S.base.geo&&STREET.pos){const d=geoDist(S.base.geo,STREET.pos);if(d>60){toast('Walk home to stash: '+Math.round(d)+' m away','d');return;}}
-  const raw=packPts();const qm=roleLvl('quartermaster');const pts=Math.round(raw*runMult()*TIERS[S.league.tier].mult*(1+(qm?0.08+qm*0.04:0)+sk('haggler')*0.05)*dealMod('pts'));
+  const raw=packPts();const qm=roleLvl('quartermaster');const pts=Math.round(raw*runMult()*TIERS[S.league.tier].mult*(1+(qm?0.08+qm*0.04:0)+sk('haggler')*0.05+sk('marathoner')*0.04)*dealMod('pts'));
   let meds=0;for(const it of S.pack){if(it.cat==='shelf')S.shelf.push({id:it.id,n:it.n,e:it.e});else if(it.cat==='candy')S.stock.candy=(S.stock.candy||0)+(it.qty||1);else if(it.cat==='ammo')S.stock.ammo+=(it.qty||0);else if(it.cat==='chest'){S.stock.scrap+=5;}else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;if(it.cat==='meds')meds++;}}
   rollWeek();S.league.score+=pts;ctEvent('stash',pts);if(meds)ctEvent('meds',meds);
   let eat=activeCrew().length;if(sk('rationing'))eat=Math.ceil(eat/2);S.stock.food=Math.max(0,S.stock.food-eat);if(sk('harvest'))S.stock.food+=sk('harvest');
@@ -610,16 +632,16 @@ function bank(){
 function supplyDrop(){if(!S.base){toast('Claim a base first');return;}if(!S.base.rooms.radio){toast(S.work&&S.work.k==='radio'?'The radio is still being built. Keep walking.':'Build a Ham radio first (30 scrap + 3,000 steps).');return;}if(S.flags.dropDate===S.steps.date){toast('Already called in today. The next drop is after midnight.');return;}S.flags.dropDate=S.steps.date;const list=table(['food','water','meds','ammo'],0.3,0.4);const got=[];for(let i=0;i<3;i++){const it=wpick(list,'w');const item=it.gear?{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}:{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:it.cat,qty:it.qty,uid:uid(),r:it.r};if(takeItem(item,null))got.push(it.e+' '+it.n);}log('Supply drop: '+got.join(', ')+'. In your pack.');SFX.play('chest');save();render();openSheet(`<h2>Supply drop</h2><div class="big">📦</div><p>It came down two streets over. In your pack now:<br><b style="color:var(--bone)">${esc(got.join(', ')||'nothing usable')}</b></p><button class="btn a wide" onclick="closeSheet()">Grab it</button>`);}
 function buyCandy(id,c){S.stock.candy=S.stock.candy||0;if(S.cosmetics.includes(id)){toast('Already yours');return;}if(S.stock.candy<c){toast('Need '+c+' candy');return;}S.stock.candy-=c;S.cosmetics.push(id);SFX.play('legend');toast('Yours. Put it on under You.','l');save();render();}
 const TRADE=[{id:'bandage',n:'Bandages',e:'🩹',c:10,give:s=>s.meds++},{id:'beans',n:'Canned food',e:'🥫',c:5,give:s=>s.food++},{id:'water',n:'Water bottle',e:'💧',c:5,give:s=>s.water++},{id:'ammo',n:'Box of rounds (x6)',e:'📦',c:12,give:s=>s.ammo+=6},{id:'key',n:'Chest key',e:'🗝️',c:25,give:()=>S.keys++}];
-function trade(id){const t=TRADE.find(x=>x.id===id);if(!t)return;if(!S.base){toast('The trader only comes to a base');return;}let c=t.c;if(sk('haggler'))c=Math.max(1,Math.round(c*(1-sk('haggler')*0.1)));if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}S.stock.scrap-=c;t.give(S.stock);log('Bought '+t.n+' from the trader for '+c+' scrap.');toast(t.e+' '+t.n,'a');SFX.play('chest');save();render();}
+function trade(id){const t=TRADE.find(x=>x.id===id);if(!t)return;if(!S.base){toast('The trader only comes to a base');return;}let c=t.c;c=Math.max(1,Math.round(c*(1-sk('haggler')*0.1-sk('trader')*0.15)));if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}S.stock.scrap-=c;t.give(S.stock);log('Bought '+t.n+' from the trader for '+c+' scrap.');toast(t.e+' '+t.n,'a');SFX.play('chest');save();render();}
 function renderTrader(){const el=$('#trader');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first. The trader only stops where there are walls.</p>';return;}
-  el.innerHTML=TRADE.map(t=>{let c=t.c;if(sk('haggler'))c=Math.max(1,Math.round(c*(1-sk('haggler')*0.1)));return `<button class="tr${S.stock.scrap<c?' off':''}" onclick="trade('${t.id}')"><span class="e">${t.e}</span><b>${t.n}</b><span class="chip a">${c}🔩</span></button>`;}).join('');}
+  el.innerHTML=TRADE.map(t=>{let c=Math.max(1,Math.round(t.c*(1-sk('haggler')*0.1-sk('trader')*0.15)));return `<button class="tr${S.stock.scrap<c?' off':''}" onclick="trade('${t.id}')"><span class="e">${t.e}</span><b>${t.n}</b><span class="chip a">${c}🔩</span></button>`;}).join('');}
 function heal(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.meds<1){toast('No meds in stash');return;}S.stock.meds--;S.hp=Math.min(maxHp(),S.hp+40+sk('fielddressing')*10);save();render();}
 function eat(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.food<1){toast('No food in stash');return;}S.stock.food--;S.hp=Math.min(maxHp(),S.hp+15+sk('comfortfood')*5+(bg('chef')?10:0)+(bg('farmer')?5:0));save();render();}
 function equip(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;S.eq[g.slot]=S.eq[g.slot]===uidv?null:uidv;SFX.play('ui');save();render();}
 function repair(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;if(!((S.base&&S.base.rooms.armory)||roleLvl('engineer')))return;const rc=Math.max(0,3-sk('tinkerer')-(bg('mechanic')?2:0));if(S.stock.scrap<rc){toast('Need '+rc+' scrap');return;}S.stock.scrap-=rc;g.dur=Math.min(GEAR[g.id].dur,g.dur+3+sk('tuneup')*2);toast(g.n+' repaired');save();render();}
 let GEAR_TAB='all';function gearTab(k){GEAR_TAB=k;SFX.play('ui');render();}
 const SALV={common:3,uncommon:6,rare:12,epic:20,legendary:35};
-function salvageValue(g){const ws=S.base&&S.base.rooms.workshop||0;return Math.round((SALV[g.r||'common']||3)*(1+0.25*ws));}
+function salvageValue(g){const ws=S.base&&S.base.rooms.workshop||0;return Math.round((SALV[g.r||'common']||3)*(1+0.25*ws+0.15*sk('scrapper')+0.2*sk('appraiser')));}
 function spareGear(){return S.gear.filter(g=>S.eq[g.slot]!==g.uid&&(g.r==='common'||g.r==='uncommon'||!g.r));}
 function salvage(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;const v=salvageValue(g);
   if(g.r==='legendary'||g.r==='epic'){if(!confirm('Break down your '+g.n+' ('+RAR[g.r].n+') for '+v+' scrap? It is gone for good.'))return;}
@@ -880,7 +902,10 @@ function render(){
   $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):baseDmg()[0]+'-'+baseDmg()[1]} +${S.lvl-1}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
   $('#cosmeticCount').textContent=S.cosmetics.length+' looks unlocked';
   $('#spSub').textContent=S.sp+' point'+(S.sp===1?'':'s')+' to spend';$('#youAlert').hidden=!S.sp;$('#clsDesc').textContent=(CLASSES[S.cls]?CLASSES[S.cls].e+' '+CLASSES[S.cls].n:'')+(S.bg&&BACKGROUNDS[S.bg]?' · '+BACKGROUNDS[S.bg].e+' '+BACKGROUNDS[S.bg].n+' background':'')+'. One point per level and per county milestone. General skills are open to every class.';
-  $('#skills').innerHTML=skillList().map(s=>{const r=sk(s.id);return `<div class="skill${r>=s.max?' max':''}"><div><b>${s.n} ${SKILLS.general.includes(s)?'<span class="chip" style="font-size:10px">general</span>':''}</b><span>${s.d(Math.max(1,r))}${r?' · now: '+s.d(r):''}</span><div class="pips">${Array.from({length:s.max},(_,i)=>`<i class="${i<r?'on':''}"></i>`).join('')}</div></div><button class="btn sm ${S.sp>0&&r<s.max?'a':''}" onclick="learn('${s.id}')" ${S.sp>0&&r<s.max?'':'disabled'}>${r>=s.max?'Max':'+'}</button></div>`;}).join('');
+  const skAll=skillList();const skOpen=skAll.filter(s=>!s.req||S.lvl>=s.req);const skLocked=skAll.filter(s=>s.req&&S.lvl<s.req).sort((a,b)=>a.req-b.req);
+  const skRow=(s,locked)=>{const r=sk(s.id);const can=!locked&&S.sp>0&&r<s.max;return `<div class="skill${r>=s.max?' max':''}${locked?' locked':''}"><div><b>${s.n} ${SKILLS.general.includes(s)?'<span class="chip" style="font-size:10px">general</span>':''}${locked?'<span class="chip a" style="font-size:10px">level '+s.req+'</span>':''}</b><span>${s.d(Math.max(1,r))}${r?' · now: '+s.d(r):''}</span><div class="pips">${Array.from({length:s.max},(_,i)=>`<i class="${i<r?'on':''}"></i>`).join('')}</div></div><button class="btn sm ${can?'a':''}" onclick="learn('${s.id}')" ${can?'':'disabled'}>${locked?'🔒':r>=s.max?'Max':'+'}</button></div>`;};
+  const spent=Object.values(S.skills||{}).reduce((a,b)=>a+b,0);const total=skAll.reduce((a,s)=>a+s.max,0);
+  $('#skills').innerHTML=skOpen.map(s=>skRow(s,false)).join('')+(skLocked.length?`<div class="section-label" style="margin-top:12px">Locked · keep levelling</div>`+skLocked.map(s=>skRow(s,true)).join(''):'')+`<p class="help" style="margin-top:10px">${spent} of ${total} ranks learned${skLocked.length?' · next unlock at level '+skLocked[0].req:''}.</p>`;
   $('#crewSub').textContent=S.active.length+' / '+crewSlots()+' active · '+S.crew.length+' total';
   $('#crewList').innerHTML=S.crew.length?S.crew.map(c=>{const act=S.active.includes(c.id);return `<div class="crew${act?' active':''}"><div class="av">${ART.avatarSVG(c.av,70)}</div><div><div class="nm">${esc(c.name)} <span class="chip a">Lv ${c.lvl}</span></div><div class="role">${ROLES[c.role].e} ${ROLES[c.role].n}</div><div class="tr">${ROLES[c.role].d(c.lvl+sk('leader'))}</div><div class="xp"><i style="width:${Math.min(100,c.xp/(c.lvl*6)*100)}%"></i></div><div class="a2"><button class="btn sm ${act?'':'r'}" onclick="toggleCrew('${c.id}')">${act?'Leave at base':'Bring along'}</button></div></div></div>`;}).join(''):'<p class="help">Nobody yet. Survivors hide in the places you search.</p>';
   // base
