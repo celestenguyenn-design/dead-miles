@@ -239,3 +239,16 @@ a{color:var(--amber)}
 .dealbox b{display:block}
 .hpbar2{height:10px;border-radius:5px;background:var(--ash2);overflow:hidden}.hpbar2 i{display:block;height:100%;background:linear-gradient(90deg,#c22b3a,#ff5a6a)}
 .lbrow .sc .btn{margin-top:4px}
+
+/* v4.2 pets + idle animation */
+.petrow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+.petpick{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;background:var(--ash2);border:2px solid var(--line);color:var(--bone);font-size:11px;text-align:center;font-family:inherit}
+.petpick.on{background:linear-gradient(180deg,#3a2f18,var(--ash2));box-shadow:0 0 0 2px var(--amber) inset}
+.petpick b{font-size:12px}.petpick svg{display:block}
+.petbig svg{display:block}
+@keyframes breathe{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-2px) scaleY(1.025)}}
+@keyframes sway{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}
+#youAv svg,.petbig svg,.big svg,.crew .av svg,.lbrow .av svg{transform-origin:50% 100%;animation:breathe 2.8s ease-in-out infinite}
+.enemy svg{transform-origin:50% 90%;animation:sway 1.9s ease-in-out infinite}
+.enemy.dead svg{animation:none;opacity:.5}
+.petpick.on svg{transform-origin:50% 100%;animation:breathe 2.2s ease-in-out infinite}

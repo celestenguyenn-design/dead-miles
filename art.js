@@ -179,13 +179,83 @@ function zombieSVG(kind,size){
   ${kind==='raider'?hatShape('bandana'):kind==='gunner'?hatShape('beanie'):''}
   </svg>`;
 }
-function petSVG(kind,size){
-  const w=size||64;
-  if(kind==='dog')return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${w}" height="${w}" aria-hidden="true"><ellipse cx="30" cy="46" rx="18" ry="12" fill="#b58a5a"/><rect x="16" y="50" width="7" height="10" rx="3" fill="#8a6a3a"/><rect x="36" y="50" width="7" height="10" rx="3" fill="#8a6a3a"/><path d="M12 42 q-10 -4 -6 -14" stroke="#b58a5a" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="42" cy="30" r="14" fill="#b58a5a"/><path d="M30 24 q-6 -12 2 -14 q4 6 6 12z M54 24 q6 -12 -2 -14 q-4 6 -6 12z" fill="#8a6a3a"/><ellipse cx="38" cy="30" rx="3" ry="3.5" fill="#fff"/><ellipse cx="48" cy="30" rx="3" ry="3.5" fill="#fff"/><circle cx="38.5" cy="31" r="1.8" fill="#1a1020"/><circle cx="48.5" cy="31" r="1.8" fill="#1a1020"/><ellipse cx="44" cy="38" rx="4" ry="3" fill="#2a1a14"/><path d="M44 41 q0 4 4 4" stroke="#7a3a3a" stroke-width="1.5" fill="none"/><rect x="34" y="42" width="18" height="4" rx="2" fill="#c22b3a"/></svg>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${w}" height="${w}" aria-hidden="true"><path d="M50 44 q10 -2 8 -12" stroke="#e0954a" stroke-width="6" fill="none" stroke-linecap="round"/><ellipse cx="32" cy="46" rx="16" ry="13" fill="#e0954a"/><path d="M22 40 q6 -4 12 0 M20 48 q8 -5 16 0" stroke="#b8702a" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M18 14 l8 10 l-12 2z M46 14 l-8 10 l12 2z" fill="#e0954a"/><path d="M20 16 l5 7 l-8 1z M44 16 l-5 7 l8 1z" fill="#f6b3c3"/><circle cx="32" cy="28" r="15" fill="#e0954a"/><path d="M24 18 q8 -3 16 0" stroke="#b8702a" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="26" cy="27" rx="3.2" ry="3.8" fill="#fff"/><ellipse cx="38" cy="27" rx="3.2" ry="3.8" fill="#fff"/><ellipse cx="26.5" cy="27.5" rx="2" ry="2.8" fill="#3a7a3a"/><ellipse cx="38.5" cy="27.5" rx="2" ry="2.8" fill="#3a7a3a"/><circle cx="25.5" cy="26" r="1" fill="#fff"/><circle cx="37.5" cy="26" r="1" fill="#fff"/><path d="M30 33 l2 2 l2 -2z" fill="#f6b3c3"/><path d="M32 35 q-2 3 -4 2 M32 35 q2 3 4 2" stroke="#8a5a2a" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M10 30 l12 2 M10 35 l12 0 M54 30 l-12 2 M54 35 l-12 0" stroke="#fff" stroke-width="1" opacity=".6"/><rect x="24" y="36" width="16" height="3" rx="1.5" fill="#c22b3a"/></svg>`;
+const CAT_COATS={
+  tabby:{n:'Orange tabby',r:'common',base:'#e8a04a',dark:'#c2782a',belly:'#fbe3b8',eye:'#5aa04a',pat:'stripes'},
+  gray:{n:'Gray tabby',r:'uncommon',base:'#9a9aa6',dark:'#6a6a78',belly:'#dcdce4',eye:'#e0b040',pat:'stripes'},
+  black:{n:'Black cat',r:'uncommon',base:'#2c2c36',dark:'#17171d',belly:'#2c2c36',eye:'#f0c040',pat:'none'},
+  white:{n:'White cat',r:'rare',base:'#f4f0ea',dark:'#d6d0c8',belly:'#ffffff',eye:'#5ab0e0',pat:'none'},
+  tuxedo:{n:'Tuxedo cat',r:'rare',base:'#2c2c36',dark:'#17171d',belly:'#ffffff',eye:'#7ad070',pat:'tuxedo'},
+  calico:{n:'Calico',r:'rare',base:'#f4f0ea',dark:'#e8a04a',belly:'#ffffff',eye:'#e0b040',pat:'patches',dark2:'#2c2c36'},
+  siamese:{n:'Siamese',r:'epic',base:'#efe2cf',dark:'#5a3c2e',belly:'#f7ede0',eye:'#5ab0e0',pat:'points'},
+  tortie:{n:'Tortoiseshell',r:'epic',base:'#3a2a24',dark:'#e08a3a',belly:'#3a2a24',eye:'#e0b040',pat:'patches',dark2:'#c9602a'},
+  void:{n:'Void cat',r:'legendary',base:'#101018',dark:'#06060a',belly:'#101018',eye:'#ff5a6a',pat:'glow'}
+};
+const DOG_COATS={
+  mutt:{n:'Mutt',r:'common',base:'#b58a5a',dark:'#8a6a3a',belly:'#eadcbf',eye:'#3a2a1a',ears:'floppy',pat:'none'},
+  lab:{n:'Black lab',r:'uncommon',base:'#2c2c36',dark:'#17171d',belly:'#2c2c36',eye:'#3a2a1a',ears:'floppy',pat:'none'},
+  golden:{n:'Golden retriever',r:'uncommon',base:'#e6c070',dark:'#c9a050',belly:'#f6e6c0',eye:'#3a2a1a',ears:'floppy',pat:'none'},
+  corgi:{n:'Corgi',r:'rare',base:'#e09a4a',dark:'#c2782a',belly:'#ffffff',eye:'#3a2a1a',ears:'pointy',pat:'mask'},
+  husky:{n:'Husky',r:'rare',base:'#8a8a96',dark:'#4a4a56',belly:'#ffffff',eye:'#5ab0e0',ears:'pointy',pat:'mask'},
+  dalmatian:{n:'Dalmatian',r:'epic',base:'#f4f0ea',dark:'#2c2c36',belly:'#ffffff',eye:'#3a2a1a',ears:'floppy',pat:'spots'},
+  shiba:{n:'Shiba',r:'epic',base:'#e6924a',dark:'#c2782a',belly:'#ffffff',eye:'#3a2a1a',ears:'pointy',pat:'mask'},
+  ghost:{n:'Ghost dog',r:'legendary',base:'#cfe6f2',dark:'#9cc4d8',belly:'#eef8ff',eye:'#ff5a6a',ears:'pointy',pat:'glow'}
+};
+const COAT_W={common:40,uncommon:22,rare:10,epic:4,legendary:1};
+function randomCoat(kind,minRarity){const src=kind==='dog'?DOG_COATS:CAT_COATS;const order=['common','uncommon','rare','epic','legendary'];const min=order.indexOf(minRarity||'common');
+  const pool=Object.entries(src).filter(([k,v])=>order.indexOf(v.r)>=min);let t=0;for(const [k,v] of pool)t+=COAT_W[v.r];let r=Math.random()*t;for(const [k,v] of pool){r-=COAT_W[v.r];if(r<=0)return k;}return pool[pool.length-1][0];}
+function coatInfo(kind,coat){const src=kind==='dog'?DOG_COATS:CAT_COATS;return src[coat]||src[kind==='dog'?'mutt':'tabby'];}
+function petSVG(kind,size,coat,opts){
+  const w=size||64;opts=opts||{};const c=coatInfo(kind,coat);const anim=opts.still?false:true;const id='p'+Math.floor(Math.random()*1e9);
+  const blink=anim?`<animate attributeName="ry" values="3.4;3.4;3.4;0.3;3.4" keyTimes="0;0.6;0.92;0.95;1" dur="4.3s" repeatCount="indefinite"/>`:'';
+  const wag=anim?`<animateTransform attributeName="transform" type="rotate" values="-14 ${kind==='dog'?14:50} 44;14 ${kind==='dog'?14:50} 44;-14 ${kind==='dog'?14:50} 44" dur="${kind==='dog'?'0.7s':'2.4s'}" repeatCount="indefinite"/>`:'';
+  const glow=c.pat==='glow'?`<defs><filter id="${id}g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2"/></filter></defs><ellipse cx="32" cy="40" rx="24" ry="20" fill="${c.eye}" opacity=".16" filter="url(#${id}g)">${anim?`<animate attributeName="opacity" values=".1;.26;.1" dur="2.6s" repeatCount="indefinite"/>`:''}</ellipse>`:'';
+  let s=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${w}" height="${w}" aria-hidden="true">${glow}`;
+  if(kind==='dog'){
+    // tail (behind body), body, legs, belly
+    s+=`<g>${wag}<path d="M14 44 q-9 -6 -4 -16" stroke="${c.base}" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M11 30 q-1 -3 2 -4" stroke="${c.belly}" stroke-width="3" fill="none" stroke-linecap="round"/></g>`;
+    s+=`<ellipse cx="30" cy="47" rx="17" ry="12" fill="${c.base}"/><ellipse cx="30" cy="52" rx="10" ry="6" fill="${c.belly}"/>`;
+    if(c.pat==='spots')s+=`<circle cx="22" cy="42" r="2.6" fill="${c.dark}"/><circle cx="34" cy="40" r="2" fill="${c.dark}"/><circle cx="27" cy="50" r="1.6" fill="${c.dark}"/><circle cx="40" cy="46" r="2.2" fill="${c.dark}"/>`;
+    if(c.pat==='mask')s+=`<path d="M14 44 q16 -14 32 -2 q-6 -8 -16 -8 q-10 0 -16 10z" fill="${c.dark}" opacity=".85"/>`;
+    s+=`<rect x="17" y="52" width="7" height="10" rx="3.5" fill="${c.dark}"/><rect x="26" y="54" width="7" height="9" rx="3.5" fill="${c.base}"/><rect x="36" y="52" width="7" height="10" rx="3.5" fill="${c.dark}"/><rect x="44" y="54" width="7" height="9" rx="3.5" fill="${c.base}"/>`;
+    // collar
+    if(opts.collar!==false)s+=`<path d="M30 36 q12 -4 24 0" stroke="#c22b3a" stroke-width="3.2" fill="none"/><circle cx="43" cy="37" r="2.2" fill="#f5c842"/>`;
+    // head
+    const ears=c.ears==='floppy'?`<path d="M28 20 q-10 -2 -8 14 q4 2 8 -2z" fill="${c.dark}"/><path d="M56 20 q10 -2 8 14 q-4 2 -8 -2z" fill="${c.dark}"/>`:`<path d="M29 22 l-3 -14 l12 8z" fill="${c.dark}"/><path d="M55 22 l3 -14 l-12 8z" fill="${c.dark}"/><path d="M30 20 l-1 -8 l7 5z M54 20 l1 -8 l-7 5z" fill="#f6b3c3" opacity=".8"/>`;
+    s+=ears+`<circle cx="42" cy="28" r="15" fill="${c.base}"/>`;
+    if(c.pat==='mask')s+=`<path d="M27 26 q15 -18 30 0 q-6 -10 -15 -10 q-9 0 -15 10z" fill="${c.dark}" opacity=".85"/>`;
+    if(c.pat==='spots')s+=`<circle cx="34" cy="20" r="2.4" fill="${c.dark}"/><circle cx="50" cy="34" r="1.8" fill="${c.dark}"/>`;
+    // muzzle, eyes, nose, tongue, brows
+    s+=`<ellipse cx="44" cy="35" rx="7" ry="5" fill="${c.belly}" opacity=".9"/>`;
+    s+=`<ellipse cx="36" cy="27" rx="3.6" ry="3.4" fill="#fff"><g/></ellipse><ellipse cx="48" cy="27" rx="3.6" ry="3.4" fill="#fff"/>`;
+    s+=`<ellipse cx="36.6" cy="27.6" rx="2.4" ry="2.6" fill="${c.eye}">${blink}</ellipse><ellipse cx="48.6" cy="27.6" rx="2.4" ry="2.6" fill="${c.eye}">${blink}</ellipse><circle cx="37.5" cy="26.4" r=".9" fill="#fff"/><circle cx="49.5" cy="26.4" r=".9" fill="#fff"/>`;
+    s+=`<ellipse cx="44" cy="33" rx="3" ry="2.2" fill="#2a1a14"/><path d="M44 35 q0 3 3 3" stroke="#5a2a2a" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M42 38 q2 4 5 1" fill="#ff7a8a"/>`;
+    s+=`<circle cx="33" cy="30" r="1.6" fill="#ff9ab0" opacity=".55"/><circle cx="53" cy="31" r="1.6" fill="#ff9ab0" opacity=".55"/>`;
+  }else{
+    s+=`<g>${wag}<path d="M48 46 q12 -4 8 -16" stroke="${c.pat==='points'?c.dark:c.base}" stroke-width="6" fill="none" stroke-linecap="round"/></g>`;
+    s+=`<ellipse cx="32" cy="47" rx="15" ry="12" fill="${c.base}"/>`;
+    if(c.pat==='tuxedo')s+=`<ellipse cx="32" cy="50" rx="8" ry="8" fill="${c.belly}"/>`;
+    if(c.pat==='stripes')s+=`<path d="M22 41 q6 -4 12 0 M20 48 q8 -5 16 0 M24 55 q6 -3 12 0" stroke="${c.dark}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
+    if(c.pat==='patches')s+=`<ellipse cx="24" cy="44" rx="6" ry="5" fill="${c.dark}"/><ellipse cx="40" cy="50" rx="5" ry="4" fill="${c.dark2||c.dark}"/>`;
+    s+=`<rect x="20" y="52" width="6" height="9" rx="3" fill="${c.pat==='points'?c.dark:c.pat==='tuxedo'?c.belly:c.base}"/><rect x="28" y="54" width="6" height="8" rx="3" fill="${c.pat==='points'?c.dark:c.base}"/><rect x="36" y="54" width="6" height="8" rx="3" fill="${c.pat==='points'?c.dark:c.base}"/><rect x="43" y="52" width="6" height="9" rx="3" fill="${c.pat==='points'?c.dark:c.pat==='tuxedo'?c.belly:c.base}"/>`;
+    if(opts.collar!==false)s+=`<path d="M20 38 q12 5 24 0" stroke="#c22b3a" stroke-width="3" fill="none"/><circle cx="32" cy="41" r="2.2" fill="#f5c842"/>`;
+    // ears with inner pink, twitch
+    const twitch=anim?`<animateTransform attributeName="transform" type="rotate" values="0 20 20;-8 20 20;0 20 20;0 20 20" keyTimes="0;0.05;0.1;1" dur="5.1s" repeatCount="indefinite"/>`:'';
+    s+=`<g>${twitch}<path d="M17 18 l6 -12 l8 11z" fill="${c.pat==='points'?c.dark:c.base}"/><path d="M20 17 l3.5 -7 l4.5 6.5z" fill="#f6b3c3"/></g><path d="M47 18 l-6 -12 l-8 11z" fill="${c.pat==='points'?c.dark:c.base}"/><path d="M44 17 l-3.5 -7 l-4.5 6.5z" fill="#f6b3c3"/>`;
+    s+=`<circle cx="32" cy="27" r="15" fill="${c.base}"/>`;
+    if(c.pat==='stripes')s+=`<path d="M26 15 q6 -3 12 0 M23 20 q3 -2 6 0 M35 20 q3 -2 6 0" stroke="${c.dark}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+    if(c.pat==='patches')s+=`<path d="M18 22 q6 -12 16 -8 q-8 2 -10 12z" fill="${c.dark}"/><path d="M36 14 q8 2 9 12 q-6 -2 -9 -12z" fill="${c.dark2||c.dark}"/>`;
+    if(c.pat==='points')s+=`<ellipse cx="32" cy="33" rx="8" ry="6" fill="${c.dark}" opacity=".85"/>`;
+    if(c.pat==='tuxedo')s+=`<ellipse cx="32" cy="34" rx="7" ry="5" fill="${c.belly}"/>`;
+    s+=`<ellipse cx="26" cy="27" rx="3.6" ry="3.8" fill="#fff"/><ellipse cx="38" cy="27" rx="3.6" ry="3.8" fill="#fff"/>`;
+    s+=`<ellipse cx="26.5" cy="27.5" rx="2.2" ry="3" fill="${c.eye}">${blink}</ellipse><ellipse cx="38.5" cy="27.5" rx="2.2" ry="3" fill="${c.eye}">${blink}</ellipse><ellipse cx="26.5" cy="27.8" rx=".8" ry="2.2" fill="#1a1020"/><ellipse cx="38.5" cy="27.8" rx=".8" ry="2.2" fill="#1a1020"/><circle cx="27.6" cy="26" r=".9" fill="#fff"/><circle cx="39.6" cy="26" r=".9" fill="#fff"/>`;
+    s+=`<path d="M30.5 33 l3 0 l-1.5 1.8z" fill="#f08a9a"/><path d="M32 35 q-2 3 -4 1 M32 35 q2 3 4 1" stroke="${c.pat==='glow'?'#ff5a6a':'#3a2a24'}" stroke-width="1.1" fill="none" stroke-linecap="round"/>`;
+    s+=`<path d="M12 31 l10 1 M12 35 l10 -1 M52 31 l-10 1 M52 35 l-10 -1" stroke="${c.pat==='glow'?'#5a5a6a':'#e8e0d0'}" stroke-width="1" opacity=".8"/>`;
+    s+=`<circle cx="22" cy="31" r="1.6" fill="#ff9ab0" opacity=".5"/><circle cx="42" cy="31" r="1.6" fill="#ff9ab0" opacity=".5"/>`;
+  }
+  return s+'</svg>';
 }
 const imgCache=new Map();
 function spriteImg(svg){let i=imgCache.get(svg);if(i)return i;i=new Image();i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);imgCache.set(svg,i);if(imgCache.size>60){const k=imgCache.keys().next().value;imgCache.delete(k);}return i;}
 function randomAv(){return {skin:Math.floor(Math.random()*SKINS.length),hair:HAIR_STYLES[Math.floor(Math.random()*HAIR_STYLES.length)],hairColor:Math.floor(Math.random()*HAIR_COLORS.length),eyes:EYES[Math.floor(Math.random()*EYES.length)],top:'hoodie',topColor:Math.floor(Math.random()*TOP_COLORS.length),hat:'',acc:''};}
-return {SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,avatarSVG,zombieSVG,petSVG,spriteImg,randomAv};
+return {SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,CAT_COATS,DOG_COATS,randomCoat,coatInfo,avatarSVG,zombieSVG,petSVG,spriteImg,randomAv};
 })();

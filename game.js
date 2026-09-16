@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='4.1';
+const VERSION='4.2';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -102,9 +102,16 @@ const PET_NAMES={dog:['Biscuit','Scout','Waffles','Pepper','Moose'],cat:['Mochi'
 function petLevel(){return Math.min(10,Math.floor((S.petXp||0)/4000)+1);}
 function petBlock(){return 0.25+0.02*(petLevel()-1);}
 function petXpMult(){return 1.15+0.01*(petLevel()-1);}
-function petJoin(kind){S.pet=kind;S.petXp=S.petXp||0;S.petName=S.petName||pick(PET_NAMES[kind]);log('A '+PETS[kind].n.toLowerCase()+' followed you out. It is yours now.');
-  openSheet(`<h2>A ${PETS[kind].n.toLowerCase()}!</h2><div class="big">${ART.petSVG(kind,90)}</div><p>It followed you out and will not leave. ${PETS[kind].d}.</p><input id="petNameIn" type="text" maxlength="14" value="${esc(S.petName)}" style="width:100%;margin:8px 0"><button class="btn r wide" onclick="S.petName=($('#petNameIn').value||'${esc(S.petName)}').trim().slice(0,14);save();closeSheet();render()">Come on, ${esc(S.petName)}</button>`);SFX.play('rare');}
-function renamePet(){const n=prompt('Name your '+PETS[S.pet].n.toLowerCase(),S.petName);if(n&&n.trim()){S.petName=n.trim().slice(0,14);save();render();}}
+const PET_MAX=8;
+function activePet(){return (S.pets||[]).find(p=>p.id===S.petActive)||null;}
+function setActivePet(id){const p=(S.pets||[]).find(x=>x.id===id);if(!p)return;const cur=activePet();if(cur){cur.xp=S.petXp||0;cur.name=S.petName;}S.petActive=p.id;S.pet=p.kind;S.petCoat=p.coat;S.petName=p.name;S.petXp=p.xp||0;SFX.play('ui');save();render();pushPlayer();}
+function petJoin(kind,minRarity){if(!S.pets)S.pets=[];if(S.pets.length>=PET_MAX){toast('A stray followed you, but there is no room. Eight is the limit.');return;}
+  const coat=ART.randomCoat(kind,minRarity);const ci=ART.coatInfo(kind,coat);const name=pick(PET_NAMES[kind]);const p={id:uid(),kind,coat,name,xp:0,found:Date.now()};S.pets.push(p);
+  const first=!S.petActive;if(first){S.petActive=p.id;S.pet=kind;S.petCoat=coat;S.petName=name;S.petXp=0;}
+  log('A '+ci.n.toLowerCase()+' followed you out. It is yours now.');if(ci.r==='legendary')SFX.play('legend');else SFX.play('rare');
+  openSheet(`<h2>A ${esc(ci.n.toLowerCase())}!</h2><div class="big">${ART.petSVG(kind,96,coat)}</div><p><span class="rc-${ci.r}">${RAR[ci.r].n}</span> ${PETS[kind].n.toLowerCase()}. It followed you out and will not leave. ${PETS[kind].d}.</p><input id="petNameIn" type="text" maxlength="14" value="${esc(name)}" style="width:100%;margin:8px 0"><button class="btn r wide" onclick="namePet('${p.id}',$('#petNameIn').value);closeSheet();render()">${first?'Come on, then':'Welcome to the crew'}</button>`);}
+function namePet(id,n){const p=(S.pets||[]).find(x=>x.id===id);if(!p)return;n=(n||p.name).trim().slice(0,14)||p.name;p.name=n;if(S.petActive===id)S.petName=n;save();render();}
+function renamePet(){const p=activePet();if(!p)return;const n=prompt('Name your '+PETS[p.kind].n.toLowerCase(),p.name);if(n&&n.trim()){namePet(p.id,n);}}
 function petFetch(){if(!S.pet)return;const lvl=petLevel();const kennel=S.base&&S.base.rooms.kennel?1:0;const n=1+(lvl>=6?1:0)+kennel;const got=[];
   for(let i=0;i<n;i++){
     if(S.pet==='cat'&&Math.random()<0.35){const sh=byCat('shelf');const it=wpick(sh,'w');S.shelf.push({id:it.id,n:it.n,e:it.e});got.push(it.e+' '+it.n);continue;}
@@ -113,9 +120,10 @@ function petFetch(){if(!S.pet)return;const lvl=petLevel();const kennel=S.base&&S
     else if(it.cat==='ammo'){S.stock.ammo+=it.qty||6;got.push(it.e+' '+it.n);}
     else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;got.push(it.e+' '+it.n);}}
   S.petGifts=got;S.petLast=todayStr();if(got.length){log(S.petName+' brought back '+got.join(', ')+'.');}}
-function renderPet(){const el=$('#petCard');if(!el)return;if(!S.pet){el.innerHTML='<h2>Companion <span class="sub">none yet</span></h2><p class="help">Strays hide in the houses you search. Keep looting: one always turns up by your 40th room ('+Math.min(40,S.roomsSearched||0)+' searched).</p>';return;}
-  const lvl=petLevel();const need=4000;const into=(S.petXp||0)-(lvl-1)*need;const p=PETS[S.pet];
-  el.innerHTML=`<h2>${esc(S.petName)} <span class="sub">${p.n} · level ${lvl}${lvl>=10?' (max)':''}</span></h2><div class="you"><div>${ART.petSVG(S.pet,90)}</div><div><div class="kv"><span>Bonus</span><b>${S.pet==='dog'?'blocks '+Math.round(petBlock()*100)+'% of hits':'+'+Math.round((petXpMult()-1)*100)+'% XP'}</b><span>Levels by</span><b>your steps</b><span>Brings back</span><b>${1+(lvl>=6?1:0)+(S.base&&S.base.rooms.kennel?1:0)} thing${1+(lvl>=6?1:0)+(S.base&&S.base.rooms.kennel?1:0)>1?'s':''} a morning</b></div>${lvl<10?`<div class="xp" style="margin-top:8px"><i style="width:${Math.min(100,into/need*100)}%"></i></div><p class="help">${fmt(Math.max(0,need-into))} steps to level ${lvl+1}</p>`:''}</div></div><p class="help" style="margin-top:8px">${S.petGifts&&S.petGifts.length?'This morning: '+esc(S.petGifts.join(', ')):'Nothing found yet. Sleep on it.'}</p><div class="row" style="margin-top:8px"><button class="btn sm ghost" onclick="renamePet()">Rename</button></div>`;}
+function renderPet(){const el=$('#petCard');if(!el)return;if(!S.pet){el.innerHTML='<h2>Companion <span class="sub">none yet</span></h2><p class="help">Strays hide in the houses you search. Keep looting: one always turns up by your 40th room ('+Math.min(40,S.roomsSearched||0)+' searched). Nine kinds of cat and eight kinds of dog are out there, and the rare ones are rare.</p>';return;}
+  const lvl=petLevel();const need=4000;const into=(S.petXp||0)-(lvl-1)*need;const p=PETS[S.pet];const ci=ART.coatInfo(S.pet,S.petCoat);const more=1+(lvl>=6?1:0)+(S.base&&S.base.rooms.kennel?1:0);
+  el.innerHTML=`<h2>${esc(S.petName)} <span class="sub"><span class="rc-${ci.r}">${esc(ci.n)}</span> · level ${lvl}${lvl>=10?' (max)':''}</span></h2><div class="you"><div class="petbig">${ART.petSVG(S.pet,104,S.petCoat)}</div><div><div class="kv"><span>Bonus</span><b>${S.pet==='dog'?'blocks '+Math.round(petBlock()*100)+'% of hits':'+'+Math.round((petXpMult()-1)*100)+'% XP'}</b><span>Levels by</span><b>your steps</b><span>Brings back</span><b>${more} thing${more>1?'s':''} a morning</b></div>${lvl<10?`<div class="xp" style="margin-top:8px"><i style="width:${Math.min(100,into/need*100)}%"></i></div><p class="help">${fmt(Math.max(0,need-into))} steps to level ${lvl+1}</p>`:''}</div></div><p class="help" style="margin-top:8px">${S.petGifts&&S.petGifts.length?'This morning: '+esc(S.petGifts.join(', ')):'Nothing found yet. Sleep on it.'}</p><div class="row" style="margin-top:8px"><button class="btn sm ghost" onclick="renamePet()">Rename</button><span class="help">Only the active one walks with you, fetches, and levels.</span></div>
+  <h2 style="margin-top:14px;font-size:18px">Your strays <span class="sub">${(S.pets||[]).length} of ${PET_MAX}</span></h2><div class="petrow">${(S.pets||[]).map(x=>{const c=ART.coatInfo(x.kind,x.coat);const l=Math.min(10,Math.floor((x.id===S.petActive?S.petXp:x.xp||0)/4000)+1);return `<button class="petpick${x.id===S.petActive?' on':''}" style="border-color:${RAR[c.r].c}" onclick="setActivePet('${x.id}')">${ART.petSVG(x.kind,56,x.coat,{still:x.id!==S.petActive})}<b>${esc(x.name)}</b><span class="rc-${c.r}">${esc(c.n)}</span><span class="help">L${l}</span></button>`;}).join('')}</div><p class="help" style="margin-top:6px">More strays turn up as you search rooms, clear strays on watch duty, and take down county bosses (those are rare or better).</p>`;}
 const CLASSES={
   brawler:{n:'Brawler',e:'🥊',d:'Hits hard up close. Starts with a bat and a leather jacket.',kit:['bat','jacket']},
   marksman:{n:'Marksman',e:'🎯',d:'Guns and ammo. Starts with a pistol, 6 rounds and a pipe.',kit:['pistol','pipe'],ammo:6},
@@ -168,7 +176,8 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   raids:[],raidPending:null,campCleared:'',bossKilled:'',milestones:[],
   ct:{date:'',daily:[],week:'',weekly:null,pending:{}},party:{code:'',data:null,pending:{}},wx:null,
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
-function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};S.bossFightDate=S.bossFightDate||'';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};}
+function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
+  if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};S.bossFightDate=S.bossFightDate||'';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};}
 function migrate(o){
   if(!o)return null;if(o.v===3)return o;
   if(o.v===2){const f=fresh();const m=Object.assign(f,o);m.v=3;m.av=ART.randomAv();m.cosmetics=[];m.cls='';m.sp=Math.max(0,(o.lvl||1)-1);m.skills={};m.sfx=true;m.keys=0;m.milestones=[];m.ct=f.ct;m.party=f.party;m.wx=null;m.bossKilled='';
@@ -177,7 +186,7 @@ function migrate(o){
     return m;}
   return null;
 }
-function save(){try{localStorage.setItem('deadmiles.v3',JSON.stringify(S));}catch(e){}}
+function save(){try{if(S&&S.pets&&S.petActive){const ap=S.pets.find(p=>p.id===S.petActive);if(ap){ap.xp=S.petXp||0;ap.name=S.petName||ap.name;}}localStorage.setItem('deadmiles.v3',JSON.stringify(S));}catch(e){}}
 function load(){try{let r=localStorage.getItem('deadmiles.v3');if(r){const o=JSON.parse(r);if(o&&o.v===3)return o;}r=localStorage.getItem('deadmiles.v2');if(r){const o=migrate(JSON.parse(r));if(o)return o;}}catch(e){}return null;}
 function log(m){S.journal.unshift({t:Date.now(),m});S.journal=S.journal.slice(0,40);}
 function toast(m,c){const t=document.createElement('div');t.className='toast'+(c?' '+c:'');t.textContent=m;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),2600);}
@@ -289,6 +298,7 @@ function takeWatch(k){const w=watchState();if(S.loc||S.combat){toast('Finish wha
 function watchReward(k){const j=WATCH_JOBS[k];if(!j)return;const r=j.reward;const got=[];const list=table(['food','water','meds','scrap','ammo'],0.15,0.25);
   for(let i=0;i<r.items;i++){const it=wpick(list,'w');const item=it.gear?{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}:{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:it.cat,qty:it.qty,uid:uid(),r:it.r};if(takeItem(item,null))got.push(it.e+' '+it.n);}
   S.stock.scrap+=r.scrap;if(r.key&&Math.random()<r.key){S.keys++;got.push('🗝️ Chest key');}
+  if(k==='strays'&&Math.random()<0.1&&(S.pets||[]).length<PET_MAX){setTimeout(()=>petJoin(Math.random()<0.5?'dog':'cat'),400);}
   log('Watch paid: '+r.scrap+' scrap'+(got.length?', '+got.join(', ')+' in your pack':'')+'.');toast('Watch paid: +'+r.scrap+' scrap'+(got.length?' +'+got.length+' items':''),'a');}
 function renderWatch(){const el=$('#watch');if(!el)return;const w=watchState();const left=watchMax()-w.used;$('#watchSub').textContent=left+' of '+watchMax()+' left today';
   if(left<=0){el.innerHTML='<p class="help">Nothing left to guard today. Back tomorrow'+(S.base&&(S.base.rooms.tower||0)<2?' - a Watchtower at base adds a job per level':'')+'.</p>';return;}
@@ -511,6 +521,7 @@ function searchRoom(i){pushSoon();
   ctEvent('rooms',1);
   if(!loc.stronghold&&S.crew.length<8&&Math.random()<0.07){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was hiding in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was hiding in the ${esc(r.n.toLowerCase())}. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(1)}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
   else if(!S.pet&&(Math.random()<0.03||(S.roomsSearched||0)>=40)){petJoin(Math.random()<0.6?'dog':'cat');}
+  else if(S.pet&&(S.pets||[]).length<PET_MAX&&Math.random()<0.012){petJoin(Math.random()<0.5?'dog':'cat');}
   let noise=Math.max(4,r.noise+rint(-6,8)-sk('lightstep')*4-(wxKind()==='rain'?10:0));loc.noise=Math.min(100,loc.noise+noise);
   crewXp(1);save();render();
   if(loc.noise>=100){loc.noise=55;loc.wave++;setTimeout(()=>startCombat([mk('walker'),mk(Math.random()<0.4?'runner':'walker')].concat(loc.wave>1?[mk('bloater')]:[]),'wave'),350);}
@@ -771,7 +782,7 @@ function drawScene(t){
   // crew behind, pet in front
   const ac=activeCrew();ac.slice(0,2).forEach((c,i)=>drawSprite(ART.avatarSVG(c.av,100),W*0.26-70-i*55,300-(walking?Math.abs(Math.sin(t/140+i+1))*5:Math.sin(t/800+i)*1.5),105));
   drawSprite(ART.avatarSVG(S.av,100,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''}),W*0.26,296-bob,120);
-  if(S.pet)drawSprite(ART.petSVG(S.pet,64),W*0.26+70,356-(walking?Math.abs(Math.sin(t/110))*6:Math.abs(Math.sin(t/700))*1.5),62);
+  if(S.pet)drawSprite(ART.petSVG(S.pet,64,S.petCoat,{still:true}),W*0.26+70,356-(walking?Math.abs(Math.sin(t/110))*6:Math.abs(Math.sin(t/700))*1.5),62);
   // weather particles
   if(!reduced&&(k==='rain'||k==='storm'||k==='snow')){if(particles.length<(k==='snow'?80:140))particles.push({x:Math.random()*W,y:Math.random()*H,v:k==='snow'?rnd(.6,1.4):rnd(6,10),d:rnd(-1,1)});ctx.strokeStyle=k==='snow'?'rgba(255,255,255,.8)':'rgba(180,200,230,.5)';ctx.lineWidth=k==='snow'?3:1.5;ctx.lineCap='round';for(const p of particles){ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x+(k==='snow'?0:-2),p.y+(k==='snow'?2:14));ctx.stroke();p.y+=p.v*(k==='snow'?1:4);p.x+=k==='snow'?Math.sin(t/800+p.d)*.8:-1;if(p.y>H){p.y=-10;p.x=Math.random()*W;}}}
   if(k==='storm'&&!reduced&&Math.random()<0.01){ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(0,0,W,H);}
@@ -872,27 +883,27 @@ function baseScene(st){st=st||S;if(!st.base)return '';
   const r=st.base.rooms||{};const night=isNight();const col={house:'#4a3d44',pharmacy:'#2f4a5a',gas:'#5a4a2f',grocery:'#2f5a44',police:'#2f3a5a',clinic:'#5a2f3a',hardware:'#5a3f2f',surplus:'#3f4a2f',stronghold:'#5a2a22'}[st.base.t]||'#4a3d44';
   let s=`<svg viewBox="0 0 360 170" style="width:100%;display:block;border-radius:8px;margin-top:10px;background:${night?'#0b0b10':'#22202a'}" role="img" aria-label="Your base">`;
   s+=`<rect x="0" y="120" width="360" height="50" fill="${night?'#17151a':'#2b2528'}"/>`;
-  if(r.generator)s+=`<circle cx="180" cy="60" r="140" fill="#e6a530" opacity=".07"/>`;
+  if(r.generator)s+=`<circle cx="180" cy="60" r="140" fill="#e6a530" opacity=".07"><animate attributeName="opacity" values=".07;.05;.08;.07" dur="3.1s" repeatCount="indefinite"/></circle>`;
   s+=`<rect x="120" y="40" width="120" height="82" fill="${col}"/><path d="M110 40 L180 8 L250 40z" fill="#1a1719"/><rect x="168" y="86" width="24" height="36" fill="#0d0c0e"/><rect x="136" y="56" width="20" height="18" fill="${r.generator?'#ffd98a':'#161418'}"/><rect x="204" y="56" width="20" height="18" fill="${r.generator?'#ffd98a':'#161418'}"/>`;
   s+=`<text x="180" y="34" text-anchor="middle" font-size="16">${st.base.e}</text>`;
   const tro=(st.shelf||[]).slice(-6);if(tro.length){s+=`<rect x="124" y="82" width="112" height="3" fill="#7a6a5a"/>`;tro.forEach((it,i)=>{s+=`<text x="${131+i*18}" y="80" font-size="11">${it.e}</text>`;});}
-  if(r.bell)s+=`<path d="M176 6 q4 -6 8 0 v6 h-8z" fill="#e6a530"/><circle cx="180" cy="13" r="1.5" fill="#5a3a1a"/>`;
-  if(r.forge)s+=`<rect x="96" y="90" width="18" height="30" fill="#3a2a2a"/><circle cx="105" cy="100" r="4" fill="#ff7a30"/><circle cx="105" cy="100" r="9" fill="#ff7a30" opacity=".18"/>`;
+  if(r.bell)s+=`<g><animateTransform attributeName="transform" type="rotate" values="-8 180 4;8 180 4;-8 180 4" dur="2.2s" repeatCount="indefinite"/><path d="M176 6 q4 -6 8 0 v6 h-8z" fill="#e6a530"/><circle cx="180" cy="13" r="1.5" fill="#5a3a1a"/></g>`;
+  if(r.forge)s+=`<rect x="96" y="90" width="18" height="30" fill="#3a2a2a"/><circle cx="105" cy="100" r="4" fill="#ff7a30"><animate attributeName="r" values="3.5;5;4;5.5;3.5" dur="0.9s" repeatCount="indefinite"/></circle><circle cx="105" cy="100" r="9" fill="#ff7a30" opacity=".18"><animate attributeName="opacity" values=".12;.28;.12" dur="0.9s" repeatCount="indefinite"/></circle><circle cx="103" cy="84" r="2" fill="#777" opacity=".5"><animate attributeName="cy" values="86;66" dur="2.4s" repeatCount="indefinite"/><animate attributeName="opacity" values=".5;0" dur="2.4s" repeatCount="indefinite"/></circle>`;
   if(r.workshop)s+=`<rect x="60" y="98" width="30" height="22" fill="#4a3f34"/><path d="M58 98 l17 -10 l17 10z" fill="#2a2320"/>`;
   if(r.kennel)s+=`<rect x="250" y="102" width="22" height="18" fill="#6a4a2a"/><path d="M248 102 l13 -9 l13 9z" fill="#3a2a1a"/><rect x="257" y="110" width="8" height="10" fill="#1a1410"/>`;
   if(r.vault)s+=`<rect x="206" y="100" width="16" height="16" fill="#555a66"/><circle cx="214" cy="108" r="3" fill="#2a2a30"/>`;
   const wl=r.walls||0;if(wl){const hh=10+wl*8;for(let x=8;x<352;x+=16){if(x>110&&x<250)continue;s+=`<rect x="${x}" y="${120-hh}" width="10" height="${hh}" fill="${wl>=3?'#6a6a74':'#5a4a3a'}"/>`;}s+=`<rect x="0" y="${120-hh-3}" width="112" height="4" fill="#3a3a44"/><rect x="248" y="${120-hh-3}" width="112" height="4" fill="#3a3a44"/>`;}
-  if(r.tower){const th=(r.tower||1)*22+30;s+=`<rect x="300" y="${120-th}" width="8" height="${th}" fill="#5a4a3a"/><rect x="292" y="${120-th-14}" width="24" height="16" fill="#3a3335"/><circle cx="304" cy="${120-th-8}" r="3" fill="#ffd166"/>`;}
+  if(r.tower){const th=(r.tower||1)*22+30;s+=`<rect x="300" y="${120-th}" width="8" height="${th}" fill="#5a4a3a"/><rect x="292" y="${120-th-14}" width="24" height="16" fill="#3a3335"/><circle cx="304" cy="${120-th-8}" r="3" fill="#ffd166"><animate attributeName="opacity" values="1;.4;1" dur="2.8s" repeatCount="indefinite"/></circle>`;}
   if(r.traps){for(let i=0;i<r.traps*4;i++){const x=20+i*14;s+=`<path d="M${x} 120 l4 -9 l4 9z" fill="#8a8a94"/>`;}}
   if(r.garden){for(let i=0;i<r.garden*3;i++){const x=258+i*16;s+=`<rect x="${x}" y="108" width="12" height="12" fill="#3a2a1a"/><circle cx="${x+6}" cy="106" r="5" fill="#7fbf4d"/>`;}}
-  if(r.radio)s+=`<path d="M232 40 v-30 M226 16 h12 M228 24 h8" stroke="#8fb3c9" stroke-width="2"/><circle cx="232" cy="10" r="2" fill="#ff5a6a"/>`;
+  if(r.radio)s+=`<path d="M232 40 v-30 M226 16 h12 M228 24 h8" stroke="#8fb3c9" stroke-width="2"/><circle cx="232" cy="10" r="2" fill="#ff5a6a"><animate attributeName="opacity" values="1;0.2;1" dur="1.6s" repeatCount="indefinite"/></circle>`;
   if(r.generator)s+=`<rect x="96" y="104" width="22" height="16" fill="#3a3a44"/><rect x="100" y="98" width="6" height="8" fill="#555"/>`;
   if(r.bunk)s+=`<path d="M40 120 l18 -22 l18 22z" fill="#4a5a44"/><rect x="54" y="106" width="8" height="14" fill="#1a1a1e"/>`;
   if(r.clinic)s+=`<rect x="126" y="44" width="10" height="10" fill="#e8f4f8"/><path d="M131 45 v8 M127 49 h8" stroke="#c22b3a" stroke-width="2"/>`;
   if(r.armory)s+=`<rect x="256" y="104" width="18" height="16" fill="#5a4a3a"/><path d="M256 112 h18" stroke="#2a1a0a" stroke-width="2"/>`;
-  const crew=(st===S?activeCrew():((st.active||[]).map(id=>(st.crew||[]).find(c=>c.id===id)).filter(Boolean))).slice(0,3);crew.forEach((c,i)=>{s+=`<svg x="${28+i*30}" y="86" width="26" height="34" viewBox="0 0 100 130">${ART.avatarSVG(c.av,100).replace(/<svg[^>]*>|<\/svg>/g,'')}</svg>`;});
-  s+=`<svg x="150" y="80" width="30" height="40" viewBox="0 0 100 130">${ART.avatarSVG(st.av,100).replace(/<svg[^>]*>|<\/svg>/g,'')}</svg>`;
-  if(st.pet)s+=`<svg x="185" y="100" width="20" height="20" viewBox="0 0 64 64">${ART.petSVG(st.pet,64).replace(/<svg[^>]*>|<\/svg>/g,'')}</svg>`;
+  const crew=(st===S?activeCrew():((st.active||[]).map(id=>(st.crew||[]).find(c=>c.id===id)).filter(Boolean))).slice(0,3);crew.forEach((c,i)=>{s+=`<svg x="${28+i*30}" y="86" width="26" height="34" viewBox="0 0 100 130"><g><animateTransform attributeName="transform" type="translate" values="0 0;0 -3;0 0" dur="${(2.2+i*0.4).toFixed(1)}s" repeatCount="indefinite"/>${ART.avatarSVG(c.av,100).replace(/<svg[^>]*>|<\/svg>/g,'')}</g></svg>`;});
+  s+=`<svg x="150" y="80" width="30" height="40" viewBox="0 0 100 130"><g><animateTransform attributeName="transform" type="translate" values="0 0;0 -3;0 0" dur="2.6s" repeatCount="indefinite"/>${ART.avatarSVG(st.av,100).replace(/<svg[^>]*>|<\/svg>/g,'')}</g></svg>`;
+  if(st.pet)s+=`<svg x="185" y="100" width="20" height="20" viewBox="0 0 64 64">${ART.petSVG(st.pet,64,st.petCoat,{still:true}).replace(/<svg[^>]*>|<\/svg>/g,'')}</svg>`;
   if(night)s+=`<circle cx="40" cy="26" r="12" fill="#e8e0d0" opacity=".8"/>`;
   s+='</svg>';return s;
 }
@@ -942,8 +953,8 @@ function renderOnline(){
   </ol>
   <b>Android:</b> install the tiny companion app <a href="./DeadMilesSteps.apk">DeadMilesSteps.apk</a> (Android asks once to allow installs from your browser), paste the handle <b>${esc(o.handle)}</b> and token <b style="word-break:break-all">${esc(o.token)}</b> into it, tap Allow reading steps, then Save. It posts your Health Connect steps every hour on its own.`:'Go online first, then your personal sync address and code appear here.';}
 }
-function visitFriend(i){const f=friends[i];if(!f)return;const pub=f.pub||{};const sv=pub.save||{};const st={base:sv.base||(pub.base?{...pub.base}:null),shelf:sv.shelf||[],av:sv.av||pub.av||S.av,pet:sv.pet||null,active:sv.active||[],crew:sv.crew||[]};
-  openSheet(`<h2>${esc(f.name)}'s place</h2>${st.base?baseScene(st):'<p class="help">No base claimed yet.</p>'}<div class="kv" style="margin-top:10px"><span>Level</span><b>${pub.lvl||1}</b><span>Kills</span><b>${fmt(pub.kills||0)}</b><span>Defense</span><b>${pub.defense||0}</b><span>Streak</span><b>${pub.streak||0}</b><span>Trophies</span><b>${st.shelf.length}</b><span>Companion</span><b>${st.pet?(sv.petName||PETS[st.pet].n)+' L'+Math.min(10,Math.floor((sv.petXp||0)/4000)+1):'none'}</b><span>Weapon</span><b>${esc(pub.weapon||'fists')}</b></div><button class="btn r wide" style="margin-top:10px" onclick="closeSheet()">Head back</button>`);}
+function visitFriend(i){const f=friends[i];if(!f)return;const pub=f.pub||{};const sv=pub.save||{};const st={base:sv.base||(pub.base?{...pub.base}:null),shelf:sv.shelf||[],av:sv.av||pub.av||S.av,pet:sv.pet||null,petCoat:sv.petCoat||null,active:sv.active||[],crew:sv.crew||[]};
+  openSheet(`<h2>${esc(f.name)}'s place</h2>${st.base?baseScene(st):'<p class="help">No base claimed yet.</p>'}<div class="kv" style="margin-top:10px"><span>Level</span><b>${pub.lvl||1}</b><span>Kills</span><b>${fmt(pub.kills||0)}</b><span>Defense</span><b>${pub.defense||0}</b><span>Streak</span><b>${pub.streak||0}</b><span>Trophies</span><b>${st.shelf.length}</b><span>Companion</span><b>${st.pet?(sv.petName||PETS[st.pet].n)+' the '+ART.coatInfo(st.pet,st.petCoat).n.toLowerCase()+' L'+Math.min(10,Math.floor((sv.petXp||0)/4000)+1)+((sv.pets||[]).length>1?' (+'+((sv.pets||[]).length-1)+' more)':''):'none'}</b><span>Weapon</span><b>${esc(pub.weapon||'fists')}</b></div><button class="btn r wide" style="margin-top:10px" onclick="closeSheet()">Head back</button>`);}
 function renderFriends(){
   const o=O();const el=$('#friends');if(!el)return;const sub=$('#friendsSub');const help=$('#friendsHelp');
   if(!o.ok){sub.textContent='offline';help.textContent='Go online in Settings to see who else is walking Hollow County.';el.innerHTML='';return;}
@@ -1037,6 +1048,7 @@ function bossKill(lastHit){const b=bossState();if(b.claimed)return;b.claimed=tru
   else{const pool=Object.entries(GEAR).filter(([k,v])=>v.r==='rare'||v.r==='epic').map(([k,v])=>({id:k,...v,w:v.r==='epic'?4:6}));const it=wpick(pool,'w');S.gear.push({uid:uid(),id:it.id,...GEAR[it.id]});got.push(it.e+' '+it.n);}
   S.keys++;got.push('🗝️ chest key');S.stock.scrap+=12;got.push('12 scrap');if(Math.random()<0.3){const cs=rollCosmetic();takeItem(cs,null);got.push(cs.n);}
   if(lastHit){S.keys++;S.stock.scrap+=10;got.push('last hit: +1 key, +10 scrap');}
+  if(Math.random()<0.2&&(S.pets||[]).length<PET_MAX){setTimeout(()=>petJoin(Math.random()<0.5?'dog':'cat','rare'),400);got.push('a stray followed you home');}
   S.league.score+=150;log(bossName()+' is down. Your share: '+got.join(', ')+'.');
   const html=`<h2>${esc(bossName())} is down</h2><div class="big">${legend?'🌟':'💀'}</div><p>${lastHit?'You landed the last hit. ':''}Your share of the loot:<br><b style="color:var(--bone)">${esc(got.join(' · '))}</b></p><p class="help">${legend?'The legendary chance resets to 6%.':'No legendary this time. Every boss phase you fight raises the chance by 3%. Next kill: '+Math.round(bossChance()*100)+'%.'} The next boss has ${Math.round(15*S.bossKills)}% more HP.</p>`;
   if(C&&C.where==='boss'&&!C.summaryShown)C.killHtml=html;else openSheet(html+`<button class="btn r wide" onclick="closeSheet()">Take it</button>`);}
@@ -1053,7 +1065,7 @@ async function shareCard(){const W=720,H=400;const cv=document.createElement('ca
   x.fillStyle='#e63e5c';x.fillRect(0,0,W,8);
   const img=ART.spriteImg(ART.avatarSVG(S.av,220,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''}));await new Promise(r=>{if(img.complete&&img.naturalWidth)r();else{img.onload=r;img.onerror=r;}});
   try{x.drawImage(img,40,90,220,286);}catch(e){}
-  if(S.pet){const p=ART.spriteImg(ART.petSVG(S.pet,90));await new Promise(r=>{if(p.complete&&p.naturalWidth)r();else{p.onload=r;p.onerror=r;}});try{x.drawImage(p,230,290,90,90);}catch(e){}}
+  if(S.pet){const p=ART.spriteImg(ART.petSVG(S.pet,90,S.petCoat,{still:true}));await new Promise(r=>{if(p.complete&&p.naturalWidth)r();else{p.onload=r;p.onerror=r;}});try{x.drawImage(p,230,290,90,90);}catch(e){}}
   x.fillStyle='#e8e0d0';x.font='bold 40px Georgia,serif';x.fillText('Dead Miles',300,70);x.font='16px system-ui,sans-serif';x.fillStyle='#b9b2a4';x.fillText('Hollow County · '+district().n+' · '+todayStr(),300,96);
   x.fillStyle='#e8e0d0';x.font='bold 26px system-ui,sans-serif';x.fillText((S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl,300,140);
   const rows=[['🚶 '+fmt(S.steps.today)+' steps today','#7fbf4d'],['🏚️ '+(S.today.places||0)+' places cleared','#e6a530'],['💀 '+(S.today.kills||0)+' hostiles put down','#ff5a6a'],['🔥 streak '+S.streak.days+' day'+(S.streak.days===1?'':'s')+' · best '+(S.streakBest||S.streak.days),'#8fb3c9']];
