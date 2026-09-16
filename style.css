@@ -232,3 +232,4 @@ a{color:var(--amber)}
 .tr .e{font-size:26px}.tr b{font-size:13px}.tr.off{opacity:.5}
 .tabs{flex-wrap:wrap}
 #gearTabs button{padding:8px 7px;font-size:12px;letter-spacing:.3px}
+.btn:disabled{opacity:.45;cursor:default}
