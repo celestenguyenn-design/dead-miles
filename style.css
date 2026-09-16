@@ -233,3 +233,9 @@ a{color:var(--amber)}
 .tabs{flex-wrap:wrap}
 #gearTabs button{padding:8px 7px;font-size:12px;letter-spacing:.3px}
 .btn:disabled{opacity:.45;cursor:default}
+
+/* v4.0 */
+.dealbox{border:1px solid var(--line);border-left:4px solid var(--amber);border-radius:8px;padding:10px 12px;background:var(--panel2);margin-bottom:10px}
+.dealbox b{display:block}
+.hpbar2{height:10px;border-radius:5px;background:var(--ash2);overflow:hidden}.hpbar2 i{display:block;height:100%;background:linear-gradient(90deg,#c22b3a,#ff5a6a)}
+.lbrow .sc .btn{margin-top:4px}

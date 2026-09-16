@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=3.10">
+<link rel="stylesheet" href="style.css?v=4.0">
 </head>
 <body>
 <div id="app">
@@ -48,6 +48,8 @@
       <div class="card">
         <h2>Daily target <span class="sub" id="goalSub"></span></h2>
         <div class="progress" style="margin-top:8px"><div class="bar"><i id="goalBar" style="background:linear-gradient(90deg,var(--rot2),var(--rot))"></i></div><div class="row"><span id="goalLeft"></span><span id="goalRight"></span></div></div>
+        <p class="help" id="streakLine" style="margin-top:8px"></p>
+        <div class="row" style="margin-top:8px"><button class="btn sm" id="shareBtn">Share today's card</button><span class="help">A picture of your day to send.</span></div>
       </div>
       <div class="card"><h2>Log</h2><ul class="journal" id="journal" style="margin-top:8px"></ul></div>
     </section>
@@ -73,6 +75,7 @@
     <section class="view" id="v-you">
       <div class="card"><div class="you"><div id="youAv"></div><div><h2 id="youName"></h2><div class="kv" style="margin-top:6px" id="youKv"></div><div class="xp"><i id="youXp"></i></div></div></div>
         <div class="row" style="margin-top:10px"><button class="btn sm" id="lookBtn">Change look</button><span class="chip s" id="cosmeticCount"></span></div></div>
+      <div class="card" id="petCard"></div>
       <div class="card steel"><h2>Boutique <span class="sub" id="walletSub"></span></h2><p>Every step you walk goes in the wallet, on top of everything else it does. Spend steps on looks. Tap one to try it on.</p><div id="shop"></div></div>
       <div class="card amber"><h2>Skills <span class="sub" id="spSub"></span></h2><p id="clsDesc"></p><div class="stack" id="skills" style="margin-top:10px"></div><div class="row" style="margin-top:10px"><button class="btn sm ghost" id="respecBtn">Reset skills (15 scrap)</button></div></div>
       <div class="card blood"><h2>Crew <span class="sub" id="crewSub"></span></h2><p>Survivors you meet on the road. Active crew fight beside you. Everyone active eats 1 food when you stash. Bunkhouse at base adds slots.</p></div>
@@ -113,6 +116,7 @@
 
     <section class="view" id="v-league">
       <div class="card"><h2>Hollow County <span class="sub" id="mapSub"></span></h2><div id="mapBox" style="margin-top:10px"></div><p class="help" id="mapHelp" style="margin-top:8px"></p></div>
+      <div class="card blood" id="bossCard"><h2>County boss <span class="sub" id="bossSub"></span></h2><div id="bossBody" style="margin-top:8px"></div></div>
       <div class="card steel" id="partyCard"><h2>Party <span class="sub" id="partySub"></span></h2><div id="partyBody" style="margin-top:8px"></div></div>
       <div class="card rot">
         <div class="tier"><div class="badge" id="tierBadge">🔰</div><div><h2 id="tierName"></h2><p id="tierSub" style="margin:2px 0 0"></p></div></div>
@@ -121,7 +125,7 @@
       </div>
       <div class="card"><h2>Friends <span class="sub" id="friendsSub"></span></h2><p class="help" id="friendsHelp"></p><div class="lb" id="friends" style="margin-top:10px"></div></div>
       <div class="card"><h2>Rival crews</h2><div class="lb" id="board" style="margin-top:10px"></div><p class="help" id="boardHelp" style="margin-top:8px"></p></div>
-      <div class="card"><h2>Marisol on the radio <span class="sub" id="storySub"></span></h2><ul class="journal" id="story" style="margin-top:8px"></ul></div>
+      <div class="card"><h2>Marisol on the radio <span class="sub" id="storySub"></span></h2><div id="dealBox" style="margin-top:8px"></div><ul class="journal" id="story" style="margin-top:8px"></ul></div>
       <div class="card"><h2>Radio chatter</h2><ul class="journal" id="radio" style="margin-top:8px"></ul></div>
       <div class="card"><h2>Past weeks</h2><ul class="journal" id="seasons" style="margin-top:8px"></ul></div>
     </section>
@@ -137,8 +141,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=3.10"></script>
-<script src="street.js?v=3.10"></script>
-<script src="game.js?v=3.10"></script>
+<script src="art.js?v=4.0"></script>
+<script src="street.js?v=4.0"></script>
+<script src="game.js?v=4.0"></script>
 </body>
 </html>
