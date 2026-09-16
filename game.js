@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='4.2';
+const VERSION='4.3';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -138,20 +138,20 @@ const SKILLS={
   general:[{id:'longhaul',n:'Long Haul',max:2,d:r=>'+'+(10*r)+' HP recovered overnight'},{id:'pathfinder',n:'Pathfinder',max:3,d:r=>'Places are '+(6*r)+'% closer'},{id:'leader',n:'Leader',max:1,d:r=>'Active crew act as one level higher'}]
 };
 const BUILD={
-  walls:{n:'Walls',e:'🧱',lv:5,def:[6,12,20,30,42],cost:[15,30,50,90,140],d:'Defense against raids. L4+ is concrete.'},
-  tower:{n:'Watchtower',e:'🗼',lv:3,def:[5,10,16],cost:[20,40,80],d:'Defense, you see raids coming, +1 watch job per level'},
-  traps:{n:'Traps',e:'🪤',lv:3,def:[4,9,15],cost:[12,28,60],d:'Defense; raiders sometimes die on the way in'},
-  bunk:{n:'Bunkhouse',e:'🛏️',lv:3,def:[0,0,0],cost:[25,45,80],d:'+1 active crew slot per level'},
-  armory:{n:'Armory',e:'🔧',lv:1,def:[2],cost:[20],d:'Repair melee gear for 3 scrap'},
-  clinic:{n:'Clinic',e:'🏥',lv:1,def:[0],cost:[25],d:'Stashing heals you to full for 1 meds'},
-  garden:{n:'Garden',e:'🥬',lv:3,def:[0,0,0],cost:[20,35,60],d:'+3 food per level every morning'},
-  radio:{n:'Ham radio',e:'📻',lv:1,def:[0],cost:[30],d:'Rival intel and one supply drop a day'},
-  generator:{n:'Generator',e:'⚡',lv:2,def:[6,10],cost:[40,90],d:'Lights. Zombies avoid it: -30% raid odds (L2: -45%)'},
-  workshop:{n:'Workshop',e:'🪚',lv:2,def:[0,0],cost:[35,70],d:'Salvaged gear gives +25% scrap per level'},
-  forge:{n:'Forge',e:'🔥',lv:1,def:[0],cost:[60],d:'Upgrade gear with scrap: +2 damage or +1 armor per level, three levels each'},
-  vault:{n:'Vault',e:'🔐',lv:2,def:[0,0],cost:[45,90],d:'Raiders that break in take 50% less from the stash (L2: 80% less)'},
-  kennel:{n:'Kennel',e:'🐾',lv:1,def:[0],cost:[30],d:'Your companion brings back one more thing each morning and levels 25% faster'},
-  bell:{n:'Alarm bell',e:'🔔',lv:1,def:[3],cost:[50],d:'+1 watch job per day, and the whole crew wakes for raids'}
+  walls:{n:'Walls',e:'🧱',lv:5,def:[6,12,20,30,42],labor:[1500,3000,5000,8000,12000],cost:[15,30,50,90,140],d:'Defense against raids. L4+ is concrete.'},
+  tower:{n:'Watchtower',e:'🗼',lv:3,def:[5,10,16],labor:[2000,4000,7000],cost:[20,40,80],d:'Defense, you see raids coming, +1 watch job per level'},
+  traps:{n:'Traps',e:'🪤',lv:3,def:[4,9,15],labor:[1000,2500,4500],cost:[12,28,60],d:'Defense; raiders sometimes die on the way in'},
+  bunk:{n:'Bunkhouse',e:'🛏️',lv:3,def:[0,0,0],labor:[2000,4000,7000],cost:[25,45,80],d:'+1 active crew slot per level'},
+  armory:{n:'Armory',e:'🔧',lv:1,def:[2],labor:[2500],cost:[20],d:'Repair melee gear for 3 scrap'},
+  clinic:{n:'Clinic',e:'🏥',lv:1,def:[0],labor:[3000],cost:[25],d:'Stashing heals you to full for 1 meds'},
+  garden:{n:'Garden',e:'🥬',lv:3,def:[0,0,0],labor:[1500,3000,5000],cost:[20,35,60],d:'+3 food per level every morning'},
+  radio:{n:'Ham radio',e:'📻',lv:1,def:[0],labor:[3000],cost:[30],d:'Rival intel and one supply drop a day'},
+  generator:{n:'Generator',e:'⚡',lv:2,def:[6,10],labor:[5000,9000],cost:[40,90],d:'Lights. Zombies avoid it: -30% raid odds (L2: -45%)'},
+  workshop:{n:'Workshop',e:'🪚',lv:2,def:[0,0],labor:[3500,7000],cost:[35,70],d:'Salvaged gear gives +25% scrap per level'},
+  forge:{n:'Forge',e:'🔥',lv:1,def:[0],labor:[6000],cost:[60],d:'Upgrade gear with scrap: +2 damage or +1 armor per level, three levels each'},
+  vault:{n:'Vault',e:'🔐',lv:2,def:[0,0],labor:[5000,9000],cost:[45,90],d:'Raiders that break in take 50% less from the stash (L2: 80% less)'},
+  kennel:{n:'Kennel',e:'🐾',lv:1,def:[0],labor:[3000],cost:[30],d:'Your companion brings back one more thing each morning and levels 25% faster'},
+  bell:{n:'Alarm bell',e:'🔔',lv:1,def:[3],labor:[5000],cost:[50],d:'+1 watch job per day, and the whole crew wakes for raids'}
 };
 const TIERS=[{n:'Drifter',e:'🔰',mult:1},{n:'Scavenger',e:'🎒',mult:1.3},{n:'Ranger',e:'🏹',mult:1.65},{n:'Warlord',e:'⚔️',mult:2.1},{n:'Legend',e:'☠️',mult:2.7}];
 const RIVALS=[
@@ -330,7 +330,7 @@ function rollWeek(){
 function checkMilestones(){for(let i=1;i<DISTRICTS.length;i++){if(S.steps.total>=DISTRICTS[i].steps&&!S.milestones.includes(i)){S.milestones.push(i);S.sp++;S.keys++;log('Milestone: '+fmt(DISTRICTS[i].steps)+' lifetime steps. '+DISTRICTS[i].n+' is open. +1 skill point, +1 key.');toast(DISTRICTS[i].n+' unlocked · +1 skill point','l');SFX.play('legend');}}}
 function addSteps(n,src){
   n=Math.floor(n);if(!(n>0))return;rollDay();rollWeek();S.lastAnim=Date.now();
-  if(src!=='carry'){S.steps.total+=n;S.steps.today+=n;S.wallet=(S.wallet||0)+n;if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
+  if(src!=='carry'){S.steps.total+=n;S.steps.today+=n;S.wallet=(S.wallet||0)+n;workSteps(n);if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
   if(src!=='carry'&&S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');streakReward();}
   if(S.loc||S.combat){S.walk.banked=(S.walk.banked||0)+n;if(src!=='carry'&&src!=='live')toast('+'+fmt(n)+' steps saved for after this stop','z');save();render();return;}
   let left=n;
@@ -368,7 +368,7 @@ let C=null;
 function startCombat(enemies,where,job){
   C={enemies,where,job,turn:1,log:[],target:0,brace:false,over:false,fled:false};
   S.combat=true;SFX.play('growl');
-  const desc=where==='rival'?'Nadia\'s scouts step out of the dark.':where==='road'?'Something is in the road.':where==='boss'?bossName()+' steps out. Phase '+(S.bossFightsToday)+' of the week\'s hunt.':where==='watch'?'Watch duty. '+(WATCH_JOBS[C.job]?WATCH_JOBS[C.job].n+'.':''):where==='wave'?'The noise brought more.':where==='raid'?'Raiders are at your walls.':S.loc&&S.loc.stronghold?['','At the gate.','Into the yard.','The boss trailer. '+bossName()+' is home.'][S.loc.stage+1]:'They were waiting inside '+(S.loc?S.loc.n:'the dark')+'.';
+  const desc=where==='rival'?'Nadia\'s scouts step out of the dark.':where==='road'?'Something is in the road.':where==='boss'?bossName()+' steps out. Phase '+(S.bossFightsToday)+' of the week\'s hunt.':where==='watch'?'Watch duty. '+(WATCH_JOBS[C.job]?WATCH_JOBS[C.job].n+'.':''):where==='wave'?'The noise brought more.':where==='raid'?'Raiders are at your walls.':where==='horde'?'Horde night. They are over the fence.':S.loc&&S.loc.stronghold?['','At the gate.','Into the yard.','The boss trailer. '+bossName()+' is home.'][S.loc.stage+1]:'They were waiting inside '+(S.loc?S.loc.n:'the dark')+'.';
   clog(desc+' '+enemies.length+' hostile'+(enemies.length>1?'s':'')+'.','sys');
   let amb=0.15;if(wxKind()==='fog')amb+=0.1;if(roleLvl('scout')||sk('quickdraw'))amb=0;
   if(where==='enter'&&Math.random()<amb){clog('Ambush! They act first.','hit');enemyPhase();}
@@ -408,7 +408,7 @@ function act(kind){
   }
   else if(kind==='brace'){C.brace=true;clog('You brace.','you');}
   else if(kind==='med'){const m=S.pack.find(p=>p.cat==='meds')||(S.stock.meds>0?{stock:true}:null);if(!m){toast('No meds');return;}const heal=(m.id==='kit'?70:m.id==='abx'?45:35)+sk('fielddressing')*10;if(m.stock)S.stock.meds--;else S.pack=S.pack.filter(p=>p!==m);S.hp=Math.min(maxHp(),S.hp+heal);clog('You patch up: +'+heal+' HP.','good');SFX.play('loot');}
-  else if(kind==='flee'){if(C.where==='raid'){toast('Nowhere to run. This is your base.');return;}
+  else if(kind==='flee'){if(C.where==='raid'||C.where==='horde'){toast('Nowhere to run. This is your base.');return;}
     if(Math.random()<0.7){C.fled=true;clog('You break away and run.','sys');const drop=Math.ceil(S.pack.length*0.25);for(let i=0;i<drop&&S.pack.length;i++)S.pack.splice(rint(0,S.pack.length-1),1);endCombat(false);return;}
     else clog('You stumble. They close in.','hit');
   }
@@ -454,7 +454,7 @@ function dropLegend(why){const id=pick(LEGEND_IDS);S.gear.push({uid:uid(),id,...
 function death(){
   C.over=true;S.combat=false;const lost=packPts();SFX.play('dead');
   const where=C.where;if(where==='raid'&&S.raidPending){const p=S.raidPending;resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;}
-  if(where==='boss')bossAfter(false);
+  if(where==='boss')bossAfter(false);if(where==='horde')resolveHorde(true,false);
   S.pack=[];S.run=0;S.loc=null;newDistance();S.hp=Math.round(maxHp()*0.4);
   const gearLost=S.gear.length&&Math.random()<0.5?S.gear.splice(rint(0,S.gear.length-1),1)[0]:null;if(gearLost){for(const k in S.eq)if(S.eq[k]===gearLost.uid)S.eq[k]=null;}
   log('You went down. Your crew dragged you back to base. Pack lost ('+fmt(lost)+' pts)'+(gearLost?', and your '+gearLost.n+' is gone':'')+'.');
@@ -470,6 +470,7 @@ function endCombat(won){
     if(where==='enter'||where==='wave'){if(S.loc.stronghold&&where==='enter'){S.loc.stage++;S.loc.cleared=true;if(S.loc.stage>=3){S.campCleared=weekId();log('Stronghold cleared. The county is quieter for a while.');ctEvent('stronghold',1);}}else{S.loc.cleared=true;}if(where==='enter')ctEvent('places',1);}
     if(where==='raid'){resolveRaidFight(true);}
     if(where==='watch'){watchReward(C.job);}
+    if(where==='horde'){resolveHorde(true,true);}
     if(where==='boss'){bossAfter(true);}
     if(where==='rival'){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:6});for(let i=0;i<3&&S.pack.length<capacity();i++)S.pack.push({id:'scrap',...ITEMS.scrap,uid:uid()});log('Nadia\'s scouts ran. You took their ammo and scrap.');}
     crewXp(2);
@@ -477,6 +478,7 @@ function endCombat(won){
     if(where==='enter'){S.loc=null;S.run=0;newDistance();log('You fled and lost part of the pack.');}
     else if(where==='wave'){S.loc.rooms.forEach(r=>r.done=true);S.loc=null;newDistance();log('You fled the wave and lost part of the pack.');}
     else if(where==='boss'){bossAfter(false);log('You fell back from '+bossName()+'. The damage you dealt still counts.');}
+    else if(where==='horde'){resolveHorde(true,false);}
     else log('You fled the road.');
   }
   const summary=C.killHtml?C.killHtml:won?`<h2>Clear</h2><div class="big">${where==='raid'?'🧱':'💥'}</div><p>${C.log.filter(l=>l.c==='good').slice(0,4).map(l=>esc(l.m)).join('<br>')||'They are down.'}</p>`:`<h2>You got away</h2><div class="big">💨</div><p>Dropped a quarter of the pack on the way out.</p>`;
@@ -552,7 +554,7 @@ function leaveLoc(){
 function claimBase(){
   const loc=S.loc;if(!loc||!loc.cleared)return;
   if(S.base&&S.stock.scrap<20){toast('Moving base costs 20 scrap');return;}
-  if(S.base)S.stock.scrap-=20;
+  if(S.base)S.stock.scrap-=20;S.horde=null;S.work=null;
   const rooms={};
   if(loc.t==='pharmacy'||loc.t==='clinic')rooms.clinic=1;if(loc.t==='gas')rooms.generator=1;if(loc.t==='grocery')rooms.garden=1;
   if(loc.t==='police'){rooms.armory=1;rooms.walls=1;}if(loc.t==='hardware')rooms.walls=1;if(loc.t==='surplus'){rooms.armory=1;rooms.traps=1;}
@@ -564,7 +566,11 @@ function claimBase(){
 }
 function defense(){if(!S.base)return 0;let d=0;for(const [k,l] of Object.entries(S.base.rooms)){if(!l)continue;d+=BUILD[k].def[l-1]||0;}return d;}
 function buildCost(k){const b=BUILD[k];const l=S.base.rooms[k]||0;if(l>=b.lv)return null;let c=b.cost[l];const el=roleLvl('engineer');if(el)c=Math.round(c*(1-(0.15+el*0.05)));if(S.base.t==='hardware')c=Math.round(c*0.9);return c;}
-function build(k){if(!S.base)return;const c=buildCost(k);if(c===null)return;if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}S.stock.scrap-=c;S.base.rooms[k]=(S.base.rooms[k]||0)+1;log('Built '+BUILD[k].n+' level '+S.base.rooms[k]+'.');toast(BUILD[k].n+' L'+S.base.rooms[k],'a');SFX.play('chest');save();render();pushPlayer();}
+function buildLabor(k){const b=BUILD[k];const l=S.base.rooms[k]||0;if(l>=b.lv)return null;let n=b.labor[l];const el=roleLvl('engineer');if(el)n=Math.round(n*(1-(0.1+el*0.05)));return n;}
+function build(k){if(!S.base)return;if(S.work){toast('Finish '+BUILD[S.work.k].n+' first, or cancel it');return;}const c=buildCost(k);if(c===null)return;if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}
+  S.stock.scrap-=c;S.work={k,lvl:(S.base.rooms[k]||0)+1,need:buildLabor(k),done:0,scrap:c,started:Date.now()};log('Started on '+BUILD[k].n+' level '+S.work.lvl+'. '+fmt(S.work.need)+' steps of work to do.');toast(BUILD[k].n+': walk '+fmt(S.work.need)+' steps to finish it','a');SFX.play('ui');save();render();}
+function cancelWork(){if(!S.work)return;const w=S.work;S.stock.scrap+=w.scrap;S.work=null;log('Stopped work on '+BUILD[w.k].n+'. Scrap refunded.');save();render();}
+function workSteps(n){if(!S.work||!S.base)return;S.work.done+=n;if(S.work.done>=S.work.need){const w=S.work;S.work=null;S.base.rooms[w.k]=Math.max(S.base.rooms[w.k]||0,w.lvl);log('Built '+BUILD[w.k].n+' level '+w.lvl+'.');toast(BUILD[w.k].n+' L'+w.lvl+' finished','a');SFX.play('chest');pushPlayer();}}
 function packPts(){return S.pack.reduce((a,b)=>a+b.pts,0);}
 const runMult=()=>1+S.run*0.1;
 function bank(){
@@ -639,6 +645,26 @@ function resolveRaid(power,hour,date){
   toast(repelled?'Raid repelled':'Base raided','d');
 }
 function resolveRaidFight(won){if(!S.raidPending)return;const p=S.raidPending;S.raids.unshift({t:p.date+' '+String(p.hour).padStart(2,'0')+':00',power:p.power,def:defense(),repelled:true,stolen:{},fought:true});S.raidPending=null;S.flags.lastRaidCheck=p.date;log('You held the base yourself. Raiders driven off.');addXp(30);S.stock.scrap+=rint(4,10);}
+/* ================= horde night (every 7 days) ================= */
+function hordeAt(fromMs){const d=new Date(fromMs);d.setHours(21,0,0,0);d.setDate(d.getDate()+7);return d.getTime();}
+function hordeState(){if(!S.base)return null;if(!S.horde||!S.horde.next){let nx=hordeAt(S.base.claimed||Date.now());while(nx<Date.now())nx=hordeAt(nx);S.horde={n:0,next:nx,pending:false};}return S.horde;}
+function hordePower(){const h=hordeState();return Math.round((28+12*(h?h.n:0)+S.walk.district*10+S.league.tier*5)*dealMod('raid'));}
+function hordeDefense(){return defense()+activeCrew().length*3+(S.base&&S.base.rooms.bell?activeCrew().length*2:0);}
+function resolveHorde(fought,won){const h=hordeState();if(!h)return;const power=hordePower();const def=hordeDefense();const repelled=fought?won:def>=power;const stolen={};
+  if(!repelled){let frac=clamp((power-Math.max(0,fought?def*0.5:def))/power*0.8,0.25,0.7);const vl=S.base.rooms.vault||0;if(vl)frac*=vl>=2?0.2:0.5;
+    for(const k of ['food','water','meds','scrap','ammo']){const n=Math.floor(S.stock[k]*frac);if(n){S.stock[k]-=n;stolen[k]=n;}}
+    if(S.base.rooms.walls){S.base.rooms.walls--;stolen.walls=1;}if(S.base.rooms.traps&&Math.random()<0.5){S.base.rooms.traps--;stolen.traps=1;}}
+  else if(fought){S.stock.scrap+=25;S.keys++;addXp(40);}
+  S.raids.unshift({t:todayStr()+' 21:00',power,def,repelled,stolen,fought,by:'Horde night '+(h.n+1)});S.raids=S.raids.slice(0,12);
+  log(repelled?(fought?'You held the walls against horde night '+(h.n+1)+' yourself. +25 scrap, +1 key.':'Horde night '+(h.n+1)+': '+def+' defense against '+power+'. The walls held.'):'Horde night '+(h.n+1)+' broke through ('+power+' vs '+def+') and took '+Object.entries(stolen).map(([k,v])=>v+' '+k).join(', ')+'.');
+  toast(repelled?'Horde repelled':'The horde broke in','d');if(!repelled)SFX.play('hurt');else SFX.play('win');
+  h.n++;h.next=hordeAt(h.next);h.pending=false;save();render();}
+function fightHorde(){const h=hordeState();const n=Math.min(6,4+Math.floor(h.n/2));const en=[];for(let i=0;i<n;i++)en.push(mk(i===n-1?'bloater':i%3===2?'runner':i===1&&h.n>=2?'screamer':'walker'));startCombat(en,'horde');}
+function hordeTick(){const h=hordeState();if(!h)return;if(Date.now()<h.next)return;
+  if(document.visibilityState==='visible'&&!S.combat&&!S.loc&&!$('#modal').classList.contains('on')){h.pending=true;save();
+    openSheet(`<h2>Horde night</h2><div class="big">${ART.zombieSVG('walker',60)}${ART.zombieSVG('runner',60)}${ART.zombieSVG('bloater',60)}</div><p>Day ${7*(h.n+1)}. They come every seven days and they come all at once. Your walls: <b>${hordeDefense()}</b> vs the horde's <b>${hordePower()}</b>. Fight at the gate, or let the walls decide. Lose and they take the stockpile.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveHorde(false)">Let the walls decide</button><button class="btn r" onclick="closeSheet();fightHorde()">Fight at the gate</button></div>`);}
+  else if(document.visibilityState!=='visible'||Date.now()-h.next>6*3600000){resolveHorde(false);}}
+function hordeCountdown(){const h=hordeState();if(!h)return '';const ms=h.next-Date.now();if(ms<=0)return 'Horde night is here.';const d=Math.floor(ms/86400000),hr=Math.floor(ms%86400000/3600000);const dt=new Date(h.next);return 'Horde night '+(h.n+1)+' in '+(d?d+'d ':'')+hr+'h ('+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()]+' 9pm) · they bring '+hordePower()+', you have '+hordeDefense()+'.';}
 function raidTick(){
   if(!S.raidPending)return;const p=S.raidPending;const now=new Date();
   if(todayStr()!==p.date){resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=todayStr();save();return;}
@@ -837,11 +863,12 @@ function render(){
   // base
   const bh=$('#baseHead');
   if(!S.base){bh.className='card blood';bh.innerHTML='<h2>No base yet</h2><p>Clear any place, then tap <b>Claim as base</b> on it. Where you set up matters: a police station comes with an armory and walls, a pharmacy with a clinic, a gas station with a generator. You can move later for 20 scrap.</p>';}
-  else{bh.className='card';bh.innerHTML=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2>${baseScene()}<p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div></div></div>`;}
+  else{bh.className='card';bh.innerHTML=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2>${baseScene()}<p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div><div class="help" style="margin-top:4px;color:var(--amber)">${hordeCountdown()}</div></div></div>`;}
   $('#baseAlert').hidden=!(S.raidPending&&S.base&&S.base.rooms.tower);
   $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',candy:'🍬'}[k]}</div><b>${S.stock[k]||0}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`;
   $('#dropRow').hidden=!(S.base&&S.base.rooms.radio);const used=S.flags.dropDate===S.steps.date;$('#dropBtn').textContent=used?'📻 Drop used today':'📻 Call in today\'s supply drop';$('#dropBtn').classList.toggle('ghost',used);$('#dropHelp').textContent=used?'Next one after midnight.':'Three free items into your pack.';
-  $('#build').innerHTML=S.base?Object.entries(BUILD).map(([k,b])=>{const l=S.base.rooms[k]||0;const c=buildCost(k);return `<div class="room2${l?' own':''}"><div class="e">${b.e}</div><div class="t"><b>${b.n}${l?' L'+l:''}${b.def[l-1]?' · +'+b.def[l-1]+' def':''}</b><span>${b.d}${c!==null?' · next: '+c+' scrap':' · maxed'}</span></div>${c!==null?`<button class="btn sm a" onclick="build('${k}')">Build</button>`:'<span class="chip z">max</span>'}</div>`;}).join(''):'<p class="help">Claim a base to build.</p>';
+  const wk=S.work;$('#workCard').hidden=!(S.base&&wk);if(S.base&&wk){$('#workCard').innerHTML=`<h2>Under construction <span class="sub">${BUILD[wk.k].e} ${BUILD[wk.k].n} L${wk.lvl}</span></h2><div class="progress" style="margin-top:8px"><div class="bar"><i style="width:${Math.min(100,wk.done/wk.need*100)}%;background:linear-gradient(90deg,var(--amber),#ffd166)"></i></div><div class="row"><span><b>${fmt(Math.min(wk.done,wk.need))}</b> / ${fmt(wk.need)} steps of work</span><span>${fmt(Math.max(0,wk.need-wk.done))} to go</span></div></div><p class="help" style="margin-top:6px">Every step you walk is labor on it. Bigger builds take more walking. One job at a time.</p><div class="row" style="margin-top:6px"><button class="btn sm ghost" onclick="cancelWork()">Cancel (refund ${wk.scrap} scrap)</button></div>`;}
+  $('#build').innerHTML=S.base?Object.entries(BUILD).map(([k,b])=>{const l=S.base.rooms[k]||0;const c=buildCost(k);const lb=buildLabor(k);const busy=!!S.work;return `<div class="room2${l?' own':''}"><div class="e">${b.e}</div><div class="t"><b>${b.n}${l?' L'+l:''}${b.def[l-1]?' · +'+b.def[l-1]+' def':''}</b><span>${b.d}${c!==null?' · next: '+c+' scrap + '+fmt(lb)+' steps':' · maxed'}</span></div>${c!==null?(busy&&S.work.k===k?'<span class="chip a">building</span>':`<button class="btn sm a" onclick="build('${k}')"${busy?' disabled':''}>Build</button>`):'<span class="chip z">max</span>'}</div>`;}).join(''):'<p class="help">Claim a base to build.</p>';
   $('#raidLog').innerHTML=S.raids.length?S.raids.map(r=>`<li><time>${r.t.slice(5)}</time><span>${r.by?esc(r.by)+': ':''}${r.repelled?(r.fought?'You fought them off yourself.':'Held: '+r.def+' def vs '+r.power+'.'):'Broke in ('+r.power+' vs '+r.def+'). Took '+Object.entries(r.stolen).map(([k,v])=>v+' '+k).join(', ')+'.'}</span></li>`).join(''):'<li><span class="help">No raids yet. They start the day after you claim a base.</span></li>';
   $('#shelfSub').textContent=S.shelf.length+' found';const shelfIds=Object.entries(ITEMS).filter(([k,v])=>v.cat==='shelf');const owned=S.shelf.reduce((m,x)=>{m[x.id]=(m[x.id]||0)+1;return m;},{});
   $('#shelf').innerHTML=shelfIds.map(([k,v])=>`<div class="it${owned[k]?'':' locked'}"><div class="e">${v.e}</div><span class="rc-${v.r}">${v.n}${owned[k]>1?' x'+owned[k]:''}</span></div>`).join('');
@@ -855,7 +882,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderFriends();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();
+  renderOnline();renderFriends();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -1084,7 +1111,7 @@ function whileYouWereOut(){
   S.lastRank=rank;
   const hrs=Math.round(away/3600000);const w=wxLabel();
   const ct=(S.ct.daily||[]).filter(c=>!c.done).length;
-  openSheet(`<h2>While you were out</h2><p class="help">${hrs} hours away · ${esc(w)}</p><ul class="journal" style="margin:8px 0 12px">${items.length?items.map(m=>`<li><span>${esc(m)}</span></li>`).join(''):'<li><span>Quiet night. Nothing came over the fence.</span></li>'}</ul><p>${ct?ct+' contract'+(ct>1?'s':'')+' open today. ':''}${S.raidPending?'Raiders are expected today at '+S.raidPending.hour+':00. ':''}The Wanted boss this week is ${esc(bossName())}.</p><button class="btn r wide" onclick="closeSheet()">Back to the road</button>`);
+  openSheet(`<h2>While you were out</h2><p class="help">${hrs} hours away · ${esc(w)}</p><ul class="journal" style="margin:8px 0 12px">${items.length?items.map(m=>`<li><span>${esc(m)}</span></li>`).join(''):'<li><span>Quiet night. Nothing came over the fence.</span></li>'}</ul><p>${ct?ct+' contract'+(ct>1?'s':'')+' open today. ':''}${S.raidPending?'Raiders are expected today at '+S.raidPending.hour+':00. ':''}${S.base?hordeCountdown()+' ':''}The Wanted boss this week is ${esc(bossName())}.</p><button class="btn r wide" onclick="closeSheet()">Back to the road</button>`);
 }
 function start(){
   S=load()||fresh();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}

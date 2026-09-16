@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=4.2">
+<link rel="stylesheet" href="style.css?v=4.3">
 </head>
 <body>
 <div id="app">
@@ -90,7 +90,8 @@
       </div>
       <div class="card steel"><h2>Trader</h2><p>Marlow's truck stops at any base with walls. Scrap in, supplies out. Salvage spare gear under Pack to get scrap.</p><div class="trade" id="trader" style="margin-top:10px"></div></div>
       <div class="card" id="eventCard" hidden></div>
-      <div class="card"><h2>Build</h2><p>Scrap builds. Walls and towers are what raiders hit first.</p><div class="stack" id="build" style="margin-top:10px"></div></div>
+      <div class="card amber" id="workCard" hidden></div>
+      <div class="card"><h2>Build</h2><p>Scrap buys the materials, your steps are the labor. Every seven days a horde hits the base at 9pm: if the walls fail, they take the stockpile.</p><div class="stack" id="build" style="margin-top:10px"></div></div>
       <div class="card"><h2>Raid log</h2><ul class="journal" id="raidLog" style="margin-top:8px"></ul></div>
       <div class="card"><h2>Trophies <span class="sub" id="shelfSub"></span></h2><div class="shelf" id="shelf" style="margin-top:10px"></div></div>
       <div class="card">
@@ -141,8 +142,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=4.2"></script>
-<script src="street.js?v=4.2"></script>
-<script src="game.js?v=4.2"></script>
+<script src="art.js?v=4.3"></script>
+<script src="street.js?v=4.3"></script>
+<script src="game.js?v=4.3"></script>
 </body>
 </html>
