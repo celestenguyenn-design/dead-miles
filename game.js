@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='4.4';
+const VERSION='4.5';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -294,7 +294,7 @@ function watchMax(){return 3+(S.base&&S.base.rooms.tower?S.base.rooms.tower:0)+(
 function watchState(){const t=todayStr();if(!S.watch||S.watch.date!==t){const keys=Object.keys(WATCH_JOBS);const jobs=[];while(jobs.length<3){const k=pick(keys);if(!jobs.includes(k))jobs.push(k);}S.watch={date:t,used:0,jobs};}return S.watch;}
 function takeWatch(k){const w=watchState();if(S.loc||S.combat){toast('Finish what you are doing first');return;}if(w.used>=watchMax()){toast('No watches left today');return;}
   const j=WATCH_JOBS[k];if(!j||!w.jobs.includes(k)){return;}if(S.hp<25&&!confirm('You are at '+S.hp+' HP. Take the job anyway?'))return;
-  w.used++;w.jobs=w.jobs.filter(x=>x!==k);save();log('Watch duty: '+j.n+'.');startCombat(j.enemies(),'watch',k);}
+  gearCheck(()=>{const w2=watchState();if(!w2.jobs.includes(k)||w2.used>=watchMax())return;w2.used++;w2.jobs=w2.jobs.filter(x=>x!==k);save();log('Watch duty: '+j.n+'.');startCombat(j.enemies(),'watch',k);});}
 function watchReward(k){const j=WATCH_JOBS[k];if(!j)return;const r=j.reward;const got=[];const list=table(['food','water','meds','scrap','ammo'],0.15,0.25);
   for(let i=0;i<r.items;i++){const it=wpick(list,'w');const item=it.gear?{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}:{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:it.cat,qty:it.qty,uid:uid(),r:it.r};if(takeItem(item,null))got.push(it.e+' '+it.n);}
   S.stock.scrap+=r.scrap;if(r.key&&Math.random()<r.key){S.keys++;got.push('🗝️ Chest key');}
@@ -659,7 +659,7 @@ function resolveHorde(fought,won){const h=hordeState();if(!h)return;const power=
   log(repelled?(fought?'You held the walls against horde night '+(h.n+1)+' yourself. +25 scrap, +1 key.':'Horde night '+(h.n+1)+': '+def+' defense against '+power+'. The walls held.'):'Horde night '+(h.n+1)+' broke through ('+power+' vs '+def+') and took '+Object.entries(stolen).map(([k,v])=>v+' '+k).join(', ')+'.');
   toast(repelled?'Horde repelled':'The horde broke in','d');if(!repelled)SFX.play('hurt');else SFX.play('win');
   h.n++;h.next=hordeAt(h.next);h.pending=false;save();render();}
-function fightHorde(){const h=hordeState();const n=Math.min(6,4+Math.floor(h.n/2));const en=[];for(let i=0;i<n;i++)en.push(mk(i===n-1?'bloater':i%3===2?'runner':i===1&&h.n>=2?'screamer':'walker'));startCombat(en,'horde');}
+function fightHorde(){gearCheck(()=>{const h=hordeState();const n=Math.min(6,4+Math.floor(h.n/2));const en=[];for(let i=0;i<n;i++)en.push(mk(i===n-1?'bloater':i%3===2?'runner':i===1&&h.n>=2?'screamer':'walker'));startCombat(en,'horde');});}
 function hordeTick(){const h=hordeState();if(!h)return;if(Date.now()<h.next)return;
   if(document.visibilityState==='visible'&&!S.combat&&!S.loc&&!$('#modal').classList.contains('on')){h.pending=true;save();
     openSheet(`<h2>Horde night</h2><div class="big">${ART.zombieSVG('walker',60)}${ART.zombieSVG('runner',60)}${ART.zombieSVG('bloater',60)}</div><p>Day ${7*(h.n+1)}. They come every seven days and they come all at once. Your walls: <b>${hordeDefense()}</b> vs the horde's <b>${hordePower()}</b>. Fight at the gate, or let the walls decide. Lose and they take the stockpile.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveHorde(false)">Let the walls decide</button><button class="btn r" onclick="closeSheet();fightHorde()">Fight at the gate</button></div>`);}
@@ -671,7 +671,7 @@ function raidTick(){
   if(now.getHours()>=p.hour){ if(document.visibilityState==='visible'&&!S.combat&&!S.loc&&!$('#modal').classList.contains('on')){openSheet(`<h2>Raiders at the walls</h2><div class="big">${ART.zombieSVG('raider',70)}${ART.zombieSVG('gunner',70)}</div><p>A crew of ${p.power>25?'six':p.power>18?'four':'three'} is coming over the fence. Your defenses: ${defense()} vs their ${p.power}. Fight them yourself, or let the walls decide.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveRaid(${p.power},${p.hour},'${p.date}');S.flags.lastRaidCheck='${p.date}';save();render()">Let the walls hold</button><button class="btn d" onclick="closeSheet();fightRaid()">Fight</button></div>`,true);}
     else if(document.visibilityState!=='visible'){resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;save();}}
 }
-function fightRaid(){const p=S.raidPending;const n=p.power>25?4:p.power>18?3:2;const en=[];for(let i=0;i<n;i++)en.push(mk(i===0&&p.power>22?'gunner':'raider'));startCombat(en,'raid');}
+function fightRaid(){gearCheck(()=>{const p=S.raidPending;const n=p.power>25?4:p.power>18?3:2;const en=[];for(let i=0;i<n;i++)en.push(mk(i===0&&p.power>22?'gunner':'raider'));startCombat(en,'raid');});}
 
 /* ================= league ================= */
 function rivalScore(r,week,now,tier){const start=new Date(week+'T00:00:00');const rng=mulberry(hash(week+r.id));const mult=TIERS[tier].mult;let total=0;
@@ -1054,13 +1054,22 @@ function bossState(){const w=weekId();if(!S.boss||S.boss.week!==w){S.boss={week:
   if(S.bossFightDate!==todayStr()){S.bossFightDate=todayStr();S.bossFightsToday=0;}return S.boss;}
 function bossChance(){return Math.min(1,0.06+0.03*(S.bossPity||0));}
 function bossPhaseHp(){return 110+S.walk.district*35+(S.bossKills||0)*15;}
+let PENDING_FIGHT=null;
+function runPending(){const f=PENDING_FIGHT;PENDING_FIGHT=null;if(f)f();}
+function gearCheck(then){const w=eqItem('melee');const armor=eqItem('armor')||eqItem('head');const owned=S.gear.filter(x=>x.slot==='melee'&&S.eq.melee!==x.uid);const ownedArmor=S.gear.filter(x=>(x.slot==='armor'||x.slot==='head')&&S.eq[x.slot]!==x.uid);
+  if(w&&(armor||!ownedArmor.length)){then();return;}
+  PENDING_FIGHT=then;
+  const wl=owned.slice(0,4).map(x=>`<button class="btn wide" style="margin-top:6px" onclick="equip('${x.uid}');$('#sheet').querySelector('#gcMsg').textContent='${esc(x.n)} equipped.';">${x.e} Equip ${esc(x.n)} <span class="help">${x.dmg?x.dmg[0]+'-'+x.dmg[1]+' dmg':''}</span></button>`).join('');
+  const al=ownedArmor.slice(0,3).map(x=>`<button class="btn wide ghost" style="margin-top:6px" onclick="equip('${x.uid}');$('#sheet').querySelector('#gcMsg').textContent='${esc(x.n)} equipped.';">${x.e} Wear ${esc(x.n)} <span class="help">-${x.dr} damage</span></button>`).join('');
+  openSheet(`<h2>${w?'No armor on':'Bare hands'}</h2><p>${w?'You have a weapon but nothing protecting you.':'You have no weapon equipped.'}${!w&&!owned.length?' You do not own one yet. Garages, hardware stores and the police station carry them.':''}</p>${wl}${al}<p class="help" id="gcMsg" style="margin-top:8px"></p><div class="grid2" style="margin-top:8px"><button class="btn ghost" onclick="PENDING_FIGHT=null;closeSheet()">Not now</button><button class="btn r" onclick="closeSheet();runPending()">${w?'Fight as is':'Fight anyway'}</button></div>`,true);}
 function fightBoss(){const b=bossState();if(S.loc||S.combat){toast('Finish what you are doing first');return;}if(b.killed){toast(bossName()+' is already down this week');return;}
   if(S.bossFightsToday>=BOSS_FIGHTS_PER_DAY){toast('No boss fights left today. Two a day.');return;}
   if(S.hp<30&&!confirm('You are at '+S.hp+' HP. The boss hits hard. Go anyway?'))return;
+  gearCheck(()=>{const b2=bossState();if(b2.killed||S.bossFightsToday>=BOSS_FIGHTS_PER_DAY)return;
   S.bossFightsToday++;const st=strongholdStage(3);const boss=st[1];boss.warden=true;const remaining=Math.max(1,b.hp);boss.hp=boss.max=Math.min(remaining,bossPhaseHp());
-  const en=bossMembers()>1?[mk('raider'),boss]:[boss];save();startCombat(en,'boss');}
+  const en=bossMembers()>1?[mk('raider'),boss]:[boss];save();startCombat(en,'boss');});}
 function bossAfter(won){if(!C||C.bossDone||C.where!=='boss')return;C.bossDone=true;const boss=C.enemies.find(e=>e.warden);if(!boss)return;const dmg=Math.max(0,boss.max-Math.max(0,boss.hp));const b=bossState();
-  if(dmg>0){b.my+=dmg;ctEvent('boss',dmg);}
+  if(dmg>0){b.my+=dmg;ctEvent('boss',dmg);}else{S.bossFightsToday=Math.max(0,S.bossFightsToday-1);clog('You never touched the boss. That fight is not counted.','sys');log('Left the boss fight without landing a hit. It did not count.');}
   if(won){S.bossPity=(S.bossPity||0)+1;S.stock.scrap+=4;const list=table(['food','water','meds','scrap','ammo'],0.1,0.2);const it=wpick(list,'w');const item=it.gear?{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}:{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:it.cat,qty:it.qty,uid:uid(),r:it.r};takeItem(item,null);clog('Phase done: +4 scrap, '+it.n+'. Legendary chance now '+Math.round(bossChance()*100)+'%.','good');}
   if(S.party&&S.party.code&&O().ok){bossPost(dmg);}
   else{b.hp=Math.max(0,b.hp-dmg);if(b.hp<=0&&!b.killed){b.killed=true;b.killer='you';bossKill(true);}}
