@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='4.0';
+const VERSION='4.1';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -168,7 +168,7 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   raids:[],raidPending:null,campCleared:'',bossKilled:'',milestones:[],
   ct:{date:'',daily:[],week:'',weekly:null,pending:{}},party:{code:'',data:null,pending:{}},wx:null,
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
-function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};S.bossFightDate=S.bossFightDate||'';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};}
+function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};S.bossFightDate=S.bossFightDate||'';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};}
 function migrate(o){
   if(!o)return null;if(o.v===3)return o;
   if(o.v===2){const f=fresh();const m=Object.assign(f,o);m.v=3;m.av=ART.randomAv();m.cosmetics=[];m.cls='';m.sp=Math.max(0,(o.lvl||1)-1);m.skills={};m.sfx=true;m.keys=0;m.milestones=[];m.ct=f.ct;m.party=f.party;m.wx=null;m.bossKilled='';
