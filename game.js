@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.15';
+const VERSION='6.16';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1184,10 +1184,30 @@ let raf=0;function animate(){cancelAnimationFrame(raf);const step=(t)=>{drawScen
 function animateOnce(){if(!raf)animate();else drawScene(performance.now());}
 
 /* ================= render ================= */
+// Roll a number up to its new value rather than snapping. Short, eased, and it
+// cancels cleanly if another update lands mid-roll.
+const COUNTERS=new WeakMap();
+function countTo(el,to){
+  if(!el)return;
+  const prev=COUNTERS.get(el);
+  if(prev&&prev.to===to){el.textContent=fmt(to);return;}
+  if(prev&&prev.raf)cancelAnimationFrame(prev.raf);
+  const from=prev?prev.shown:(parseInt(String(el.textContent).replace(/\D/g,''),10)||0);
+  if(from===to||Math.abs(to-from)<2||reduced){el.textContent=fmt(to);COUNTERS.set(el,{to,shown:to,raf:0});return;}
+  const t0=performance.now(),dur=Math.min(900,300+Math.abs(to-from)/8);
+  const rec={to,shown:from,raf:0};COUNTERS.set(el,rec);
+  if(to>from){el.classList.remove('tick');void el.offsetWidth;el.classList.add('tick');}
+  const step=(t)=>{
+    const k=Math.min(1,(t-t0)/dur);const e=1-Math.pow(1-k,3);
+    rec.shown=Math.round(from+(to-from)*e);el.textContent=fmt(rec.shown);
+    if(k<1){rec.raf=requestAnimationFrame(step);}else{rec.raf=0;rec.shown=to;}
+  };
+  rec.raf=requestAnimationFrame(step);
+}
 function render(){
   ensureState();rollDay();rollWeek();ctRoll();checkRaids();storyCheck();
   $('#hpNum').textContent=S.hp+' / '+maxHp();$('#hpBar').style.width=clamp(S.hp/maxHp()*100,0,100)+'%';
-  $('#topSteps').textContent=fmt(S.steps.today);
+  countTo($('#topSteps'),S.steps.today);
   $('#sceneTag').textContent=district().n+' · '+S.walk.houses+' places';$('#arriveTag').hidden=!S.loc;
   const wt=$('#wxTag');wt.hidden=false;wt.textContent=wxLabel();
   $('#pbar').style.width=(S.loc?100:(S.walk.dist?S.walk.progress/S.walk.dist*100:0))+'%';
@@ -1197,7 +1217,10 @@ function render(){
   renderLoc();renderRaidCard();renderContracts();
   const hs=hydroState();const hb=$('#hydroBar');if(hb){hb.style.width=Math.round(S.hydro||0)+'%';hb.style.background=hs==='ok'?'linear-gradient(90deg,#3a7ad6,#5fb3c9)':hs==='thirsty'?'linear-gradient(90deg,#c9a04a,#f5c842)':'linear-gradient(90deg,#8a2a2a,#e63e5c)';
     $('#hydroSub').textContent=hydroLabel();$('#hydroLeft').innerHTML='<b>'+Math.round(S.hydro||0)+'%</b> water · '+S.stock.water+' in the stash';$('#hydroRight').textContent=hs==='ok'?'':hs==='thirsty'?'-10% damage':'-20% damage, -15% max HP';$('#drinkBtn').disabled=S.stock.water<1||(S.hydro||0)>=100;}
-  $('#goalSub').textContent='streak '+S.streak.days+' · best '+Math.max(S.streakBest||0,S.streak.days);const nsr=nextStreakReward();const sl=$('#streakLine');if(sl)sl.textContent=nsr?(nsr.d-S.streak.days)+' more day'+(nsr.d-S.streak.days===1?'':'s')+' in a row for '+nsr.n+'. Miss a day and the streak breaks (and a walker gets into the scrap).':'Every streak reward earned. Keep it alive.';$('#goalBar').style.width=Math.min(100,S.steps.today/S.goal*100)+'%';$('#goalLeft').innerHTML='<b>'+fmt(S.steps.today)+'</b> / '+fmt(S.goal);$('#goalRight').textContent=S.steps.today>=S.goal?'Done. +2 food, +2 water, +15 XP.':fmt(S.goal-S.steps.today)+' to go';
+  $('#goalSub').textContent='streak '+S.streak.days+' · best '+Math.max(S.streakBest||0,S.streak.days);const nsr=nextStreakReward();const sl=$('#streakLine');if(sl)sl.textContent=nsr?(nsr.d-S.streak.days)+' more day'+(nsr.d-S.streak.days===1?'':'s')+' in a row for '+nsr.n+'. Miss a day and the streak breaks (and a walker gets into the scrap).':'Every streak reward earned. Keep it alive.';(function(){const gb=$('#goalBar');gb.style.width=Math.min(100,S.steps.today/S.goal*100)+'%';
+    const hit=S.steps.today>=S.goal;const card=gb.closest('.card');
+    if(card){if(hit&&S.flags.goalCheer!==S.steps.date){S.flags.goalCheer=S.steps.date;card.classList.remove('goalhit');void card.offsetWidth;card.classList.add('goalhit');}
+      if(!hit)card.classList.remove('goalhit');}})();$('#goalLeft').innerHTML='<b>'+fmt(S.steps.today)+'</b> / '+fmt(S.goal);$('#goalRight').textContent=S.steps.today>=S.goal?'Done. +2 food, +2 water, +15 XP.':fmt(S.goal-S.steps.today)+' to go';
   $('#journal').innerHTML=S.journal.slice(0,12).map(j=>`<li><time>${timeStr(j.t)}</time><span>${esc(j.m)}</span></li>`).join('')||'<li><span class="help">Nothing yet.</span></li>';
   // pack
   $('#packSub').textContent=S.pack.length+' / '+capacity();$('#runMult').textContent='x'+runMult().toFixed(1);$('#packPts').textContent=fmt(packPts());$('#keyCount').textContent=S.keys;
@@ -1212,7 +1235,8 @@ function render(){
   $('#gearTabs').innerHTML=[['all','All',S.gear.length],['weapons','Weapons',S.gear.filter(GT.weapons).length],['armor','Armor',S.gear.filter(GT.armor).length],['bags','Bags',S.gear.filter(GT.bags).length]].map(([k,n,c])=>`<button class="${GEAR_TAB===k?'on':''}" onclick="gearTab('${k}')">${n} ${c}</button>`).join('');
   $('#gearSub').textContent=S.gear.length+' pieces';
   $('#salvageAll').style.display=spare.length<2?'none':'';$('#salvageAll').textContent='Salvage '+spare.length+' spare common/uncommon for '+spare.reduce((t,x)=>t+salvageValue(x),0)+'🔩';
-  $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':g.dmg[0]+'-'+g.dmg[1]+' dmg · '+(g.id==='oldreliable'?'never breaks':g.dur+'/'+GEAR[g.id].dur+' durability')):g.slot==='ranged'?g.dmg[0]+'-'+g.dmg[1]+' dmg · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';return `<div class="gear${eq?' eq':''}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${g.slot==='melee'&&g.dur<GEAR[g.id].dur&&g.id!=='oldreliable'?(canRepair?`<button class="btn sm${g.broken?' r':''}" onclick="repair('${g.uid}')">Repair 3🔩</button>`:(g.broken?'<span class="chip d">needs an armory</span>':'')):''}${S.base&&S.base.rooms.forge&&(g.up||0)<3?`<button class="btn sm" onclick="upgrade('${g.uid}')">Forge +${(g.up||0)+1} · ${UPG_COST[g.up||0]}🔩</button>`:''}<button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
+  $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':g.dmg[0]+'-'+g.dmg[1]+' dmg · '+(g.id==='oldreliable'?'never breaks':g.dur+'/'+GEAR[g.id].dur+' durability')):g.slot==='ranged'?g.dmg[0]+'-'+g.dmg[1]+' dmg · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';const sh=(g.r==='legendary'||g.r==='epic')?' shine'+(g.r==='legendary'?' leg':''):'';
+    return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${g.slot==='melee'&&g.dur<GEAR[g.id].dur&&g.id!=='oldreliable'?(canRepair?`<button class="btn sm${g.broken?' r':''}" onclick="repair('${g.uid}')">Repair 3🔩</button>`:(g.broken?'<span class="chip d">needs an armory</span>':'')):''}${S.base&&S.base.rooms.forge&&(g.up||0)<3?`<button class="btn sm" onclick="upgrade('${g.uid}')">Forge +${(g.up||0)+1} · ${UPG_COST[g.up||0]}🔩</button>`:''}<button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
   // you
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
   $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):baseDmg()[0]+'-'+baseDmg()[1]} +${S.lvl-1}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
@@ -1333,6 +1357,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.16',d:'Sep 17',t:'Things move now',
+  i:['Your step count rolls up to its new number instead of snapping, and flashes green as it lands.',
+     'Epic and legendary gear catches the light in your pack.',
+     'Hitting your daily target pulses the card. Switching tabs, the cards arrive one after another.',
+     'All of it turns itself off if your phone is set to reduce motion.']},
  {v:'6.15',d:'Sep 17',t:'See your last seven days of steps',
   i:['The Steps card now shows a week of daily totals, so a zero is never ambiguous - you can see at a glance whether it is a fresh day or something is stuck.',
      'Tap any bar to see that day exact number. Today is the one with the ring.',
@@ -1688,7 +1717,8 @@ function classSheet(){let cls='brawler';const draw=()=>{$('#sheet').innerHTML=`<
 
 /* ================= wiring ================= */
 function wire(){
-  document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{SFX.play('ui');if(typeof STREET!=='undefined'&&STREET.on){STREET.on=false;if(STREET.watch!==null){navigator.geolocation.clearWatch(STREET.watch);STREET.watch=null;}clearInterval(STREET.timer);$('#v-street').insertBefore($('#locCard'),$('#raidCard'));}document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));$('#main').scrollTop=0;if(b.dataset.v==='street')animate();});
+  document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{SFX.play('ui');if(typeof STREET!=='undefined'&&STREET.on){STREET.on=false;if(STREET.watch!==null){navigator.geolocation.clearWatch(STREET.watch);STREET.watch=null;}clearInterval(STREET.timer);$('#v-street').insertBefore($('#locCard'),$('#raidCard'));}document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.view').forEach(v=>{const on=v.id==='v-'+b.dataset.v;v.classList.toggle('on',on);
+      v.classList.remove('tabin');if(on&&!reduced){void v.offsetWidth;v.classList.add('tabin');}});$('#main').scrollTop=0;if(b.dataset.v==='street')animate();});
   $('#syncBtn').onclick=()=>{const v=parseInt($('#syncInput').value,10);if(!(v>=0))return;if(syncTotal(v,'sync'))$('#syncInput').value='';};
   $('#pedoBtn').onclick=pedoToggle;$('#clipBtn').onclick=readClipboard;$('#bankBtn').onclick=bank;$('#healBtn').onclick=heal;$('#eatBtn').onclick=eat;$('#dropBtn').onclick=supplyDrop;$('#drinkBtn').onclick=()=>drink();
   $('#lookBtn').onclick=()=>lookSheet();$('#respecBtn').onclick=respec;$('#bgBtn').onclick=()=>bgSheet(false);$('#sfxBtn').onclick=()=>{S.sfx=!S.sfx;save();render();if(S.sfx)SFX.play('ui');};

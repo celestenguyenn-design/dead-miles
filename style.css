@@ -280,3 +280,33 @@ a{color:var(--amber)}
 @keyframes muzzlepop{0%{opacity:1;transform:translate(-50%,-50%) scale(.5)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5)}}
 .clog li{animation:slidein .25s ease}
 @keyframes slidein{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+
+/* ---- v6.16 animation pass ---- */
+/* The step number counts up instead of snapping, and glows as it lands. */
+#topSteps{display:inline-block;transition:color .3s}
+#topSteps.tick{animation:steptick .5s ease-out}
+@keyframes steptick{0%{transform:scale(1)}35%{transform:scale(1.14);color:var(--rot)}100%{transform:scale(1)}}
+
+/* Rare gear catches the light as you scroll past it. */
+.gear.shine{position:relative;overflow:hidden}
+.gear.shine::after{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.13),transparent);
+  animation:sweep 4.5s ease-in-out infinite;pointer-events:none}
+.gear.shine.leg::after{background:linear-gradient(100deg,transparent,rgba(255,196,66,.22),transparent);animation-duration:3.2s}
+@keyframes sweep{0%{left:-60%}55%,100%{left:120%}}
+
+/* Hitting the daily target should feel like something. */
+.goalhit{animation:goalpop .9s ease-out}
+@keyframes goalpop{0%{box-shadow:0 0 0 0 rgba(127,191,77,.55)}100%{box-shadow:0 0 0 22px rgba(127,191,77,0)}}
+
+/* Cards arrive instead of appearing, staggered down the page. */
+.tabin>.card{animation:cardin .32s ease-out backwards}
+.tabin>.card:nth-child(2){animation-delay:.04s}
+.tabin>.card:nth-child(3){animation-delay:.08s}
+.tabin>.card:nth-child(4){animation-delay:.12s}
+.tabin>.card:nth-child(n+5){animation-delay:.16s}
+@keyframes cardin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* Your survivor breathes while standing around. */
+.avidle{animation:avbreathe 3.6s ease-in-out infinite;transform-origin:50% 100%}
+@keyframes avbreathe{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-1.5px) scaleY(1.012)}}
