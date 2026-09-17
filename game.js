@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.18';
+const VERSION='6.19';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1592,6 +1592,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.19',d:'Sep 17',t:'A tidier Base page',
+  i:['Settings is one line again instead of ten cards, and opens into five groups: Account and backup, Steps, Notifications, Game, and Danger.',
+     'Build, Trader, Raid log and Trophies fold away too. Each one tells you what is inside without opening it - how much scrap you have, how many rooms, how many trophies.',
+     'Nothing moved out of reach. Everything is where it was, just behind one tap.']},
  {v:'6.18',d:'Sep 17',t:'Give something to a friend',
   i:['Every item in your pack has a Gift button. Pick a friend, add a note, and it lands in their pack the next time they open the game.',
      'It leaves your pack only once the server confirms it - if the send fails, you keep it.',
@@ -1827,6 +1831,14 @@ function renderOnline(){
   else{body=`<div class="kv"><span>Handle</span><b>@${esc(o.handle)}</b><span>Last phone sync</span><b>${o.lastPost?timeStr(o.lastPost)+' today':'none yet'}</b><span>Server</span><b>${o.err?'<span style="color:#ff8a92">'+esc(o.err)+'</span>':'ok'}</b></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pullSteps();loadFriends();partySync();toast('Syncing')">Sync now</button><button class="btn sm ghost" onclick="testOnline()">Test connection</button><button class="btn sm ghost" onclick="copyText(O().token,'')">Copy account key</button><button class="btn sm ghost" onclick="signInSheet()">Re-enter my key</button></div><p class="help">Account key = how to move to another browser or phone. There, type this handle, paste the key, and your save comes with it.</p>`;}
   $('#onlineBody').innerHTML=body;
   try{checkAchv();}catch(e){}
+  // fold summaries carry the live state, so a closed fold still tells you something
+  try{const bf=$('#buildFold');
+    if(bf){const rooms=S.base?Object.values(S.base.rooms||{}).reduce((a,b)=>a+b,0):0;
+      bf.textContent=!S.base?'claim a base first':(S.work?('building '+BUILD[S.work.k].n+'...'):(rooms+' room'+(rooms===1?'':'s')+' · '+fmt(S.stock.scrap)+' scrap'));}
+    const tf=$('#traderFold');
+    if(tf)tf.textContent=S.base?(fmt(S.stock.scrap)+' scrap to spend'):'needs a base';
+    const sf=$('#shelfSubFold');if(sf)sf.textContent=(S.shelf||[]).length+' found';
+  }catch(e){}
   try{const got=Object.keys(S.achv||{}).length;const ws=$('#wallSub');if(ws)ws.textContent=got+'/'+ACHV.length;
     const wl=$('#wallLine');if(wl){const last=(S.weeks||[])[0];
       wl.textContent=last?('Last week: '+fmt(last.steps)+' steps, '+fmt(last.kills)+' walkers, '+fmt(last.places)+' places.')

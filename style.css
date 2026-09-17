@@ -310,3 +310,19 @@ a{color:var(--amber)}
 /* Your survivor breathes while standing around. */
 .avidle{animation:avbreathe 3.6s ease-in-out infinite;transform-origin:50% 100%}
 @keyframes avbreathe{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-1.5px) scaleY(1.012)}}
+
+/* ---- v6.19 folded sections ---- */
+.fold{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin:10px 0;overflow:hidden}
+.fold>summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;gap:8px;
+  font-size:17px;color:var(--bone);user-select:none}
+.fold>summary::-webkit-details-marker{display:none}
+.fold>summary::after{content:'▸';margin-left:auto;color:var(--bone2);transition:transform .2s}
+.fold[open]>summary::after{transform:rotate(90deg)}
+.fold>summary:active{background:var(--panel2)}
+.fold .sub{font-size:13px;color:var(--muted);font-weight:400}
+.foldbody{padding:0 12px 12px;animation:foldin .2s ease-out}
+@keyframes foldin{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+/* a fold's own cards lose their outer chrome - the fold is the container now */
+.foldbody>.card{margin:8px 0;border:1px solid var(--line)}
+.fold.big>summary{font-family:'Bebas Neue';letter-spacing:.06em;font-size:21px}
+.fold .fold{background:var(--ash2)}

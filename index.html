@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=6.18">
+<link rel="stylesheet" href="style.css?v=6.19">
 </head>
 <body>
 <div id="app">
@@ -107,42 +107,42 @@
         <div class="row" style="margin-top:10px"><button class="btn sm" id="healBtn">Use medkit: +40 HP</button><button class="btn sm" id="eatBtn">Eat: +15 HP</button><span class="help">HP also recovers overnight.</span></div>
         <div class="row" style="margin-top:8px" id="dropRow" hidden><button class="btn sm z" id="dropBtn">📻 Call in today's supply drop</button><span class="help" id="dropHelp"></span></div>
       </div>
-      <div class="card steel"><h2>Trader</h2><p>Marlow's truck stops at any base with walls. Scrap in, supplies out. Salvage spare gear under Pack to get scrap.</p><div class="trade" id="trader" style="margin-top:10px"></div></div>
-      <div class="card" id="eventCard" hidden></div>
+      <details class="fold"><summary><b>Trader</b> <span class="sub" id="traderFold"></span></summary><div class="foldbody"><div class="card steel"><h2>Trader</h2><p>Marlow's truck stops at any base with walls. Scrap in, supplies out. Salvage spare gear under Pack to get scrap.</p><div class="trade" id="trader" style="margin-top:10px"></div></div></div></details>
+        <div class="card" id="eventCard" hidden></div>
       <div class="card amber" id="workCard" hidden></div>
-      <div class="card"><h2>Build</h2><p>Scrap buys the materials, your steps are the labor. Every seven days a horde hits the base at 9pm: if the walls fail, they take the stockpile.</p><div class="stack" id="build" style="margin-top:10px"></div></div>
-      <div class="card"><h2>Raid log</h2><ul class="journal" id="raidLog" style="margin-top:8px"></ul></div>
-      <div class="card"><h2>Trophies <span class="sub" id="shelfSub"></span></h2><div class="shelf" id="shelf" style="margin-top:10px"></div></div>
-      <div class="card">
-        <h2>Settings <span class="sub" id="verSub"></span></h2>
-        <div class="stack" style="margin-top:10px">
-          <label class="row" style="justify-content:space-between">Daily step target <input id="goalInput" type="number" inputmode="numeric" min="1000" step="500" style="width:120px"></label>
-          <label class="row" style="justify-content:space-between">Your name <input id="nameInput" type="text" maxlength="18" style="width:160px"></label>
-          <label class="row" style="justify-content:space-between">Sounds <button class="btn sm" id="sfxBtn">On</button></label>
-          <div class="card" style="background:var(--ash2)"><h2>Notifications <span class="sub">phone nudges</span></h2><div id="pushBody" style="margin-top:8px"></div></div>
-          <div class="card" style="background:var(--ash2)" id="onlineCard">
+      <details class="fold"><summary><b>Build</b> <span class="sub" id="buildFold"></span></summary><div class="foldbody"><div class="card"><h2>Build</h2><p>Scrap buys the materials, your steps are the labor. Every seven days a horde hits the base at 9pm: if the walls fail, they take the stockpile.</p><div class="stack" id="build" style="margin-top:10px"></div></div></div></details>
+        <details class="fold"><summary><b>Raid log</b></summary><div class="foldbody">      <div class="card"><h2>Raid log</h2><ul class="journal" id="raidLog" style="margin-top:8px"></ul></div></div></details>
+        <details class="fold"><summary><b>Trophies</b> <span class="sub" id="shelfSubFold"></span></summary><div class="foldbody">      <div class="card"><h2>Trophies <span class="sub" id="shelfSub"></span></h2><div class="shelf" id="shelf" style="margin-top:10px"></div></div></div></details>
+        <details class="fold big" id="setFold">
+          <summary><b>Settings</b> <span class="sub" id="verSub"></span></summary>
+          <div class="foldbody">
+<details class="fold"><summary><b>Account &amp; backup</b> <span class="sub">get back in if you lose this phone</span></summary><div class="foldbody">          <div class="card" style="background:var(--ash2)" id="onlineCard">
             <h2>Online <span class="sub" id="onlineStatus">off</span></h2>
             <p id="onlineHelp">Online turns on silent step sync from your phone, the friends board, and party contracts.</p>
             <div class="stack" style="margin-top:10px" id="onlineBody"></div>
           </div>
-          <div class="card" style="background:var(--ash2)"><h2>Phone step sync <span class="sub">the shortcut</span></h2><div id="stepSyncBody"></div></div>
-          <details><summary style="cursor:pointer;font-weight:700">Phone shortcut (silent step sync)</summary>
-            <div class="help" style="margin-top:8px;line-height:1.6" id="shortcutHelp"></div>
-          </details>
-          <div class="row"><button class="btn sm ghost" id="demoBtn">Demo: +300 steps</button><span class="help">Try it at your desk.</span></div>
-          <div class="row"><button class="btn sm" onclick="newsSheet()">What's new</button><span class="help">Every update, explained in the game.</span></div>
-          <div class="row"><button class="btn sm" id="updateBtn">Update the game now</button><span class="help">Pulls the newest version.</span></div>
-          <div class="row" id="undoRow" hidden><button class="btn sm" id="undoBtn">Undo restore</button></div>
           <div class="card" style="background:var(--ash2)"><h2>Recovery code <span class="sub">how you get back in</span></h2><div id="recovBody"></div></div>
           <div class="card" style="background:var(--ash2)"><h2>Save to a file <span class="sub">your own backup</span></h2><p class="help">Phones can lose website data, and deleting the home-screen icon can take the save with it. Keep a file somewhere safe and you can always come back.</p><div class="row" style="margin-top:8px"><button class="btn sm r" onclick="exportSave()">Save to a file</button><label class="btn sm" style="cursor:pointer">Load from a file<input type="file" accept="application/json,.json" style="display:none" onchange="importSave(this)"></label></div></div>
           <div class="card" style="background:var(--ash2)"><h2>Restore points <span class="sub">this phone</span></h2><p class="help">Automatic snapshots of your save. If you ever lose progress, come here and go back.</p><div class="lb" id="snapList" style="margin-top:8px"></div></div>
           <div class="card" style="background:var(--ash2)"><h2>Restore points <span class="sub">cloud</span></h2><p class="help">Kept on the server, so they survive losing the phone, deleting the app or a wipe. One an hour, plus one every time something tries to save over you with a smaller character.</p><div class="lb" id="cloudSnapList" style="margin-top:8px"></div><button class="btn ghost" style="margin-top:8px" onclick="loadCloudSnaps()">Check the server</button></div>
-          <div class="row"><button class="btn sm ghost d" id="resetBtn">Reset everything</button></div>
-        </div>
-      </div>
-    </section>
+          <div class="row" id="undoRow" hidden><button class="btn sm" id="undoBtn">Undo restore</button></div></div></details>
+<details class="fold"><summary><b>Steps</b> <span class="sub">the phone shortcut</span></summary><div class="foldbody">          <div class="card" style="background:var(--ash2)"><h2>Phone step sync <span class="sub">the shortcut</span></h2><div id="stepSyncBody"></div></div>
+          <details><summary style="cursor:pointer;font-weight:700">Phone shortcut (silent step sync)</summary>
+            <div class="help" style="margin-top:8px;line-height:1.6" id="shortcutHelp"></div>
+          </details>
+          <div class="row"><button class="btn sm ghost" id="demoBtn">Demo: +300 steps</button><span class="help">Try it at your desk.</span></div></div></details>
+<details class="fold"><summary><b>Notifications</b> <span class="sub">phone nudges</span></summary><div class="foldbody">          <div class="card" style="background:var(--ash2)"><h2>Notifications <span class="sub">phone nudges</span></h2><div id="pushBody" style="margin-top:8px"></div></div></div></details>
+<details class="fold"><summary><b>Game</b> <span class="sub">name, target, sound</span></summary><div class="foldbody">          <label class="row" style="justify-content:space-between">Daily step target <input id="goalInput" type="number" inputmode="numeric" min="1000" step="500" style="width:120px"></label>
+          <label class="row" style="justify-content:space-between">Your name <input id="nameInput" type="text" maxlength="18" style="width:160px"></label>
+          <label class="row" style="justify-content:space-between">Sounds <button class="btn sm" id="sfxBtn">On</button></label>
+          <div class="row"><button class="btn sm" onclick="newsSheet()">What's new</button><span class="help">Every update, explained in the game.</span></div>
+          <div class="row"><button class="btn sm" id="updateBtn">Update the game now</button><span class="help">Pulls the newest version.</span></div></div></details>
+<details class="fold"><summary><b>Danger</b></summary><div class="foldbody"><p class="help">This wipes your character on this device. The cloud copy and your PIN are untouched, so you can sign back in.</p>          <div class="row"><button class="btn sm ghost d" id="resetBtn">Reset everything</button></div></div></details>
+          </div>
+        </details>
+      </section>
 
-    <section class="view" id="v-league">
+<section class="view" id="v-league">
       <div class="card"><h2>Hollow County <span class="sub" id="mapSub"></span></h2><div id="mapBox" style="margin-top:10px"></div><p class="help" id="mapHelp" style="margin-top:8px"></p></div>
       <div class="card blood" id="bossCard"><h2>County boss <span class="sub" id="bossSub"></span></h2><div id="bossBody" style="margin-top:8px"></div></div>
       <div class="card steel" id="partyCard"><h2>Party <span class="sub" id="partySub"></span></h2><div id="partyBody" style="margin-top:8px"></div></div>
@@ -169,8 +169,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=6.18"></script>
-<script src="street.js?v=6.18"></script>
-<script src="game.js?v=6.18"></script>
+<script src="art.js?v=6.19"></script>
+<script src="street.js?v=6.19"></script>
+<script src="game.js?v=6.19"></script>
 </body>
 </html>
