@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=6.19">
+<link rel="stylesheet" href="style.css?v=6.20">
 </head>
 <body>
 <div id="app">
@@ -28,7 +28,8 @@
   <div class="main" id="main">
 
     <section class="view on" id="v-street">
-      <div class="scene"><canvas id="cv" width="960" height="500"></canvas><div class="tag" id="sceneTag"></div><div class="wx" id="wxTag" hidden></div><div class="arrive" id="arriveTag" hidden>Arrived</div></div>
+      <div class="scene"><canvas id="cv" width="960" height="500"></canvas><div class="tag" id="sceneTag"></div><div class="wx" id="wxTag" hidden></div><div class="arrive" id="arriveTag" hidden>Arrived</div>
+        <div class="card" id="dayModCard"></div></div>
       <div class="progress"><div class="bar"><i id="pbar"></i></div><div class="row"><span id="pleft"></span><span id="pright"></span></div></div>
       <div class="card steel"><h2>Street mode <span class="sub">live map</span></h2><p>Out walking? Open the real map: the buildings around you become the places to loot, and your own home can be your base.</p><button class="btn z wide" style="margin-top:10px" id="streetBtn">Open the live map</button></div>
       <div class="card blood"><h2>Watch duty <span class="sub" id="watchSub"></span></h2><p>No steps today? Take a job. Three fights a day that need no walking. Loot goes in your pack, scrap goes straight to the stash.</p><div class="stack" id="watch" style="margin-top:10px"></div></div>
@@ -143,6 +144,7 @@
       </section>
 
 <section class="view" id="v-league">
+        <div class="card steel" id="convoyCard" hidden></div>
       <div class="card"><h2>Hollow County <span class="sub" id="mapSub"></span></h2><div id="mapBox" style="margin-top:10px"></div><p class="help" id="mapHelp" style="margin-top:8px"></p></div>
       <div class="card blood" id="bossCard"><h2>County boss <span class="sub" id="bossSub"></span></h2><div id="bossBody" style="margin-top:8px"></div></div>
       <div class="card steel" id="partyCard"><h2>Party <span class="sub" id="partySub"></span></h2><div id="partyBody" style="margin-top:8px"></div></div>
@@ -169,8 +171,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=6.19"></script>
-<script src="street.js?v=6.19"></script>
-<script src="game.js?v=6.19"></script>
+<script src="art.js?v=6.20"></script>
+<script src="street.js?v=6.20"></script>
+<script src="game.js?v=6.20"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.19';
+const VERSION='6.20';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -84,7 +84,12 @@ const STORY=[
  {id:'s7',t:'What the rail yard held',need:s=>s.kills>=80,txt:'"I found the manifest. Forty crates, medical, marked for the county hospital. They never arrived. The fever did. Draw your own line between those two facts."'},
  {id:'s8',t:'Hospital Row',need:s=>s.steps.total>=120000,txt:'"The hospital is standing. Third floor is where the crates went. The Tolls sealed it and put a boss on the door. If you get in there, you get the truth and a lot of meds."'},
  {id:'s9',t:'The Marina',need:s=>s.steps.total>=200000,txt:'"Boats. Real ones, with fuel. The Tolls are loading them. If they leave with the crates, this county stays dead. The Overpass crossing is the only road to the docks."'},
- {id:'s10',t:'The Overpass',need:s=>s.steps.total>=320000,txt:'"This is Marisol. If you can hear this, you walked the whole county. The north side is open. Come across. We could use someone who does not quit."'}
+ {id:'s10',t:'The Overpass',need:s=>s.steps.total>=320000,txt:'"This is Marisol. If you can hear this, you walked the whole county. The north side is open. Come across. We could use someone who does not quit."'},
+ {id:'s11',t:'Across the bridge',need:s=>s.steps.total>=420000,txt:'You cross. Marisol is shorter than she sounded. She looks at your boots, not your face. "Everyone who gets here says the same thing - that they were going to stop. Nobody stops. There is more county past this one."'},
+ {id:'s12',t:'The far road',need:s=>s.steps.total>=600000,txt:'"The maps stop being useful out here. We name places after whoever found them. Walk far enough and something will end up with your name on it."'},
+ {id:'s13',t:'What Nadia wanted',need:s=>s.steps.total>=800000,txt:'A page in a dead raider pocket, in Nadia handwriting: "He keeps walking. Every time we take something he just goes further out. I do not think he is running from us. I think we are in his way."'},
+ {id:'s14',t:'A long walker',need:s=>s.steps.total>=1000000,txt:'A million steps. Marisol does the arithmetic out loud - four hundred miles, give or take. "People used to do this for fun," she says. "Before." She does not say it like a joke.'},
+ {id:'s15',t:'Still going',need:s=>s.steps.total>=1500000,txt:'The radio is mostly quiet now. Every few weeks a new voice, somewhere further out, reading names off a list and asking if anyone is still walking. You are.'}
 ];
 function eventNow(){const d=new Date();const m=d.getMonth()+1,day=d.getDate();if((m===10&&day>=15)||(m===11&&day<=2))return 'halloween';return '';}
 const HALLOWEEN_SHOP=[{id:'hat:witch',n:'Witch hat',c:40},{id:'hat:pumpkin',n:'Pumpkin head',c:60},{id:'top:skeleton',n:'Skeleton hoodie',c:50},{id:'acc:wings',n:'Bat wings',c:80}];
@@ -521,16 +526,51 @@ function wxEffects(){
 function thirstMult(){
   const k=wxKind(), t=(S.wx&&typeof S.wx.temp==='number')?S.wx.temp:null;
   let m=1;
+  if(dayMod().thirst)m*=dayMod().thirst;
   if(k==='rain'||k==='snow')m*=0.8;
   if(k==='storm')m*=0.9;
   if(t!==null){ if(t>=30)m*=1.5; else if(t>=25)m*=1.25; else if(t<=5)m*=0.85; }
   return Math.round(m*100)/100;
 }
-function lootMult(){let m=district().loot;if(wxKind()==='snow')m*=1.1;if(wxKind()==='storm')m*=1.3;if(isNight())m*=1.5+sk('nightowl')*0.1;return m;}
+function lootMult(){let m=district().loot*modLoot();if(wxKind()==='snow')m*=1.1;if(wxKind()==='storm')m*=1.3;if(isNight())m*=1.5+sk('nightowl')*0.1;return m;}
 
 /* ================= world ================= */
-const district=()=>DISTRICTS[Math.min(S.walk.district,DISTRICTS.length-1)];
-function unlockedDistrict(){let d=0;for(let i=0;i<DISTRICTS.length;i++)if(S.steps.total>=DISTRICTS[i].steps)d=i;return d;}
+// ---- the road does not end (v6.20) ----
+// The county used to stop at The Overpass, 320,000 steps. After that nothing
+// new ever arrived again: same district, same threat, same loot, forever. So
+// the road keeps going. Districts past the hand-written six are generated,
+// deterministic by index, and threat and loot keep climbing. Nothing resets.
+const DIST_FAR=['The Reservoir','Kestrel Flats','The Quarry','Ash Hollow','Carter Mill','The Fairgrounds',
+  'North Bridge','Pinegrove','The Rail Yard','Blackwater','Sutter Ridge','The Airfield','Moss Landing',
+  'Fort Hale','The Cannery','Widow Creek','Granite Pass','The Silos','Lake Verity','Dunmore'];
+const DIST_STEP=100000;               // a new district every 100k beyond the county
+function districtAt(i){
+  if(i<DISTRICTS.length)return DISTRICTS[i];
+  const k=i-DISTRICTS.length;         // 0,1,2... out past the Overpass
+  const base=DISTRICTS[DISTRICTS.length-1];
+  return {
+    n:DIST_FAR[k%DIST_FAR.length]+(k>=DIST_FAR.length?' II':''),
+    dist:[base.dist[0]+k*40, base.dist[1]+k*70],
+    loot:Math.round((base.loot+(k+1)*0.15)*100)/100,
+    threat:Math.round((base.threat+(k+1)*0.2)*100)/100,
+    steps:base.steps+(k+1)*DIST_STEP,
+    far:true};
+}
+const district=()=>districtAt(Math.max(0,S.walk.district|0));
+function unlockedDistrict(){
+  let d=0;
+  for(let i=0;i<DISTRICTS.length;i++)if(S.steps.total>=DISTRICTS[i].steps)d=i;
+  if(S.steps.total>=DISTRICTS[DISTRICTS.length-1].steps){
+    const past=Math.floor((S.steps.total-DISTRICTS[DISTRICTS.length-1].steps)/DIST_STEP);
+    d=DISTRICTS.length-1+past;
+  }
+  return d;
+}
+// A rank you carry, so the far road means something you can see.
+const VET_STEP=500000;
+function vetRank(){return Math.floor((S.steps.total||0)/VET_STEP);}
+const VET_TITLES=['','Veteran','Ranger','Pathfinder','Outrider','Long Walker','Legend of the Road'];
+function vetTitle(){const r=vetRank();return r?(VET_TITLES[Math.min(r,VET_TITLES.length-1)]+(r>=VET_TITLES.length?' '+(r-VET_TITLES.length+2):'')):'';}
 function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05));if(wxKind()==='snow')dist=Math.round(dist*1.1);S.walk.dist=dist;S.walk.progress=0;S.walk.toNext=dist;}
 function bossName(){if(eventNow()==='halloween')return 'The Gourd King';return BOSS_NAMES[hash(weekId()+'boss')%BOSS_NAMES.length];}
 function makeLoc(force,nameOverride){
@@ -559,7 +599,7 @@ function encounterFor(loc){
   const ambushCut=roleLvl('scout')?0.2+roleLvl('scout')*0.08:0;
   let quiet=0.27+ambushCut;if(wxKind()==='fog')quiet-=0.1;if(wxKind()==='rain')quiet-=0.08;
   if(rng<quiet)return [];
-  let count=th<1.5?(Math.random()<0.3?2:1):th<2.5?rint(1,3):rint(2,3);if(isNight()||wxKind()==='storm')count++;count=Math.min(S.walk.district>=3?5:4,count);const out=[];
+  let count=th<1.5?(Math.random()<0.3?2:1):th<2.5?rint(1,3):rint(2,3);if(isNight()||wxKind()==='storm')count++;count+=modCount();count=Math.max(1,count);count=Math.min(S.walk.district>=3?5:4,count);const out=[];
   for(let i=0;i<count;i++){if(S.walk.district>=1&&Math.random()<0.15)out.push(mk(Math.random()<0.7?'raider':'gunner'));else{const k=wpick(Object.entries(ENEMIES).filter(([k,v])=>v.w>0).map(([k,v])=>({k,w:v.w*(isNight()&&k==='runner'?2:1)})),'w').k;out.push(mk(k));}}
   return out;
 }
@@ -701,6 +741,55 @@ function nemCard(){
     +'<div class="row"><span>her crew: '+esc(NEM_RANKS[Math.min(n.lvl-1,5)])+'</span><span>'+(n.lvl>=6?'as good as you':'level '+n.lvl+' of 6')+'</span></div></div>'
     +'<p class="help" style="margin-top:6px">Her scouts hit harder every time she wins. Beat them and she pulls back.</p>';
 }
+/* ================= today on the road ================= */
+// A reason to walk on THIS day rather than steps in general. Deterministic from
+// the date, so everyone in the group gets the same one and can talk about it.
+const DAY_MODS=[
+  {id:'scav', n:'Picked over',   d:'Everything is 25% richer out there today.', loot:1.25},
+  {id:'thin', n:'Thin crowd',    d:'One fewer walker in every encounter.',      count:-1},
+  {id:'swarm',n:'Bad day',       d:'One extra walker in every encounter, but loot is up 40%.', count:1, loot:1.4},
+  {id:'quiet',n:'Quiet streets', d:'Searching makes far less noise today.',      noise:0.5},
+  {id:'cool', n:'Cool front',    d:'Your water lasts twice as long.',            thirst:0.5},
+  {id:'hunt', n:'Bounty day',    d:'Raiders are carrying double scrap.',         raider:2},
+  {id:'far',  n:'Long roads',    d:'Places are further apart, and worth more.',  dist:1.25, loot:1.3},
+  {id:'calm', n:'Nothing doing', d:'An ordinary day in Hollow County.'},
+];
+function dayMod(){return DAY_MODS[Math.abs(hash(todayStr()+'road'))%DAY_MODS.length];}
+function modLoot(){return dayMod().loot||1;}
+function modCount(){return dayMod().count||0;}
+
+/* ================= the convoy ================= */
+// The board ranks everyone against each other. This is the one thing they do
+// together: a weekly step target for the whole group. No server work - the
+// leaderboard already carries everyone's weekly steps.
+function convoy(){
+  const rows=(friends||[]).filter(f=>f.pub);
+  const n=Math.max(1,rows.length);
+  const total=rows.reduce((a,f)=>a+((f.pub&&f.pub.steps_week)||0),0);
+  const goal=n*35000;                       // 5k a day each, a real but fair ask
+  return {n,total,goal,done:total>=goal,pct:Math.min(100,Math.round(total/goal*100))};
+}
+function claimConvoy(){
+  const c=convoy();const w=weekId();
+  if(!c.done){toast('Not there yet - '+fmt(c.goal-c.total)+' steps to go','d');return;}
+  if(S.convoyClaimed===w){toast('Already collected this week');return;}
+  S.convoyClaimed=w;S.stock.scrap+=25;S.keys+=1;addXp(60);
+  log('The convoy made it. Everyone walked '+fmt(c.total)+' steps together. +25 scrap, +1 key, +60 XP.');
+  toast('Convoy made it · +25 scrap, +1 key','l');SFX.play('chest');save();render();
+}
+function renderConvoy(){
+  const el=$('#convoyCard');if(!el)return;
+  if(!O().ok||!(friends||[]).length){el.hidden=true;return;}
+  const c=convoy();el.hidden=false;
+  el.innerHTML='<h2>The convoy <span class="sub">'+c.n+' walking</span></h2>'
+    +'<p class="help">Everyone on the board, one target, every week. You get there together or not at all.</p>'
+    +'<div class="progress" style="margin-top:8px"><div class="bar"><i style="width:'+c.pct+'%;background:linear-gradient(90deg,var(--rot2),var(--rot))"></i></div>'
+    +'<div class="row"><span><b>'+fmt(c.total)+'</b> / '+fmt(c.goal)+'</span><span>'+(c.done?'made it':fmt(c.goal-c.total)+' to go')+'</span></div></div>'
+    +(c.done?(S.convoyClaimed===weekId()
+        ?'<p class="help" style="color:var(--rot);margin-top:8px">You have collected your share this week.</p>'
+        :'<button class="btn r wide" style="margin-top:8px" onclick="claimConvoy()">Collect your share</button>')
+      :'');
+}
 /* ================= the week in review ================= */
 // Everything here is a delta from marks taken at the start of the week, so no
 // new counters have to be maintained anywhere in the game loop.
@@ -806,7 +895,22 @@ function achvSheet(){
     +ACHV.map(row).join('')
     +'<button class="btn r wide" style="margin-top:12px" onclick="closeSheet()">Close</button>',true);
 }
-function checkMilestones(){for(let i=1;i<DISTRICTS.length;i++){if(S.steps.total>=DISTRICTS[i].steps&&!S.milestones.includes(i)){S.milestones.push(i);S.sp++;S.keys++;log('Milestone: '+fmt(DISTRICTS[i].steps)+' lifetime steps. '+DISTRICTS[i].n+' is open. +1 skill point, +1 key.');toast(DISTRICTS[i].n+' unlocked · +1 skill point','l');SFX.play('legend');}}}
+function checkMilestones(){
+  const top=unlockedDistrict();
+  for(let i=1;i<=top;i++){
+    if(S.milestones.includes(i))continue;
+    const d=districtAt(i);
+    if(S.steps.total<d.steps)continue;
+    S.milestones.push(i);S.sp++;S.keys++;
+    log('Milestone: '+fmt(d.steps)+' lifetime steps. '+d.n+' is open. +1 skill point, +1 key.');
+    toast(d.n+' unlocked · +1 skill point','l');SFX.play('legend');
+  }
+  // a rank every 500,000 steps, forever
+  const r=vetRank();
+  if(r>(S.vet||0)){S.vet=r;S.sp++;S.keys+=2;
+    log('You are a '+vetTitle()+' now. '+fmt(r*VET_STEP)+' lifetime steps. +1 skill point, +2 keys.');
+    toast(vetTitle()+' · '+fmt(r*VET_STEP)+' steps','l');SFX.play('legend');}
+}
 function addSteps(n,src){
   n=Math.floor(n);if(!(n>0))return;rollDay();rollWeek();S.lastAnim=Date.now();
   if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(Math.max(3,Math.round(6*thirstMult())));}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
@@ -1038,7 +1142,7 @@ function searchRoom(i){pushSoon();
   if(!loc.stronghold&&S.crew.length<8&&Math.random()<0.07){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was hiding in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was hiding in the ${esc(r.n.toLowerCase())}. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(1)}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
   else if(!S.pet&&(Math.random()<0.03||(S.roomsSearched||0)>=40)){petJoin(Math.random()<0.6?'dog':'cat');}
   else if(S.pet&&(S.pets||[]).length<PET_MAX&&Math.random()<0.012){petJoin(Math.random()<0.5?'dog':'cat');}
-  let noise=Math.max(4,r.noise+rint(-6,8)-sk('lightstep')*4-(wxKind()==='rain'?10:0));loc.noise=Math.min(100,loc.noise+noise);
+  let noise=Math.max(4,Math.round((r.noise+rint(-6,8)-sk('lightstep')*4-(wxKind()==='rain'?10:0))*(dayMod().noise||1)));loc.noise=Math.min(100,loc.noise+noise);
   crewXp(1);save();render();
   if(loc.noise>=100){loc.noise=55;loc.wave++;setTimeout(()=>startCombat([mk('walker'),mk(Math.random()<0.4?'runner':'walker')].concat(loc.wave>1?[mk('bloater')]:[]),'wave'),350);}
 }
@@ -1592,6 +1696,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.20',d:'Sep 17',t:'The road does not end any more',
+  i:['The county used to stop at The Overpass, 320,000 steps. After that nothing new ever arrived again. Now the road keeps going - new districts every 100,000 steps, forever, each one richer and meaner than the last.',
+     'Every 500,000 steps you earn a rank you carry: Veteran, Ranger, Pathfinder, Outrider, Long Walker. It shows on the road screen.',
+     'TODAY ON THE ROAD: every day has its own condition - richer loot, thinner crowds, quiet streets, bounty day. Everyone in your group gets the same one.',
+     'THE CONVOY: one weekly step target for everyone on the board together. Hit it and you all collect. League tab.',
+     'And the radio keeps talking - five new transmissions out past the county, the last one at a million steps.']},
  {v:'6.19',d:'Sep 17',t:'A tidier Base page',
   i:['Settings is one line again instead of ten cards, and opens into five groups: Account and backup, Steps, Notifications, Game, and Danger.',
      'Build, Trader, Raid log and Trophies fold away too. Each one tells you what is inside without opening it - how much scrap you have, how many rooms, how many trophies.',
@@ -1844,6 +1954,11 @@ function renderOnline(){
       wl.textContent=last?('Last week: '+fmt(last.steps)+' steps, '+fmt(last.kills)+' walkers, '+fmt(last.places)+' places.')
         :'Your first weekly recap lands when this week ends.';}
     nemCard();}catch(e){}
+  try{const dm=dayMod();const dc=$('#dayModCard');
+    if(dc)dc.innerHTML='<h2>Today on the road <span class="sub">'+esc(dm.n)+'</span></h2>'
+      +'<p class="help" style="margin-top:4px">'+esc(dm.d)+'</p>'
+      +(vetRank()?'<p class="help" style="margin-top:6px;color:var(--amber)">'+esc(vetTitle())+' · '+fmt(S.steps.total)+' lifetime steps · '+esc(district().n)+'</p>':'');
+    renderConvoy();}catch(e){}
   renderStepHist();
   const sHelp=$('#stepsHelp');
   if(sHelp){
