@@ -226,7 +226,7 @@ async function openRaid(poiId){
   const r=raidAt(p);if(!r){toast('Nothing here now');return;}
   RAID_STATE=null;raidSheet(r);
   await raidSync(r,0);                       // read the shared bar without hitting it
-  if($('#modal').classList.contains('on'))raidSheet(r);
+  if(!C&&!S.combat&&$('#modal').classList.contains('on'))raidSheet(r);
 }
 // Sending the call. The invite rides on the board every client already polls,
 // so nobody has to paste a link and no new database table was needed.
@@ -270,8 +270,15 @@ function openCall(i){
     +(left>0?'<button class="btn r" onclick="openCallGo('+i+')">Join · 1 flare</button>'
             :'<button class="btn" disabled>No flares left</button>')
     +'</div>',true);
-  raidSync(r,0).then(()=>{if($('#modal').classList.contains('on'))openCall(i);}).catch(()=>{});
+  const mark='call-'+r.id+'-'+Date.now();SHEET_MARK=mark;
+  raidSync(r,0).then(()=>{
+    if(C||S.combat)return;                     // a fight started; never draw over it
+    if(SHEET_MARK!==mark)return;               // she moved on, or a newer sheet is up
+    if(!$('#modal').classList.contains('on'))return;
+    SHEET_MARK='';openCall(i);                 // redraw once, with the health bar filled in
+  }).catch(()=>{});
 }
+let SHEET_MARK='';
 function openCallGo(i){
   const c=raidCalls()[i];if(!c)return;
   joinRemote(Object.assign({},c.call,{T:RAID_TIERS[c.call.tier-1]}));
@@ -298,6 +305,7 @@ async function enterRaid(r,remote){
   // out at "no weapon equipped" and the raid never happens - so the flare is
   // not spent until the fight actually starts, below.
   if(remote&&flaresLeft()<=0){toast('Out of flares until tomorrow','d');return;}
+  SHEET_MARK='';                              // cancel any sheet refresh still in flight
   closeSheet();
   gearCheck(()=>{
     if(remote&&!spendFlare()){toast('Out of flares until tomorrow','d');return;}

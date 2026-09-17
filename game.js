@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.30';
+const VERSION='6.31';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -226,6 +226,10 @@ function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossK
   // equipped" burned it. Hand today's back, once, to anyone upgrading.
   if(S.flareFix!==1){S.flareFix=1;S.flares.used=0;}
   if(!S.checkin)S.checkin={date:'',n:0};if(!S.ladder)S.ladder={date:'',hit:[]};
+  // S.combat is saved; C is memory only. A fight whose screen never drew leaves
+  // a battle that can never end - every raid and every doorway answers "Finish
+  // what you are doing first" with nothing to finish.
+  if(S.combat&&!C)S.combat=false;
   if(S.flare&&S.flare.endsAt<=Date.now())S.flare=null;}
 function migrate(o){
   if(!o)return null;if(o.v===3)return o;
@@ -1211,6 +1215,17 @@ function renderLadder(){
     +'</div>'
     +'<p class="help" style="margin-top:6px">'+(next?fmt(Math.max(0,next.s-today))+' more steps for '+esc(next.n)+'.':'Every reward collected today. Come back tomorrow.')+' Resets at midnight with your step count.</p>';
 }
+// liveRaidAfter ALWAYS clears S.raidCur, win or lose. So a raidCur still sitting
+// there when the game boots is a raid that started and never finished - the app
+// was closed, or its screen never drew. She paid a flare for that. Give it back.
+function recoverStuckRaid(){
+  const cur=S&&S.raidCur;if(!cur)return;
+  S.raidCur=null;S.combat=false;
+  if(cur.remote&&S.flares&&S.flares.used>0){
+    S.flares.used--;
+    setTimeout(()=>{if(S.onboarded){log('A raid you joined never finished. Your flare is back.');toast('Flare refunded','a');}},600);
+  }
+}
 function checkMilestones(){
   const top=unlockedDistrict();
   for(let i=1;i<=top;i++){
@@ -1703,7 +1718,7 @@ async function pullSteps(){
   save();if(typeof C==='undefined'||!C)render();else renderOnline();
 }
 let friends=[];
-async function loadFriends(){const o=O();if(!o.ok)return;try{rollWeek();friends=(await rpc('get_board',{p_week:S.league.week}))||[];o.err='';}catch(e){o.err=e.message;}renderFriends();}
+async function loadFriends(){const o=O();if(!o.ok)return;try{rollWeek();const fr=await rpc('get_board',{p_week:S.league.week});friends=Array.isArray(fr)?fr:[];o.err='';}catch(e){o.err=e.message;}renderFriends();}
 async function testOnline(){const o=O();$('#onlineStatus').textContent='testing...';try{const t0=Date.now();await rpc('get_board',{p_week:S.league.week});o.err='';toast('Server answered in '+(Date.now()-t0)+' ms','z');}catch(e){o.err=e.message;toast('No answer: '+e.message,'d');}save();renderOnline();}
 /* party: shared weekly contract + shared Wanted boss */
 const PARTY_GOALS=[{t:'steps',goal:60000},{t:'places',goal:20},{t:'kills',goal:50},{t:'boss',goal:600}];
@@ -2153,6 +2168,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.31',d:'Sep 17',t:'The raid that took your flare and never started',
+  i:['Joining a raid call could take the flare, start the fight in the background, and never draw the fight on your screen - leaving you stuck on "finish what you are doing first" with nothing to finish.',
+     'The cause was the raid call sheet refreshing itself when the server answered. On a slow connection that answer landed AFTER the fight had begun and painted the old screen back over it, again and again.',
+     'IF THIS HAPPENED TO YOU, YOUR FLARE COMES BACK on your next open. A raid that never finished is now always detected and refunded.',
+     'A fight can also no longer get stuck across an app restart.']},
  {v:'6.30',d:'Sep 17',t:'Daily check-in and a reward ladder for today\'s steps',
   i:['DAILY CHECK-IN. Open the game, tap once, get something. Seven days in the cycle: scrap, food and water, a chest key, meds, ammo, and a bigger day seven, then it loops.',
      'MISSING A DAY DOES NOT RESET IT. Your streak already punishes a missed day and you work six days a week. The check-in just picks up where it left off.',
@@ -2747,7 +2767,7 @@ function whileYouWereOut(){
   openSheet(`<h2>While you were out</h2><p class="help">${hrs} hours away · ${esc(w)}</p><ul class="journal" style="margin:8px 0 12px">${items.length?items.map(m=>`<li><span>${esc(m)}</span></li>`).join(''):'<li><span>Quiet night. Nothing came over the fence.</span></li>'}</ul><p>${ct?ct+' contract'+(ct>1?'s':'')+' open today. ':''}${S.raidPending?'Raiders are expected today at '+S.raidPending.hour+':00. ':''}${S.base?hordeCountdown()+' ':''}The Wanted boss this week is ${esc(bossName())}.</p><button class="btn r wide" onclick="closeSheet()">Back to the road</button>`);
 }
 function start(){
-  S=load()||fresh();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
+  S=load()||fresh();recoverStuckRaid();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
   wire();render();fetchWeather();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
   if(!S.onboarded){identBoot().then(found=>{if(!found)onboard();});}else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else{whileYouWereOut();newsCheck();recapCheck();}autoSyncFromUrl();}
