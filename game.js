@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.47';
+const VERSION='6.48';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2722,6 +2722,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.48',d:'Sep 17',t:'Facial hair',
+  i:['SEVEN FACIAL HAIR STYLES - stubble, moustache, goatee, mutton chops, boxed beard, full beard, or clean shaven. Your look, under Hair colour.',
+     'Facial hair follows your hair colour by default, and there is a colour row if you want it to differ.',
+     'Requested by one of your friends.']},
  {v:'6.47',d:'Sep 17',t:'The map is cute now',
   i:['A BLOOM MAP SKIN, and it is the new default. Warm daylight instead of the cold inverted night map, soft cream streets, and chunky rounded pins in white with a proper drop shadow so they sit ON the world instead of floating over it.',
      'Your character stands on a little shadow puddle, and the pins breathe with a slow bob. Reduced-motion settings are respected.',
@@ -3302,13 +3306,21 @@ function lookSheet(onDone){
     <div class="section-label">Skin</div><div class="opts" style="margin:6px 0 10px">${sw(ART.SKINS,av.skin,'skin')}</div>
     <div class="section-label">Hair <span class="help">more in the Boutique</span></div><div class="opts" style="margin:6px 0 10px">${opt(ART.HAIR_STYLES.concat(Object.keys(ART.HAIR_SHOP).filter(k=>own('hair',k))),av.hair,'hair',v=>(ART.HAIR_SHOP[v]||{}).n||v)}</div>
     <div class="section-label">Hair color</div><div class="opts" style="margin:6px 0 10px">${sw(ART.HAIR_COLORS,av.hairColor,'hairColor')}</div>
+    <div class="section-label">Facial hair</div><div class="opts" style="margin:6px 0 10px">${Object.entries(ART.BEARDS).map(([k,n])=>`<button class="${(av.beard||'')===k?'on':''}" data-set="beard" data-v="${k}">${n}</button>`).join('')}</div>
+    ${av.beard?`<div class="section-label">Facial hair color</div><div class="opts" style="margin:6px 0 10px"><button class="${av.beardColor===undefined?'on':''}" data-set="beardColor" data-v="">Same as hair</button>${sw(ART.HAIR_COLORS,av.beardColor,'beardColor')}</div>`:''}
     <div class="section-label">Eyes</div><div class="opts" style="margin:6px 0 10px">${opt(ART.EYES.concat(Object.keys(ART.EYES_SHOP).filter(k=>own('eyes',k))),av.eyes,'eyes',v=>(ART.EYES_SHOP[v]||{}).n||v)}</div>
     <div class="section-label">Hoodie color</div><div class="opts" style="margin:6px 0 10px">${sw(ART.TOP_COLORS,av.topColor,'topColor')}</div>
     <div class="section-label">Outfit <span class="help">found in the world or bought with steps</span></div><div class="opts" style="margin:6px 0 10px">${tops.map(([k,v])=>`<button class="${av.top===k?'on':''}${k!=='hoodie'&&!own('top',k)?' locked':''}" data-set="top" data-v="${k}"><span class="rc-${v.r}">${v.n}</span></button>`).join('')}</div>
     <div class="section-label">Hat</div><div class="opts" style="margin:6px 0 10px">${hats.map(([k,v])=>`<button class="${(av.hat||'')===k?'on':''}${k&&!own('hat',k)?' locked':''}" data-set="hat" data-v="${k}"><span class="rc-${v.r}">${v.n}</span></button>`).join('')}</div>
     <div class="section-label">Accessory</div><div class="opts" style="margin:6px 0 10px">${accs.map(([k,v])=>`<button class="${(av.acc||'')===k?'on':''}${k&&!own('acc',k)?' locked':''}" data-set="acc" data-v="${k}"><span class="rc-${v.r}">${v.n}</span></button>`).join('')}</div>
     <div class="grid2"><button class="btn" id="lookRandom">Random</button><button class="btn r" id="lookDone">Done</button></div>`;
-    $('#sheet').querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{const set=b.dataset.set;let v=b.dataset.v;if(['skin','hairColor','topColor'].includes(set))v=+v;if(b.classList.contains('locked')){toast('Find it in the world first');return;}av[set]=v;SFX.play('ui');draw();});
+    $('#sheet').querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{const set=b.dataset.set;let v=b.dataset.v;
+      if(b.classList.contains('locked')){toast('Find it in the world first');return;}
+      // "Same as hair" is the ABSENCE of a beard colour, not colour zero - +'' is 0,
+      // which would silently pin the beard to the first swatch.
+      if(set==='beardColor'&&v===''){delete av.beardColor;SFX.play('ui');draw();return;}
+      if(['skin','hairColor','topColor','beardColor'].includes(set))v=+v;
+      av[set]=v;SFX.play('ui');draw();});
     $('#lookRandom').onclick=()=>{Object.assign(av,ART.randomAv());draw();};
     $('#lookDone').onclick=()=>{save();closeSheet();render();pushPlayer();if(onDone)onDone();};
   };

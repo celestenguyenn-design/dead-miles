@@ -75,6 +75,48 @@ function eyes(style,mood){
   if(style==='sparkle')return `<ellipse cx="${L}" cy="${Y}" rx="9.5" ry="11.5" fill="#fff"/><ellipse cx="${R}" cy="${Y}" rx="9.5" ry="11.5" fill="#fff"/><ellipse cx="${L+0.5}" cy="${Y+1}" rx="7" ry="9" fill="#3a5aa8"/><ellipse cx="${R-0.5}" cy="${Y+1}" rx="7" ry="9" fill="#3a5aa8"/><ellipse cx="${L+0.5}" cy="${Y+3}" rx="4" ry="5.5" fill="#1a1020"/><ellipse cx="${R-0.5}" cy="${Y+3}" rx="4" ry="5.5" fill="#1a1020"/><circle cx="${L-3}" cy="${Y-4}" r="3.2" fill="#fff"/><circle cx="${R-3}" cy="${Y-4}" r="3.2" fill="#fff"/><circle cx="${L+4}" cy="${Y+5}" r="1.6" fill="#fff"/><circle cx="${R+4}" cy="${Y+5}" r="1.6" fill="#fff"/>`+lash;
   return `<ellipse cx="${L}" cy="${Y}" rx="9" ry="11" fill="#fff"/><ellipse cx="${R}" cy="${Y}" rx="9" ry="11" fill="#fff"/><ellipse cx="${L+0.5}" cy="${Y+1}" rx="6" ry="8.5" fill="#2a1a14"/><ellipse cx="${R-0.5}" cy="${Y+1}" rx="6" ry="8.5" fill="#2a1a14"/><circle cx="${L-2.5}" cy="${Y-3}" r="2.6" fill="#fff"/><circle cx="${R-2.5}" cy="${Y-3}" r="2.6" fill="#fff"/><circle cx="${L+3}" cy="${Y+4}" r="1.3" fill="#fff"/><circle cx="${R+3}" cy="${Y+4}" r="1.3" fill="#fff"/>`+lash;
 }
+/* Facial hair. Requested by one of her friends, and the avatar had no way to
+   read as masculine at all beyond a buzz cut - every option was hair, eyes and
+   clothes. The head is an ellipse at cx50 cy49 rx31.5 ry30, so the face runs
+   x18.5-81.5 and y19-79 and every shape below is drawn to that jaw. It renders
+   under the mouth, so lips still show through a full beard. */
+const BEARDS={'':'Clean shaven',stubble:'Stubble',moustache:'Moustache',goatee:'Goatee',
+  chops:'Mutton chops',boxed:'Boxed beard',full:'Full beard'};
+const BEARD_KEYS=Object.keys(BEARDS);
+function beard(kind,c){
+  if(!kind||!BEARDS[kind])return '';
+  const jaw='M21 55 q1 25 29 25 q28 0 29 -25';
+  // Geometry notes, learned the hard way by rendering a contact sheet:
+  // the eyes run x32-68 / y50-60 and the mouth is y69-74. Anything narrower
+  // than the eye span sitting at y62 reads as a NOSE, not a moustache, because
+  // it lands in the gap between two huge chibi eyes. A moustache has to be
+  // WIDER than the eyes and finish above 69, or it swallows the mouth.
+  const mo='M31 61 q19 -6 38 0 q-2 8 -9 7 q-5 -1 -10 -2 q-5 1 -10 2 q-7 1 -9 -7z';
+  switch(kind){
+    case 'stubble':
+      return `<path d="${jaw} q-5 14 -29 14 q-24 0 -29 -14z" fill="${c}" opacity=".38"/>`;
+    case 'moustache':
+      return `<path d="${mo}" fill="${c}"/>`;
+    case 'goatee':
+      // Chin patch stays ON the chin (jaw bottoms out at y79) - any lower and
+      // it dangles onto the neck like a goat's actual beard.
+      return `<path d="M36 62 q14 -5 28 0 q-2 7 -8 6 q-6 -1 -6 -1 q0 0 -6 1 q-6 1 -8 -6z" fill="${c}"/>`
+        +`<path d="M43 71 q7 -3 14 0 q-1 7 -7 8 q-6 -1 -7 -8z" fill="${c}"/>`;
+    case 'chops':
+      // Sideburns: start at the hairline, hug the head curve down to the jaw,
+      // and widen onto the CHEEK as they go. Hugging the edge only, they
+      // disappear under the fringe; as a thin spike they read as fangs.
+      return `<path d="M22 44 q0 18 8 30 q8 2 12 -3 q-10 -6 -14 -15 q-4 -7 -6 -12z" fill="${c}"/>`
+        +`<path d="M78 44 q0 18 -8 30 q-8 2 -12 -3 q10 -6 14 -15 q4 -7 6 -12z" fill="${c}"/>`;
+    case 'boxed':
+      return `<path d="${jaw} q-4 11 -13 14 v-9 q-16 5 -32 0 v9 q-9 -3 -13 -14z" fill="${c}"/>`
+        +`<path d="${mo}" fill="${c}"/>`;
+    case 'full':
+      return `<path d="M20 50 q0 22 8 32 q6 8 22 8 q16 0 22 -8 q8 -10 8 -32 q-4 16 -12 20 v-6 q-18 7 -36 0 v6 q-8 -4 -12 -20z" fill="${c}"/>`
+        +`<path d="${mo}" fill="${c}"/>`;
+  }
+  return '';
+}
 function mouth(mood){
   if(mood==='dead')return `<path d="M42 72 q8 -5 16 0" stroke="#1a1020" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M45 68 l3 7 M52 68 l3 7" stroke="#1a1020" stroke-width="2"/>`;
   if(mood==='scream')return `<ellipse cx="50" cy="73" rx="7" ry="8" fill="#3a0a10"/><path d="M45 68 h10" stroke="#fff" stroke-width="2"/>`;
@@ -295,6 +337,7 @@ function avatarSVG(av,size,opts){
   ${hooded?'':(o?`<g ${o}>${hairBack(style,hc)}</g>`:hairBack(style,hc))}
   ${bp.back}
   ${bp.head}
+  ${av.beard?beard(av.beard,HAIR_COLORS[av.beardColor===undefined?(av.hairColor||0):av.beardColor]||hc):''}
   ${eyes(av.eyes||'round',mood)}
   ${mouth(mood)}
   ${hooded?`<clipPath id="fh${uid}"><ellipse cx="50" cy="49" rx="31.5" ry="30"/></clipPath><g clip-path="url(#fh${uid})">${hairFront(style,hc)}</g>`
@@ -409,6 +452,6 @@ function petSVG(kind,size,coat,opts){
 }
 const imgCache=new Map();
 function spriteImg(svg){let i=imgCache.get(svg);if(i)return i;i=new Image();i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);imgCache.set(svg,i);if(imgCache.size>60){const k=imgCache.keys().next().value;imgCache.delete(k);}return i;}
-function randomAv(){return {skin:Math.floor(Math.random()*SKINS.length),hair:HAIR_STYLES[Math.floor(Math.random()*HAIR_STYLES.length)],hairColor:Math.floor(Math.random()*HAIR_COLORS.length),eyes:EYES[Math.floor(Math.random()*EYES.length)],top:'hoodie',topColor:Math.floor(Math.random()*TOP_COLORS.length),hat:'',acc:''};}
-return {gachaSVG,BUILDS,setBuild,SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,CAT_COATS,DOG_COATS,randomCoat,coatInfo,avatarSVG,setStyle,bodyParts,zombieSVG,petSVG,spriteImg,randomAv};
+function randomAv(){return {skin:Math.floor(Math.random()*SKINS.length),hair:HAIR_STYLES[Math.floor(Math.random()*HAIR_STYLES.length)],hairColor:Math.floor(Math.random()*HAIR_COLORS.length),eyes:EYES[Math.floor(Math.random()*EYES.length)],top:'hoodie',topColor:Math.floor(Math.random()*TOP_COLORS.length),hat:'',acc:'',beard:Math.random()<0.28?BEARD_KEYS[1+Math.floor(Math.random()*(BEARD_KEYS.length-1))]:''};}
+return {gachaSVG,BEARDS,BEARD_KEYS,beard,BUILDS,setBuild,SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,CAT_COATS,DOG_COATS,randomCoat,coatInfo,avatarSVG,setStyle,bodyParts,zombieSVG,petSVG,spriteImg,randomAv};
 })();
