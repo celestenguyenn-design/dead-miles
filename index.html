@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=6.44">
+<link rel="stylesheet" href="style.css?v=6.45">
 </head>
 <body>
 <div id="app">
@@ -57,6 +57,7 @@
         <button class="btn sm wide" style="margin-top:10px" onclick="syncDoctor()">Why aren't my steps syncing?</button>
         <p class="help" style="margin-top:8px" id="stepsHelp">Go online in Settings and set up the phone shortcut once: your Health steps then land here on their own.</p>
       </div>
+      <div class="card blood" id="infectCard" hidden></div>
       <div class="card steel">
         <h2>Water <span class="sub" id="hydroSub"></span></h2>
         <div class="progress" style="margin-top:8px"><div class="bar"><i id="hydroBar"></i></div><div class="row"><span id="hydroLeft"></span><span id="hydroRight" style="color:#ff8a92"></span></div></div>
@@ -180,8 +181,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=6.44"></script>
-<script src="street.js?v=6.44"></script>
-<script src="game.js?v=6.44"></script>
+<script src="art.js?v=6.45"></script>
+<script src="street.js?v=6.45"></script>
+<script src="game.js?v=6.45"></script>
 </body>
 </html>

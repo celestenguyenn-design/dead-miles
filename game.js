@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.44';
+const VERSION='6.45';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -227,7 +227,7 @@ const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic co
 
 /* ================= state ================= */
 let S=null;
-function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},checkin:{date:'',n:0},ladder:{date:'',hit:[]},
+function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},infect:null,checkin:{date:'',n:0},ladder:{date:'',hit:[]},
   steps:{total:0,today:0,date:todayStr(),lastSync:0,lastSyncDate:''},
   walk:{toNext:0,dist:500,district:0,houses:0,progress:0,banked:0},
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
@@ -241,7 +241,7 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
 function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
-  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.parts===undefined)S.parts=0;if(S.buff===undefined)S.buff=null;
+  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.parts===undefined)S.parts=0;if(S.buff===undefined)S.buff=null;
   // A temper can lower a weapon's ceiling, so never let a stored durability
   // sit above it - that renders as "9 / 7" and repairs would read as free.
   for(const g of (S.gear||[])){
@@ -502,7 +502,7 @@ const SFX={ctx:null,
 
 /* ================= player ================= */
 function sk(id){return S.skills[id]||0;}
-const maxHp=()=>Math.max(50,Math.round(hydroHpMult()*(100+(S.lvl-1)*10+sk('tough')*10+sk('thickskin')*8+sk('survivalist')*5+(bg('firefighter')?10:0)-(bg('gamer')?10:0))));
+const maxHp=()=>Math.max(30,Math.round(hydroHpMult()*(1-infectPenalty())*(100+(S.lvl-1)*10+sk('tough')*10+sk('thickskin')*8+sk('survivalist')*5+(bg('firefighter')?10:0)-(bg('gamer')?10:0))));
 const eqItem=(slot)=>S.eq[slot]?S.gear.find(g=>g.uid===S.eq[slot]):null;
 const dr=()=>(eqItem('armor')?eqItem('armor').dr:0)+(eqItem('head')?eqItem('head').dr:0);
 const capacity=()=>10+(eqItem('bag')?eqItem('bag').cap:0)+(roleLvl('quartermaster')?3+roleLvl('quartermaster'):0)+sk('deeppockets')*2+sk('packrat')*2;
@@ -554,6 +554,39 @@ function useSnack(uidv){
   if(k.hyd)S.hydro=Math.max(0,Math.min(100,(S.hydro===undefined?100:S.hydro)+k.hyd));
   log('You eat the '+k.n.toLowerCase()+'. '+k.d);
   toast(k.n+' · +'+k.hp+' HP','z');SFX.play('ui');save();render();
+}
+/* ================= INFECTION (v6.45) =================
+   Measured: at level 8+ an ordinary fight costs 0-11% of your health, so the
+   road is scenery. The answer is not fatter walkers - it is that a bite should
+   MEAN something. This is the one mechanic the genre is built on and the game
+   did not have.
+
+   Infection does not kill you outright. It takes your CEILING away: maximum
+   health drops, drops further every day you leave it, and burns through you as
+   you walk. Antibiotics cure it, and antibiotics are rare - which turns "I found
+   loot" into "I found the RIGHT loot". */
+const INFECT_CHANCE=0.02, INFECT_PER_STEPS=400;
+function infect(){return (typeof S!=='undefined'&&S&&S.infect)||null;}
+function infectStage(){const f=infect();if(!f)return 0;
+  return Math.min(3,1+Math.max(0,Math.floor((Date.now()-f.at)/86400000)));}
+function infectPenalty(){return [0,0.15,0.25,0.35][infectStage()]||0;}
+function infectLabel(){return ['','Infected','Fevered','Failing'][infectStage()]||'';}
+function catchInfection(from){
+  if(infect())return;
+  if(sk('ironjaw')&&Math.random()<0.25)return;
+  S.infect={at:Date.now(),from:from||'a bite'};
+  clog('That one broke the skin. It is going to fester.','hit');
+  log('You were bitten. Infection is setting in - your maximum health falls until you find antibiotics.');
+  toast('INFECTED. Find antibiotics.','d');SFX.play('nemesis');
+}
+function cureInfection(){
+  if(!infect()){toast('You are not infected');return;}
+  const inPack=S.pack.find(x=>x.id==='abx');
+  if(!inPack&&S.stock.meds<4){toast('Antibiotics, or four meds from the stash, will clear it','d');return;}
+  if(inPack)S.pack=S.pack.filter(x=>x!==inPack); else S.stock.meds-=4;
+  S.infect=null;S.infectStep=0;S.hp=Math.min(maxHp(),S.hp);
+  log('The fever breaks. '+(inPack?'The antibiotics did it.':'Four doses and a bad night, but it did it.'));
+  toast('Infection cleared','z');SFX.play('legend');save();render();
 }
 function hydroState(){const h=S.hydro===undefined?100:S.hydro;return h>=60?'ok':h>=30?'thirsty':h>0?'parched':'empty';}
 function hydroDmg(){const s=hydroState();return s==='ok'?1:s==='thirsty'?0.9:0.8;}
@@ -691,7 +724,7 @@ function encounterFor(loc){
   return out;
 }
 function strongholdStage(st){if(st===1)return [mk('raider'),mk('raider')];if(st===2)return [mk('raider'),mk('gunner'),mk('raider')];const b=mk('boss');b.n=bossName();b.hp=Math.round(b.hp*1.5);b.max=b.hp;b.wanted=true;b.g=BOSS_GIMMICK[b.n]||'crit';if(b.g==='shield')b.shield=30;if(b.g==='dodgy'){b.dodge=0.45;b.hp=Math.round(b.hp*0.7);b.max=b.hp;}if(b.g==='slow'){b.dmg=b.dmg.map(x=>Math.round(x*1.4));}return [mk('gunner'),b];}
-function mk(k){const e=ENEMIES[k];const scale=1+S.walk.district*0.12+S.league.tier*0.06+Math.max(0,S.lvl-5)*0.04;return {k,n:e.n,hp:Math.round(e.hp*scale),max:Math.round(e.hp*scale),dmg:e.dmg.map(x=>Math.round(x*scale)),hit:e.hit+(isNight()?0.04:0),xp:e.xp,dodge:e.dodge||0,fast:!!e.fast,burst:e.burst||0,scream:e.scream||0,human:!!e.human,boss:!!e.boss,dead:false,stun:0};}
+function mk(k){const e=ENEMIES[k];const scale=1+S.walk.district*0.12+S.league.tier*0.06+Math.max(0,S.lvl-5)*0.075;return {k,n:e.n,hp:Math.round(e.hp*scale),max:Math.round(e.hp*scale),dmg:e.dmg.map(x=>Math.round(x*scale)),hit:e.hit+(isNight()?0.04:0),xp:e.xp,dodge:e.dodge||0,fast:!!e.fast,burst:e.burst||0,scream:e.scream||0,human:!!e.human,boss:!!e.boss,dead:false,stun:0};}
 
 /* ================= steps ================= */
 const WATCH_JOBS={
@@ -1357,6 +1390,8 @@ function addSteps(n,src){
   // counted+manual===today invariant survives.
   if(src==='live'){const r=syncReads();r.counted=(r.counted||0)+n;}
   if(src==='demo'){const r=syncReads();r.manual=(r.manual||0)+n;}
+  if(src!=='carry'&&infect()){S.infectStep=(S.infectStep||0)+n;
+    while(S.infectStep>=INFECT_PER_STEPS){S.infectStep-=INFECT_PER_STEPS;S.hp=Math.max(1,S.hp-1-infectStage());}}
   if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(Math.max(3,Math.round(6*thirstMult())));}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip'||src==='clipboard'||src==='shortcut')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);checkLadder();if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
   if(src!=='carry'&&S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');streakReward();}
   if(S.loc||S.combat){S.walk.banked=(S.walk.banked||0)+n;if(src!=='carry'&&src!=='live')toast('+'+fmt(n)+' steps saved for after this stop','z');save();render();return;}
@@ -1624,6 +1659,7 @@ function enemyPhase(){
     const swings=(e.fast&&C.turn%2===0?2:1)+(frenzied?1:0);
     for(let i=0;i<swings;i++){if(Math.random()<e.hit-sk('adrenaline')*0.06-(e.human?sk('intimidate')*0.08:0)){let d=rint(e.dmg[0],e.dmg[1]);if(e.g==='crit'&&Math.random()<0.2){d*=2;clog('A brutal swing.','hit');}
       const guards=activeCrew();if(guards.length&&Math.random()<0.3){const gc=pick(guards);clog(e.n+' turns on '+gc.name+'.','hit');hurtCrew(gc,Math.max(1,d-2));continue;}
+      if(!e.human&&Math.random()<INFECT_CHANCE)catchInfection(e.n);
       hurt(d,e.n);
         if(e.g==='bleed'){C.bleed=Math.max(1,3-sk('clotting'));}if(e.g==='poison'){C.poison=Math.max(1,3-sk('clotting'));}
         if(e.g==='steal'&&S.pack.length&&Math.random()<0.3){const it=S.pack.splice(rint(0,S.pack.length-1),1)[0];clog(e.n+' lifts your '+it.n+' mid-swing.','hit');}}
@@ -1644,6 +1680,11 @@ function death(){
   // Only ordinary gear can be taken off you. An epic or legendary survives a
   // death the same way it survives breaking - anything else makes one bad fight
   // cost the rarest thing you own.
+  // Death took your pack and one ordinary weapon and left the stash, keys,
+  // parts, level and banked steps untouched - about one trip's worth. A fifth of
+  // the scrap pile stings without undoing a week.
+  const scrapLost=Math.round((S.stock.scrap||0)*0.2);
+  if(scrapLost>0){S.stock.scrap-=scrapLost;log('They went through the stash while you were down: -'+scrapLost+' scrap.');}
   const losable=S.gear.map((g,i)=>({g,i})).filter(x=>x.g.r!=='epic'&&x.g.r!=='legendary');
   let gearLost=null;
   if(losable.length&&Math.random()<0.5){const pick=losable[rint(0,losable.length-1)];
@@ -2463,6 +2504,18 @@ function render(){
   $('#pright').innerHTML='Run <b>x'+runMult().toFixed(1)+'</b> · Pack <b>'+fmt(packPts())+'</b> pts';
   $('#syncHint').textContent=S.steps.lastSyncDate===S.steps.date&&S.steps.lastSync?'synced at '+fmt(S.steps.lastSync):'';
   renderLoc();renderRaidCard();renderContracts();
+  try{const ic=$('#infectCard');if(ic){
+    const f=infect();
+    if(!f)ic.hidden=true;
+    else{ic.hidden=false;
+      const st=infectStage(),abx=S.pack.some(x=>x.id==='abx');
+      ic.innerHTML='<h2 style="color:#ff8a92">'+esc(infectLabel())+' <span class="sub">stage '+st+' of 3</span></h2>'
+        +'<p>A bite broke the skin'+(f.from?' ('+esc(f.from)+')':'')+'. Your maximum health is down <b>'+Math.round(infectPenalty()*100)+'%</b>, and you lose health as you walk.</p>'
+        +'<p class="help">It gets worse every day you leave it: 15% today, 25% tomorrow, 35% after that.</p>'
+        +'<button class="btn r wide" style="margin-top:8px" onclick="cureInfection()">'
+          +(abx?'Take the antibiotics':S.stock.meds>=4?'Burn 4 meds on it':'Need antibiotics, or 4 meds')+'</button>'
+        +'<p class="help" style="margin-top:6px">Antibiotics turn up in pharmacies and clinics.</p>';}
+  }}catch(e){}
   const hs=hydroState();const hb=$('#hydroBar');if(hb){hb.style.width=Math.round(S.hydro||0)+'%';hb.style.background=hs==='ok'?'linear-gradient(90deg,#3a7ad6,#5fb3c9)':hs==='thirsty'?'linear-gradient(90deg,#c9a04a,#f5c842)':'linear-gradient(90deg,#8a2a2a,#e63e5c)';
     $('#hydroSub').textContent=hydroLabel();$('#hydroLeft').innerHTML='<b>'+Math.round(S.hydro||0)+'%</b> water · '+S.stock.water+' in the stash';$('#hydroRight').textContent=hs==='ok'?'':hs==='thirsty'?'-10% damage':'-20% damage, -15% max HP';$('#drinkBtn').disabled=S.stock.water<1||(S.hydro||0)>=100;}
   $('#goalSub').textContent='streak '+S.streak.days+' · best '+Math.max(S.streakBest||0,S.streak.days);const nsr=nextStreakReward();const sl=$('#streakLine');if(sl)sl.textContent=nsr?(nsr.d-S.streak.days)+' more day'+(nsr.d-S.streak.days===1?'':'s')+' in a row for '+nsr.n+'. Miss a day and the streak breaks (and a walker gets into the scrap).':'Every streak reward earned. Keep it alive.';(function(){const gb=$('#goalBar');gb.style.width=Math.min(100,S.steps.today/S.goal*100)+'%';
@@ -2621,6 +2674,13 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.45',d:'Sep 17',t:'INFECTION, and death that costs something',
+  i:['I measured the ordinary game the same way I measured raids. At level 8 and up, a walker costs you ZERO health and a raider costs eleven percent. The road had stopped being dangerous years before you noticed.',
+     'INFECTION. A bite from the dead can infect you - about 1 in 10 of a rough fight, never from a raider, they are not dead. It does not kill you outright. It takes your CEILING: maximum health down 15%, then 25% tomorrow, then 35%, and it bleeds you as you walk.',
+     'ANTIBIOTICS CURE IT, and antibiotics are rare - pharmacies and clinics. Four ordinary meds will do it too, grudgingly. So finding loot is no longer the same as finding the RIGHT loot.',
+     'DEATH COSTS SOMETHING NOW. It used to take your pack and one ordinary weapon and leave the stash, keys, parts, level and banked steps untouched - about one trip. It also takes a fifth of your scrap pile.',
+     'Enemies keep pace with you. Your health more than doubles from level 3 to 15 and theirs barely moved; they scale nearly twice as fast now.',
+     'Your legendaries are still safe from death, and your steps are never touched. Those two rules are not going anywhere.']},
  {v:'6.44',d:'Sep 17',t:'Raids fight back now',
   i:['You were right and it was worse than you thought. I simulated 300 fights per tier: a LEVEL 3 character with a machete and no armour beat a tier 5 raid 100% of the time. The old numbers looked fine because dying and respawning was being scored as a win.',
      'RAID BOSSES HAVE MECHANICS NOW, and they stack by tier. PLATED (tier 2+): 55% of your damage soaks into the plating until a HEAVY SWING cracks it open - the heavy swing is now the correct opening move, not a trap. ENRAGED (3+): hits 50% harder below half health. CALLER (4+): drags in another body every third round, up to two. FRENZY (5): acts twice a round below a third health.',
