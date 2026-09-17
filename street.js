@@ -198,6 +198,21 @@ async function raidSync(r,dmg){
   }catch(e){}
   return null;
 }
+// What a raid actually pays, spelled out before she spends anything on it.
+function raidPayout(tier,here){
+  const n=1+tier+(here?1:0);
+  const scrap=Math.round(6*tier*(here?1.5:1));
+  const keys=(tier>=4?2:1)+(here&&tier>=3?1:0);
+  const leg=tier>=4?Math.round((tier===5?50:22)*(here?1.4:1)):0;
+  return '<div class="kv" style="margin-top:8px">'
+    +'<span>If you win</span><b>'+n+' item'+(n===1?'':'s')+' · '+scrap+'🔩 · '+keys+' key'+(keys===1?'':'s')+' · '+(40*tier)+' XP</b>'
+    +(leg?'<span>Legendary chance</span><b style="color:var(--amber)">'+leg+'%</b>':'')
+    +'<span>Item quality</span><b>'+(tier>=3?'nothing common':'better than the street')+'</b>'
+    +'<span>If you lose</span><b>'+(4+tier*3)+'🔩 · '+(15*tier)+' XP for the damage you did</b></div>'
+    +'<p class="help" style="margin-top:6px">Your loot is your own - it does not split, and everyone hits the same health bar.'
+    +(here?' <b style="color:var(--rot)">You walked here, so this one pays the boots-on-the-ground bonus.</b>'
+          :' Walking to a raid yourself pays more than flaring in.')+'</p>';
+}
 function raidSheet(r){
   const near=raidNear(r);const mine=(S.raidsDone||{})[r.id];
   const left=Math.max(0,r.endsAt-Date.now());
@@ -211,7 +226,7 @@ function raidSheet(r){
     +(hp!==null?'<div class="progress" style="margin-top:8px"><div class="bar"><i style="width:'+Math.round(hp/max*100)+'%;background:linear-gradient(90deg,#8a2230,'+r.T.col+')"></i></div>'
         +'<div class="row"><span>'+fmt(hp)+' / '+fmt(max)+'</span><span>'+(dead?'down':'everyone hits the same one')+'</span></div></div>':'')
     +(RAID_STATE&&RAID_STATE.hits?'<p class="help" style="margin-top:6px">'+Object.keys(RAID_STATE.hits).length+' survivor'+(Object.keys(RAID_STATE.hits).length===1?'':'s')+' have hit it.</p>':'')
-    +'<p class="help" style="margin-top:8px">Tier '+r.tier+' drops '+(r.tier>=4?'a legendary chance and guaranteed rare gear':r.tier>=3?'guaranteed rare gear':'better than the street')+'. Your loot is your own - it does not split.</p>'
+    +raidPayout(r.tier,near)
     +'<div class="grid2" style="margin-top:10px">'
     +'<button class="btn ghost" onclick="shareRaid(\''+esc(r.poi)+'\')">Invite a friend</button>'
     +(mine?'<button class="btn" disabled>You fought this one</button>'
@@ -263,7 +278,7 @@ function openCall(i){
     +'<p class="help">'+esc(c.from)+' called you in.</p>'
     +'<p><b style="color:'+esc(r.T.col)+'">'+esc(r.boss)+'</b></p>'
     +'<p class="help">'+esc(r.n)+' · '+(mins>60?Math.floor(mins/60)+'h '+(mins%60)+'m':mins+' min')+' left · you fight it from here</p>'
-    +'<p class="help" style="margin-top:8px">Tier '+r.tier+' drops '+(r.tier>=4?'a legendary chance and guaranteed rare gear':r.tier>=3?'guaranteed rare gear':'better than the street')+'. Your loot is your own - it does not split. Everyone hits the same health bar.</p>'
+    +raidPayout(r.tier,false)
     +'<div class="kv" style="margin-top:8px"><span>Flares left today</span><b>'+left+' of '+flaresMax()+'</b><span>This seat costs</span><b>1 flare</b></div>'
     +'<div class="grid2" style="margin-top:10px">'
     +'<button class="btn ghost" onclick="closeSheet()">Not now</button>'
@@ -354,7 +369,8 @@ function liveRaidAfter(won){
   // Raid loot uses the game's own tables, just weighted hard toward gear and
   // rerolled for rarity - a tier 5 should feel like a tier 5 without inventing
   // a second item system that can drift from the first.
-  const got=[];const n=1+cur.tier;
+  const here=!cur.remote;                       // she physically walked to this one
+  const got=[];const n=1+cur.tier+(here?1:0);
   const pool=table(['meds','ammo','scrap','food','water'], 2, 4+cur.tier*3)
     .map(x=>({...x, w:x.w*rarW(x)*((RAR[x.r||'common'].w>=3)?(1+cur.tier*0.9):1)}));
   for(let i=0;i<n;i++){
@@ -367,10 +383,11 @@ function liveRaidAfter(won){
       : {id:it.id,n:it.n,e:it.e,pts:Math.round(it.pts*cur.loot),cat:it.cat,qty:it.qty,r:it.r};
     if(takeItem(packed,null))got.push(packed.n);
   }
-  if(cur.tier>=4&&Math.random()<(cur.tier===5?0.5:0.22)){dropLegendQuiet();got.push('a LEGENDARY');}
-  S.stock.scrap+=6*cur.tier;S.keys+=cur.tier>=4?2:1;addXp(40*cur.tier);
+  if(cur.tier>=4&&Math.random()<(cur.tier===5?0.5:0.22)*(here?1.4:1)){dropLegendQuiet();got.push('a LEGENDARY');}
+  const scrap=Math.round(6*cur.tier*(here?1.5:1));
+  S.stock.scrap+=scrap;S.keys+=(cur.tier>=4?2:1)+(here&&cur.tier>=3?1:0);addXp(40*cur.tier);
   ctEvent('kills',1);
-  log('Raid cleared: '+cur.n+' (tier '+cur.tier+'). +'+(6*cur.tier)+' scrap, +'+(cur.tier>=4?2:1)+' keys'+(got.length?', '+got.join(', '):'')+'.');
+  log('Raid cleared: '+cur.n+' (tier '+cur.tier+'). +'+scrap+' scrap, +'+((cur.tier>=4?2:1)+(here&&cur.tier>=3?1:0))+' keys, +'+(40*cur.tier)+' XP'+(got.length?', '+got.join(', '):'')+'.'+(here?' Walked-in bonus applied.':''));
   toast('Tier '+cur.tier+' raid cleared','l');SFX.play('legend');
   save();render();pushPlayer();
 }

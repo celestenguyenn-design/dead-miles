@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.32';
+const VERSION='6.33';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -207,7 +207,7 @@ const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic co
 
 /* ================= state ================= */
 let S=null;
-function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},checkin:{date:'',n:0},ladder:{date:'',hit:[]},
+function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,checkin:{date:'',n:0},ladder:{date:'',hit:[]},
   steps:{total:0,today:0,date:todayStr(),lastSync:0,lastSyncDate:''},
   walk:{toNext:0,dist:500,district:0,houses:0,progress:0,banked:0},
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
@@ -221,7 +221,10 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
 function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
-  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};
+  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(S.parts===undefined)S.parts=0;
+  // A temper can lower a weapon's ceiling, so never let a stored durability
+  // sit above it - that renders as "9 / 7" and repairs would read as free.
+  for(const g of (S.gear||[])){const mx=repairMax(g);if(mx&&g.dur>mx)g.dur=mx;}
   // v6.29 spent a flare before the gear check, so backing out of "no weapon
   // equipped" burned it. Hand today's back, once, to anyone upgrading.
   if(S.flareFix!==1){S.flareFix=1;S.flares.used=0;}
@@ -1323,7 +1326,7 @@ function swapSheet(){
     +'<div class="stack" style="margin-top:8px">'
     +opts.map(g=>'<button class="room2" onclick="doSwap(\''+g.uid+'\')"><div class="e">'+esc(g.e)+'</div>'
       +'<div class="t"><b class="rc-'+esc(g.r||'common')+'">'+esc(g.n)+'</b>'
-      +'<span>'+(g.dmg?g.dmg[0]+'-'+g.dmg[1]+' dmg · ':'')+(g.id==='oldreliable'?'never breaks':g.dur+' swing'+(g.dur===1?'':'s')+' left')+'</span></div></button>').join('')
+      +'<span>'+(g.dmg?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · ':'')+(temperOf(g)?esc(temperOf(g).n)+' · ':'')+(g.id==='oldreliable'?'never breaks':g.dur+' swing'+(g.dur===1?'':'s')+' left')+'</span></div></button>').join('')
     +'</div>'
     +'<button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet();renderCombat()">Never mind</button>',true);
 }
@@ -1355,19 +1358,22 @@ function act(kind){
   // "Fists" is the same swing with the weapon deliberately left out of it. She
   // asked for this so a legendary is not spent on a walker: less damage, but
   // nothing wears down.
-  if(kind==='attack'||kind==='fists'){const w=kind==='fists'?null:eqItem('melee');const dm=w?w.dmg:baseDmg();
+  if(kind==='attack'||kind==='fists'){const w=kind==='fists'?null:eqItem('melee');const dm=w?wDmg(w):baseDmg();
     if(Math.random()<t.dodge){clog(t.n+' sidesteps your swing.','');SFX.play('miss');}
     else if(Math.random()<0.9){let d=Math.round((rint(dm[0],dm[1])+(S.lvl-1)+(w?dmgBonus():0))*hydroDmg());dealTo(t,d,'You hit '+t.n+(w?' with the '+w.n:' bare-handed'),'slash');SFX.play('hit');
       if(w&&w.id==='lastword'&&Math.random()<0.3){t.stun=1;clog(t.n+' is knocked flat. It loses its next turn.','good');}
+      const tp=temperOf(w);
+      if(tp&&tp.twice&&Math.random()<tp.twice&&!t.dead&&t.hp>0){
+        const d2=Math.round(d*0.6);dealTo(t,d2,'The '+w.n+' comes back around','slash');clog('Vicious: a second cut.','good');}
       if(sk('cleave')&&Math.random()<sk('cleave')*0.2){const o=alive().find(e=>e!==t);if(o){dealTo(o,Math.round(d/2),'The swing carries into '+o.n);}}
       if(w&&!(Math.random()<sk('irongrip')*0.25)){w.dur--;if(w.dur<=0&&Math.random()<sk('juryrig')*0.2){w.dur=1;clog('You jury-rig the '+w.n+' back together.','good');}
         if(w.dur>0&&w.dur<=3)clog(w.n+': '+w.dur+' swing'+(w.dur===1?'':'s')+' left before it gives out.','hit');
         breakWeapon(w);}}
     else{clog('You miss.','');SFX.play('miss');}
   }
-  else if(kind==='heavy'){const w=eqItem('melee');if(!w){toast('Need a melee weapon');return;}
+  else if(kind==='heavy'){const w=eqItem('melee');if(!w){toast('Need a melee weapon');return;}const hd=wDmg(w);
     if(Math.random()<t.dodge+0.1){clog(t.n+' ducks the big swing.','');SFX.play('miss');}
-    else if(Math.random()<0.6+sk('bruiser')*0.12){const d=Math.round((rint(w.dmg[0],w.dmg[1])+dmgBonus())*1.6*hydroDmg())+(S.lvl-1);dealTo(t,d,'Heavy swing lands','heavy');SFX.play('hit');}
+    else if(Math.random()<0.6+sk('bruiser')*0.12){const d=Math.round((rint(hd[0],hd[1])+dmgBonus())*1.6*hydroDmg())+(S.lvl-1);dealTo(t,d,'Heavy swing lands','heavy');SFX.play('hit');}
     else{clog('The heavy swing goes wide.','');SFX.play('miss');}
     w.dur-=2;breakWeapon(w);
     if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+8);
@@ -1495,7 +1501,7 @@ function renderCombat(){
   <div class="pbox${phurt?' hurt':''}"><div class="sp${plunge?' lunge':''}">${ART.avatarSVG(S.av,60,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',mood:S.hp<maxHp()*0.3?'angry':''})}${flash?'<span class="muzzle">✳️</span>':''}</div><div><div class="hplab"><span>You · DR ${dr()}</span><span>${S.hp} / ${maxHp()}</span></div><div class="hpbar"><i style="width:${S.hp/maxHp()*100}%"></i></div></div>${phurt?`<span class="dmg">-${C.pfx.d}</span>`:''}</div>
   <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}${hit?`<span class="spark">${SPARK[e.fx.k||'slash']}</span>`:''}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
   <div class="acts">
-    <button class="btn r" onclick="attackGuard()">${w?w.e+' '+esc(w.n):'👊 Fists'}<small>${w?(w.dmg[0]+dmgBonus())+'-'+(w.dmg[1]+dmgBonus())+' · '+(w.id==='oldreliable'?'∞':w.dur)+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
+    <button class="btn r" onclick="attackGuard()">${w?w.e+' '+esc(w.n)+(temperOf(w)?' <span class="chip s">'+esc(temperOf(w).n)+'</span>':''):'👊 Fists'}<small>${w?(wDmg(w)[0]+dmgBonus())+'-'+(wDmg(w)[1]+dmgBonus())+' · '+(w.id==='oldreliable'?'∞':w.dur)+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
     <button class="btn" onclick="act('heavy')" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · ${60+sk('bruiser')*12}% hit · noisy</small></button>
     ${w?`<button class="btn" onclick="act('fists')">👊 Fists<small>${baseDmg()[0]}-${baseDmg()[1]} dmg · saves your ${esc(w.n)}</small></button>`:''}
     <button class="btn" onclick="swapSheet()">🔄 Switch weapon<small>${swapOptions().length} in your gear${w?' · costs your turn':' · free, hands empty'}</small></button>
@@ -1606,9 +1612,57 @@ function equip(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;
 
    The bench (armory or engineer) is a HALF-PRICE discount now instead of a
    gate, so building one still pays. */
+/* ================= THE WORKBENCH (v6.33) =================
+   Upgrading what she owns, NOT a sixth way to get new weapons - the gacha
+   already does acquisition, and a crafting bench that mints weapons would make
+   cranking pointless.
+
+   Her one condition was "don't make the game too easy", so the currency is
+   PARTS, and parts come from exactly one place: breaking down gear. No amount
+   of walking alone buys a +3 legendary. You have to feed gear to gear.
+
+   And a temper reroll is a GAMBLE, not a ladder. Crude is a real downgrade and
+   it is the most common result. Rerolling a good temper can genuinely cost you. */
+const PART_YIELD={common:1,uncommon:2,rare:4,epic:8,legendary:15};
+const PART_COST={common:[2,4,7],uncommon:[2,5,9],rare:[5,10,18],epic:[9,18,32],legendary:[10,20,36]};
+const TEMPERS={
+  crude:   {n:'Crude',    w:22, dmg:-0.10, dur:4,  d:'Ugly, but it lasts'},
+  balanced:{n:'Balanced', w:20, dmg:0.05,  dur:2,  d:'A little of both'},
+  sturdy:  {n:'Sturdy',   w:18, dmg:0,     dur:5,  d:'Takes a beating'},
+  keen:    {n:'Keen',     w:16, dmg:0.18,  dur:-2, d:'Sharper. Wears out faster'},
+  heavy:   {n:'Heavy',    w:12, dmg:0.12,  dur:0,  d:'Hits harder'},
+  vicious: {n:'Vicious',  w:8,  dmg:0.10,  dur:0, twice:0.12, d:'12% chance to strike twice'},
+  perfect: {n:'Perfect',  w:4,  dmg:0.25,  dur:3,  d:'Everything went right'},
+};
+const TEMPER_ORDER=['perfect','vicious','heavy','keen','sturdy','balanced','crude'];
+function temperOdds(){const t=Object.values(TEMPERS).reduce((a,b)=>a+b.w,0);
+  return TEMPER_ORDER.map(k=>[k,Math.round(TEMPERS[k].w/t*1000)/10]);}
+function temperOf(g){return (g&&g.temper&&TEMPERS[g.temper])||null;}
+// Effective numbers. The temper is never baked into g.dmg, because a reroll has
+// to be able to take it back off cleanly.
+function wDmg(g){
+  if(!g||!g.dmg)return null;
+  const t=temperOf(g);if(!t||!t.dmg)return g.dmg;
+  return [Math.max(1,Math.round(g.dmg[0]*(1+t.dmg))),Math.max(2,Math.round(g.dmg[1]*(1+t.dmg)))];
+}
+function partsHave(){return S.parts||0;}
+function partsFor(g,lvl){const tbl=PART_COST[g.r||'common']||PART_COST.common;return tbl[Math.min(2,lvl)]||0;}
+function upgradeParts(g){
+  let c=partsFor(g,(g.up||0));
+  if(S.base&&S.base.rooms.forge)c=Math.ceil(c*0.6);   // the forge is a discount now, not a gate
+  return Math.max(1,c);
+}
+function rerollScrap(g){return {common:8,uncommon:10,rare:16,epic:24,legendary:34}[g.r||'common'];}
+function rerollParts(g){let c={common:2,uncommon:3,rare:5,epic:8,legendary:12}[g.r||'common'];
+  if(S.base&&S.base.rooms.forge)c=Math.ceil(c*0.6);return Math.max(1,c);}
+function rollTemper(){const tot=Object.values(TEMPERS).reduce((a,b)=>a+b.w,0);let r=Math.random()*tot;
+  for(const k of Object.keys(TEMPERS)){r-=TEMPERS[k].w;if(r<=0)return k;}return 'balanced';}
+function benchable(g){return !!(g&&(g.dmg||g.dr!==undefined||g.cap));}
+
 const REPAIR_PER={common:1,uncommon:1,rare:2,epic:3,legendary:4};
 function atBench(){return !!((S.base&&S.base.rooms.armory)||roleLvl('engineer'));}
-function repairMax(g){return (GEAR[g.id]&&GEAR[g.id].dur)||0;}
+function repairMax(g){const base=(GEAR[g.id]&&GEAR[g.id].dur)||0;if(!base)return 0;
+  const t=temperOf(g);return Math.max(1,base+(t?t.dur:0));}
 function repairMissing(g){return Math.max(0,repairMax(g)-Math.max(0,g.dur||0));}
 function repairCost(g){
   const miss=repairMissing(g);if(!miss)return 0;
@@ -1644,12 +1698,85 @@ function salvageValue(g){const ws=S.base&&S.base.rooms.workshop||0;return Math.r
 function spareGear(){return S.gear.filter(g=>S.eq[g.slot]!==g.uid&&(g.r==='common'||g.r==='uncommon'||!g.r));}
 function salvage(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;const v=salvageValue(g);
   if(g.r==='legendary'||g.r==='epic'){if(!confirm('Break down your '+g.n+' ('+RAR[g.r].n+') for '+v+' scrap? It is gone for good.'))return;}
-  S.gear=S.gear.filter(x=>x.uid!==uidv);for(const k in S.eq)if(S.eq[k]===uidv)S.eq[k]=null;S.stock.scrap+=v;log('Salvaged the '+g.n+' for '+v+' scrap.');toast('+'+v+' scrap','a');SFX.play('chest');save();render();}
-function salvageAll(){const sp=spareGear();if(!sp.length)return;let v=0;for(const g of sp)v+=salvageValue(g);const ids=new Set(sp.map(g=>g.uid));S.gear=S.gear.filter(g=>!ids.has(g.uid));S.stock.scrap+=v;log('Salvaged '+sp.length+' spare pieces for '+v+' scrap.');toast('+'+v+' scrap','a');SFX.play('chest');save();render();}
+  const pp=PART_YIELD[g.r||'common']||1;
+  S.gear=S.gear.filter(x=>x.uid!==uidv);for(const k in S.eq)if(S.eq[k]===uidv)S.eq[k]=null;
+  S.stock.scrap+=v;S.parts=(S.parts||0)+pp;
+  log('Salvaged the '+g.n+' for '+v+' scrap and '+pp+' part'+(pp===1?'':'s')+'.');
+  toast('+'+v+' scrap · +'+pp+' parts','a');SFX.play('chest');save();render();}
+function salvageAll(){const sp=spareGear();if(!sp.length)return;let v=0,pp=0;
+  for(const g of sp){v+=salvageValue(g);pp+=PART_YIELD[g.r||'common']||1;}
+  const ids=new Set(sp.map(g=>g.uid));S.gear=S.gear.filter(g=>!ids.has(g.uid));
+  S.stock.scrap+=v;S.parts=(S.parts||0)+pp;
+  log('Salvaged '+sp.length+' spare pieces for '+v+' scrap and '+pp+' parts.');
+  toast('+'+v+' scrap · +'+pp+' parts','a');SFX.play('chest');save();render();}
 const UPG_COST=[10,20,35];
-function upgrade(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;if(!(S.base&&S.base.rooms.forge)){toast('Build a Forge first');return;}const up=g.up||0;if(up>=3){toast('Fully upgraded');return;}const c=UPG_COST[up];if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}
-  S.stock.scrap-=c;g.up=up+1;if(g.dmg){g.dmg=[g.dmg[0]+2,g.dmg[1]+2];}else if(g.dr!==undefined){g.dr+=1;}else if(g.cap){g.cap+=2;}
-  log('Forged the '+g.n+' to +'+g.up+'.');toast(g.n+' +'+g.up,'a');SFX.play('chest');save();render();}
+function upgrade(uidv){
+  const g=S.gear.find(x=>x.uid===uidv);if(!g||!benchable(g))return;
+  const up=g.up||0;if(up>=3){toast('Fully upgraded');return;}
+  const c=UPG_COST[up], pc=upgradeParts(g);
+  if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}
+  if(partsHave()<pc){toast('Need '+pc+' parts. Salvage gear to get them - you have '+partsHave()+'.','d');return;}
+  S.stock.scrap-=c;S.parts=partsHave()-pc;g.up=up+1;
+  if(g.dmg){g.dmg=[g.dmg[0]+2,g.dmg[1]+2];}else if(g.dr!==undefined){g.dr+=1;}else if(g.cap){g.cap+=2;}
+  log('Worked the '+g.n+' up to +'+g.up+' ('+c+' scrap, '+pc+' parts).');
+  toast(g.n+' +'+g.up,'a');SFX.play('chest');save();render();
+  if($('#modal').classList.contains('on'))benchSheet(uidv);
+}
+// Rerolling is the gamble. Crude is the single most likely result and it is a
+// real downgrade, so a good temper is something you decide whether to risk.
+function reroll(uidv){
+  const g=S.gear.find(x=>x.uid===uidv);if(!g||!benchable(g))return;
+  const sc=rerollScrap(g), pc=rerollParts(g);
+  if(S.stock.scrap<sc){toast('Need '+sc+' scrap');return;}
+  if(partsHave()<pc){toast('Need '+pc+' parts. Salvage gear to get them - you have '+partsHave()+'.','d');return;}
+  const old=g.temper;
+  if(old&&!confirm('Reroll the '+g.n+'? Its '+TEMPERS[old].n+' temper is gone whichever way this lands, and Crude is the most likely result.'))return;
+  S.stock.scrap-=sc;S.parts=partsHave()-pc;
+  g.temper=rollTemper();
+  const t=TEMPERS[g.temper];
+  if(g.dur!==undefined)g.dur=Math.min(g.dur,repairMax(g));   // a worse temper can shrink the bar
+  const better=old&&TEMPER_ORDER.indexOf(g.temper)<TEMPER_ORDER.indexOf(old);
+  log('Reworked the '+g.n+': '+t.n+'. '+t.d+'.');
+  toast(g.n+' is now '+t.n+(old?(better?' - better than before':g.temper===old?' - the same again':' - worse than before'):''),
+        g.temper==='perfect'?'l':better||!old?'a':'d');
+  SFX.play(g.temper==='perfect'?'legend':'chest');
+  save();render();
+  if($('#modal').classList.contains('on'))benchSheet(uidv);
+}
+function benchSheet(uidv){
+  const g=S.gear.find(x=>x.uid===uidv);if(!g)return;
+  if(!benchable(g)){toast('Nothing to work on there');return;}
+  const up=g.up||0, t=temperOf(g);
+  const uc=UPG_COST[up], upc=upgradeParts(g);
+  const rs=rerollScrap(g), rp=rerollParts(g);
+  const dm=wDmg(g);
+  const forge=!!(S.base&&S.base.rooms.forge);
+  const stat=g.dmg?(dm[0]+'-'+dm[1]+' dmg'+(t&&t.dmg?' <span class="help">('+(t.dmg>0?'+':'')+Math.round(t.dmg*100)+'% from '+esc(t.n)+')</span>':''))
+    :g.dr!==undefined?('-'+g.dr+' damage taken'):('+'+g.cap+' carry');
+  openSheet('<h2>Workbench</h2>'
+    +'<div class="kv" style="margin-top:6px"><span>'+esc(g.e+' '+g.n)+'</span><b class="rc-'+esc(g.r||'common')+'">'+esc(RAR[g.r||'common'].n)+(up?' +'+up:'')+'</b>'
+      +'<span>Now</span><b>'+stat+'</b>'
+      +(repairMax(g)?'<span>Durability</span><b>'+Math.max(0,g.dur||0)+' / '+repairMax(g)+'</b>':'')
+      +'<span>Temper</span><b>'+(t?esc(t.n)+' <span class="help">'+esc(t.d)+'</span>':'<span class="help">none yet</span>')+'</b>'
+      +'<span>Your parts</span><b>'+partsHave()+'</b><span>Your scrap</span><b>'+fmt(S.stock.scrap)+'</b></div>'
+    +'<div class="section-label" style="margin-top:12px">Work it up</div>'
+    +'<p class="help">'+(up>=3?'This is as far as it goes.':'+2 damage (or +1 armor, +2 carry) a level, three levels. Parts only come from breaking down gear.')+'</p>'
+    +(up>=3?'':'<button class="btn r wide" style="margin-top:6px" onclick="upgrade(\''+g.uid+'\')"'
+        +((S.stock.scrap<uc||partsHave()<upc)?' disabled':'')+'>To +'+(up+1)+' · '+uc+'🔩 · '+upc+' parts</button>')
+    +'<div class="section-label" style="margin-top:14px">Rework the temper</div>'
+    +'<p class="help">A gamble, not a ladder. Whatever it has now is gone, and these are the real odds:</p>'
+    +'<div style="display:flex;flex-direction:column;gap:2px;margin:6px 0">'
+    +temperOdds().map(([k,pct])=>{const x=TEMPERS[k];const cur=g.temper===k;
+      return '<div style="display:flex;gap:8px;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,'+(cur?'.09':'.04')+')">'
+        +'<b style="width:74px'+(k==='perfect'?';color:var(--amber)':k==='crude'?';color:#ff8a92':'')+'">'+esc(x.n)+'</b>'
+        +'<span class="help" style="flex:1">'+esc(x.d)+'</span>'
+        +'<span class="help">'+pct+'%</span>'+(cur?'<span class="chip a">now</span>':'')+'</div>';}).join('')
+    +'</div>'
+    +'<button class="btn wide" onclick="reroll(\''+g.uid+'\')"'+((S.stock.scrap<rs||partsHave()<rp)?' disabled':'')+'>'
+      +(g.temper?'Rework':'Temper it')+' · '+rs+'🔩 · '+rp+' parts</button>'
+    +'<p class="help" style="margin-top:8px">'+(forge?'Your forge is cutting the parts cost by 40%.':'A Forge at your base cuts the parts cost by 40%.')+'</p>'
+    +'<button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet()">Done</button>',true);
+}
 function dropGear(uidv){S.gear=S.gear.filter(x=>x.uid!==uidv);for(const k in S.eq)if(S.eq[k]===uidv)S.eq[k]=null;save();render();}
 function toggleCrew(id){const i=S.active.indexOf(id);if(i>=0)S.active.splice(i,1);else{if(S.active.length>=crewSlots()){toast('No free slot. Build a bunkhouse.');return;}S.active.push(id);}save();render();}
 function shopItems(){const out=[];for(const [k,v] of Object.entries(ART.HAIR_SHOP))out.push({id:'hair:'+k,slot:'hair',key:k,n:v.n,c:v.c,r:v.c>=12000?'epic':'rare'});for(const [k,v] of Object.entries(ART.EYES_SHOP))out.push({id:'eyes:'+k,slot:'eyes',key:k,n:v.n,c:v.c,r:'epic'});for(const [k,v] of Object.entries(ART.HATS))if(v.c)out.push({id:'hat:'+k,slot:'hat',key:k,n:v.n,c:v.c,r:v.r});for(const [k,v] of Object.entries(ART.TOPS))if(v.c)out.push({id:'top:'+k,slot:'top',key:k,n:v.n,c:v.c,r:v.r});for(const [k,v] of Object.entries(ART.ACCS))if(v.c)out.push({id:'acc:'+k,slot:'acc',key:k,n:v.n,c:v.c,r:v.r});return out;}
@@ -2123,7 +2250,7 @@ function render(){
   const gearShown=S.gear.filter(GT[GEAR_TAB]||GT.all).sort((a,b)=>((S.eq[b.slot]===b.uid)-(S.eq[a.slot]===a.uid))||(RORD[b.r||'common']-RORD[a.r||'common']));
   const spare=spareGear();
   $('#gearTabs').innerHTML=[['all','All',S.gear.length],['weapons','Weapons',S.gear.filter(GT.weapons).length],['armor','Armor',S.gear.filter(GT.armor).length],['bags','Bags',S.gear.filter(GT.bags).length]].map(([k,n,c])=>`<button class="${GEAR_TAB===k?'on':''}" onclick="gearTab('${k}')">${n} ${c}</button>`).join('');
-  $('#gearSub').textContent=S.gear.length+' pieces';
+  $('#gearSub').textContent=S.gear.length+' pieces · '+partsHave()+' parts';
   $('#salvageAll').style.display=spare.length<2?'none':'';$('#salvageAll').textContent='Salvage '+spare.length+' spare common/uncommon for '+spare.reduce((t,x)=>t+salvageValue(x),0)+'🔩';
   const broke=S.gear.filter(g=>repairMax(g)&&repairMissing(g)&&g.id!=='oldreliable');
   const ra=$('#repairAll');
@@ -2133,8 +2260,8 @@ function render(){
     ra.textContent='Repair '+broke.length+' worn piece'+(broke.length===1?'':'s')+' for '+bill+'🔩'+(atBench()?' (bench price)':'');
     ra.classList.toggle('off',S.stock.scrap<Math.min(...broke.map(repairCost).concat([Infinity])));
   }
-  $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':g.dmg[0]+'-'+g.dmg[1]+' dmg · '+(g.id==='oldreliable'?'never breaks':g.dur+'/'+GEAR[g.id].dur+' durability')):g.slot==='ranged'?g.dmg[0]+'-'+g.dmg[1]+' dmg · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';const sh=(g.r==='legendary'||g.r==='epic')?' shine'+(g.r==='legendary'?' leg':''):'';
-    return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${repairMax(g)&&repairMissing(g)&&g.id!=='oldreliable'?`<button class="btn sm${g.broken?' r':''}${S.stock.scrap<repairCost(g)?' off':''}" onclick="repair('${g.uid}')">Repair ${repairCost(g)}🔩</button>`:''}${S.base&&S.base.rooms.forge&&(g.up||0)<3?`<button class="btn sm" onclick="upgrade('${g.uid}')">Forge +${(g.up||0)+1} · ${UPG_COST[g.up||0]}🔩</button>`:''}<button class="btn sm ghost" onclick="giftSheet('${g.uid}')">Gift</button><button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
+  $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+(g.id==='oldreliable'?'never breaks':g.dur+'/'+repairMax(g)+' durability')):g.slot==='ranged'?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';const sh=(g.r==='legendary'||g.r==='epic')?' shine'+(g.r==='legendary'?' leg':''):'';
+    return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''}${temperOf(g)?` <span class="chip${g.temper==='perfect'?' a':g.temper==='crude'?' d':''}">${esc(temperOf(g).n)}</span>`:''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${repairMax(g)&&repairMissing(g)&&g.id!=='oldreliable'?`<button class="btn sm${g.broken?' r':''}${S.stock.scrap<repairCost(g)?' off':''}" onclick="repair('${g.uid}')">Repair ${repairCost(g)}🔩</button>`:''}${benchable(g)?`<button class="btn sm" onclick="benchSheet('${g.uid}')">🛠️ Workbench</button>`:''}<button class="btn sm ghost" onclick="giftSheet('${g.uid}')">Gift</button><button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
   // you
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
   $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):baseDmg()[0]+'-'+baseDmg()[1]} +${S.lvl-1}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
@@ -2145,9 +2272,9 @@ function render(){
   const spent=Object.values(S.skills||{}).reduce((a,b)=>a+b,0);const total=skAll.reduce((a,s)=>a+s.max,0);
   $('#skills').innerHTML=skOpen.map(s=>skRow(s,false)).join('')+(skLocked.length?`<div class="section-label" style="margin-top:12px">Locked · keep levelling</div>`+skLocked.map(s=>skRow(s,true)).join(''):'')+`<p class="help" style="margin-top:10px">${spent} of ${total} ranks learned${skLocked.length?' · next unlock at level '+skLocked[0].req:''}.</p>`;
   $('#crewSub').textContent=S.active.length+' / '+crewSlots()+' active · '+S.crew.length+' total';
-  $('#crewList').innerHTML=S.crew.length?S.crew.map(c=>{const act=S.active.includes(c.id);return `<div class="crew${act?' active':''}"><div class="av">${ART.avatarSVG(c.av,70)}</div><div><div class="nm">${esc(c.name)} <span class="chip a">Lv ${c.lvl}</span></div><div class="role">${ROLES[c.role].e} ${ROLES[c.role].n}</div><div class="tr">${ROLES[c.role].d(c.lvl+sk('leader'))}</div><div class="hpbar2" style="margin-top:6px"><i style="width:${Math.max(0,(c.hp===undefined?crewMax(c):c.hp)/crewMax(c)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${(c.hp||0)<=0?'<b style="color:#ff8a92">Down. Cannot fight.</b> Heals overnight, or patch them up now.':'HP '+(c.hp===undefined?crewMax(c):c.hp)+' / '+crewMax(c)}</div>
+  $('#crewList').innerHTML=S.crew.length?S.crew.map(c=>{const act=S.active.includes(c.id);return `<div class="crew${act?' active':''}"><div class="av">${ART.avatarSVG(c.av,70)}</div><div><div class="nm">${esc(c.name)} <span class="chip a">Lv ${c.lvl}</span></div><div class="role">${ROLES[c.role].e} ${ROLES[c.role].n}</div><div class="tr">${ROLES[c.role].d(c.lvl+sk('leader'))}</div><div class="hpbar2" style="margin-top:6px"><i style="width:${Math.max(0,(c.hp===undefined?crewMax(c):c.hp)/crewMax(c)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${(c.hp||0)<=0?'<b style="color:#ff8a92">Down. Cannot fight.</b> Mends '+(18+(S.base&&S.base.rooms.clinic?18:0))+' HP a night, or patch them up now.':'HP '+(c.hp===undefined?crewMax(c):c.hp)+' / '+crewMax(c)+((c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?' · mends '+(18+(S.base&&S.base.rooms.clinic?18:0))+' a night'+(S.base&&S.base.rooms.clinic?' (clinic)':''):'')}</div>
     <div class="xp" style="margin-top:6px"><i style="width:${Math.min(100,c.lvl>=5?100:c.xp/(c.lvl*6)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${c.lvl>=5?'Fully trained':'Experience '+c.xp+' / '+(c.lvl*6)+' to level '+(c.lvl+1)}</div>
-    <div class="a2">${(c.hp||0)<=0?`<button class="btn sm r" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>`:`<button class="btn sm ${act?'':'r'}" onclick="toggleCrew('${c.id}')">${act?'Leave at base':'Bring along'}</button>`}</div></div></div>`;}).join(''):'<p class="help">Nobody yet. Survivors hide in the places you search.</p>';
+    <div class="a2">${(c.hp||0)<=0?`<button class="btn sm r" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>`:`<button class="btn sm ${act?'':'r'}" onclick="toggleCrew('${c.id}')">${act?'Leave at base':'Bring along'}</button>${(c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?`<button class="btn sm ghost" style="margin-top:4px" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>`:''}`}</div></div></div>`;}).join(''):'<p class="help">Nobody yet. Survivors hide in the places you search.</p>';
   // base
   const bh=$('#baseHead');
   if(!S.base){bh.className='card blood';bh.innerHTML='<h2>No base yet</h2><p>Clear any place, then tap <b>Claim as base</b> on it. Where you set up matters: a police station comes with an armory and walls, a pharmacy with a clinic, a gas station with a generator. You can move later for 20 scrap.</p>';}
@@ -2258,6 +2385,13 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.33',d:'Sep 17',t:'The Workbench, and raids that pay properly',
+  i:['THE WORKBENCH. Every weapon and piece of armour has a 🛠️ Workbench button in Gear. Work it up to +3, or rework its TEMPER.',
+     'PARTS are the new currency, and they come from exactly one place: breaking down gear. Walking does not earn them. A +3 legendary costs 66 parts - about nine epics fed into it - or 40 with a Forge. The Forge is now a 40% discount instead of a requirement.',
+     'A TEMPER is a permanent personality for a weapon: Keen hits 18% harder but wears out faster, Sturdy lasts far longer, Vicious strikes twice 12% of the time, Perfect is all upside and 4% likely. CRUDE is the most common result and it is a real downgrade, so rerolling something good is a genuine gamble. The odds are printed on the bench.',
+     'RAIDS TELL YOU WHAT THEY PAY before you commit - items, scrap, keys, XP, and the legendary chance.',
+     'WALKING TO A RAID NOW BEATS FLARING IN: an extra item, 50% more scrap, an extra key at tier 3+, and a better legendary roll. A tier 5 you walked to is a 70% legendary chance against 50% for a remote seat.',
+     'You can patch up a hurt crew member with meds BEFORE they collapse - the button used to appear only once they were already down. They also mend 18 HP a night on their own, 36 with a clinic.']},
  {v:'6.32',d:'Sep 17',t:'Repair anything, punch anything, swap mid-fight',
   i:['REPAIR WITH SCRAP, ANYWHERE. You no longer need an armory. A repair always puts a weapon back to FULL, and the price is on the button. An armory (or the engineer role) is now a HALF-PRICE discount instead of a gate. There is a "Repair all" button in Gear too.',
      'A wrecked legendary is a repair bill, not a loss. The Last Word costs 36 scrap to bring back, 18 at a bench.',
