@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.11';
+const VERSION='6.12';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -583,9 +583,10 @@ function enterLoc(){
   const loc=S.loc;if(!loc||loc.cleared)return;
   const en=encounterFor(loc);
   if(!en.length){loc.cleared=true;log(loc.n+' is quiet. You slip in.');ctEvent('places',1);save();render();return;}
-  startCombat(en,'enter');
+  gearCheck(()=>{const l2=S.loc;if(!l2||l2.cleared)return;startCombat(en,'enter');});
 }
-function pushStage(){const loc=S.loc;if(!loc||!loc.stronghold||loc.stage>=3)return;startCombat(strongholdStage(loc.stage+1),'enter');}
+function pushStage(){const loc=S.loc;if(!loc||!loc.stronghold||loc.stage>=3)return;
+  gearCheck(()=>{const l2=S.loc;if(!l2||!l2.stronghold||l2.stage>=3)return;startCombat(strongholdStage(l2.stage+1),'enter');});}
 
 /* ================= combat ================= */
 let C=null;
@@ -1283,6 +1284,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.12',d:'Sep 17',t:'The equip check works on normal fights too',
+  i:['Walking into a house with no weapon equipped now warns you, the same as horde nights and boss fights already did. That was the fight it was missing - the one you have fifty times a day.',
+     'Tap Fight anyway and it stays quiet for the rest of the day, until your gear actually changes. No nagging at every doorway.']},
  {v:'6.11',d:'Sep 17',t:'Shortcut setup without the fiddly bit',
   i:['The shortcut used to put your code and your step number in one box, so you had to edit around a blue bubble without deleting it. That was the worst part of the whole setup.',
      'Now it can be two boxes: c holds your code, n holds nothing but the Sum bubble. Each one you replace whole - nothing to edit around.',
@@ -1626,10 +1630,14 @@ let PENDING_FIGHT=null;
 function runPending(){const f=PENDING_FIGHT;PENDING_FIGHT=null;if(f)f();}
 function gearCheck(then){const w=eqItem('melee');const armor=eqItem('armor')||eqItem('head');const owned=S.gear.filter(x=>x.slot==='melee'&&S.eq.melee!==x.uid);const ownedArmor=S.gear.filter(x=>(x.slot==='armor'||x.slot==='head')&&S.eq[x.slot]!==x.uid);
   if(w&&(armor||!ownedArmor.length)){then();return;}
+  // She has already said "fight anyway" for this exact gear situation today.
+  const sig=todayStr()+':'+(w?w.id:'none')+':'+(armor?armor.id:'none')+':'+owned.length+':'+ownedArmor.length;
+  if(S.gcOk===sig){then();return;}
+  S.gcSig=sig;
   PENDING_FIGHT=then;
   const wl=owned.slice(0,4).map(x=>`<button class="btn wide" style="margin-top:6px" onclick="equip('${x.uid}');$('#sheet').querySelector('#gcMsg').textContent='${esc(x.n)} equipped.';">${x.e} Equip ${esc(x.n)} <span class="help">${x.dmg?x.dmg[0]+'-'+x.dmg[1]+' dmg':''}</span></button>`).join('');
   const al=ownedArmor.slice(0,3).map(x=>`<button class="btn wide ghost" style="margin-top:6px" onclick="equip('${x.uid}');$('#sheet').querySelector('#gcMsg').textContent='${esc(x.n)} equipped.';">${x.e} Wear ${esc(x.n)} <span class="help">-${x.dr} damage</span></button>`).join('');
-  openSheet(`<h2>${w?'No armor on':'Bare hands'}</h2><p>${w?'You have a weapon but nothing protecting you.':'You have no weapon equipped.'}${!w&&!owned.length?' You do not own one yet. Garages, hardware stores and the police station carry them.':''}</p>${wl}${al}<p class="help" id="gcMsg" style="margin-top:8px"></p><div class="grid2" style="margin-top:8px"><button class="btn ghost" onclick="PENDING_FIGHT=null;closeSheet()">Not now</button><button class="btn r" onclick="closeSheet();runPending()">${w?'Fight as is':'Fight anyway'}</button></div>`,true);}
+  openSheet(`<h2>${w?'No armor on':'Bare hands'}</h2><p>${w?'You have a weapon but nothing protecting you.':'You have no weapon equipped.'}${!w&&!owned.length?' You do not own one yet. Garages, hardware stores and the police station carry them.':''}</p>${wl}${al}<p class="help" id="gcMsg" style="margin-top:8px"></p><div class="grid2" style="margin-top:8px"><button class="btn ghost" onclick="PENDING_FIGHT=null;closeSheet()">Not now</button><button class="btn r" onclick="S.gcOk=S.gcSig;save();closeSheet();runPending()">${w?'Fight as is':'Fight anyway'}</button></div>`,true);}
 function fightBoss(){const b=bossState();if(S.loc||S.combat){toast('Finish what you are doing first');return;}if(b.killed){toast(bossName()+' is already down this week');return;}
   if(S.bossFightsToday>=BOSS_FIGHTS_PER_DAY){toast('No boss fights left today. Two a day.');return;}
   if(S.hp<30&&!confirm('You are at '+S.hp+' HP. The boss hits hard. Go anyway?'))return;
