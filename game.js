@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.21';
+const VERSION='6.22';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -913,6 +913,7 @@ function checkMilestones(){
 }
 function addSteps(n,src){
   n=Math.floor(n);if(!(n>0))return;rollDay();rollWeek();S.lastAnim=Date.now();
+  if(src==='walk'){const r=syncReads();r.phone=Math.max(r.phone||0,(S.steps.today||0)+n);}
   if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(Math.max(3,Math.round(6*thirstMult())));}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
   if(src!=='carry'&&S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');streakReward();}
   if(S.loc||S.combat){S.walk.banked=(S.walk.banked||0)+n;if(src!=='carry'&&src!=='live')toast('+'+fmt(n)+' steps saved for after this stop','z');save();render();return;}
@@ -1474,10 +1475,34 @@ function pedoToggle(){
 function onMotion(e){pedo.got=true;const a=e.accelerationIncludingGravity;if(!a)return;const mag=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2);pedo.filt=pedo.filt*0.8+mag*0.2;const now=Date.now();
   if(mag-pedo.filt>2.2&&now-pedo.last>280){pedo.last=now;pedo.count++;if(pedo.count%10===0)addSteps(10,'live');$('#pedoStatus').textContent='Counting: '+pedo.count+' steps this walk';}}
 function pedoStop(silent){pedo.on=false;window.removeEventListener('devicemotion',onMotion);const rem=pedo.count%10;if(rem)addSteps(rem,'live');if(pedo.wake){try{pedo.wake.release();}catch(e){}pedo.wake=null;}$('#pedoBtn').textContent='Walk mode';if(!silent)$('#pedoStatus').textContent=pedo.count?'Walk saved: '+pedo.count+' steps.':'';}
-function syncTotal(v,src){rollDay();let delta=(S.steps.lastSyncDate===S.steps.date)?v-S.steps.lastSync:v-S.steps.today;
-  if(delta<0){toast('That is fewer than the last sync ('+fmt(S.steps.lastSync)+').');return false;}
-  S.steps.lastSync=v;S.steps.lastSyncDate=S.steps.date;if(delta===0){toast('Already synced to '+fmt(v));save();render();return true;}
-  toast('+'+fmt(delta)+' steps ('+src+')','z');SFX.play('step');addSteps(delta,src);return true;}
+// Typing a total and the phone posting a total are two DIFFERENT readings of
+// the same day, on different scales. They used to share one baseline, so typing
+// 5,000 when Health said 3,200 made every later phone sync look like you had
+// walked backwards - and it was refused, forever, until Health passed 5,000.
+// Now each source keeps its own reading and the day's count only ever goes up.
+function syncReads(){
+  if(!S.steps.reads||S.steps.readsDate!==S.steps.date){S.steps.reads={phone:0,typed:0};S.steps.readsDate=S.steps.date;}
+  return S.steps.reads;
+}
+function syncBucket(src){return (src==='phone'||src==='clip'||src==='shortcut')?'phone':'typed';}
+function syncTotal(v,src){
+  rollDay();
+  v=Math.max(0,Math.round(v||0));
+  const reads=syncReads(), b=syncBucket(src);
+  reads[b]=Math.max(reads[b]||0,v);
+  S.steps.lastSync=v;S.steps.lastSyncDate=S.steps.date;   // kept for the "synced at" line
+  const target=Math.max(reads.phone||0,reads.typed||0);
+  const delta=target-(S.steps.today||0);
+  if(delta<=0){
+    // Say WHY nothing moved, instead of implying she walked backwards.
+    const other=b==='phone'?'typed':'phone';
+    if((reads[other]||0)>v)
+      toast('Counted. Your '+(other==='typed'?'typed total':'phone')+' ('+fmt(reads[other])+') is still ahead, so the number holds there.','a');
+    else toast('Already counted up to '+fmt(target));
+    save();render();return true;
+  }
+  toast('+'+fmt(delta)+' steps ('+src+')','z');SFX.play('step');addSteps(delta,src);return true;
+}
 function autoSyncFromUrl(){try{const q=new URLSearchParams(location.search);const h=new URLSearchParams(location.hash.replace(/^#/,''));const v=parseInt(q.get('steps')||h.get('steps'),10);if(v>=0){syncTotal(v,'shortcut');history.replaceState(null,'',location.pathname);}}catch(e){}}
 async function readClipboard(){try{const t=await navigator.clipboard.readText();const m=String(t).replace(/,/g,'').match(/\d{2,6}/);if(!m){toast('No step count on the clipboard');return;}syncTotal(parseInt(m[0],10),'clipboard');}catch(e){toast('Clipboard is blocked here. Type it in Sync.');}}
 
@@ -1698,6 +1723,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.22',d:'Sep 17',t:'Typing your steps no longer freezes them',
+  i:['Typing a total and your phone sending a total are two different readings of the same day. They used to share one baseline, so typing 5,000 when your phone had 3,200 made every later sync look like you had walked backwards - and it was refused until your phone caught up.',
+     'Each now keeps its own reading and the day only ever goes up. Type 5,000, walk 200, and it says 5,200.',
+     'If one reading is still ahead of the other, the game says so instead of pretending nothing happened.']},
  {v:'6.21',d:'Sep 17',t:'LIVE RAIDS',
   i:['Real places near you host raids for two hours at a time. Walk to one, tap it, fight it.',
      'Five tiers: Stray pack, Nest, Swarm, Bloated horror, and The Tall One. Tier 3 and up guarantee rare gear; tier 4 and 5 can drop a legendary.',
