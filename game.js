@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.38';
+const VERSION='6.39';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2527,6 +2527,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.39',d:'Sep 17',t:'The game can now tell you WHY your steps are not syncing',
+  i:['There is a button on the Steps card: "Why aren\'t my steps syncing?" It walks the whole chain - your Shortcut, the server, the game, today\'s number - and names the link that is broken instead of leaving you to guess.',
+     'It shows the real data at each step: how many step posts the server actually received today, the biggest one, how long ago it arrived, and what the game did with it.',
+     'The most useful line is whether the server received ANYTHING today. If it did not, the problem is your Shortcut and no amount of tapping Sync in the game will help. If it did, there is a "Take them now" button right there.',
+     '"Copy this" puts the whole report on your clipboard so you can paste it to me instead of describing it.']},
  {v:'6.38',d:'Sep 17',t:'The heavy swing that ate a legendary without asking',
   i:['A HEAVY SWING COSTS TWO DURABILITY and never warned you about it. A legendary sitting on 2 died to a single tap with no confirmation - that is your friend\'s "it swung two times and it broke". It was one swing that counted as two.',
      'The heavy swing now asks first when it would wreck something rare, and the button says "costs 2 durability" so you can see it coming.',
@@ -2731,6 +2736,80 @@ function cmpVer(a,b){const x=String(a).split('.').map(Number),y=String(b).split(
 // number; the game only reads what the server already has. So when the server
 // has nothing for today, offer to RUN the Shortcut instead of checking again.
 const SC_NAME='Dead Miles Steps';
+/* ================= WHY AREN'T MY STEPS SYNCING (v6.39) =================
+   Four times this session the answer to "my steps are not syncing" has been a
+   different link in the chain, and every time we found it by guessing. The chain
+   is: your Shortcut -> the server -> this game -> today's number. This walks all
+   four and names the one that is broken, with the real data at each step. */
+async function syncDoctor(){
+  const o=O();const out=[];let verdict='';
+  const row=(ok,label,detail)=>out.push({ok,label,detail});
+  openSheet('<h2>Checking your step sync</h2><p class="help">Talking to the server...</p>',true);
+
+  // 1. signed in
+  if(!o.ok){
+    row(false,'Signed in','No. The game cannot receive steps while it is signed out.');
+    verdict='You are signed out. Open Settings and sign in with your handle and key, then run this again.';
+  } else row(true,'Signed in','as @'+o.handle);
+
+  // 2. server reachable
+  let reach=false;
+  if(o.ok){
+    try{const t0=Date.now();await rpc('get_board',{p_week:S.league.week});reach=true;
+      row(true,'Server answers','yes, in '+(Date.now()-t0)+' ms');
+    }catch(e){row(false,'Server answers','no - '+e.message);
+      if(!verdict)verdict='The game cannot reach the server at all. Check your signal, then run this again.';}
+  }
+
+  // 3. the key the Shortcut uses
+  if(o.ok&&reach){
+    try{await fetchStepKey();}catch(e){}
+    if(o.stepKey)row(true,'Your Shortcut key','present');
+    else{row(false,'Your Shortcut key','missing');
+      if(!verdict)verdict='The game has no Shortcut key, so nothing your phone sends can be matched to you. Settings has a Fix my shortcut link.';}
+  }
+
+  // 4. what the server actually has for today - the link nobody could see
+  let rows=null;
+  if(o.ok&&reach){
+    const since=new Date();since.setHours(0,0,0,0);
+    try{rows=await rpc('get_steps',{p_handle:o.handle,p_token:o.token,p_since:since.toISOString()});}
+    catch(e){row(false,'Steps on the server','could not read them - '+e.message);}
+    if(rows){
+      if(!rows.length){
+        row(false,'Steps on the server','NOTHING has arrived today');
+        if(!verdict)verdict='The server has not received a single step from your phone today. That means your Shortcut did not run, or it is sending the wrong key. This is the broken link - the game is fine.';
+      }else{
+        const best=Math.max(...rows.map(r=>r.steps));
+        const newest=new Date(rows[0].posted_at);
+        const mins=Math.round((Date.now()-newest.getTime())/60000);
+        row(true,'Steps on the server',rows.length+' arrived today · highest '+fmt(best)+' · newest '+(mins<1?'just now':mins<60?mins+' min ago':Math.round(mins/60)+'h ago'));
+        // 5. did the game take it?
+        const c=stepsCounted();
+        if(c>=best)row(true,'The game took it','counted '+fmt(c)+', which is everything the server has');
+        else{row(false,'The game took it','the game only counted '+fmt(c)+' of the '+fmt(best)+' on the server');
+          if(!verdict)verdict='The server HAS your steps but the game had not taken them. Tap "Take them now" below.';}
+      }
+    }
+  }
+
+  const c=stepsCounted(),m=stepsManual();
+  row(true,"Today's number",fmt(c)+' from your phone + '+fmt(m)+' you typed = '+fmt(S.steps.today||0));
+  if(!verdict)verdict='Everything in the chain looks right. If the number still looks wrong, the arithmetic is on the Steps card - tell me the three numbers on that line.';
+
+  openSheet('<h2>Step sync check</h2>'
+    +'<div class="stack" style="margin-top:8px">'
+    +out.map(r=>'<div style="display:flex;gap:8px;padding:7px 9px;border-radius:8px;background:rgba(255,255,255,.05);border-left:4px solid '+(r.ok?'var(--rot)':'var(--blood)')+'">'
+      +'<span>'+(r.ok?'✓':'✗')+'</span><span style="flex:1;min-width:0"><b>'+esc(r.label)+'</b><div class="help">'+esc(r.detail)+'</div></span></div>').join('')
+    +'</div>'
+    +'<div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(230,165,48,.12);border-left:4px solid var(--amber)">'
+    +'<b style="color:var(--amber)">What to do</b><div style="margin-top:4px">'+esc(verdict)+'</div></div>'
+    +'<div class="grid2" style="margin-top:10px">'
+    +'<button class="btn ghost" onclick="copyText($(\'#sheet\').innerText,\'\');toast(\'Copied - paste it to Claude\',\'z\')">Copy this</button>'
+    +'<button class="btn r" onclick="pullSteps();toast(\'Taking them now\')">Take them now</button></div>'
+    +'<button class="btn ghost wide" style="margin-top:8px" onclick="runShortcut()">Run my Shortcut</button>'
+    +'<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet()">Close</button>',true);
+}
 async function fetchStepKey(){
   const o=O();if(!o.ok)return null;
   try{const k=await rpc('get_step_key',{p_handle:o.handle,p_token:o.token});
