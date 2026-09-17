@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.12';
+const VERSION='6.13';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -237,13 +237,42 @@ function staleStop(){
   if(STALE)return;STALE=true;
   try{openSheet('<h2>Opened somewhere else</h2><p>This copy of the game is behind a newer one, so it stopped saving rather than undo that progress. This happens when the game is open in two places at once.</p><p class="help">Reloading will pick up the newest save. Use one copy from now on, ideally the home-screen icon.</p><button class="btn r wide" onclick="location.reload()">Reload the newest save</button>',true);}catch(e){}
 }
+// Restore points. Recent history is fine-grained (every ~3 minutes) so "put it
+// back the way it was five minutes ago" is actually possible; older ones thin
+// out to roughly one an hour so the list stays short and storage stays small.
+const SNAP_FINE=3*60000, SNAP_FINE_WINDOW=30*60000, SNAP_MAX=20, SNAP_BYTES=1500000;
+function snapThin(arr){
+  // Older points are bucketed by clock hour, not by distance from the newest.
+  // Spacing them relative to each other made the long tail erode: whenever a
+  // point aged out of the fine window it became the new anchor and dropped the
+  // one just behind it, so after a long session nothing older than the window
+  // survived. Fixed buckets keep one per hour, permanently.
+  const now=Date.now();const keep=[];const seen={};
+  for(const s of arr){
+    if(now-s.t<SNAP_FINE_WINDOW||s.why!=='auto'){keep.push(s);continue;}
+    const bucket=Math.floor(s.t/3600000);
+    if(!seen[bucket]){seen[bucket]=1;keep.push(s);}
+  }
+  return keep.slice(0,SNAP_MAX);
+}
 function snapshot(why){
-  try{const arr=JSON.parse(localStorage.getItem('deadmiles.snaps')||'[]');
-    if(why==='auto'&&arr[0]&&Date.now()-arr[0].t<3600000)return;
+  let arr;
+  try{arr=JSON.parse(localStorage.getItem('deadmiles.snaps')||'[]');}catch(e){arr=[];}
+  if(!Array.isArray(arr))arr=[];
+  try{
+    if(why==='auto'&&arr[0]&&Date.now()-arr[0].t<SNAP_FINE)return;
     const copy=JSON.parse(JSON.stringify(S));copy.journal=[];delete copy.wx;if(copy.party)delete copy.party.data;
     arr.unshift({t:Date.now(),why,name:S.name,lvl:S.lvl,steps:(S.steps&&S.steps.total)||0,s:copy});
-    localStorage.setItem('deadmiles.snaps',JSON.stringify(arr.slice(0,5)));
-  }catch(e){try{localStorage.removeItem('deadmiles.snaps');}catch(e2){}}
+    arr=snapThin(arr);
+    // Drop the oldest until it fits. Never wipe the whole history to make room -
+    // that used to happen on any storage error and took every restore point with it.
+    let out=JSON.stringify(arr);
+    while(arr.length>1&&out.length>SNAP_BYTES){arr.pop();out=JSON.stringify(arr);}
+    for(;;){
+      try{localStorage.setItem('deadmiles.snaps',out);return;}
+      catch(e){if(arr.length<=1)return;arr.pop();out=JSON.stringify(arr);}
+    }
+  }catch(e){}
 }
 function snapshots(){try{return JSON.parse(localStorage.getItem('deadmiles.snaps')||'[]');}catch(e){return [];}}
 function restoreSnapshot(i){
@@ -1190,7 +1219,7 @@ function render(){
   $('#shelfSub').textContent=S.shelf.length+' found';const shelfIds=Object.entries(ITEMS).filter(([k,v])=>v.cat==='shelf');const owned=S.shelf.reduce((m,x)=>{m[x.id]=(m[x.id]||0)+1;return m;},{});
   $('#shelf').innerHTML=shelfIds.map(([k,v])=>`<div class="it${owned[k]?'':' locked'}"><div class="e">${v.e}</div><span class="rc-${v.r}">${v.n}${owned[k]>1?' x'+owned[k]:''}</span></div>`).join('');
   $('#goalInput').value=S.goal;$('#nameInput').value=S.name;$('#sfxBtn').textContent=S.sfx?'On':'Off';const vs=$('#verSub');if(vs)vs.textContent='v'+VERSION;const bi=backupInfo();const ub=$('#undoRow');if(ub){ub.hidden=!bi;if(bi)$('#undoBtn').textContent='Undo restore (put back the save from '+ago(bi.t)+')';}
-  const snList=snapshots();const snEl=$('#snapList');if(snEl)snEl.innerHTML=snList.length?snList.map((s,i)=>`<div class="lbrow"><div class="rk">${i+1}</div><div class="nm">${esc(s.name||'Survivor')} · level ${s.lvl}<small>${fmt(s.steps)} lifetime steps · ${esc(ago(s.t))}${s.why&&s.why!=='auto'?' · '+esc(s.why):''}</small></div><div class="sc"><button class="btn xs" onclick="restoreSnapshot(${i})">Go back</button></div></div>`).join(''):'<p class="help">None yet. The game keeps one an hour, plus one before anything risky.</p>';if(CLOUD_SNAPS===null&&O().ok)loadCloudSnaps();else renderCloudSnaps();renderRecov();renderStepSync();
+  const snList=snapshots();const snEl=$('#snapList');if(snEl)snEl.innerHTML=snList.length?snList.map((s,i)=>`<div class="lbrow"><div class="rk">${i+1}</div><div class="nm">${esc(s.name||'Survivor')} · level ${s.lvl}<small>${fmt(s.steps)} lifetime steps · ${esc(ago(s.t))}${s.why&&s.why!=='auto'?' · '+esc(s.why):''}</small></div><div class="sc"><button class="btn xs" onclick="restoreSnapshot(${i})">Go back</button></div></div>`).join(''):'<p class="help">None yet. One every few minutes while you play, thinning to about one an hour further back, plus one before anything risky.</p>';if(CLOUD_SNAPS===null&&O().ok)loadCloudSnaps();else renderCloudSnaps();renderRecov();renderStepSync();
   // county
   renderMap();renderParty();renderBoss();renderDeal();renderEvent();renderStory();renderShop();renderPet();
   const tier=TIERS[S.league.tier];$('#tierBadge').textContent=tier.e;$('#tierName').textContent=tier.n;$('#tierSub').textContent='Tier '+(S.league.tier+1)+' of '+TIERS.length+' · stash x'+tier.mult;
@@ -1284,6 +1313,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.13',d:'Sep 17',t:'Go back five minutes, not a whole hour',
+  i:['Restore points used to be taken once an hour, so the closest you could get was up to an hour ago. Now one is taken every few minutes while you play, thinning to about one an hour further back.',
+     'Settings, Restore points: pick any of them and tap Go back.',
+     'Also fixed: a storage error used to delete every restore point you had. It now drops the oldest one and keeps the rest.']},
  {v:'6.12',d:'Sep 17',t:'The equip check works on normal fights too',
   i:['Walking into a house with no weapon equipped now warns you, the same as horde nights and boss fights already did. That was the fight it was missing - the one you have fifty times a day.',
      'Tap Fight anyway and it stays quiet for the rest of the day, until your gear actually changes. No nagging at every doorway.']},
