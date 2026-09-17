@@ -463,10 +463,29 @@ async function enterRaid(r,remote){
     const T=r.T;
     const boss=mk('bloater');
     boss.n=r.boss;boss.raid=r.id;boss.warden=true;
-    boss.hp=boss.max=Math.round(boss.max*(1+T.hp*0.55));
-    boss.dmg=boss.dmg.map(x=>Math.round(x*T.dmg));
+    // scales with HER now, not just with the tier
+    // Scale the THREAT with her level, not the boss's health pool. Her HP more
+    // than doubles from level 3 to 15 while her damage barely moves, so scaling
+    // health just made fights longer - and a longer fight against several
+    // enemies is one she loses to attrition, not to skill.
+    boss.max=Math.round(boss.max*(1+T.hp*0.55));
+    boss.dmg=boss.dmg.map(x=>Math.round(x*T.dmg*raidScale()));
+    // THE SHARED BAR IS NOW REAL. You face what is LEFT of it, not a fresh boss.
+    // Solo at tier 5 you cannot take it in one go - but every attempt sticks, and
+    // friends who join chip the same pool. This is what makes a raid co-op
+    // instead of a private fight with a cosmetic group total.
+    const shared=(st&&st.max>0&&st.hp>=0)?Math.max(0.08,st.hp/st.max):1;
+    boss.hp=Math.max(1,Math.round(boss.max*shared));
+
+    for(const m of raidMechs(T.t)){
+      if(m==='plated')boss.plate=true;
+      if(m==='enraged')boss.enrage=true;
+      if(m==='caller')boss.caller=true;
+      if(m==='frenzy')boss.frenzy=true;
+    }
     const en=[boss];
     if(T.t>=3)en.unshift(mk('runner'));
+    if(T.t>=4)en.unshift(mk('walker'));
     if(T.t>=5)en.unshift(mk('gunner'));
     // Carry the raid itself, not just its poi id: a remote raider has no POI
     // list to look it up in afterwards.

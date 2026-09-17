@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.43';
+const VERSION='6.44';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1411,7 +1411,11 @@ function alive(){return C.enemies.filter(e=>!e.dead);}
 function targetEnemy(){let t=C.enemies[C.target];if(!t||t.dead){const a=alive();t=a[0];C.target=C.enemies.indexOf(t);}return t;}
 function hurt(n,src){let d=Math.max(1,n-dr());if(C.brace)d=Math.ceil(d*(1-(sk('steady')?0.6+sk('steady')*0.1:0.5)));if(S.pet==='dog'&&Math.random()<petBlock()){clog(S.petName+' lunges and takes the hit meant for you.','good');return;}if(sk('ironjaw')&&!C.jaw&&S.hp-d<=0){C.jaw=true;d=S.hp-1;clog('Iron Jaw. You stay on your feet at 1 HP.','good');}
   S.hp-=d;C.pfx={d,t:Date.now()};clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
-function dealTo(t,d,label,kind){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));if(t.shield>0){const s=Math.min(t.shield,d);t.shield-=s;d-=s;clog('The shield soaks '+s+'.'+(t.shield<=0?' It cracks apart.':''),'');if(d<=0){t.fx={d:0,t:Date.now()};C.lunge=Date.now();return;}}t.hp-=d;t.fx={d,t:Date.now(),k:kind||'slash'};C.lunge=Date.now();clog(label+' for '+d+'.','you');if(t.wanted)ctEvent('boss',d);}
+function dealTo(t,d,label,kind){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));
+  if(t.plate&&!t.cracked){
+    if(kind==='heavy'){t.cracked=true;clog('The heavy swing splits '+t.n+"'s plating wide open.",'good');}
+    else{const soak=Math.round(d*0.55);d=Math.max(1,d-soak);clog('Most of that glanced off the plating.','');}
+  }if(t.shield>0){const s=Math.min(t.shield,d);t.shield-=s;d-=s;clog('The shield soaks '+s+'.'+(t.shield<=0?' It cracks apart.':''),'');if(d<=0){t.fx={d:0,t:Date.now()};C.lunge=Date.now();return;}}t.hp-=d;t.fx={d,t:Date.now(),k:kind||'slash'};C.lunge=Date.now();clog(label+' for '+d+'.','you');if(t.wanted)ctEvent('boss',d);}
 // Weapons she can actually put in her hand right now: melee, not wrecked, not
 // the one already equipped.
 function swapOptions(){return S.gear.filter(g=>g.slot==='melee'&&!g.broken&&(g.dur===undefined||g.dur>0)&&S.eq.melee!==g.uid);}
@@ -1528,7 +1532,13 @@ function act(kind){
     }
   }
   else if(kind==='brace'){C.brace=true;clog('You brace.','you');}
-  else if(kind==='med'){const m=S.pack.find(p=>p.cat==='meds')||(S.stock.meds>0?{stock:true}:null);if(!m){toast('No meds');return;}const heal=(m.id==='kit'?70:m.id==='abx'?45:35)+setPerk('med')+sk('fielddressing')*10;if(m.stock)S.stock.meds--;else S.pack=S.pack.filter(p=>p!==m);S.hp=Math.min(maxHp(),S.hp+heal);clog('You patch up: +'+heal+' HP.','good');SFX.play('loot');}
+  else if(kind==='med'){
+    // Unlimited patch-ups meant ten meds were 400 extra HP and no boss could
+    // ever out-damage a pack. Two a fight (three with Field Dressing) turns
+    // "do I have meds" into "when do I spend one".
+    const cap=2+(sk('fielddressing')?1:0);
+    if((C.meds||0)>=cap){toast('You can only patch up '+cap+' times in one fight','d');return;}
+    C.meds=(C.meds||0)+1;const m=S.pack.find(p=>p.cat==='meds')||(S.stock.meds>0?{stock:true}:null);if(!m){toast('No meds');return;}const heal=(m.id==='kit'?70:m.id==='abx'?45:35)+setPerk('med')+sk('fielddressing')*10;if(m.stock)S.stock.meds--;else S.pack=S.pack.filter(p=>p!==m);S.hp=Math.min(maxHp(),S.hp+heal);clog('You patch up: +'+heal+' HP.','good');SFX.play('loot');}
   else if(kind==='swap'){
     // Free when you are holding nothing - that is the case she hit, standing
     // there bare-handed because her weapon just broke. Otherwise it costs the
@@ -1559,6 +1569,36 @@ function act(kind){
   if(S.hp<=0){death();return;}
   renderCombat();
 }
+/* ================= RAID BOSS MECHANICS (v6.44) =================
+   A tier 5 used to be a tier 1 with more HP, and a simulation of 300 fights per
+   build won 100% of them at every tier, with a level-3 character in a machete
+   beating the hardest thing in the game. Bigger numbers were never the answer -
+   they make a fight LONGER, not harder. These make it ask something of you.
+
+   Each tier adds one, and they stack:
+     2+  PLATED   - 55% of damage soaks into plating until a heavy swing cracks it
+     3+  ENRAGED  - under half health it hits 50% harder
+     4+  CALLER   - drags in another body every third round
+     5   FRENZY   - under a third health it acts twice a round
+   The plating is the interesting one: it makes the heavy swing (which costs two
+   durability and was previously a trap) the correct opening move. */
+const RAID_MECH={
+  plated: {n:'Plated',  d:'55% of damage soaks into the plating. A heavy swing cracks it.'},
+  enraged:{n:'Enraged', d:'Hits 50% harder below half health.'},
+  caller: {n:'Caller',  d:'Drags in another body every third round.'},
+  frenzy: {n:'Frenzy',  d:'Acts twice a round below a third health.'},
+};
+function raidMechs(tier){
+  const m=[];
+  if(tier>=2)m.push('plated');
+  if(tier>=3)m.push('enraged');
+  if(tier>=4)m.push('caller');
+  if(tier>=5)m.push('frenzy');
+  return m;
+}
+// A boss must stay frightening at level 20, not just at level 3. Her health more
+// than doubles across that span while a raid's did not move at all.
+function raidScale(){return 1+Math.max(0,(S.lvl||1)-3)*0.055;}
 function enemyPhase(){
   for(const e of alive()){
     if(e.stun>0){e.stun--;clog(e.n+' is still down.','');continue;}
@@ -1569,7 +1609,19 @@ function enemyPhase(){
       if(e.g==='flee'&&e.hp<e.max/4){e.dead=true;e.hp=0;e.fled=true;clog(e.n+' vaults the fence and is gone. The bounty walks with him, but he dropped his bag.','sys');S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:6});S.keys++;continue;}
       if(e.g==='slow'&&C.turn%2===1){clog(e.n+' winds up.','');continue;}
     }
-    const swings=e.fast&&C.turn%2===0?2:1;
+    if(e.enrage&&!e.enraged&&e.hp<e.max/2){e.enraged=true;e.dmg=e.dmg.map(x=>Math.round(x*1.5));
+      clog(e.n+' stops holding back.','hit');SFX.play('growl');}
+    // Capped at two. Uncapped, a ten-round fight spawned three extra bodies and
+    // snowballed into something no amount of skill survives - the simulation put
+    // a fully kitted level 15 at a 2% win rate. A threat you cannot answer is not
+    // difficulty, it is a wall.
+    if(e.caller&&C.turn%3===0&&(e.called||0)<2&&alive().length<5){
+      e.called=(e.called||0)+1;
+      const w=mk(Math.random()<0.5?'walker':'runner');C.enemies.push(w);
+      clog(e.n+' bellows, and another one shoulders in.','hit');}
+    const frenzied=e.frenzy&&e.hp<e.max/3;
+    if(frenzied&&!e.wasFrenzied){e.wasFrenzied=true;clog(e.n+' goes berserk.','hit');SFX.play('growl');}
+    const swings=(e.fast&&C.turn%2===0?2:1)+(frenzied?1:0);
     for(let i=0;i<swings;i++){if(Math.random()<e.hit-sk('adrenaline')*0.06-(e.human?sk('intimidate')*0.08:0)){let d=rint(e.dmg[0],e.dmg[1]);if(e.g==='crit'&&Math.random()<0.2){d*=2;clog('A brutal swing.','hit');}
       const guards=activeCrew();if(guards.length&&Math.random()<0.3){const gc=pick(guards);clog(e.n+' turns on '+gc.name+'.','hit');hurtCrew(gc,Math.max(1,d-2));continue;}
       hurt(d,e.n);
@@ -1638,7 +1690,7 @@ function renderCombat(){
   $('#sheet').innerHTML=`<h2>${C.where==='raid'?'Defend the base':C.where==='road'?'On the road':'Inside'} <span class="chip d" style="float:right">round ${C.turn}</span></h2>
   <div class="pbox${phurt?' hurt':''}"><div class="sp${plunge?' lunge':''}">${ART.avatarSVG(S.av,60,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',mood:S.hp<maxHp()*0.3?'angry':''})}${flash?'<span class="muzzle">✳️</span>':''}</div><div><div class="hplab"><span>You · DR ${dr()}</span><span>${S.hp} / ${maxHp()}</span></div><div class="hpbar"><i style="width:${S.hp/maxHp()*100}%"></i></div></div>${phurt?`<span class="dmg">-${C.pfx.d}</span>`:''}</div>
   ${S.buff&&S.buff.fights>0?`<div class="help" style="margin-top:6px;color:var(--amber)">${esc(BUFF_TEXT[S.buff.k]||'')}</div>`:''}
-  <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}${hit?`<span class="spark">${SPARK[e.fx.k||'slash']}</span>`:''}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
+  <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}${hit?`<span class="spark">${SPARK[e.fx.k||'slash']}</span>`:''}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.plate&&!e.cracked?' · <b style="color:var(--steel)">plated</b>':''}${e.enraged?' · <b style="color:#ff8a92">enraged</b>':''}${e.caller?' · calls more':''}${e.frenzy?' · frenzies low':''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
   <div class="acts">
     <button class="btn r" onclick="attackGuard()">${w?w.e+' '+esc(w.n)+(temperOf(w)?' <span class="chip s">'+esc(temperOf(w).n)+'</span>':''):'👊 Fists'}<small>${w?(wDmg(w)[0]+dmgBonus())+'-'+(wDmg(w)[1]+dmgBonus())+' · '+w.dur+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
     <button class="btn" onclick="heavyGuard()" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · ${60+sk('bruiser')*12}% hit · costs 2 durability</small></button>
@@ -2569,6 +2621,13 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.44',d:'Sep 17',t:'Raids fight back now',
+  i:['You were right and it was worse than you thought. I simulated 300 fights per tier: a LEVEL 3 character with a machete and no armour beat a tier 5 raid 100% of the time. The old numbers looked fine because dying and respawning was being scored as a win.',
+     'RAID BOSSES HAVE MECHANICS NOW, and they stack by tier. PLATED (tier 2+): 55% of your damage soaks into the plating until a HEAVY SWING cracks it open - the heavy swing is now the correct opening move, not a trap. ENRAGED (3+): hits 50% harder below half health. CALLER (4+): drags in another body every third round, up to two. FRENZY (5): acts twice a round below a third health.',
+     'YOU CAN ONLY PATCH UP TWICE IN A FIGHT (three times with Field Dressing). Ten meds used to be four hundred free health and no boss could out-damage a backpack.',
+     'THE SHARED HEALTH BAR IS REAL. You now face what is LEFT of it, not a fresh boss. Every attempt sticks for two hours, so friends chip the same pool - and losing still pays scrap and XP, and your seat stays paid.',
+     'A TIER 5 IS NO LONGER A SOLO FIGHT. Alone you will almost certainly lose the first few goes. That is the point. Bring people, or wear it down over the two hours.',
+     'Raid bosses scale their DAMAGE with your level rather than their health, so they stay dangerous at level 20 without turning into ten-minute slogs.']},
  {v:'6.43',d:'Sep 17',t:'Readable raid list, on foot only, and a gift limit',
   i:['THE LIVE RAID LIST WAS UNREADABLE. It was borrowing the leaderboard\'s layout, which is a four-column grid for rank, avatar, name and score - so a raid\'s name landed in the 44-pixel avatar slot and wrapped one word per line. It has its own layout now: tier badge, name, address, time left, and what you can do about it.',
      'ON FOOT ONLY. Driving to a raid no longer counts. Above 32 km/h the game marks you as in a vehicle, and you need about 75 seconds back on foot before you can join a raid or search a place. A hard run and a bicycle are both well under the line, so nothing you do on your own legs trips it.',
