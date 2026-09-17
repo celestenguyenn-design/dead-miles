@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.35';
+const VERSION='6.36';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -203,7 +203,7 @@ const RIVALS=[
   {id:'nadia',n:'Nadia\'s crew',av:{skin:4,hair:'curly',hairColor:0,eyes:'sparkle',top:'biker',topColor:3},pace:[4200,4500,4200,4400,5000,12500,11500],blurb:'Quiet all week, then two huge weekend hauls.'}
 ];
 const PTS_PER_STEP=0.085;
-const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic comes pre-built',gas:'Generator comes pre-built',grocery:'Garden comes pre-built',police:'Armory comes pre-built and walls start at level 1',clinic:'Clinic comes pre-built',hardware:'Walls start at level 1 and builds cost 10% less',diner:'A full freezer: +2 food every morning',surplus:'Armory comes pre-built, traps start at level 1',stronghold:'Raiders want it back: +40% raid odds, but the loot pile respawns weekly'};
+const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic comes pre-built',gas:'Generator pre-built - 5,000 steps of work, 6 defense, and raiders come 30% less often, forever',grocery:'Garden comes pre-built',police:'Armory and level 1 walls pre-built - 4,000 steps and 35 scrap of work, and 8 defense',clinic:'Clinic comes pre-built',hardware:'Level 1 walls pre-built, and every build here costs 10% less, forever',diner:'A full freezer: +2 food every morning',surplus:'Armory and level 1 traps pre-built - 3,500 steps and 32 scrap of work, and 6 defense',stronghold:'Raiders want it back: +40% raid odds, but the loot pile respawns weekly'};
 
 /* ================= state ================= */
 let S=null;
@@ -1579,9 +1579,30 @@ function leaveLoc(){
 }
 
 /* ================= base ================= */
+// What you already sank into the base you are about to walk away from.
+function baseSunk(){
+  if(!S.base)return {steps:0,scrap:0,def:0,rooms:[]};
+  let steps=0,scrap=0;const rooms=[];
+  for(const [k,l] of Object.entries(S.base.rooms||{})){
+    if(!l||!BUILD[k])continue;
+    for(let i=0;i<l;i++){steps+=BUILD[k].labor[i]||0;scrap+=BUILD[k].cost[i]||0;}
+    rooms.push(BUILD[k].n+(BUILD[k].lv>1?' L'+l:''));
+  }
+  return {steps,scrap,def:defense(),rooms};
+}
 function claimBase(){
   const loc=S.loc;if(!loc||!loc.cleared)return;
   if(S.base&&S.stock.scrap<20){toast('Moving base costs 20 scrap');return;}
+  // Moving has always wiped every room you built - it just never said so.
+  // Twenty scrap is not the price of moving. The walls are.
+  if(S.base){
+    const k=baseSunk();
+    if(k.rooms.length&&!confirm(
+      'Move your base to '+loc.n+'?\n\n'
+      +'You LOSE everything built at '+S.base.n+': '+k.rooms.join(', ')+'.\n'
+      +'That is '+fmt(k.steps)+' steps and '+k.scrap+' scrap of work, and '+k.def+' defense.\n'
+      +'Nothing carries over - the new base starts with whatever that building came with.'))return;
+  }
   if(S.base)S.stock.scrap-=20;S.horde=null;S.work=null;
   const rooms={};
   if(loc.t==='pharmacy'||loc.t==='clinic')rooms.clinic=1;if(loc.t==='gas')rooms.generator=1;if(loc.t==='grocery')rooms.garden=1;
@@ -2343,7 +2364,7 @@ function renderLoc(){
     el.innerHTML=`<h2>🏴 ${esc(loc.n)} <span class="sub">stage ${loc.stage}/3</span></h2><p><b style="color:var(--bone)">WANTED: ${esc(bossName())}</b>. Fires, tents, a trailer with a padlock. Fight through ${next?next:'nothing, it is yours'}${loc.stage<3?', or take what you have and go':''}. Every stage you clear opens its loot.</p>
     ${loc.stage>0?`<div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div><div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done||r.stage>loc.stage?'disabled':''}><span class="n">${esc(r.n)}</span><span class="m">${r.done?'searched':r.stage>loc.stage?'locked: stage '+r.stage:'noise +'+r.noise}</span></button>`).join('')}</div>`:''}
     ${loc.found.length?`<div class="section-label" style="margin-top:12px">Found here</div><div class="loot" style="margin-top:6px">${loc.found.map(it=>`<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span>${esc(it.n)}<span class="pt">+${it.pts}</span></div>`).join('')}</div>`:''}
-    ${bankedLine()}<div class="grid2" style="margin-top:12px">${next?`<button class="btn d" onclick="pushStage()">Push to ${next}</button>`:`<button class="btn" onclick="claimBase()">${S.base?'Move base here (20 scrap)':'Claim as base'}</button>`}<button class="btn ${next?'':'r'}" onclick="leaveLoc()">${loc.stage?'Take the loot and go':'Keep walking'}</button></div>`;return;}
+    ${bankedLine()}<div class="grid2" style="margin-top:12px">${next?`<button class="btn d" onclick="pushStage()">Push to ${next}</button>`:`<button class="btn" onclick="claimBase()">${S.base?(baseSunk().rooms.length?'Move base · lose what you built':'Move base here (20 scrap)'):'Claim as base'}</button>`}<button class="btn ${next?'':'r'}" onclick="leaveLoc()">${loc.stage?'Take the loot and go':'Keep walking'}</button></div>`;return;}
   if(loc.rival){const r=RIVALS.find(x=>x.id===loc.rival);const first=r.n.split("'")[0];
     const body=loc.rival==='theo'?`<p><b style="color:var(--bone)">${esc(r.n)}</b> is jogging up the other side of the street toward the same door. Theo grins at you.</p><div class="grid2" style="margin-top:12px"><button class="btn r" onclick="rivalAct('race')">Race them in (${Math.round((0.5+(S.lvl-1)*0.03+roleLvl('scout')*0.05)*100)}%)</button><button class="btn" onclick="rivalAct('wait')">Let them go first</button></div><p class="help" style="margin-top:8px">Win the race: first pick, 30% more loot. Lose: scraps. Wait: they clear the walkers for you, costs 150 steps.</p>`
       :loc.rival==='maya'?`<p><b style="color:var(--bone)">${esc(r.n)}</b> has a fire going out front. Maya waves you over: "Three food for two antibiotics. Fair?"</p><div class="grid2" style="margin-top:12px"><button class="btn a" onclick="rivalAct('trade')">Trade (3 food → 2 antibiotics)</button><button class="btn" onclick="S.loc.rival='';save();render()">No thanks</button></div>`
@@ -2355,7 +2376,7 @@ function renderLoc(){
   <div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span><span class="help">${loc.noise>=70?'Something is stirring':loc.noise>=40?'Keep it down':'Quiet'}</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div>
   <div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done?'disabled':''}><span class="n">${esc(r.n)}</span><span class="m">${r.done?'searched':'noise +'+r.noise}</span>${r.peek&&!r.done?`<span class="peek">🔭 ${esc(r.peek)}</span>`:''}</button>`).join('')}</div>
   ${loc.found.length?`<div class="section-label" style="margin-top:12px">Found here</div><div class="loot" style="margin-top:6px">${loc.found.map(it=>`<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span>${esc(it.n)}<span class="pt">+${it.pts}</span></div>`).join('')}</div>`:''}
-  ${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn ${done?'r':''}" onclick="leaveLoc()">${done?'Move on':'Leave the rest'}</button><button class="btn" onclick="claimBase()">${S.base?'Move base here (20 scrap)':'Claim as base'}</button></div>`;
+  ${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn ${done?'r':''}" onclick="leaveLoc()">${done?'Move on':'Leave the rest'}</button><button class="btn" onclick="claimBase()">${S.base?(baseSunk().rooms.length?'Move base · lose what you built':'Move base here (20 scrap)'):'Claim as base'}</button></div>`;
 }
 function bankedLine(){const b=S.walk.banked||0;if(!b)return '';const d=district();const avg=(d.dist[0]+d.dist[1])/2;const n=Math.floor(b/avg);return `<p class="help" style="margin-top:10px">🚶 <b style="color:var(--bone)">${fmt(b)} steps saved</b> while you stop here. They carry you onward the moment you leave${n>=1?' (about '+n+' more place'+(n>1?'s':'')+' already reached)':''}.</p>`;}
 function baseScene(st){st=st||S;if(!st.base)return '';
@@ -2421,6 +2442,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.36',d:'Sep 17',t:'Moving your base tells you what it costs',
+  i:['MOVING YOUR BASE HAS ALWAYS DESTROYED EVERY ROOM YOU BUILT. It never said so - the button just read "Move base here (20 scrap)". Twenty scrap is not the price. The walls are.',
+     'It now warns you first, listing exactly what you lose: the rooms, the steps and scrap they took, and the defense. A base with level 4 walls is over 26,000 steps of work.',
+     'The button says "lose what you built" when you have something to lose, and stays quiet when you do not.',
+     'Every base type now states what its free rooms are actually worth, so you can compare. The Gas station is the most valuable claim in the game (5,000 steps of work and 30% fewer raids, forever), not the police station.']},
  {v:'6.35',d:'Sep 17',t:'No weapon has infinite hits, and repair prices follow power',
   i:['GUNS WEAR OUT NOW. They never did - the 9mm, the shotgun, Mercy and Whisper could fire forever. Every weapon in the game has a use count: Mercy 8 shots, Whisper 12, the 9mm 10, the shotgun 6.',
      'REPAIR PRICES NOW FOLLOW HOW HARD A WEAPON HITS, not the word printed on it. Two legendaries can be very different weapons - Mercy does 46 damage a shot and Whisper does 28 - so charging them the same was wrong.',
