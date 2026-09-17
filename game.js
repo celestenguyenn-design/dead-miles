@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.46';
+const VERSION='6.47';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -227,7 +227,7 @@ const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic co
 
 /* ================= state ================= */
 let S=null;
-function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},infect:null,diff:'normal',checkin:{date:'',n:0},ladder:{date:'',hit:[]},
+function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},infect:null,diff:'normal',mapSkin:'bloom',checkin:{date:'',n:0},ladder:{date:'',hit:[]},
   steps:{total:0,today:0,date:todayStr(),lastSync:0,lastSyncDate:''},
   walk:{toNext:0,dist:500,district:0,houses:0,progress:0,banked:0},
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
@@ -241,7 +241,7 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
 function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
-  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(S.parts===undefined)S.parts=0;if(S.buff===undefined)S.buff=null;
+  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(S.buff===undefined)S.buff=null;
   // A temper can lower a weapon's ceiling, so never let a stored durability
   // sit above it - that renders as "9 / 7" and repairs would read as free.
   for(const g of (S.gear||[])){
@@ -578,6 +578,14 @@ const DIFF={
   brutal:{n:'Hollow',   d:'For the people who asked for a grind. Do not pick this to relax.',
           enemy:1.5, infect:2.6, scrap:0.30, meds:1, raid:1.3},
 };
+/* Map skin. She asked for "cuter, kind of like Pikmin Bloom" - so Bloom is the
+   default now, and the original grim night map stays as an option rather than
+   being thrown away. */
+const MAPSKINS={bloom:{n:'Bloom',d:'Warm daylight, soft chunky pins. Cute.'},
+                hollow:{n:'Hollow',d:'The original: a cold, inverted night map.'}};
+function mapSkin(){return (typeof S!=='undefined'&&S&&S.mapSkin)||'bloom';}
+function applyMapSkin(){const m=$('#v-map');if(m)m.classList.toggle('map-bloom',mapSkin()==='bloom');}
+function setMapSkin(k){if(!MAPSKINS[k])return;S.mapSkin=k;applyMapSkin();save();render();toast(MAPSKINS[k].n+' map','a');}
 function diff(){return DIFF[(typeof S!=='undefined'&&S&&S.diff)||'normal']||DIFF.normal;}
 function setDiff(k){if(!DIFF[k])return;S.diff=k;log('Difficulty set to '+DIFF[k].n+'.');toast(DIFF[k].n,'a');save();render();}
 const INFECT_BASE=0.012, INFECT_PER_STEPS=600;
@@ -2288,6 +2296,11 @@ async function pushOff(){
   }catch(e){}
   S.push=false;save();toast('Notifications off');renderPush();
 }
+function renderMapSkin(){
+  const el=$('#skinRow');if(!el)return;
+  el.innerHTML=Object.entries(MAPSKINS).map(([k,m])=>
+    '<button class="btn xs'+(mapSkin()===k?' a':' ghost')+'" onclick="setMapSkin(\''+k+'\')">'+esc(m.n)+'</button>').join('');
+}
 function renderDiff(){
   const el=$('#diffBody');if(!el)return;
   el.innerHTML='<p class="help">Change it whenever you like. Nothing you own is affected.</p>'
@@ -2709,6 +2722,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.47',d:'Sep 17',t:'The map is cute now',
+  i:['A BLOOM MAP SKIN, and it is the new default. Warm daylight instead of the cold inverted night map, soft cream streets, and chunky rounded pins in white with a proper drop shadow so they sit ON the world instead of floating over it.',
+     'Your character stands on a little shadow puddle, and the pins breathe with a slow bob. Reduced-motion settings are respected.',
+     'The old look is still there as HOLLOW - there is a Bloom / Hollow switch right on the map screen, above the buttons. Pick whichever you like; it is remembered.',
+     'It is a treatment of the same OpenStreetMap tiles rather than a different map provider, so nothing got slower and nothing new is downloaded.']},
  {v:'6.46',d:'Sep 17',t:'A DIFFICULTY SETTING, and infection that never punishes time away',
   i:['You were right twice. Infection was too common AND it got worse just because days passed - so someone who could not get out for two days came back with a third of their health gone. That punishes having a life, in a game whose whole point is making walking feel good.',
      'IT NO LONGER WORSENS WITH TIME. Ever. It only turns worse if you take ANOTHER bite while it is running. A week away costs you nothing.',

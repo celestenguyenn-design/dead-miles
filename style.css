@@ -255,7 +255,38 @@ a{color:var(--amber)}
 .leaflet-control-attribution a{color:#aaa!important}
 
 /* OSM tiles are light; invert them so the street map matches the game's dark look */
+/* Two map skins. HOLLOW is the original: inverted into a grim night map.
+   BLOOM is what she asked for - soft, warm, toy-like, the Pikmin Bloom feeling.
+   It is a filter on the same OpenStreetMap tiles rather than a different tile
+   provider, so it costs nothing and works offline-cached exactly as before:
+   pull the saturation down so the road spaghetti stops shouting, lift the
+   brightness so it reads as daylight, then warm the whole thing with a sepia
+   pass and bring back a gentler saturation on top. */
 .dm-tiles{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.6)}
+.map-bloom .dm-tiles{filter:saturate(.45) brightness(1.1) contrast(.82) sepia(.28) saturate(1.25) hue-rotate(-6deg)}
+.map-bloom #map{background:#eef3e2}
+/* Markers: chunky, rounded, with a soft drop rather than a hard black shadow. */
+.map-bloom .poi{background:rgba(255,253,248,.96);border:3px solid #fff;color:#3b3b44;
+  box-shadow:0 3px 0 rgba(120,110,95,.28),0 6px 14px rgba(120,110,95,.22);border-radius:14px;
+  width:38px;height:38px;font-size:19px}
+.map-bloom .poi.near{border-color:#ffd66e;box-shadow:0 3px 0 rgba(190,140,20,.3),0 0 0 5px rgba(255,214,110,.4),0 8px 18px rgba(190,140,20,.25)}
+.map-bloom .poi.sh{border-color:#ffb3c7}
+.map-bloom .poi.base{border-color:#a8e6a1;width:44px;height:44px}
+.map-bloom .poi.raid{border-color:#fff;box-shadow:0 3px 0 color-mix(in srgb,var(--rc) 45%,transparent),0 0 0 5px color-mix(in srgb,var(--rc) 30%,transparent),0 8px 18px rgba(0,0,0,.18)}
+.map-bloom .poi.raid b{border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.2)}
+.map-bloom .poi.looted{opacity:.4}
+/* You, with a little shadow puddle so you sit ON the world instead of over it. */
+.map-bloom .me-icon{filter:drop-shadow(0 4px 3px rgba(90,80,70,.35))}
+.map-bloom .me-icon::after{content:'';position:absolute;left:50%;bottom:2px;width:26px;height:8px;
+  transform:translateX(-50%);border-radius:50%;background:rgba(90,80,70,.20);z-index:-1}
+.map-bloom .z-icon{filter:drop-shadow(0 3px 2px rgba(90,80,70,.3))}
+.map-bloom .leaflet-control-attribution{background:rgba(255,255,255,.62)!important;color:#6b6b74!important}
+.map-bloom .leaflet-control-attribution a{color:#4a7fb5!important}
+/* a slow, soft bob so the map never feels dead */
+.map-bloom .poi{animation:bloombob 3.4s ease-in-out infinite}
+.map-bloom .poi.near{animation:pulse 1.4s infinite}
+@keyframes bloombob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@media(prefers-reduced-motion:reduce){.map-bloom .poi{animation:none}}
 
 /* trader */
 .trade{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}

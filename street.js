@@ -63,6 +63,7 @@ function streetStart(){
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',className:'dm-tiles'}).addTo(STREET.map);
   }
   setTimeout(()=>{STREET.map.invalidateSize();if(STREET.pos)STREET.map.setView([STREET.pos.lat,STREET.pos.lon],17);},50);
+  try{applyMapSkin();renderMapSkin();}catch(e){}
   $('#mapStatus').textContent=STREET.pos?STREET.pois.length+' places nearby':'Finding you...';
   if(navigator.wakeLock)navigator.wakeLock.request('screen').then(w=>STREET.wake=w).catch(()=>{});
   STREET.watch=navigator.geolocation.watchPosition(onPos,e=>{STREET.err=e.message;$('#mapStatus').textContent=e.code===1?'Location is blocked. Allow it for this site in Settings > Safari > Location (or the site settings) and reopen.':'Waiting for GPS: '+e.message;},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
