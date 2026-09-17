@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.42';
+const VERSION='6.43';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -227,7 +227,7 @@ const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic co
 
 /* ================= state ================= */
 let S=null;
-function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,checkin:{date:'',n:0},ladder:{date:'',hit:[]},
+function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},checkin:{date:'',n:0},ladder:{date:'',hit:[]},
   steps:{total:0,today:0,date:todayStr(),lastSync:0,lastSyncDate:''},
   walk:{toNext:0,dist:500,district:0,houses:0,progress:0,banked:0},
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
@@ -241,7 +241,7 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
 function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
-  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(S.parts===undefined)S.parts=0;if(S.buff===undefined)S.buff=null;
+  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.parts===undefined)S.parts=0;if(S.buff===undefined)S.buff=null;
   // A temper can lower a weapon's ceiling, so never let a stored durability
   // sit above it - that renders as "9 / 7" and repairs would read as free.
   for(const g of (S.gear||[])){
@@ -338,7 +338,7 @@ async function loadCloudSnaps(){
   if(!o.ok){if(el)el.innerHTML='<p class="help">Go online first (Base tab, Settings) and these appear.</p>';return;}
   if(el)el.innerHTML='<p class="help">Checking the server...</p>';
   try{const rows=await rpc('list_saves',{p_handle:o.handle,p_token:o.token});
-    CLOUD_SNAPS=rows||[];renderCloudSnaps();
+    CLOUD_SNAPS=Array.isArray(rows)?rows:[];renderCloudSnaps();
   }catch(e){if(el)el.innerHTML='<p class="help">Could not reach the server: '+esc(e.message)+'</p>';}
 }
 function renderCloudSnaps(){
@@ -752,15 +752,46 @@ function giftSheet(uidv){
   const o=O();if(!o.ok){toast('Go online first (Settings)','d');return;}
   const mates=(friends||[]).filter(f=>f.handle&&f.handle!==o.handle&&!(S.hidden||[]).includes(f.handle));
   if(!mates.length){openSheet('<h2>Send a gift</h2><p>Nobody on the board yet but you. Once your friends are online they show up here.</p><button class="btn r wide" onclick="closeSheet()">Close</button>',true);return;}
+  const stop=giftBlocked(g);
+  if(stop){
+    openSheet('<h2>Cannot send that</h2><p>'+esc(stop)+'</p>'
+      +'<div class="kv" style="margin-top:8px"><span>Gift allowance today</span><b>'+giftLeft()+' of '+GIFT_BUDGET+'</b>'
+      +'<span>This piece costs</span><b>'+giftCost(g)+'</b></div>'
+      +'<p class="help" style="margin-top:8px">A common or uncommon piece costs 1, rare 2, epic 3, legendary 5. It resets at midnight.</p>'
+      +'<button class="btn r wide" style="margin-top:10px" onclick="closeSheet()">Close</button>',true);
+    return;
+  }
   openSheet('<h2>Send '+esc(g.n)+'</h2>'
     +'<p class="help">It leaves your pack and lands in theirs the next time they open the game. You cannot take it back.</p>'
+    +'<div class="kv" style="margin-top:6px"><span>This one costs</span><b>'+giftCost(g)+' of your gift allowance</b>'
+    +'<span>Left today</span><b>'+giftLeft()+' of '+GIFT_BUDGET+'</b></div>'
     +'<input id="giftNote" maxlength="120" placeholder="say something (optional)" style="width:100%;margin:8px 0">'
     +mates.slice(0,10).map(f=>'<button class="btn wide" style="margin-top:6px" onclick="sendGift(\''+esc(uidv)+'\',\''+esc(f.handle)+'\')">'
       +esc(f.name||f.handle)+' <span class="help">@'+esc(f.handle)+'</span></button>').join('')
     +'<button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet()">Not now</button>',true);
 }
+/* ================= GIFT LIMITS (v6.43) =================
+   Her words: "we can't like gift our whole ass inventory." Without a cap, two
+   accounts hand the same legendary back and forth and the loot economy stops
+   meaning anything. The limit is per DAY and weighted by rarity, so ordinary
+   kindness - passing a spare machete to a friend who is stuck - stays free,
+   and shipping your vault does not. */
+const GIFT_COST={common:1,uncommon:1,rare:2,epic:3,legendary:5};
+const GIFT_BUDGET=6;
+function giftDay(){const d=S.gifts||(S.gifts={date:'',spent:0});if(d.date!==S.steps.date){d.date=S.steps.date;d.spent=0;}return d;}
+function giftCost(g){return GIFT_COST[g&&g.r||'common']||1;}
+function giftLeft(){return Math.max(0,GIFT_BUDGET-giftDay().spent);}
+function giftBlocked(g){
+  const c=giftCost(g);
+  if(c>giftLeft())return 'That is '+c+' of your gift allowance and you have '+giftLeft()+' left today.';
+  if((S.gear||[]).filter(x=>x.slot===g.slot&&!x.broken).length<=1&&g.slot==='melee')
+    return 'That is your only weapon. Keep it.';
+  return '';
+}
 async function sendGift(uidv,to){
   const o=O();const g=(S.gear||[]).find(x=>x.uid===uidv);if(!g||!o.ok)return;
+  const stop=giftBlocked(g);
+  if(stop){toast(stop,'d');return;}
   const note=($('#giftNote')&&$('#giftNote').value||'').slice(0,120);
   closeSheet();toast('Sending...');
   let r;
@@ -772,7 +803,9 @@ async function sendGift(uidv,to){
   // only now does it leave your pack
   S.gear=S.gear.filter(x=>x.uid!==uidv);
   for(const k in S.eq)if(S.eq[k]===uidv)S.eq[k]=null;
-  log('Sent '+g.n+' to @'+to+'.');toast(g.n+' sent','z');SFX.play('chest');save();render();pushPlayer();
+  giftDay().spent+=giftCost(g);
+  log('Sent '+g.n+' to @'+to+'. '+giftLeft()+' of your gift allowance left today.');
+  toast(g.n+' sent · '+giftLeft()+' allowance left','z');SFX.play('chest');save();render();pushPlayer();
 }
 async function takeGifts(){
   const o=O();if(!o.ok)return;
@@ -2412,7 +2445,7 @@ function render(){
     ra.classList.toggle('off',S.stock.scrap<Math.min(...broke.map(repairCost).concat([Infinity])));
   }
   $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=(g.slot==='melee'||g.slot==='ranged')&&g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+(g.dur+'/'+repairMax(g)+' durability')):g.slot==='ranged'?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+g.dur+'/'+repairMax(g)+' · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';const sh=(g.r==='legendary'||g.r==='epic')?' shine'+(g.r==='legendary'?' leg':''):'';
-    return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''}${temperOf(g)?` <span class="chip${g.temper==='perfect'?' a':g.temper==='crude'?' d':''}">${esc(temperOf(g).n)}</span>`:''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${repairMax(g)&&repairMissing(g)?`<button class="btn sm${g.broken?' r':''}${S.stock.scrap<repairCost(g)?' off':''}" onclick="repair('${g.uid}')">Repair ${repairCost(g)}🔩</button>`:''}${benchable(g)?`<button class="btn sm" onclick="benchSheet('${g.uid}')">🛠️ Workbench</button>`:''}<button class="btn sm ghost" onclick="giftSheet('${g.uid}')">Gift</button><button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
+    return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''}${temperOf(g)?` <span class="chip${g.temper==='perfect'?' a':g.temper==='crude'?' d':''}">${esc(temperOf(g).n)}</span>`:''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${repairMax(g)&&repairMissing(g)?`<button class="btn sm${g.broken?' r':''}${S.stock.scrap<repairCost(g)?' off':''}" onclick="repair('${g.uid}')">Repair ${repairCost(g)}🔩</button>`:''}${benchable(g)?`<button class="btn sm" onclick="benchSheet('${g.uid}')">🛠️ Workbench</button>`:''}<button class="btn sm ghost${giftBlocked(g)?' off':''}" onclick="giftSheet('${g.uid}')">Gift ${giftCost(g)}</button><button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
   // you
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
   $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):baseDmg()[0]+'-'+baseDmg()[1]} +${S.lvl-1}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
@@ -2536,6 +2569,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.43',d:'Sep 17',t:'Readable raid list, on foot only, and a gift limit',
+  i:['THE LIVE RAID LIST WAS UNREADABLE. It was borrowing the leaderboard\'s layout, which is a four-column grid for rank, avatar, name and score - so a raid\'s name landed in the 44-pixel avatar slot and wrapped one word per line. It has its own layout now: tier badge, name, address, time left, and what you can do about it.',
+     'ON FOOT ONLY. Driving to a raid no longer counts. Above 32 km/h the game marks you as in a vehicle, and you need about 75 seconds back on foot before you can join a raid or search a place. A hard run and a bicycle are both well under the line, so nothing you do on your own legs trips it.',
+     'Joining from home with a flare is unaffected - you are not driving TO that one.',
+     'A GIFT LIMIT. Six points of gift allowance a day: a common or uncommon piece costs 1, rare 2, epic 3, legendary 5. So one legendary a day, or a handful of spares, but not your whole inventory. You also cannot gift what you are wearing, or your only weapon.']},
  {v:'6.42',d:'Sep 17',t:'A Brooklyn block full of buildings said "no places found"',
   i:['The old lookup asked for shops AND parks AND every building in ONE request. On a dense city block the building half alone is hundreds of buildings, so the whole thing hit the server\'s time limit and came back empty - taking the pharmacy across the road down with it.',
      'It is two separate requests now. A slow building lookup can no longer wipe out the shops, and you get whichever half succeeded.',

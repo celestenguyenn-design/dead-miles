@@ -8,6 +8,46 @@ const POI_KIND={pharmacy:['pharmacy','💊'],police:['police','🚓'],fuel:['gas
   school:['stronghold','🏴'],park:['stronghold','🏴'],college:['stronghold','🏴']};
 const HOUSE_KINDS=['house','residential','apartments','detached','semidetached_house','terrace','yes','bungalow'];
 function geoDist(a,b){const R=6371000,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180;const x=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+/* ================= ON FOOT ONLY (v6.43) =================
+   Her rule: driving to a raid should not count. The whole game is a walking
+   game, and a car turns "walk to the corner" into "drive past it".
+
+   Thresholds chosen so that nothing a human does on foot trips it. A fast walk
+   is about 1.5 m/s, a hard run 4-5, a bike 5-7. VEHICLE is 9 m/s (32 km/h),
+   which nobody reaches without an engine. Below that, play is untouched.
+
+   Being in a car is not a punishment, it is a pause: once you are back under
+   walking speed, a short settle and you are playing again. That way a bus ride
+   past a raid costs nothing, and driving to one buys you nothing. */
+const VEHICLE_MS=9, SETTLE_MS=75000;
+function speedNow(){
+  const h=STREET.spd||[];if(h.length<2)return 0;
+  const a=h[h.length-2],b=h[h.length-1];
+  const dt=(b.t-a.t)/1000;if(dt<=0.4)return STREET.lastSpd||0;
+  return geoDist(a,b)/dt;
+}
+function noteSpeed(pos,gps){
+  if(!STREET.spd)STREET.spd=[];
+  STREET.spd.push({lat:pos.lat,lon:pos.lon,t:Date.now()});
+  if(STREET.spd.length>6)STREET.spd.shift();
+  // Trust the GPS chip's own speed when it gives one - it is far steadier than
+  // differencing two fixes, which a jumpy urban position makes look like 30 m/s.
+  const measured=(typeof gps==='number'&&gps>=0)?gps:speedNow();
+  STREET.lastSpd=measured;
+  if(measured>=VEHICLE_MS)STREET.lastFast=Date.now();
+}
+function drivingLock(){
+  if(!STREET.lastFast)return 0;
+  const left=SETTLE_MS-(Date.now()-STREET.lastFast);
+  return left>0?Math.ceil(left/1000):0;
+}
+// One gate, used by everything that is supposed to require being there on foot.
+function onFootCheck(what){
+  const left=drivingLock();
+  if(!left)return true;
+  toast('You are moving too fast to '+what+'. On foot in '+left+'s.','d');
+  return false;
+}
 function streetState(){if(!S.street)S.street={looted:{},visits:0};return S.street;}
 function reachRadius(){const acc=STREET.pos&&STREET.pos.acc||20;return Math.min(70,Math.max(35,acc+15));}
 
@@ -27,11 +67,12 @@ function streetStart(){
   if(navigator.wakeLock)navigator.wakeLock.request('screen').then(w=>STREET.wake=w).catch(()=>{});
   STREET.watch=navigator.geolocation.watchPosition(onPos,e=>{STREET.err=e.message;$('#mapStatus').textContent=e.code===1?'Location is blocked. Allow it for this site in Settings > Safari > Location (or the site settings) and reopen.':'Waiting for GPS: '+e.message;},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
   STREET.timer=setInterval(zombieTick,4000);
+  STREET.lockTimer=setInterval(()=>{if(STREET.on&&drivingLock())renderStreet();},2000);
   render();
 }
 function streetStop(){
   STREET.on=false;if(STREET.watch!==null){navigator.geolocation.clearWatch(STREET.watch);STREET.watch=null;}
-  clearInterval(STREET.timer);if(STREET.wake){try{STREET.wake.release();}catch(e){}STREET.wake=null;}
+  clearInterval(STREET.timer);clearInterval(STREET.lockTimer);if(STREET.wake){try{STREET.wake.release();}catch(e){}STREET.wake=null;}
   $('#v-street').insertBefore($('#locCard'),$('#raidCard'));
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-street'));document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x.dataset.v==='street'));
   render();
@@ -39,7 +80,8 @@ function streetStop(){
 
 /* ---------- position ---------- */
 function onPos(p){
-  const pos={lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy||20};const first=!STREET.pos;STREET.pos=pos;
+  const pos={lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy||20};const first=!STREET.pos;
+  noteSpeed(pos,p.coords.speed);STREET.pos=pos;
   if(!STREET.me){STREET.me=L.marker([pos.lat,pos.lon],{icon:L.divIcon({className:'me-icon',html:ART.avatarSVG(S.av,44),iconSize:[44,57],iconAnchor:[22,54]}),zIndexOffset:1000}).addTo(STREET.map);
     STREET.accC=L.circle([pos.lat,pos.lon],{radius:pos.acc,color:'#8fb3c9',weight:1,fillOpacity:.08}).addTo(STREET.map);}
   else{STREET.me.setLatLng([pos.lat,pos.lon]);STREET.accC.setLatLng([pos.lat,pos.lon]).setRadius(pos.acc);}
@@ -153,6 +195,7 @@ function tapPoi(id){
   if(S.loc&&S.loc.geo!==id){toast('Finish or leave '+S.loc.n+' first');return;}
   if(st==='looted'){const t=streetState().looted[id];const h=Math.ceil((24*3600000-(Date.now()-t))/3600000);toast(p.n+' is picked clean. Resets in '+h+'h');return;}
   if(st==='far'){toast(p.n+': walk closer ('+Math.round(geoDist(p,STREET.pos))+' m)');return;}
+  if(!onFootCheck('search a place'))return;   // looting from a moving car does not count
   if(S.loc&&S.loc.geo===id){$('#locCard').scrollIntoView({behavior:'smooth'});return;}
   const loc=makeLoc(p.t,p.n);loc.geo=id;loc.e=p.e;S.loc=loc;streetState().visits++;
   log('Reached '+p.n+' (on your street).');SFX.play('arrive');save();render();$('#locCard').scrollIntoView({behavior:'smooth'});
@@ -186,30 +229,48 @@ function renderRaidList(){
   const rs=liveRaids();
   if(!rs.length){el.hidden=true;return;}
   el.hidden=false;
-  rs.sort((a,b)=>b.tier-a.tier);
-  el.innerHTML='<h2>Live raids <span class="sub">'+rs.length+' nearby</span></h2>'
-    +'<p class="help">Two hours each. Everyone at the same place fights the same one.</p>'
-    +rs.slice(0,6).map(r=>{const near=raidNear(r);const done=(S.raidsDone||{})[r.id];
+  // nearest playable first: in reach, then by tier, then by what is closest
+  rs.sort((a,b)=>{
+    const an=raidNear(a)?0:1,bn=raidNear(b)?0:1;
+    const ad=(S.raidsDone||{})[a.id]?1:0,bd=(S.raidsDone||{})[b.id]?1:0;
+    return ad-bd||an-bn||b.tier-a.tier;
+  });
+  const inReach=rs.filter(r=>raidNear(r)&&!(S.raidsDone||{})[r.id]).length;
+  el.innerHTML='<h2>Live raids <span class="sub">'+(inReach?inReach+' in reach':rs.length+' nearby')+'</span></h2>'
+    +'<p class="help">Two hours each. Everyone standing at the same place fights the same one.</p>'
+    +rs.slice(0,6).map(r=>{
+      const near=raidNear(r),done=(S.raidsDone||{})[r.id];
       const mins=Math.max(0,Math.round((r.endsAt-Date.now())/60000));
-      return '<button class="lbrow" style="width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:9px 0" onclick="openRaid(\''+esc(r.poi)+'\')">'
-        +'<div class="rk" style="color:'+r.T.col+'">'+r.T.e+'</div>'
-        +'<div class="nm">'+esc(r.T.n)+' <span class="chip s">tier '+r.tier+'</span>'
-        +'<small>'+esc(r.n)+' · '+(mins>60?Math.floor(mins/60)+'h '+(mins%60)+'m':mins+'m')+' left'
-        +(done?' · cleared by you':near?' · in reach':' · walk closer')+'</small></div></button>';}).join('');
+      const left=mins>=60?Math.floor(mins/60)+'h '+(mins%60)+'m':mins+' min';
+      const tag=done?['done','Cleared']:near?['near','Fight']:['far','Walk closer'];
+      return '<button class="raidrow" style="--rc:'+r.T.col+'" onclick="openRaid(\''+esc(r.poi)+'\')">'
+        +'<span class="tb"><span class="e">'+r.T.e+'</span><span class="t">T'+r.tier+'</span></span>'
+        +'<span class="mid"><b>'+esc(r.T.n)+'</b>'
+          +'<span class="where">'+esc(r.n)+'</span>'
+          +'<span class="when">'+left+' left</span></span>'
+        +'<span class="go '+tag[0]+'">'+tag[1]+'</span>'
+      +'</button>';}).join('');
 }
+
 function renderStreet(){
   if(!STREET.on)return;const hd=homeDistance();
   try{renderRaidList();}catch(e){}
   const el=$('#mapInfo');if(!el)return;
   const near=STREET.pois.filter(p=>poiState(p)==='near').length;
   const lootedNear=STREET.pois.filter(p=>poiState(p)==='looted').length;
-  // "Nothing to loot" has two very different causes and they need different
-  // actions: no places found at all, versus places found but none in arm's reach.
-  const nearTxt=near?near+' within reach'
+  const lock=drivingLock();
+  // "Nothing to loot" has several causes and they need different actions, and
+  // being locked out for speed must never look like one of them.
+  const nearTxt=lock?'🚗 in a vehicle · on foot in '+lock+'s'
+    :near?near+' within reach'
     :!STREET.pois.length?'no places found here'
     :lootedNear?'all cleared - they come back tomorrow'
     :'walk toward a marker';
-  el.innerHTML=`<span class="chip s">GPS ±${STREET.pos?Math.round(STREET.pos.acc):'?'} m</span><span class="chip${near?'':' d'}" id="mapNear">${nearTxt}</span>${hd!==null?`<span class="chip a">Home ${Math.round(hd)} m</span>`:'<span class="chip">No home set</span>'}<span class="chip d">${STREET.zombies.length} on the street</span>`;
+  const sp=STREET.lastSpd||0;
+  el.innerHTML=`<span class="chip s">GPS ±${STREET.pos?Math.round(STREET.pos.acc):'?'} m${sp>1.2?' · '+(sp*3.6).toFixed(0)+' km/h':''}</span>`
+    +`<span class="chip${(lock||!near)?' d':''}" id="mapNear">${nearTxt}</span>`
+    +`${hd!==null?`<span class="chip a">Home ${Math.round(hd)} m</span>`:'<span class="chip">No home set</span>'}`
+    +`<span class="chip d">${STREET.zombies.length} on the street</span>`;
 }
 
 /* ================= LIVE RAIDS (v6.21) =================
@@ -368,6 +429,7 @@ function openCallGo(i){
 async function joinRaid(poiId){
   const p=STREET.pois.find(x=>x.id===poiId);const r=p&&raidAt(p);if(!r)return;
   if(!raidNear(r)){toast('Walk closer to join');return;}
+  if(!onFootCheck('join a raid'))return;      // driving past does not count
   return enterRaid(r,false);
 }
 // The same fight, entered from anywhere in the world. Her friends do not live
