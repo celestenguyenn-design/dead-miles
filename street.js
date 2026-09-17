@@ -228,20 +228,73 @@ async function openRaid(poiId){
   await raidSync(r,0);                       // read the shared bar without hitting it
   if($('#modal').classList.contains('on'))raidSheet(r);
 }
+// Sending the call. The invite rides on the board every client already polls,
+// so nobody has to paste a link and no new database table was needed.
 function shareRaid(poiId){
   const p=STREET.pois.find(x=>x.id===poiId);const r=p&&raidAt(p);if(!r)return;
+  const o=O();
+  const party=((S.party&&S.party.data&&S.party.data.members)||[]).map(x=>String(x).toLowerCase());
+  const mates=(friends||[]).map(f=>(f.handle||'').toLowerCase()).filter(Boolean);
+  const pick=party.length>1?party:mates;
+  const to=[...new Set(pick)].filter(h=>h&&h!==(o.handle||'').toLowerCase()).slice(0,40);
   const mins=Math.max(0,Math.round((r.endsAt-Date.now())/60000));
-  const txt='Dead Miles raid: '+r.T.e+' '+r.T.n+' (tier '+r.tier+') at '+r.n+', '+mins+' min left. Get here and hit Join.';
-  if(navigator.share){navigator.share({text:txt}).catch(()=>{});return;}
-  copyText(txt,'');toast('Copied - send it to them','z');
+  const txt='Dead Miles raid: '+r.T.e+' '+r.T.n+' (tier '+r.tier+') at '+r.n+', '+mins+' min left. Open the game - it is in your Raid calls, no travel needed.';
+  if(!o.ok||!to.length){
+    if(navigator.share){navigator.share({text:txt}).catch(()=>{});return;}
+    copyText(txt,'');toast(o.ok?'Nobody on your board yet - copied it instead':'Go online to call people in. Copied instead.','a');
+    return;
+  }
+  S.flare={id:r.id,poi:r.poi,n:r.n,w:r.w,tier:r.tier,T:r.T,boss:r.boss,endsAt:r.endsAt,to:to,at:Date.now()};
+  save();pushPlayer();render();
+  log('Called '+to.length+' '+(party.length>1?'party member':'survivor')+(to.length===1?'':'s')+' to the tier '+r.tier+' raid at '+r.n+'.');
+  toast('Called '+to.length+' in'+(party.length>1?' from your party':'')+'. They can join from anywhere.','l');
+  closeSheet();
+}
+function cancelCall(){S.flare=null;save();pushPlayer();render();toast('Call off');}
+// Opening someone else's call. The raid is rebuilt from the invite, so this
+// client never needs their map.
+function openCall(i){
+  const c=raidCalls()[i];if(!c){render();return;}
+  const f=c.call;const r=Object.assign({},f,{T:RAID_TIERS[f.tier-1]});
+  const mins=Math.max(0,Math.round((r.endsAt-Date.now())/60000));
+  const left=flaresLeft();
+  RAID_STATE=null;
+  openSheet('<h2>'+esc(r.T.e+' '+r.T.n)+' <span class="sub">tier '+r.tier+'</span></h2>'
+    +'<p class="help">'+esc(c.from)+' called you in.</p>'
+    +'<p><b style="color:'+esc(r.T.col)+'">'+esc(r.boss)+'</b></p>'
+    +'<p class="help">'+esc(r.n)+' · '+(mins>60?Math.floor(mins/60)+'h '+(mins%60)+'m':mins+' min')+' left · you fight it from here</p>'
+    +'<p class="help" style="margin-top:8px">Tier '+r.tier+' drops '+(r.tier>=4?'a legendary chance and guaranteed rare gear':r.tier>=3?'guaranteed rare gear':'better than the street')+'. Your loot is your own - it does not split. Everyone hits the same health bar.</p>'
+    +'<div class="kv" style="margin-top:8px"><span>Flares left today</span><b>'+left+' of '+flaresMax()+'</b><span>This seat costs</span><b>1 flare</b></div>'
+    +'<div class="grid2" style="margin-top:10px">'
+    +'<button class="btn ghost" onclick="closeSheet()">Not now</button>'
+    +(left>0?'<button class="btn r" onclick="openCallGo('+i+')">Join · 1 flare</button>'
+            :'<button class="btn" disabled>No flares left</button>')
+    +'</div>',true);
+  raidSync(r,0).then(()=>{if($('#modal').classList.contains('on'))openCall(i);}).catch(()=>{});
+}
+function openCallGo(i){
+  const c=raidCalls()[i];if(!c)return;
+  joinRemote(Object.assign({},c.call,{T:RAID_TIERS[c.call.tier-1]}));
 }
 async function joinRaid(poiId){
   const p=STREET.pois.find(x=>x.id===poiId);const r=p&&raidAt(p);if(!r)return;
   if(!raidNear(r)){toast('Walk closer to join');return;}
+  return enterRaid(r,false);
+}
+// The same fight, entered from anywhere in the world. Her friends do not live
+// in her city; a raid only she can reach is not co-op. A remote seat costs one
+// flare, standing there costs nothing - walking is still the better deal.
+async function joinRemote(r){
+  if(flaresLeft()<=0){toast('Out of flares until tomorrow. Walk more today to earn another.','d');return;}
+  return enterRaid(r,true);
+}
+async function enterRaid(r,remote){
+  if(!r)return;
   if((S.raidsDone||{})[r.id]){toast('You already fought this one');return;}
   if(S.loc||S.combat){toast('Finish what you are doing first');return;}
   const st=await raidSync(r,0);
-  if(st&&st.hp===0){toast('Someone already put it down');raidSheet(r);return;}
+  if(st&&st.hp===0){toast('Someone already put it down');if(remote)render();else raidSheet(r);return;}
+  if(remote&&!spendFlare()){toast('Out of flares until tomorrow','d');return;}
   closeSheet();
   gearCheck(()=>{
     const T=r.T;
@@ -252,7 +305,9 @@ async function joinRaid(poiId){
     const en=[boss];
     if(T.t>=3)en.unshift(mk('runner'));
     if(T.t>=5)en.unshift(mk('gunner'));
-    S.raidCur={id:r.id,tier:T.t,loot:T.loot,n:r.boss,poi:r.poi};
+    // Carry the raid itself, not just its poi id: a remote raider has no POI
+    // list to look it up in afterwards.
+    S.raidCur={id:r.id,tier:T.t,loot:T.loot,n:r.boss,poi:r.poi,r:{id:r.id,poi:r.poi,n:r.n,w:r.w,tier:r.tier,boss:r.boss,endsAt:r.endsAt},remote:!!remote};
     startCombat(en,'liveraid');
   });
 }
@@ -260,7 +315,8 @@ async function joinRaid(poiId){
 function liveRaidAfter(won){
   const cur=S.raidCur;if(!cur)return;S.raidCur=null;
   if(!S.raidsDone)S.raidsDone={};
-  const p=STREET.pois.find(x=>x.id===cur.poi);const r=p&&raidAt(p);
+  const p=STREET.pois.find(x=>x.id===cur.poi);
+  const r=(p&&raidAt(p))||(cur.r?Object.assign({},cur.r,{T:RAID_TIERS[cur.r.tier-1]}):null);
   const dealt=won?9999:Math.round(400*cur.tier);
   if(r)raidSync(r,dealt);
   if(!won){log('The raid at '+cur.n+' beat you back. You can try again if it is still standing.');return;}

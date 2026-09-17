@@ -70,6 +70,25 @@ function decide(row, everyone) {
     });
   }
 
+  // A friend called you into a live raid. The invite lives on their own public
+  // state, so we look at everybody's flare and push to the handles it names.
+  // Tagged per raid id, so two different raids both get through in one day.
+  const me = (row.handle || '').toLowerCase();
+  for (const other of everyone) {
+    const fl = (other.pub || {}).flare;
+    if (!fl || !fl.id || !fl.endsAt || fl.endsAt < now.getTime()) continue;
+    if ((other.handle || '').toLowerCase() === me) continue;
+    if (!(fl.to || []).map(x => String(x).toLowerCase()).includes(me)) continue;
+    const tag = 'flare:' + fl.id;
+    if (!fresh(tag)) continue;
+    const mins = Math.max(0, Math.round((fl.endsAt - now.getTime()) / 60000));
+    out.push({
+      tag, day,
+      title: `${(other.pub && other.pub.name) || other.handle} called a tier ${fl.tier} raid`,
+      body: `${fl.boss || 'Something big'} at ${fl.n || 'their street'}. ${mins} min left. Open the game and spend a flare - you do not have to be there.`,
+    });
+  }
+
   // Your rival went past you today.
   const rival = (pub.rival || '').toLowerCase();
   if (rival && fresh('rival')) {

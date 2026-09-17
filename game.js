@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.25';
+const VERSION='6.27';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -207,7 +207,7 @@ const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic co
 
 /* ================= state ================= */
 let S=null;
-function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,
+function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],
   steps:{total:0,today:0,date:todayStr(),lastSync:0,lastSyncDate:''},
   walk:{toNext:0,dist:500,district:0,houses:0,progress:0,banked:0},
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
@@ -220,7 +220,9 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   ct:{date:'',daily:[],week:'',weekly:null,pending:{}},party:{code:'',data:null,pending:{}},wx:null,
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
 function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
-  if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};}
+  if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
+  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];
+  if(S.flare&&S.flare.endsAt<=Date.now())S.flare=null;}
 function migrate(o){
   if(!o)return null;if(o.v===3)return o;
   if(o.v===2){const f=fresh();const m=Object.assign(f,o);m.v=3;m.av=ART.randomAv();m.cosmetics=[];m.cls='';m.sp=Math.max(0,(o.lvl||1)-1);m.skills={};m.sfx=true;m.keys=0;m.milestones=[];m.ct=f.ct;m.party=f.party;m.wx=null;m.bossKilled='';
@@ -901,6 +903,51 @@ function gPull(k){
   gachaSheet(k,{n:line,r:rar,slot:it.slot,key:it.key,id:it.id});
   save();render();pushPlayer();
 }
+// You cannot decide whether a machine is worth 6,000 steps without knowing what
+// is in it. This lists the whole pool, by rarity, with what you already own
+// ticked off and what is still catchable counted.
+function poolSheet(k){
+  const m=GACHA[k];const RARORDER=['legendary','epic','rare','common'];
+  const owned=S.cosmetics||[];
+  const rows=RARORDER.map(rar=>{
+    let items,left;
+    if(m.kind==='weapon'){
+      items=Object.entries(GEAR).filter(([id,v])=>(v.r||'common')===rar).map(([id,v])=>({id,n:v.n,e:v.e,have:(S.gear||[]).some(g=>g.id===id),
+        sub:v.slot==='melee'?(v.dmg?v.dmg[0]+'-'+v.dmg[1]+' dmg':''):v.slot==='ranged'?(v.dmg?v.dmg[0]+'-'+v.dmg[1]+' dmg':''):v.dr?('-'+v.dr+' damage taken'):v.cap?('+'+v.cap+' carry'):''}));
+      left=items.length;                                  // weapons can repeat
+    }else{
+      // A generic shirt emoji does not tell you what a ball gown looks like,
+      // and that was the whole complaint. Draw each one on her own avatar.
+      items=cosmeticPool().filter(c=>(c.r||'common')===rar).map(c=>({id:c.id,n:c.n,
+        e:ART.avatarSVG(Object.assign({},S.av,{[c.slot]:c.key}),40),have:owned.includes(c.id),sub:c.slot==='hat'?'head':c.slot==='acc'?'face':'outfit'}));
+      left=items.filter(x=>!x.have).length;
+    }
+    if(!items.length)return '';
+    const pct=(GACHA_ODDS.find(o=>o[0]===rar)||[0,0])[1];
+    return '<div class="section-label" style="margin-top:12px;display:flex;justify-content:space-between">'
+      +'<span class="rc-'+rar+'">'+rar.toUpperCase()+' · '+pct+'%</span>'
+      +'<span class="help">'+(m.kind==='weapon'?items.length+' in the machine':left+' of '+items.length+' still to find')+'</span></div>'
+      +'<div style="display:flex;flex-direction:column;gap:2px">'
+      +items.sort((a,b)=>(a.have-b.have)||a.n.localeCompare(b.n)).map(it=>
+        '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:7px;background:'+(it.have?'rgba(255,255,255,.03)':'rgba(255,255,255,.06)')+';'+(it.have&&m.kind!=='weapon'?'opacity:.5':'')+'">'
+        +'<span style="font-size:15px;display:flex;align-items:center">'+it.e+'</span>'
+        +'<span style="flex:1;min-width:0"><b class="rc-'+rar+'" style="font-size:14px">'+esc(it.n)+'</b>'
+        +(it.sub?' <span class="help">'+esc(it.sub)+'</span>':'')+'</span>'
+        +(it.have?'<span class="help" style="color:var(--rot)">'+(m.kind==='weapon'?'owned':'✓ got it')+'</span>':'')
+        +'</div>').join('')+'</div>';
+  }).join('');
+  const hero=m.kind==='cloth'&&!owned.includes('top:onesie_axolotl');
+  openSheet('<h2>What is in the '+esc(m.n)+'</h2>'
+    +'<p class="help">'+fmt(m.cost)+' steps a crank · every '+GACHA_PITY+'th is epic or better'
+      +(m.kind==='cloth'?' · clothes you own never come up again':' · weapons can repeat')+'</p>'
+    +(hero?'<div style="margin:10px 0;padding:10px 12px;border-radius:10px;background:rgba(245,200,66,.12);border-left:4px solid var(--amber)">'
+        +'<b style="color:var(--amber)">The one everyone wants</b>'
+        +'<div style="display:flex;align-items:center;gap:10px;margin-top:6px">'+ART.avatarSVG(Object.assign({},S.av,{top:'onesie_axolotl'}),66)
+        +'<span><b class="rc-legendary">Axolotl onesie</b><div class="help">Pink, frilly, 3% a crank.</div></span></div></div>':'')
+    +rows
+    +'<div class="grid2" style="margin-top:12px"><button class="btn ghost" onclick="gachaSheet(\''+k+'\')">Back</button>'
+    +'<button class="btn r" onclick="gPull(\''+k+'\')"'+((S.wallet||0)<m.cost?' disabled':'')+'>Crank · '+fmt(m.cost)+'</button></div>',true);
+}
 function gachaSheet(k,got){
   const m=GACHA[k];const g=gState(k);
   const col={common:'#b9b2a4',rare:'#5eadff',epic:'#be78ff',legendary:'#f5c842'}[got?got.r:'common'];
@@ -916,7 +963,7 @@ function gachaSheet(k,got){
       +'<span>Cranks so far</span><b>'+g.rolls+'</b>'
       +'<span>Guaranteed epic in</span><b>'+left+'</b></div>'
     +'<div class="grid2" style="margin-top:10px">'
-      +'<button class="btn ghost" onclick="closeSheet()">Done</button>'
+      +'<button class="btn ghost" onclick="poolSheet(\''+k+'\')">ⓘ Prize list</button>'
       +'<button class="btn r" onclick="gPull(\''+k+'\')"'+((S.wallet||0)<m.cost?' disabled':'')+'>Crank again · '+fmt(m.cost)+'</button></div>'
     +'<p class="help" style="margin-top:10px">Odds per crank: '+GACHA_ODDS.map(([r,w])=>w+'% '+r).join(' · ')
       +'. Every '+GACHA_PITY+'th crank is epic or better. Clothes you already own never come up.</p>',true);
@@ -930,6 +977,7 @@ function renderGacha(){
         +'<h3>'+esc(m.n)+'</h3>'
         +'<div class="help">'+(m.kind==='cloth'?'clothes and looks':'weapons and gear')+'</div>'
         +'<button class="btn sm '+(can?'r':'')+'" style="margin-top:8px;width:100%" onclick="gachaSheet(\''+k+'\')"'+(can?'':' disabled')+'>'+fmt(m.cost)+' steps</button>'
+        +'<button class="btn sm ghost" style="margin-top:6px;width:100%" onclick="poolSheet(\''+k+'\')">ⓘ What can I get?</button>'
         +'<div class="help" style="margin-top:4px">'+g.rolls+' cranked</div></div>';}).join('')
     +'</div>'
     +'<p class="help" style="margin-top:10px">Steps banked: <b style="color:var(--bone)">'+fmt(S.wallet||0)+'</b></p>';
@@ -1065,8 +1113,12 @@ function checkMilestones(){
 }
 function addSteps(n,src){
   n=Math.floor(n);if(!(n>0))return;rollDay();rollWeek();S.lastAnim=Date.now();
-  if(src==='walk'){const r=syncReads();r.phone=Math.max(r.phone||0,(S.steps.today||0)+n);}
-  if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(Math.max(3,Math.round(6*thirstMult())));}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
+  // The in-app pedometer walks the same legs the phone counts, so it raises
+  // COUNTED. Demo steps are invented, so they raise MANUAL. Either way the
+  // counted+manual===today invariant survives.
+  if(src==='live'){const r=syncReads();r.counted=(r.counted||0)+n;}
+  if(src==='demo'){const r=syncReads();r.manual=(r.manual||0)+n;}
+  if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(Math.max(3,Math.round(6*thirstMult())));}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip'||src==='clipboard'||src==='shortcut')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
   if(src!=='carry'&&S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');streakReward();}
   if(S.loc||S.combat){S.walk.banked=(S.walk.banked||0)+n;if(src!=='carry'&&src!=='live')toast('+'+fmt(n)+' steps saved for after this stop','z');save();render();return;}
   let left=n;
@@ -1512,7 +1564,7 @@ async function goOnline(handle,token){
   }catch(e){o.ok=false;o.err=e.message;save();render();}
 }
 function compactSave(){const c=JSON.parse(JSON.stringify(S));delete c.online;delete c.journal;delete c.wx;delete c.combat;if(c.party)delete c.party.data;return c;}
-function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:S.stock.ammo}};}
+function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code,flare:(S.flare&&S.flare.endsAt>Date.now())?S.flare:null},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:S.stock.ammo}};}
 let pushTimer=0;let pushSoonTimer=0;function pushSoon(){clearTimeout(pushSoonTimer);pushSoonTimer=setTimeout(()=>pushPlayer(),8000);}
 function pushPlayer(){const o=O();if(!o.ok||!S.onboarded||STALE)return Promise.resolve();clearTimeout(pushTimer);return new Promise(res=>{pushTimer=setTimeout(async()=>{try{rollWeek();
   const ok=await rpc('save_player',{p_handle:o.handle,p_token:o.token,p_name:S.name,p_tier:S.league.tier,p_week:S.league.week,p_score:S.league.score,p_state:publicState()});
@@ -1632,29 +1684,136 @@ function pedoStop(silent){pedo.on=false;window.removeEventListener('devicemotion
 // 5,000 when Health said 3,200 made every later phone sync look like you had
 // walked backwards - and it was refused, forever, until Health passed 5,000.
 // Now each source keeps its own reading and the day's count only ever goes up.
+// Two kinds of step source, and mixing them up is what broke this twice:
+//   COUNTED - the phone, the Shortcut, the clipboard, the in-app pedometer.
+//             They all measure the SAME legs, so we keep the highest reading.
+//   MANUAL  - a number she types in. Those are steps no counter saw (phone on
+//             the desk, treadmill, stroller), so they ADD on top.
+// today = counted + manual, always, and that invariant is restored on every
+// write. v6.22 took max() of the two: she typed 5,000, her phone counted 425,
+// and the game showed 5,000 while the phone kept ticking into a number that
+// could never win. Additive is what she meant both times she reported it.
 function syncReads(){
-  if(!S.steps.reads||S.steps.readsDate!==S.steps.date){S.steps.reads={phone:0,typed:0};S.steps.readsDate=S.steps.date;}
-  return S.steps.reads;
+  const s=S.steps;
+  if(!s.reads||s.readsDate!==s.date){s.reads={counted:0,manual:0};s.readsDate=s.date;}
+  const r=s.reads;
+  if(r.counted===undefined){                 // migrate a v6.22 save without losing today
+    r.counted=r.phone||0;
+    r.manual=Math.max(0,(s.today||0)-(r.phone||0));
+    delete r.phone;delete r.typed;
+  }
+  return r;
 }
-function syncBucket(src){return (src==='phone'||src==='clip'||src==='shortcut')?'phone':'typed';}
-function syncTotal(v,src){
+/* ================= FLARES - the daily energy for remote raids (v6.27) =================
+   Her friends do not live in her city, so a raid nobody can reach is a raid
+   nobody can join. A flare lets you drop into a friend's raid from anywhere.
+   It is capped per day on purpose: this is a walking game, and standing at the
+   raid yourself is still FREE. You earn the extra flares by walking. */
+const FLARE_BASE=3, FLARE_PER=6000, FLARE_CAP=6;
+// Who is calling me to a raid right now. The invite rides on the board every
+// client already polls, so this whole feature needed no new database work -
+// and it expires by itself when the raid window closes.
+function raidCalls(){
+  const o=O();if(!o.ok)return [];
+  const me=(o.handle||'').toLowerCase();const now=Date.now();const out=[];
+  for(const f of (friends||[])){
+    const fl=f.pub&&f.pub.flare;if(!fl||!fl.id||!fl.endsAt)continue;
+    if(f.handle&&f.handle.toLowerCase()===me)continue;
+    if(fl.endsAt<=now)continue;
+    if(!(fl.to||[]).map(x=>String(x).toLowerCase()).includes(me))continue;
+    if((S.raidsDone||{})[fl.id])continue;
+    if((S.callsHidden||[]).includes(fl.id))continue;
+    out.push({call:fl,from:(f.pub&&f.pub.name)||f.handle,handle:f.handle});
+  }
+  return out.sort((a,b)=>b.call.tier-a.call.tier||a.call.endsAt-b.call.endsAt);
+}
+function dismissCall(id){S.callsHidden=(S.callsHidden||[]).concat([id]).slice(-40);save();render();}
+function renderCalls(){
+  const el=$('#callCard');if(!el)return;
+  const cs=raidCalls();const mine=S.flare&&S.flare.endsAt>Date.now()?S.flare:null;
+  if(!cs.length&&!mine){el.hidden=true;return;}
+  el.hidden=false;
+  const left=flaresLeft(),max=flaresMax();const nxt=flareNext();
+  el.innerHTML='<h2>Raid calls <span class="sub">'+left+' of '+max+' flares left</span></h2>'
+    +'<p class="help">A flare drops you into a friend\'s raid from anywhere, even another city. Standing at one yourself costs nothing.'
+      +(nxt?' Another flare at '+fmt(nxt)+' more steps today.':' You have all the flares the day gives.')+'</p>'
+    +(mine?'<div style="margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(120,150,190,.12);border-left:4px solid var(--steel)">'
+        +'<b>Your call is out to '+(mine.to||[]).length+'</b>'
+        +'<div class="help">'+esc(mine.T.e+' '+mine.T.n)+' tier '+mine.tier+' at '+esc(mine.n)+' · '+Math.max(0,Math.round((mine.endsAt-Date.now())/60000))+' min left</div>'
+        +'<button class="btn sm ghost" style="margin-top:8px" onclick="cancelCall()">Call it off</button></div>':'')
+    +cs.map((c,i)=>{const r=c.call;const mins=Math.max(0,Math.round((r.endsAt-Date.now())/60000));
+      // Stacked, not a flex row: on a phone the buttons squeezed the boss name
+      // down to one word a line.
+      return '<div style="margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.05);border-left:4px solid '+esc(r.T.col)+'">'
+        +'<b style="color:'+esc(r.T.col)+'">'+esc(c.from)+' called a tier '+r.tier+'</b>'
+        +'<div style="margin-top:2px">'+esc(r.T.e+' '+r.boss)+'</div>'
+        +'<div class="help">'+esc(r.n)+' · '+(mins>60?Math.floor(mins/60)+'h '+(mins%60)+'m':mins+' min')+' left · fight it from here</div>'
+        +'<div class="grid2" style="margin-top:8px">'
+        +'<button class="btn sm ghost" onclick="dismissCall(\''+esc(r.id)+'\')">No thanks</button>'
+        +'<button class="btn sm r" onclick="openCall('+i+')"'+(left<=0?' disabled':'')+'>'+(left<=0?'No flares left':'Join · 1 flare')+'</button>'
+        +'</div></div>';}).join('');
+}
+function flareDay(){const f=S.flares||(S.flares={date:'',used:0});if(f.date!==S.steps.date){f.date=S.steps.date;f.used=0;}return f;}
+function flaresMax(){return Math.min(FLARE_CAP,FLARE_BASE+Math.floor((S.steps.today||0)/FLARE_PER));}
+function flaresLeft(){return Math.max(0,flaresMax()-flareDay().used);}
+function flareNext(){const n=flaresMax();if(n>=FLARE_CAP)return 0;return (n-FLARE_BASE+1)*FLARE_PER-(S.steps.today||0);}
+function spendFlare(){const f=flareDay();if(flaresLeft()<=0)return false;f.used++;save();return true;}
+
+function stepsCounted(){return syncReads().counted||0;}
+// The arithmetic, on screen, before she commits to either button.
+function syncMath(){const el=$('#syncMath');if(!el)return;
+  const inp=$('#syncInput');const v=inp?parseInt(inp.value,10):NaN;
+  const c=stepsCounted(),m=stepsManual();
+  if(!(v>0)){el.innerHTML=fmt(c)+' counted by your phone'+(m?' + '+fmt(m)+' you added by hand':'')+' = <b>'+fmt(S.steps.today||0)+'</b> today.';return;}
+  el.innerHTML='<b>Add these</b> makes it '+fmt((S.steps.today||0)+v)+'. <b>That\'s my total</b> makes it '+fmt(Math.max(S.steps.today||0,v))+'.';}
+function stepsManual(){return syncReads().manual||0;}
+// The one place today's number is allowed to move.
+function stepsApply(src){
+  const r=syncReads();
+  let target=(r.counted||0)+(r.manual||0);
+  if(target<(S.steps.today||0)){             // steps never go down; re-anchor instead
+    r.manual=Math.max(0,(S.steps.today||0)-(r.counted||0));
+    target=S.steps.today||0;
+  }
+  const delta=target-(S.steps.today||0);
+  if(delta>0){SFX.play('step');addSteps(delta,src);}
+  else{save();render();}
+  return delta;
+}
+// A counter reported its running total for today.
+function syncCounted(v,src){
   rollDay();
   v=Math.max(0,Math.round(v||0));
-  const reads=syncReads(), b=syncBucket(src);
-  reads[b]=Math.max(reads[b]||0,v);
-  S.steps.lastSync=v;S.steps.lastSyncDate=S.steps.date;   // kept for the "synced at" line
-  const target=Math.max(reads.phone||0,reads.typed||0);
-  const delta=target-(S.steps.today||0);
-  if(delta<=0){
-    // Say WHY nothing moved, instead of implying she walked backwards.
-    const other=b==='phone'?'typed':'phone';
-    if((reads[other]||0)>v)
-      toast('Counted. Your '+(other==='typed'?'typed total':'phone')+' ('+fmt(reads[other])+') is still ahead, so the number holds there.','a');
-    else toast('Already counted up to '+fmt(target));
-    save();render();return true;
-  }
-  toast('+'+fmt(delta)+' steps ('+src+')','z');SFX.play('step');addSteps(delta,src);return true;
+  const r=syncReads();const before=r.counted||0;
+  r.counted=Math.max(before,v);
+  S.steps.lastSync=v;S.steps.lastSyncDate=S.steps.date;
+  const d=stepsApply(src);
+  if(d>0)toast('+'+fmt(d)+' steps ('+src+')','z');
+  else if(v<before)toast('Your '+src+' reads '+fmt(v)+', under the '+fmt(before)+' already counted today. Keeping the higher one.','a');
+  else toast('Already counted up to '+fmt(before));
+  return true;
 }
+// "Add" - steps the counter never saw. Pure addition.
+function addManual(v){
+  rollDay();v=Math.max(0,Math.round(v||0));if(!v){toast('Type a number first');return false;}
+  const r=syncReads();r.manual=(r.manual||0)+v;
+  stepsApply('sync');
+  toast('+'+fmt(v)+' by hand. Today: '+fmt(S.steps.today),'z');
+  return true;
+}
+// "That is my total" - the counter is behind or wrong. Anything walked from
+// here still stacks on top, because only the offset is being set.
+function setManual(v){
+  rollDay();v=Math.max(0,Math.round(v||0));
+  const before=S.steps.today||0;
+  const r=syncReads();r.manual=Math.max(0,v-(r.counted||0));
+  const d=stepsApply('sync');
+  if(d>0)toast('Today set to '+fmt(S.steps.today),'z');
+  else toast('Today is already '+fmt(before)+', which is higher. Whatever you walk from here still counts on top.','a');
+  return true;
+}
+// kept so old call sites and the Shortcut URL keep working
+function syncTotal(v,src){return syncCounted(v,src);}
 function autoSyncFromUrl(){try{const q=new URLSearchParams(location.search);const h=new URLSearchParams(location.hash.replace(/^#/,''));const v=parseInt(q.get('steps')||h.get('steps'),10);if(v>=0){syncTotal(v,'shortcut');history.replaceState(null,'',location.pathname);}}catch(e){}}
 async function readClipboard(){try{const t=await navigator.clipboard.readText();const m=String(t).replace(/,/g,'').match(/\d{2,6}/);if(!m){toast('No step count on the clipboard');return;}syncTotal(parseInt(m[0],10),'clipboard');}catch(e){toast('Clipboard is blocked here. Type it in Sync.');}}
 
@@ -1875,6 +2034,16 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.27',d:'Sep 17',t:'Raid from anywhere, and typed steps that ADD',
+  i:['RAID CALLS. Standing at a raid your friend found is no longer the only way in. Hit "Invite a friend" at a raid and everyone in your party (or everyone on your board) gets a Raid call on their home screen and a notification - wherever they live.',
+     'FLARES are the daily energy for that. You get 3 a day plus one for every 6,000 steps you walk, up to 6. A remote seat costs one flare. Standing at the raid yourself is still FREE, because this is a walking game.',
+     'Everyone who joins hits the SAME health bar, and your loot is your own - it does not split.',
+     'TYPED STEPS ARE FIXED. They used to fight your phone for the same number, so typing 5,000 froze you at 5,000 while your phone kept counting. Now there are two buttons: "Add these" puts your number on top of what the phone counted, and "That\'s my total" sets the total. The line underneath shows the arithmetic before you tap.',
+     'A step count can never go down, and anything you walk after typing always counts on top.']},
+ {v:'6.26',d:'Sep 17',t:'See what is in the machines',
+  i:['Each gumball machine has an "ⓘ What can I get?" button. It lists everything inside, grouped by rarity, with the odds for each tier.',
+     'Clothes you already own are ticked off and greyed, and it counts how many are still out there. Weapons show their damage.',
+     'The Axolotl onesie gets its own card at the top until you get it.']},
  {v:'6.25',d:'Sep 17',t:'Your body is not a box any more',
   i:['The torso was literally a rounded rectangle, which is why everyone looked boxy. It is a real silhouette now - shoulders, a waist, hips.',
      'FOUR BUILDS in the character editor: Straight, Curvy, Athletic, Slim. Arms and legs follow whichever you pick.',
@@ -2038,7 +2207,7 @@ function fixShortcut(){
     const code=stepCode().replace(/\|$/,'');
     openSheet('<h2>Fix my shortcut</h2>'
       +'<p>Your shortcut proves the steps are yours with a code. This is a <b>permanent</b> one, so this is the last time.</p>'
-      +'<div style="padding:10px 12px;border-radius:8px;background:rgba(94,173,255,.12);border-left:4px solid var(--sky)">'
+      +'<div style="padding:10px 12px;border-radius:8px;background:rgba(94,173,255,.12);border-left:4px solid var(--steel)">'
       +'<b style="color:var(--bone)">The easy way - two boxes, each replaced whole</b>'
       +'<div class="help" style="margin-top:4px">No editing around the blue bubble. In <b>Request Body</b> you want two fields:</div>'
       +'<div class="help" style="margin-top:6px">field named <b>c</b> &rarr; this code:</div>'
@@ -2108,6 +2277,7 @@ function wxSheet(){
     +'<button class="btn r wide" style="margin-top:12px" onclick="closeSheet()">Got it</button>',true);
 }
 function renderStepHist(){
+  syncMath();
   const el=$('#stepHist');if(!el)return;
   const days=stepDays();const known=days.filter(d=>d.known&&d.n!==null);
   if(known.length<2&&!(S.steps.today>0)){el.innerHTML='<p class="help">Your day-by-day history starts building from today.</p>';return;}
@@ -2164,6 +2334,7 @@ function renderOnline(){
       +'<p class="help" style="margin-top:4px">'+esc(dm.d)+'</p>'
       +(vetRank()?'<p class="help" style="margin-top:6px;color:var(--amber)">'+esc(vetTitle())+' · '+fmt(S.steps.total)+' lifetime steps · '+esc(district().n)+'</p>':'');
     renderConvoy();}catch(e){}
+  try{renderCalls();}catch(e){}
   renderStepHist();
   const sHelp=$('#stepsHelp');
   if(sHelp){
@@ -2177,17 +2348,17 @@ function renderOnline(){
              ? '<div class="help" style="margin-top:4px">Your count resets at midnight - yesterday you finished on <b>'+fmt(y.n)+'</b>. So a zero this early is normal; it only means trouble if it stays zero after you have walked.</div>'
              : '';})()
           +'<div class="help" style="margin-top:4px">The game is not allowed to read Apple Health. Your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number. Run it and your steps land here.</div>'
-          +'<div class="help" style="margin-top:6px">If it runs and nothing arrives, the code inside it is out of date - that happens after you recover your account. <a href="#" onclick="fixShortcut();return false;" style="color:var(--sky)">Fix my shortcut</a></div>'
+          +'<div class="help" style="margin-top:6px">If it runs and nothing arrives, the code inside it is out of date - that happens after you recover your account. <a href="#" onclick="fixShortcut();return false;" style="color:var(--steel);text-decoration:underline">Fix my shortcut</a></div>'
           +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run my Health shortcut</button>'
           +'<button class="btn sm ghost" onclick="syncNow()">Just check again</button></div>'
           +'<div class="help" style="margin-top:6px">Or type today\'s total from the Health app in the box above and tap Sync - that always works. '
-          +'<a href="#" onclick="renameShortcut();return false;" style="color:var(--sky)">Shortcut named something else?</a></div></div>'
+          +'<a href="#" onclick="renameShortcut();return false;" style="color:var(--steel);text-decoration:underline">Shortcut named something else?</a></div></div>'
           +'<span class="help" style="display:block;margin-top:6px">Checked the server '+esc(when)+'. To make this automatic: Shortcuts app, Automation tab, Time of Day, a few times a day, Run Immediately.</span>';
       }else{
         sHelp.innerHTML='<b style="color:var(--bone)">Checked the server '+esc(when)+'.</b> Your phone last sent steps at '+esc(timeStr(o.lastPost))+'.'
           +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="syncNow()">Sync my steps now</button>'
           +'<button class="btn sm ghost" onclick="runShortcut()">Run my Health shortcut</button></div>'
-          +'<span class="help">It checks on its own every minute and the moment you open the game. You never need to delete the icon. <a href="#" onclick="fixShortcut();return false;" style="color:var(--sky)">Fix my shortcut</a></span>';
+          +'<span class="help">It checks on its own every minute and the moment you open the game. You never need to delete the icon. <a href="#" onclick="fixShortcut();return false;" style="color:var(--steel);text-decoration:underline">Fix my shortcut</a></span>';
       }}
   }
   const sh=$('#shortcutHelp');if(sh){const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=stepCode();if(o.ok&&!o.stepKey)fetchStepKey();sh.innerHTML=o.ok?`<b>iPhone, one time.</b> Two things to copy:<br>
@@ -2313,7 +2484,11 @@ function classSheet(){let cls='brawler';const draw=()=>{$('#sheet').innerHTML=`<
 function wire(){
   document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{SFX.play('ui');if(typeof STREET!=='undefined'&&STREET.on){STREET.on=false;if(STREET.watch!==null){navigator.geolocation.clearWatch(STREET.watch);STREET.watch=null;}clearInterval(STREET.timer);$('#v-street').insertBefore($('#locCard'),$('#raidCard'));}document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.view').forEach(v=>{const on=v.id==='v-'+b.dataset.v;v.classList.toggle('on',on);
       v.classList.remove('tabin');if(on&&!reduced){void v.offsetWidth;v.classList.add('tabin');}});$('#main').scrollTop=0;if(b.dataset.v==='street')animate();});
-  $('#syncBtn').onclick=()=>{const v=parseInt($('#syncInput').value,10);if(!(v>=0))return;if(syncTotal(v,'sync'))$('#syncInput').value='';};
+  // Two buttons instead of one, because "5,000" meant "add 5,000" to her and
+  // "my total is 5,000" to the code, and nothing on screen said which.
+  $('#syncInput').oninput=syncMath;syncMath();
+  $('#syncAdd').onclick=()=>{const v=parseInt($('#syncInput').value,10);if(!(v>0)){toast('Type a number first');return;}if(addManual(v)){$('#syncInput').value='';syncMath();}};
+  $('#syncSet').onclick=()=>{const v=parseInt($('#syncInput').value,10);if(!(v>=0)){toast('Type a number first');return;}if(setManual(v)){$('#syncInput').value='';syncMath();}};
   $('#pedoBtn').onclick=pedoToggle;$('#clipBtn').onclick=readClipboard;$('#bankBtn').onclick=bank;$('#healBtn').onclick=heal;$('#eatBtn').onclick=eat;$('#dropBtn').onclick=supplyDrop;$('#drinkBtn').onclick=()=>drink();
   $('#lookBtn').onclick=()=>lookSheet();$('#respecBtn').onclick=respec;$('#bgBtn').onclick=()=>bgSheet(false);$('#sfxBtn').onclick=()=>{S.sfx=!S.sfx;save();render();if(S.sfx)SFX.play('ui');};
   $('#demoBtn').onclick=()=>{toast('+300 demo steps','z');addSteps(300,'demo');};$('#shareBtn').onclick=shareCard;

@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=6.25">
+<link rel="stylesheet" href="style.css?v=6.27">
 </head>
 <body>
 <div id="app">
@@ -36,6 +36,7 @@
       <div class="card" id="locCard" hidden></div>
       <div class="card steel" id="rivalCard" hidden></div>
       <div class="card" id="raidCard" hidden></div>
+      <div class="card" id="callCard" hidden></div>
       <div class="card" id="contractsCard"><h2>Contracts <span class="sub" id="contractsSub"></span></h2><div class="stack" id="contracts" style="margin-top:10px"></div></div>
       <div class="card">
         <h2>Steps <span class="sub" id="syncHint"></span></h2>
@@ -45,9 +46,11 @@
           <span class="help" id="pedoStatus"></span>
         </div>
         <div class="row" style="margin-top:10px">
-          <input id="syncInput" type="number" inputmode="numeric" min="0" placeholder="Today's total from Health" style="flex:1;min-width:150px" aria-label="Today's total steps">
-          <button class="btn r" id="syncBtn">Sync</button>
+          <input id="syncInput" type="number" inputmode="numeric" min="0" placeholder="steps" style="flex:1;min-width:110px" aria-label="Steps to add or set">
+          <button class="btn r" id="syncAdd">Add these</button>
+          <button class="btn ghost" id="syncSet">That's my total</button>
         </div>
+        <p class="help" id="syncMath" style="margin-top:6px"></p>
         <div id="stepHist" style="margin-top:10px"></div>
         <p class="help" style="margin-top:8px" id="stepsHelp">Go online in Settings and set up the phone shortcut once: your Health steps then land here on their own.</p>
       </div>
@@ -173,8 +176,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=6.25"></script>
-<script src="street.js?v=6.25"></script>
-<script src="game.js?v=6.25"></script>
+<script src="art.js?v=6.27"></script>
+<script src="street.js?v=6.27"></script>
+<script src="game.js?v=6.27"></script>
 </body>
 </html>
