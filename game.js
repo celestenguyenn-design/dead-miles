@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.34';
+const VERSION='6.35';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -30,15 +30,15 @@ const ITEMS={
 };
 const GEAR={
   pipe:{n:'Lead pipe',e:'🪈',slot:'melee',dmg:[8,13],dur:6,w:6,pts:10,r:'common'},bat:{n:'Baseball bat',e:'⚾',slot:'melee',dmg:[9,15],dur:5,w:5,pts:14,r:'common'},crowbar:{n:'Crowbar',e:'🔧',slot:'melee',dmg:[11,17],dur:8,w:3,pts:18,r:'uncommon'},machete:{n:'Machete',e:'🔪',slot:'melee',dmg:[14,21],dur:7,w:2,pts:26,r:'rare'},axe:{n:'Fire axe',e:'🪓',slot:'melee',dmg:[18,26],dur:6,w:1.2,pts:34,r:'rare'},sledge:{n:'Sledgehammer',e:'🔨',slot:'melee',dmg:[22,32],dur:5,w:.6,pts:40,r:'epic'},
-  pistol:{n:'9mm pistol',e:'🔫',slot:'ranged',dmg:[22,30],ammo:'ammo',w:1.2,pts:30,r:'rare'},shotgun:{n:'Pump shotgun',e:'🎯',slot:'ranged',dmg:[34,50],ammo:'shells',w:.5,pts:45,r:'epic'},
+  pistol:{n:'9mm pistol',e:'🔫',slot:'ranged',dmg:[22,30],dur:10,ammo:'ammo',w:1.2,pts:30,r:'rare'},shotgun:{n:'Pump shotgun',e:'🎯',slot:'ranged',dmg:[34,50],dur:6,ammo:'shells',w:.5,pts:45,r:'epic'},
   jacket:{n:'Leather jacket',e:'🧥',slot:'armor',dr:2,w:4,pts:14,r:'common'},pads:{n:'Hockey pads',e:'🏒',slot:'armor',dr:4,w:2,pts:20,r:'uncommon'},vest:{n:'Riot vest',e:'🦺',slot:'armor',dr:6,w:.9,pts:34,r:'rare'},
   helmet:{n:'Motorcycle helmet',e:'⛑️',slot:'head',dr:2,w:2.5,pts:12,r:'common'},riot:{n:'Riot helmet',e:'🪖',slot:'head',dr:3,w:1,pts:22,r:'rare'},
   pack2:{n:'Hiking pack',e:'🎒',slot:'bag',cap:6,w:1.5,pts:16,r:'uncommon'},pack3:{n:'Military ruck',e:'🪖',slot:'bag',cap:12,w:.5,pts:28,r:'rare'},
   // legendaries: never in the normal roll, only chests and bosses
-  mercy:{n:'Mercy',e:'🎯',slot:'ranged',dmg:[38,54],ammo:'shells',w:0,pts:90,r:'legendary',legend:'Fires without a shell 35% of the time'},
+  mercy:{n:'Mercy',e:'🎯',slot:'ranged',dmg:[38,54],dur:8,ammo:'shells',w:0,pts:90,r:'legendary',legend:'Fires without a shell 35% of the time'},
   lastword:{n:'The Last Word',e:'⚾',slot:'melee',dmg:[16,24],dur:9,w:0,pts:80,r:'legendary',legend:'30% chance a hit knocks the enemy out of its next turn'},
   oldreliable:{n:'Old Reliable',e:'🔧',slot:'melee',dmg:[16,24],dur:20,w:0,pts:70,r:'legendary',legend:'20 swings between rebuilds - twice any other weapon - but the bill is the biggest in the county'},
-  whisper:{n:'Whisper',e:'🔫',slot:'ranged',dmg:[24,32],ammo:'ammo',w:0,pts:85,r:'legendary',legend:'Makes no noise'},
+  whisper:{n:'Whisper',e:'🔫',slot:'ranged',dmg:[24,32],dur:12,ammo:'ammo',w:0,pts:85,r:'legendary',legend:'Makes no noise'},
   nightingale:{n:'Nightingale',e:'🦺',slot:'armor',dr:4,w:0,pts:85,r:'legendary',legend:'Heals 5 HP every combat round'}
 };
 const LEGEND_IDS=['mercy','lastword','oldreliable','whisper','nightingale'];
@@ -224,7 +224,11 @@ function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossK
   if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(S.parts===undefined)S.parts=0;
   // A temper can lower a weapon's ceiling, so never let a stored durability
   // sit above it - that renders as "9 / 7" and repairs would read as free.
-  for(const g of (S.gear||[])){const mx=repairMax(g);if(mx&&g.dur>mx)g.dur=mx;}
+  for(const g of (S.gear||[])){
+    const mx=repairMax(g);
+    if(mx&&g.dur===undefined)g.dur=mx;     // guns from before they could wear out
+    if(mx&&g.dur>mx)g.dur=mx;
+  }
   // v6.29 spent a flare before the gear check, so backing out of "no weapon
   // equipped" burned it. Hand today's back, once, to anyone upgrading.
   if(S.flareFix!==1){S.flareFix=1;S.flares.used=0;}
@@ -1338,6 +1342,14 @@ function doSwap(uidv){
   if(free){clog('You pull out the '+g.n+'.','good');renderCombat();}
   else act('swap');                                  // costs the round
 }
+function shootGuard(){
+  const g=eqItem('ranged');
+  if(g&&g.dur===1&&(g.r==='epic'||g.r==='legendary')&&C&&!C.durWarnedGun){
+    C.durWarnedGun=true;
+    if(!confirm('This is the last shot your '+g.n+' has in it. It will be wrecked (you keep it, but it needs rebuilding). Fire anyway?'))return;
+  }
+  act('shoot');
+}
 function attackGuard(){
   const w=eqItem('melee');
   if(w&&w.dur===1&&(w.r==='epic'||w.r==='legendary')&&C&&!C.durWarned){
@@ -1346,12 +1358,14 @@ function attackGuard(){
   }
   act('attack');
 }
-function breakWeapon(w){if(w.dur>0)return;
+function breakWeapon(w){if(w.dur===undefined||w.dur>0)return;
+  const slot=w.slot||'melee';                       // guns wear out too now
   const keep=(w.r==='epic'||w.r==='legendary');
-  if(keep){w.broken=true;w.dur=0;S.eq.melee=null;
-    clog('The '+w.n+' is wrecked - it stays in your pack. Repair it at the armory.','sys');
-    toast(w.n+' wrecked, not lost. Repair it in Pack.','d');
-  }else{clog('The '+w.n+' breaks.','sys');S.gear=S.gear.filter(g=>g.uid!==w.uid);S.eq.melee=null;}}
+  if(keep){w.broken=true;w.dur=0;if(S.eq[slot]===w.uid)S.eq[slot]=null;
+    clog('The '+w.n+' is wrecked - it stays in your pack. It needs rebuilding.','sys');
+    toast(w.n+' wrecked, not lost. Repair it in Gear.','d');
+  }else{clog('The '+w.n+(slot==='ranged'?' jams for good.':' breaks.'),'sys');
+    S.gear=S.gear.filter(g=>g.uid!==w.uid);if(S.eq[slot]===w.uid)S.eq[slot]=null;}}
 function act(kind){
   if(!C||C.over)return;C.brace=false;
   const t=targetEnemy();if(!t){endCombat(true);return;}
@@ -1388,6 +1402,14 @@ function act(kind){
     for(let s=0;s<shots;s++){const tt=targetEnemy();if(!tt)break;
       if(Math.random()<0.92){let d=Math.round((rint(g.dmg[0],g.dmg[1])+(S.lvl-1)+sk('steadyaim')*3)*hydroDmg());if(sk('coldbarrel')&&!C.fired){d=Math.round(d*1.5);clog('Cold barrel. The first shot bites.','good');}if(Math.random()<sk('headshot')*0.1){d*=2;clog('Headshot.','good');}C.fired=true;tt.shot=true;C.muzzle=Date.now();dealTo(tt,d,'You fire the '+g.n,'shot');}else{C.fired=true;clog('The shot goes wide.','');}}
     if(S.loc&&g.id!=='whisper')S.loc.noise=Math.min(100,S.loc.noise+Math.max(5,25-sk('silencer')*8));
+    // Guns wear like everything else now. Irongrip and jury-rig apply the same
+    // way they do to a melee weapon.
+    if(g.dur!==undefined&&!(Math.random()<sk('irongrip')*0.25)){
+      g.dur--;
+      if(g.dur<=0&&Math.random()<sk('juryrig')*0.2){g.dur=1;clog('You clear a jam and keep the '+g.n+' running.','good');}
+      if(g.dur>0&&g.dur<=3)clog(g.n+': '+g.dur+' shot'+(g.dur===1?'':'s')+' before it needs work.','hit');
+      breakWeapon(g);
+    }
   }
   else if(kind==='brace'){C.brace=true;clog('You brace.','you');}
   else if(kind==='med'){const m=S.pack.find(p=>p.cat==='meds')||(S.stock.meds>0?{stock:true}:null);if(!m){toast('No meds');return;}const heal=(m.id==='kit'?70:m.id==='abx'?45:35)+setPerk('med')+sk('fielddressing')*10;if(m.stock)S.stock.meds--;else S.pack=S.pack.filter(p=>p!==m);S.hp=Math.min(maxHp(),S.hp+heal);clog('You patch up: +'+heal+' HP.','good');SFX.play('loot');}
@@ -1505,7 +1527,7 @@ function renderCombat(){
     <button class="btn" onclick="act('heavy')" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · ${60+sk('bruiser')*12}% hit · noisy</small></button>
     ${w?`<button class="btn" onclick="act('fists')">👊 Fists<small>${baseDmg()[0]}-${baseDmg()[1]} dmg · saves your ${esc(w.n)}</small></button>`:''}
     <button class="btn" onclick="swapSheet()">🔄 Switch weapon<small>${swapOptions().length} in your gear${w?' · costs your turn':' · free, hands empty'}</small></button>
-    <button class="btn" onclick="act('shoot')" ${g&&(ammoN||g.id==='mercy')?'':'disabled'}>${g?g.e+' '+esc(g.n):'🔫 No gun'}<small>${g?(g.dmg[0]+sk('steadyaim')*3)+'-'+(g.dmg[1]+sk('steadyaim')*3)+' · '+ammoN+' rounds':'find one'}</small></button>
+    <button class="btn" onclick="shootGuard()" ${g&&(ammoN||g.id==='mercy')?'':'disabled'}>${g?g.e+' '+esc(g.n)+(temperOf(g)?' <span class="chip s">'+esc(temperOf(g).n)+'</span>':''):'🔫 No gun'}<small>${g?(wDmg(g)[0]+sk('steadyaim')*3)+'-'+(wDmg(g)[1]+sk('steadyaim')*3)+' · '+ammoN+' rounds'+(g.dur!==undefined?' · '+g.dur+' left':''):'find one'}</small></button>
     <button class="btn" onclick="act('brace')">🛡️ Brace<small>${sk('steady')?60+sk('steady')*10:50}% less damage this round</small></button>
     <button class="btn" onclick="act('med')" ${meds?'':'disabled'}>🩹 Patch up<small>${meds} meds</small></button>
     <button class="btn ghost" onclick="act('flee')" ${C.where==='raid'?'disabled':''}>🏃 Run<small>70% · drop 25% pack</small></button>
@@ -1659,14 +1681,28 @@ function rollTemper(){const tot=Object.values(TEMPERS).reduce((a,b)=>a+b.w,0);le
   for(const k of Object.keys(TEMPERS)){r-=TEMPERS[k].w;if(r<=0)return k;}return 'balanced';}
 function benchable(g){return !!(g&&(g.dmg||g.dr!==undefined||g.cap));}
 
-const REPAIR_PER={common:1,uncommon:1,rare:2,epic:3,legendary:4};
+/* What a repair costs is now derived from how hard the thing hits, not from the
+   word printed on it. Her rule: "the better the legendary weapon, the more scrap
+   it costs; if it's not as OP as the Old Reliable then make it cost less."
+   A rarity label could not express that - Whisper and Mercy are both legendary
+   and one does twice the damage of the other. Power can.
+   Read from the BASE gear entry so the price is a property of the weapon you can
+   learn, not something that drifts as you upgrade it. */
+function gearPower(g){
+  const base=GEAR[g.id]||g;
+  if(base.dmg)return (base.dmg[0]+base.dmg[1])/2;
+  if(base.dr!==undefined)return base.dr*4;
+  if(base.cap)return base.cap*1.5;
+  return 5;
+}
+function repairPer(g){return Math.max(1,Math.min(9,Math.round(gearPower(g)/5)));}
 function atBench(){return !!((S.base&&S.base.rooms.armory)||roleLvl('engineer'));}
 function repairMax(g){const base=(GEAR[g.id]&&GEAR[g.id].dur)||0;if(!base)return 0;
   const t=temperOf(g);return Math.max(1,base+(t?t.dur:0));}
 function repairMissing(g){return Math.max(0,repairMax(g)-Math.max(0,g.dur||0));}
 function repairCost(g){
   const miss=repairMissing(g);if(!miss)return 0;
-  let c=miss*(REPAIR_PER[g.r||'common']||1);
+  let c=miss*repairPer(g);
   if(atBench())c=c/2;
   c-=sk('tinkerer');if(bg('mechanic'))c-=Math.ceil(c*0.4);
   return Math.max(1,Math.ceil(c));
@@ -2260,7 +2296,7 @@ function render(){
     ra.textContent='Repair '+broke.length+' worn piece'+(broke.length===1?'':'s')+' for '+bill+'🔩'+(atBench()?' (bench price)':'');
     ra.classList.toggle('off',S.stock.scrap<Math.min(...broke.map(repairCost).concat([Infinity])));
   }
-  $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+(g.dur+'/'+repairMax(g)+' durability')):g.slot==='ranged'?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';const sh=(g.r==='legendary'||g.r==='epic')?' shine'+(g.r==='legendary'?' leg':''):'';
+  $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=(g.slot==='melee'||g.slot==='ranged')&&g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+(g.dur+'/'+repairMax(g)+' durability')):g.slot==='ranged'?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+g.dur+'/'+repairMax(g)+' · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';const sh=(g.r==='legendary'||g.r==='epic')?' shine'+(g.r==='legendary'?' leg':''):'';
     return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''}${temperOf(g)?` <span class="chip${g.temper==='perfect'?' a':g.temper==='crude'?' d':''}">${esc(temperOf(g).n)}</span>`:''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${repairMax(g)&&repairMissing(g)?`<button class="btn sm${g.broken?' r':''}${S.stock.scrap<repairCost(g)?' off':''}" onclick="repair('${g.uid}')">Repair ${repairCost(g)}🔩</button>`:''}${benchable(g)?`<button class="btn sm" onclick="benchSheet('${g.uid}')">🛠️ Workbench</button>`:''}<button class="btn sm ghost" onclick="giftSheet('${g.uid}')">Gift</button><button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
   // you
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
@@ -2385,6 +2421,13 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.35',d:'Sep 17',t:'No weapon has infinite hits, and repair prices follow power',
+  i:['GUNS WEAR OUT NOW. They never did - the 9mm, the shotgun, Mercy and Whisper could fire forever. Every weapon in the game has a use count: Mercy 8 shots, Whisper 12, the 9mm 10, the shotgun 6.',
+     'REPAIR PRICES NOW FOLLOW HOW HARD A WEAPON HITS, not the word printed on it. Two legendaries can be very different weapons - Mercy does 46 damage a shot and Whisper does 28 - so charging them the same was wrong.',
+     'Weakest to dearest: a Lead pipe is 2 scrap a swing, a Machete 4, the shotgun 8, Mercy 9. Nothing strong is ever cheaper to run than something weaker than it.',
+     'Old Reliable is unchanged at 20 swings for 80 scrap, still the biggest single bill in the county.',
+     'A rare gun that runs out is GONE. An epic or legendary one only wrecks and waits in your pack for the rebuild, same as melee. You will be warned before a legendary fires its last shot.',
+     'If you already own a gun, it starts at full durability when you update.']},
  {v:'6.34',d:'Sep 17',t:'Old Reliable is not an answer any more',
   i:['Your friends were right: a weapon that NEVER breaks makes every other weapon in the game decoration. Old Reliable now has 20 swings before it needs rebuilding - still twice any other weapon, but no longer infinite.',
      'The rebuild is 80 scrap, 40 at an armory: by far the biggest single bill in the county.',
