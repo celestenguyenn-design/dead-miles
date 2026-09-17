@@ -55,41 +55,79 @@ async function fetchPois(pos,force){
   else try{const c=JSON.parse(localStorage.getItem('dm.pois.'+cell)||'null');
     if(c&&c.pois&&c.pois.length&&Date.now()-c.t<7*86400000){STREET.pois=c.pois;updateMarkers();$('#mapStatus').textContent=STREET.pois.length+' places nearby';return;}}catch(e){}
   $('#mapStatus').textContent='Looking up the buildings around you...';
-  const q=`[out:json][timeout:25];(nwr(around:350,${pos.lat},${pos.lon})[amenity~"^(pharmacy|police|fuel|hospital|clinic|doctors|dentist|veterinary|fast_food|restaurant|cafe|bar|pub|ice_cream|school|college)$"];nwr(around:350,${pos.lat},${pos.lon})[shop~"^(supermarket|convenience|grocery|greengrocer|bakery|deli|hardware|doityourself|sports|hunting|weapons|outdoor)$"];nwr(around:400,${pos.lat},${pos.lon})[leisure=park];way(around:220,${pos.lat},${pos.lon})[building~"^(house|residential|apartments|detached|semidetached_house|terrace|yes|bungalow)$"];);out center 140;`;
-  try{
-    const MIRRORS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
-    let j=null,lastErr=null;
+
+  /* Two separate requests, not one.
+     The old query asked for shops AND parks AND every building in one statement.
+     In a dense city block the building half alone is hundreds of ways, so the
+     whole thing hit Overpass's 25s ceiling and came back with NOTHING - killing
+     the shop results too, which would have taken milliseconds on their own.
+     Split, they fail independently: a slow building lookup can no longer wipe
+     out the pharmacy across the road.
+
+     The building filter is also a blacklist now instead of a whitelist. It used
+     to name eight values, and anything a city tagged differently - commercial,
+     retail, mixed-use, the row houses of Brooklyn - simply did not exist. Any
+     building is somewhere to loot; only the ones you cannot walk into are cut. */
+  const around=(r,body)=>`[out:json][timeout:60];(${body});out center 120;`;
+  const bizQ=around(0,
+    `nwr(around:350,${pos.lat},${pos.lon})[amenity~"^(pharmacy|police|fuel|hospital|clinic|doctors|dentist|veterinary|fast_food|restaurant|cafe|bar|pub|ice_cream|school|college)$"];`
+   +`nwr(around:350,${pos.lat},${pos.lon})[shop];`
+   +`nwr(around:400,${pos.lat},${pos.lon})[leisure=park]`);
+  const bldQ=`[out:json][timeout:60];(way(around:200,${pos.lat},${pos.lon})[building];);out center 120;`;
+
+  const MIRRORS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+  const ask=async(q)=>{
+    let lastErr=null;
     for(const url of MIRRORS){
       try{
         const r=await fetch(url,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
-        if(!r.ok){lastErr=new Error('map server said '+r.status);continue;}
+        if(!r.ok){lastErr=new Error('server said '+r.status);continue;}
         const got=await r.json();
-        if(got&&(got.elements||[]).length){j=got;break;}
-        j=j||got;                              // keep an empty answer, but keep trying the next mirror
+        if(got&&(got.elements||[]).length)return {els:got.elements};
+        lastErr=lastErr||new Error('empty');
       }catch(e){lastErr=e;}
     }
-    if(!j)throw (lastErr||new Error('no answer'));
-    const pois=[];
-    for(const el of j.elements||[]){const lat=el.lat||(el.center&&el.center.lat),lon=el.lon||(el.center&&el.center.lon);if(lat==null)continue;const tg=el.tags||{};
-      let kind=POI_KIND[tg.amenity]||POI_KIND[tg.shop]||(tg.leisure==='park'?POI_KIND.park:null);let housey=false;
-      if(!kind){if(tg.building&&HOUSE_KINDS.includes(tg.building)){kind=[tg.building==='apartments'?'house':'house',tg.building==='apartments'?'🏢':'🏠'];housey=true;}else continue;}
-      const name=tg.name||tg.brand||(housey?(tg['addr:housenumber']&&tg['addr:street']?tg['addr:housenumber']+' '+tg['addr:street']:(tg.building==='apartments'?'Apartment building':'House'))+'':kind[0]);
-      pois.push({id:el.type+'/'+el.id,lat,lon,t:kind[0],e:kind[1],n:name.slice(0,40),house:housey});}
-    // keep every real business, plus the nearest 40 houses
-    const biz=pois.filter(p=>!p.house);const houses=pois.filter(p=>p.house).sort((a,b)=>geoDist(a,pos)-geoDist(b,pos)).slice(0,40);
-    STREET.pois=biz.concat(houses);
-    // Never cache an empty answer. Overpass rate-limits by answering 200 with
-    // no elements, and a seven-day cache of that kills the map for a week.
-    if(STREET.pois.length)
-      try{localStorage.setItem('dm.pois.'+cell,JSON.stringify({t:Date.now(),pois:STREET.pois}));}catch(e){}
-    $('#mapStatus').textContent=STREET.pois.length
-      ? STREET.pois.length+' places nearby'
-      : 'The map server found nothing around you. It is usually just busy - tap Refresh places in a minute.';
-  }catch(e){
-    STREET.lastFetch=null;                     // let the next GPS ping try again
-    $('#mapStatus').textContent='Could not reach the map server ('+(e.message||'no connection')+'). Tap Refresh places.';
+    return {els:[],err:lastErr};
+  };
+
+  const [biz,bld]=await Promise.all([ask(bizQ),ask(bldQ)]);
+  const SKIP_BUILDING=['no','roof','carport','shed','garage','garages','bridge','construction','ruins','greenhouse','silo','tank','bunker'];
+  const pois=[];
+  const add=(el,forceHouse)=>{
+    const lat=el.lat||(el.center&&el.center.lat),lon=el.lon||(el.center&&el.center.lon);
+    if(lat==null)return;const tg=el.tags||{};
+    let kind=POI_KIND[tg.amenity]||POI_KIND[tg.shop]||(tg.leisure==='park'?POI_KIND.park:null);
+    let housey=false;
+    if(!kind){
+      if(!forceHouse||!tg.building||SKIP_BUILDING.includes(tg.building))return;
+      const apt=tg.building==='apartments'||tg.building==='residential';
+      kind=['house',apt?'🏢':'🏠'];housey=true;
+    }
+    const addr=tg['addr:housenumber']&&tg['addr:street']?tg['addr:housenumber']+' '+tg['addr:street']:'';
+    const name=tg.name||tg.brand||addr||(housey?(tg.building==='apartments'?'Apartment building':'House'):kind[0]);
+    pois.push({id:el.type+'/'+el.id,lat,lon,t:kind[0],e:kind[1],n:String(name).slice(0,40),house:housey});
+  };
+  for(const el of biz.els)add(el,false);
+  const seen=new Set(pois.map(x=>x.id));
+  for(const el of bld.els){if(!seen.has(el.type+'/'+el.id))add(el,true);}
+
+  const shops=pois.filter(p=>!p.house);
+  const houses=pois.filter(p=>p.house).sort((a,b)=>geoDist(a,pos)-geoDist(b,pos)).slice(0,40);
+  STREET.pois=shops.concat(houses);
+
+  if(STREET.pois.length){
+    try{localStorage.setItem('dm.pois.'+cell,JSON.stringify({t:Date.now(),pois:STREET.pois}));}catch(e){}
+    $('#mapStatus').textContent=STREET.pois.length+' places nearby ('+shops.length+' shops, '+houses.length+' buildings)';
+  }else{
+    STREET.lastFetch=null;                     // retry on the next GPS ping
+    // Say what actually went wrong. "Found nothing" was the same message whether
+    // the server was down, rate-limited, or the area is genuinely bare.
+    const why=(biz.err&&biz.err.message)||(bld.err&&bld.err.message)||'empty';
+    $('#mapStatus').textContent=why==='empty'
+      ? 'Both map servers answered with nothing. They are probably busy - tap Refresh places in a minute.'
+      : 'The map servers would not answer ('+why+'). Tap Refresh places in a minute.';
   }
-  updateMarkers();
+  updateMarkers();renderStreet();
 }
 function poiState(p){const st=streetState();const t=st.looted[p.id];if(t&&Date.now()-t<24*3600000)return 'looted';if(!STREET.pos)return 'far';return geoDist(p,STREET.pos)<=reachRadius()?'near':'far';}
 let RAID_WIN_SEEN=-1;

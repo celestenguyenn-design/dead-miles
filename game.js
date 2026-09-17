@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.40';
+const VERSION='6.42';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -257,6 +257,11 @@ function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossK
   // a battle that can never end - every raid and every doorway answers "Finish
   // what you are doing first" with nothing to finish.
   if(S.combat&&!C)S.combat=false;
+  // A typed number used to be written into lastSync, which then blocked every
+  // real phone reading below it for the rest of the day. It is display-only now,
+  // so anything above what the phone has actually counted is stale - drop it.
+  if(S.steps&&S.steps.lastSyncDate===S.steps.date&&S.steps.lastSync>stepsCounted())
+    {S.steps.lastSync=stepsCounted();}
   if(S.flare&&S.flare.endsAt<=Date.now())S.flare=null;}
 function migrate(o){
   if(!o)return null;if(o.v===3)return o;
@@ -2059,7 +2064,11 @@ function keyDead(){
 async function pullSteps(){
   const o=O();if(!o.ok)return;const since=new Date();since.setHours(0,0,0,0);
   try{const rows=await rpc('get_steps',{p_handle:o.handle,p_token:o.token,p_since:since.toISOString()});o.lastPull=Date.now();
-    if(rows&&rows.length){const v=Math.max(...rows.map(r=>r.steps));if(v>(S.steps.lastSyncDate===S.steps.date?S.steps.lastSync:-1)){o.lastPost=new Date(rows[0].posted_at).getTime();syncTotal(v,'phone');}}
+    if(rows&&rows.length){
+      const v=Math.max(...rows.map(r=>r.steps));
+      const t=new Date(rows[0].posted_at).getTime();if(!isNaN(t))o.lastPost=t;
+      syncCounted(v,'phone');          // idempotent: same reading twice changes nothing
+    }
     o.err='';}catch(e){o.err=e.message;}
   save();if(typeof C==='undefined'||!C)render();else renderOnline();
 }
@@ -2527,6 +2536,17 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.42',d:'Sep 17',t:'A Brooklyn block full of buildings said "no places found"',
+  i:['The old lookup asked for shops AND parks AND every building in ONE request. On a dense city block the building half alone is hundreds of buildings, so the whole thing hit the server\'s time limit and came back empty - taking the pharmacy across the road down with it.',
+     'It is two separate requests now. A slow building lookup can no longer wipe out the shops, and you get whichever half succeeded.',
+     'THE BUILDING FILTER WAS THE OTHER HALF. It listed eight exact tags, so anything a city labelled differently - commercial, retail, mixed-use, the row houses of Brooklyn - did not exist to the game. Any building is somewhere to loot now, minus sheds and garages.',
+     'The status line tells you what actually went wrong instead of one message for every cause, and says how many shops versus buildings it found.']},
+ {v:'6.41',d:'Sep 17',t:'THE step sync bug, found and fixed',
+  i:['This is the one. If you ever typed a step count, that number was written into a "highest reading seen" marker that was only ever meant to hold what your PHONE had sent.',
+     'From that moment the game asked, for every real reading your phone posted: "is 495 bigger than 5,425?" No. So it threw your phone\'s steps away, silently, for the rest of the day. Fourteen posts arrived on the server and the game counted zero of them.',
+     'That check was never needed - taking the same reading twice already changes nothing - so it is gone. A typed number can never block your phone again.',
+     'If your save still has a poisoned marker it is cleared the moment you open the game, and your phone\'s steps land on your next sync.',
+     'Thank you for running the check and pasting it. Those six lines found in one message what four guesses could not.']},
  {v:'6.40',d:'Sep 17',t:'An empty live map could stay empty for a week',
   i:['When the map server was busy it sometimes answered "here are your buildings" with an empty list - and the game CACHED that empty list for seven days. One bad moment and your whole area had nothing to loot until the cache expired. Empty answers are never cached now.',
      'There is a second map server as a backup, so one being rate-limited no longer means no places at all.',
