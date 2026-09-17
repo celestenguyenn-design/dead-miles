@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.8';
+const VERSION='6.9';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1283,6 +1283,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.9',d:'Sep 17',t:'Your shortcut gets a key that never changes',
+  i:['Your phone shortcut carries a code proving the steps are yours - and that code used to be your account key, so recovering your account quietly broke step syncing. The shortcut kept firing every hour and kept getting turned away, with nothing to tell you.',
+     'It now has its own permanent code that nothing ever changes. Update your shortcut once and it is done forever.',
+     'Steps card, Fix my shortcut: it hands you the code and the exact steps.']},
  {v:'6.8',d:'Sep 17',t:'Run your Health shortcut from inside the game',
   i:['The game is not allowed to read Apple Health - your shortcut reads it and sends the number, and the game only reads what the server already has.',
      'So when nothing has arrived today, the Steps card now offers a Run my Health shortcut button. One tap, it runs, your steps land.',
@@ -1340,12 +1344,36 @@ function cmpVer(a,b){const x=String(a).split('.').map(Number),y=String(b).split(
 // number; the game only reads what the server already has. So when the server
 // has nothing for today, offer to RUN the Shortcut instead of checking again.
 const SC_NAME='Dead Miles Steps';
+async function fetchStepKey(){
+  const o=O();if(!o.ok)return null;
+  try{const k=await rpc('get_step_key',{p_handle:o.handle,p_token:o.token});
+    if(k&&k!==o.stepKey){o.stepKey=k;save(true);renderOnline();}
+    return k;}catch(e){return null;}
+}
+function stepCode(){const o=O();return o.handle+'|'+(o.stepKey||o.token)+'|';}
 function runShortcut(){
   toast('Opening Shortcuts...');
   // it takes a moment to run and post, so check a few times on the way back
   [2000,5000,9000,15000].forEach(t=>setTimeout(()=>{if(O().ok)pullSteps();},t));
   try{location.href='shortcuts://run-shortcut?name='+encodeURIComponent(S.scName||SC_NAME);}
   catch(e){toast('Could not open Shortcuts','d');}
+}
+function fixShortcut(){
+  const o=O();if(!o.ok){toast('Go online first','d');return;}
+  fetchStepKey().then(()=>{
+    openSheet('<h2>Fix my shortcut</h2>'
+      +'<p>Your shortcut carries a code that proves the steps are yours. Recovering your account changes it, and the shortcut then gets turned away every hour with nothing to tell you. This is the code it should have now - it is a <b>permanent</b> one, so this is the last time.</p>'
+      +'<input id="fixCode" readonly value="'+esc(stepCode())+'" style="width:100%;margin:8px 0;font-size:11px">'
+      +'<button class="btn r wide" onclick="copyText($(\'#fixCode\').value,\'fixCode\')">Copy the code</button>'
+      +'<ol style="padding-left:20px;margin:12px 0;line-height:1.7">'
+      +'<li>Open <b>Shortcuts</b> and open <b>'+esc(S.scName||SC_NAME)+'</b>.</li>'
+      +'<li>Scroll to <b>Get contents of</b>, find <b>Request Body</b>, and tap the value next to the letter <b>p</b>.</li>'
+      +'<li><b>Delete everything except the blue Sum bubble at the end.</b> Leave that bubble alone.</li>'
+      +'<li>With the cursor <b>before</b> the bubble, paste. It should read your handle, a bar, the code, a bar, then the bubble.</li>'
+      +'<li>Tap <b>Done</b>, then the play button. It should finish showing <b>true</b>.</li>'
+      +'</ol>'
+      +'<button class="btn wide ghost" onclick="closeSheet()">Close</button>',true);
+  });
 }
 function renameShortcut(){
   const n=prompt('What is your Shortcut called, exactly as it appears in the Shortcuts app?',S.scName||SC_NAME);
@@ -1384,6 +1412,7 @@ function renderOnline(){
         sHelp.innerHTML='<div style="padding:10px 12px;border-radius:8px;background:rgba(255,165,0,.14);border-left:4px solid #ffa500">'
           +'<b style="color:var(--bone)">Nothing from your phone today.</b>'
           +'<div class="help" style="margin-top:4px">The game is not allowed to read Apple Health. Your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number. Run it and your steps land here.</div>'
+          +'<div class="help" style="margin-top:6px">If it runs and nothing arrives, the code inside it is out of date - that happens after you recover your account. <a href="#" onclick="fixShortcut();return false;" style="color:var(--sky)">Fix my shortcut</a></div>'
           +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run my Health shortcut</button>'
           +'<button class="btn sm ghost" onclick="syncNow()">Just check again</button></div>'
           +'<div class="help" style="margin-top:6px">Or type today\'s total from the Health app in the box above and tap Sync - that always works. '
@@ -1396,7 +1425,7 @@ function renderOnline(){
           +'<span class="help">It checks on its own every minute and the moment you open the game. You never need to delete the icon.</span>';
       }}
   }
-  const sh=$('#shortcutHelp');if(sh){const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=o.handle+'|'+o.token+'|';sh.innerHTML=o.ok?`<b>iPhone, one time.</b> Two things to copy:<br>
+  const sh=$('#shortcutHelp');if(sh){const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=stepCode();if(o.ok&&!o.stepKey)fetchStepKey();sh.innerHTML=o.ok?`<b>iPhone, one time.</b> Two things to copy:<br>
   <div class="section-label" style="margin-top:8px">A. The address</div><input id="syncUrl" readonly value="${esc(url)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncUrl').value,'syncUrl')">Copy address</button>
   <div class="section-label" style="margin-top:10px">B. Your code</div><input id="syncPrefix" readonly value="${esc(prefix)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncPrefix').value,'syncPrefix')">Copy code</button>
   <ol style="padding-left:20px;margin:10px 0">
@@ -1643,7 +1672,7 @@ function start(){
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){LAST_ACTIVE=Date.now();S.lastOpen=Date.now();const bb=board();S.lastRank=bb.findIndex(r=>r.me)+1;save();}else{onResume();}});
   window.addEventListener('pageshow',e=>{if(e.persisted)onResume();});
   window.addEventListener('focus',()=>{if(Date.now()-LAST_ACTIVE>30000)onResume();});
-  if(O().ok){identWrite(O().handle,O().token);pullSteps();loadFriends();partySync();pushPlayer();bossSync();}
+  if(O().ok){identWrite(O().handle,O().token);fetchStepKey();pullSteps();loadFriends();partySync();pushPlayer();bossSync();}
   setInterval(()=>{if(document.visibilityState==='visible'&&!C){render();if(O().ok){pullSteps();partySync();}}},60000);
   setInterval(()=>{if(document.visibilityState==='visible'&&O().ok){loadFriends();pushPlayer();}},180000);
   if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
