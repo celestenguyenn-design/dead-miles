@@ -304,11 +304,18 @@ async function enterRaid(r,remote){
   // Only CHECK the flare here. gearCheck can still stop the fight - she backs
   // out at "no weapon equipped" and the raid never happens - so the flare is
   // not spent until the fight actually starts, below.
-  if(remote&&flaresLeft()<=0){toast('Out of flares until tomorrow','d');return;}
+  if(remote&&!(S.raidSeats||{})[r.id]&&flaresLeft()<=0){toast('Out of flares until tomorrow','d');return;}
   SHEET_MARK='';                              // cancel any sheet refresh still in flight
   closeSheet();
   gearCheck(()=>{
-    if(remote&&!spendFlare()){toast('Out of flares until tomorrow','d');return;}
+    const seats=S.raidSeats||(S.raidSeats={});
+    if(remote&&!seats[r.id]){
+      if(!spendFlare()){toast('Out of flares until tomorrow','d');return;}
+      seats[r.id]=Date.now();
+      // Trim the oldest, but never the seat just paid for - whatever the clock says.
+      const ids=Object.keys(seats).filter(k=>k!==r.id).sort((a,b)=>seats[a]-seats[b]);
+      while(ids.length>39)delete seats[ids.shift()];
+    }
     const T=r.T;
     const boss=mk('bloater');
     boss.n=r.boss;boss.raid=r.id;boss.warden=true;
@@ -331,7 +338,16 @@ function liveRaidAfter(won){
   const r=(p&&raidAt(p))||(cur.r?Object.assign({},cur.r,{T:RAID_TIERS[cur.r.tier-1]}):null);
   const dealt=won?9999:Math.round(400*cur.tier);
   if(r)raidSync(r,dealt);
-  if(!won){log('The raid at '+cur.n+' beat you back. You can try again if it is still standing.');return;}
+  if(!won){
+    // You still put damage on the shared bar. Pay for that, or a lost raid is a
+    // flare spent on nothing.
+    const scrap=4+cur.tier*3, xp=15*cur.tier;
+    S.stock.scrap+=scrap;addXp(xp);
+    log('The raid at '+cur.n+' beat you back, but you hurt it: +'+scrap+' scrap, +'+xp+' XP. Your damage stays on its health bar.');
+    toast('Driven off. +'+scrap+' scrap for the damage you did','a');
+    if(cur.remote)log('Your seat in this raid is paid for. Going back in costs no flare.');
+    save();render();return;
+  }
   S.raidsDone[cur.id]=Date.now();
   // trim old entries so the save does not grow forever
   const keys=Object.keys(S.raidsDone);if(keys.length>60)keys.sort((a,b)=>S.raidsDone[a]-S.raidsDone[b]).slice(0,keys.length-60).forEach(k=>delete S.raidsDone[k]);
