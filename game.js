@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.10';
+const VERSION='6.11';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1283,6 +1283,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.11',d:'Sep 17',t:'Shortcut setup without the fiddly bit',
+  i:['The shortcut used to put your code and your step number in one box, so you had to edit around a blue bubble without deleting it. That was the worst part of the whole setup.',
+     'Now it can be two boxes: c holds your code, n holds nothing but the Sum bubble. Each one you replace whole - nothing to edit around.',
+     'Settings, Phone step sync, Fix my shortcut has both. Shortcuts that already work keep working.']},
  {v:'6.10',d:'Sep 17',t:'Everything for the shortcut in one place',
   i:['Settings now has a Phone step sync card that is always there: run the shortcut, fix its code, or rename it.',
      'Before this, Fix my shortcut only appeared when you were signed in and nothing had arrived - so it hid exactly when you needed it.']},
@@ -1375,17 +1379,25 @@ function renderStepSync(){
 function fixShortcut(){
   const o=O();if(!o.ok){toast('Go online first','d');return;}
   fetchStepKey().then(()=>{
+    const code=stepCode().replace(/\|$/,'');
     openSheet('<h2>Fix my shortcut</h2>'
-      +'<p>Your shortcut carries a code that proves the steps are yours. Recovering your account changes it, and the shortcut then gets turned away every hour with nothing to tell you. This is the code it should have now - it is a <b>permanent</b> one, so this is the last time.</p>'
-      +'<input id="fixCode" readonly value="'+esc(stepCode())+'" style="width:100%;margin:8px 0;font-size:11px">'
-      +'<button class="btn r wide" onclick="copyText($(\'#fixCode\').value,\'fixCode\')">Copy the code</button>'
-      +'<ol style="padding-left:20px;margin:12px 0;line-height:1.7">'
-      +'<li>Open <b>Shortcuts</b> and open <b>'+esc(S.scName||SC_NAME)+'</b>.</li>'
-      +'<li>Scroll to <b>Get contents of</b>, find <b>Request Body</b>, and tap the value next to the letter <b>p</b>.</li>'
-      +'<li><b>Delete everything except the blue Sum bubble at the end.</b> Leave that bubble alone.</li>'
-      +'<li>With the cursor <b>before</b> the bubble, paste. It should read your handle, a bar, the code, a bar, then the bubble.</li>'
-      +'<li>Tap <b>Done</b>, then the play button. It should finish showing <b>true</b>.</li>'
-      +'</ol>'
+      +'<p>Your shortcut proves the steps are yours with a code. This is a <b>permanent</b> one, so this is the last time.</p>'
+      +'<div style="padding:10px 12px;border-radius:8px;background:rgba(94,173,255,.12);border-left:4px solid var(--sky)">'
+      +'<b style="color:var(--bone)">The easy way - two boxes, each replaced whole</b>'
+      +'<div class="help" style="margin-top:4px">No editing around the blue bubble. In <b>Request Body</b> you want two fields:</div>'
+      +'<div class="help" style="margin-top:6px">field named <b>c</b> &rarr; this code:</div>'
+      +'<input id="fixCode" readonly value="'+esc(code)+'" style="width:100%;margin:6px 0;font-size:11px">'
+      +'<button class="btn sm r" onclick="copyText($(\'#fixCode\').value,\'fixCode\')">Copy the code</button>'
+      +'<div class="help" style="margin-top:8px">field named <b>n</b> &rarr; <b>nothing but the blue Sum bubble</b>.</div>'
+      +'<div class="help" style="margin-top:6px">Delete the old <b>p</b> field with its red minus. Needs round eleven of the setup page.</div>'
+      +'</div>'
+      +'<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">Or keep the old single p field</summary>'
+      +'<ol style="padding-left:20px;margin:10px 0;line-height:1.7">'
+      +'<li>Tap the value next to <b>p</b>.</li>'
+      +'<li>Delete everything <b>except the blue Sum bubble</b> at the end.</li>'
+      +'<li>Cursor <b>before</b> the bubble, paste the code, then type one <b>|</b> after it.</li>'
+      +'</ol></details>'
+      +'<p class="help" style="margin-top:10px">Then tap <b>Done</b> and the play button. It should say <b>ok - N steps</b>. Anything else is a sentence telling you which setting to change.</p>'
       +'<button class="btn wide ghost" onclick="closeSheet()">Close</button>',true);
   });
 }
