@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=6.22">
+<link rel="stylesheet" href="style.css?v=6.23">
 </head>
 <body>
 <div id="app">
@@ -109,12 +109,13 @@
         <div class="row" style="margin-top:10px"><button class="btn sm" id="healBtn">Use medkit: +40 HP</button><button class="btn sm" id="eatBtn">Eat: +15 HP</button><span class="help">HP also recovers overnight.</span></div>
         <div class="row" style="margin-top:8px" id="dropRow" hidden><button class="btn sm z" id="dropBtn">📻 Call in today's supply drop</button><span class="help" id="dropHelp"></span></div>
       </div>
-      <details class="fold"><summary><b>Trader</b> <span class="sub" id="traderFold"></span></summary><div class="foldbody"><div class="card steel"><h2>Trader</h2><p>Marlow's truck stops at any base with walls. Scrap in, supplies out. Salvage spare gear under Pack to get scrap.</p><div class="trade" id="trader" style="margin-top:10px"></div></div></div></details>
+      <details class="fold"><summary><b>Gumball machines</b> <span class="sub">spend your steps</span></summary><div class="foldbody"><div id="gachaBody"></div></div></details>
+        <details class="fold"><summary><b>Trader</b> <span class="sub" id="traderFold"></span></summary><div class="foldbody"><div class="card steel"><h2>Trader</h2><p>Marlow's truck stops at any base with walls. Scrap in, supplies out. Salvage spare gear under Pack to get scrap.</p><div class="trade" id="trader" style="margin-top:10px"></div></div></div></details>
         <div class="card" id="eventCard" hidden></div>
       <div class="card amber" id="workCard" hidden></div>
       <details class="fold"><summary><b>Build</b> <span class="sub" id="buildFold"></span></summary><div class="foldbody"><div class="card"><h2>Build</h2><p>Scrap buys the materials, your steps are the labor. Every seven days a horde hits the base at 9pm: if the walls fail, they take the stockpile.</p><div class="stack" id="build" style="margin-top:10px"></div></div></div></details>
         <details class="fold"><summary><b>Raid log</b></summary><div class="foldbody">      <div class="card"><h2>Raid log</h2><ul class="journal" id="raidLog" style="margin-top:8px"></ul></div></div></details>
-        <details class="fold"><summary><b>Trophies</b> <span class="sub" id="shelfSubFold"></span></summary><div class="foldbody">      <div class="card"><h2>Trophies <span class="sub" id="shelfSub"></span></h2><div class="shelf" id="shelf" style="margin-top:10px"></div></div></div></details>
+        <details class="fold"><summary><b>Trophies</b> <span class="sub" id="shelfSubFold"></span></summary><div class="foldbody"><div class="row" style="margin-bottom:8px"><button class="btn sm r" onclick="trophySheet()">Trophy room</button><span class="help" id="setsLine"></span></div>      <div class="card"><h2>Trophies <span class="sub" id="shelfSub"></span></h2><div class="shelf" id="shelf" style="margin-top:10px"></div></div></div></details>
         <details class="fold big" id="setFold">
           <summary><b>Settings</b> <span class="sub" id="verSub"></span></summary>
           <div class="foldbody">
@@ -172,8 +173,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=6.22"></script>
-<script src="street.js?v=6.22"></script>
-<script src="game.js?v=6.22"></script>
+<script src="art.js?v=6.23"></script>
+<script src="street.js?v=6.23"></script>
+<script src="game.js?v=6.23"></script>
 </body>
 </html>

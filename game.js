@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.22';
+const VERSION='6.23';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -25,7 +25,8 @@ const ITEMS={
   scrap:{n:'Scrap metal',e:'🔩',pts:4,cat:'scrap',w:10,r:'common'},tape:{n:'Duct tape',e:'🧻',pts:5,cat:'scrap',w:7,r:'common'},nails:{n:'Box of nails',e:'🔨',pts:5,cat:'scrap',w:6,r:'common'},wire:{n:'Copper wire',e:'🧵',pts:4,cat:'scrap',w:6,r:'common'},battery:{n:'Car battery',e:'🔋',pts:10,cat:'scrap',w:2.5,r:'uncommon'},fuel:{n:'Fuel can',e:'⛽',pts:12,cat:'scrap',w:2,r:'rare'},
   ammo:{n:'Box of rounds (x6)',e:'📦',pts:14,cat:'ammo',w:2.5,qty:6,r:'uncommon'},shells:{n:'Shotgun shells (x4)',e:'🟥',pts:16,cat:'ammo',w:1.2,qty:4,r:'rare'},
   key:{n:'Chest key',e:'🗝️',pts:0,cat:'key',w:0,r:'rare'},chest:{n:'Locked chest',e:'🧳',pts:0,cat:'chest',w:0,r:'epic'},
-  vinyl:{n:'Vinyl record',e:'💿',pts:25,cat:'shelf',w:1,r:'rare'},polaroid:{n:'Old polaroid',e:'📸',pts:20,cat:'shelf',w:1.1,r:'rare'},teddy:{n:'One-eyed teddy',e:'🧸',pts:18,cat:'shelf',w:1.2,r:'rare'},watch:{n:'Gold watch',e:'⌚',pts:28,cat:'shelf',w:.7,r:'epic'},globe:{n:'Snow globe',e:'🔮',pts:30,cat:'shelf',w:.6,r:'epic'},comic:{n:'Comic issue #1',e:'📖',pts:20,cat:'shelf',w:1,r:'rare'},badge:{n:'Sheriff badge',e:'⭐',pts:40,cat:'shelf',w:.3,r:'legendary'},dogtag:{n:'Soldier dog tag',e:'🏷️',pts:35,cat:'shelf',w:0,r:'epic'},skull:{n:'Raider skull mask',e:'💀',pts:45,cat:'shelf',w:0,r:'legendary'},wanted:{n:'Wanted poster',e:'📜',pts:60,cat:'shelf',w:0,r:'legendary'}
+  handcuffs:{n:'Rusted handcuffs',e:'⛓️',pts:22,cat:'shelf',w:0.4,r:'rare'},cruiser:{n:'Cruiser keys',e:'🔑',pts:24,cat:'shelf',w:0.4,r:'rare'},cards:{n:'Rookie card',e:'🃏',pts:26,cat:'shelf',w:0.38,r:'rare'},dice:{n:'Loaded dice',e:'🎲',pts:20,cat:'shelf',w:0.42,r:'rare'},cart:{n:'Game cartridge',e:'🕹️',pts:30,cat:'shelf',w:0.3,r:'epic'},steth:{n:'Stethoscope',e:'🩺',pts:24,cat:'shelf',w:0.4,r:'rare'},xray:{n:'Chest x-ray',e:'🫁',pts:22,cat:'shelf',w:0.4,r:'rare'},pills:{n:'Labelled pill bottle',e:'💊',pts:20,cat:'shelf',w:0.44,r:'rare'},thermo:{n:'Cracked thermometer',e:'🌡️',pts:18,cat:'shelf',w:0.44,r:'rare'},plate:{n:'Licence plate',e:'🪧',pts:20,cat:'shelf',w:0.42,r:'rare'},sign:{n:'Bent road sign',e:'🛑',pts:22,cat:'shelf',w:0.4,r:'rare'},atlas:{n:'County atlas',e:'🗺️',pts:26,cat:'shelf',w:0.36,r:'rare'},jar:{n:'Jar of something',e:'🫙',pts:34,cat:'shelf',w:0.22,r:'epic'},meteor:{n:'Meteorite shard',e:'☄️',pts:45,cat:'shelf',w:0.14,r:'epic'},
+  vinyl:{n:'Vinyl record',e:'💿',pts:25,cat:'shelf',w:0.45,r:'rare'},polaroid:{n:'Old polaroid',e:'📸',pts:20,cat:'shelf',w:0.5,r:'rare'},teddy:{n:'One-eyed teddy',e:'🧸',pts:18,cat:'shelf',w:0.54,r:'rare'},watch:{n:'Gold watch',e:'⌚',pts:28,cat:'shelf',w:0.32,r:'epic'},globe:{n:'Snow globe',e:'🔮',pts:30,cat:'shelf',w:0.27,r:'epic'},comic:{n:'Comic issue #1',e:'📖',pts:20,cat:'shelf',w:0.45,r:'rare'},badge:{n:'Sheriff badge',e:'⭐',pts:40,cat:'shelf',w:0.14,r:'legendary'},dogtag:{n:'Soldier dog tag',e:'🏷️',pts:35,cat:'shelf',w:0.0,r:'epic'},skull:{n:'Raider skull mask',e:'💀',pts:45,cat:'shelf',w:0.0,r:'legendary'},wanted:{n:'Wanted poster',e:'📜',pts:60,cat:'shelf',w:0.0,r:'legendary'}
 };
 const GEAR={
   pipe:{n:'Lead pipe',e:'🪈',slot:'melee',dmg:[8,13],dur:6,w:6,pts:10,r:'common'},bat:{n:'Baseball bat',e:'⚾',slot:'melee',dmg:[9,15],dur:5,w:5,pts:14,r:'common'},crowbar:{n:'Crowbar',e:'🔧',slot:'melee',dmg:[11,17],dur:8,w:3,pts:18,r:'uncommon'},machete:{n:'Machete',e:'🔪',slot:'melee',dmg:[14,21],dur:7,w:2,pts:26,r:'rare'},axe:{n:'Fire axe',e:'🪓',slot:'melee',dmg:[18,26],dur:6,w:1.2,pts:34,r:'rare'},sledge:{n:'Sledgehammer',e:'🔨',slot:'melee',dmg:[22,32],dur:5,w:.6,pts:40,r:'epic'},
@@ -464,7 +465,7 @@ const eqItem=(slot)=>S.eq[slot]?S.gear.find(g=>g.uid===S.eq[slot]):null;
 const dr=()=>(eqItem('armor')?eqItem('armor').dr:0)+(eqItem('head')?eqItem('head').dr:0);
 const capacity=()=>10+(eqItem('bag')?eqItem('bag').cap:0)+(roleLvl('quartermaster')?3+roleLvl('quartermaster'):0)+sk('deeppockets')*2+sk('packrat')*2;
 const baseDmg=()=>[3+S.lvl,6+S.lvl];
-function addXp(n){if(S.pet==='cat')n=Math.round(n*petXpMult());if(bg('gamer'))n=Math.round(n*(1.25+sk('metaknowledge')*0.05));S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
+function addXp(n){if(setPerk('xp'))n=Math.round(n*(1+setPerk('xp')));if(S.pet==='cat')n=Math.round(n*petXpMult());if(bg('gamer'))n=Math.round(n*(1.25+sk('metaknowledge')*0.05));S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
 const activeCrew=()=>S.active.map(id=>S.crew.find(c=>c.id===id)).filter(c=>c&&(c.hp===undefined||c.hp>0));
 const woundedCrew=()=>S.crew.filter(c=>c.hp!==undefined&&c.hp<=0);
 function roleLvl(role){let b=0;for(const c of activeCrew())if(c.role===role)b=Math.max(b,c.lvl+sk('leader'));return b;}
@@ -487,7 +488,8 @@ function hurtCrew(c,n){c.hp=Math.max(0,(c.hp===undefined?crewMax(c):c.hp)-n);
 function healCrew(id){const c=S.crew.find(x=>x.id===id);if(!c)return;if(c.hp>=crewMax(c)){toast(c.name+' is fine');return;}if(S.stock.meds<1){toast('No meds in the stash');return;}S.stock.meds--;c.hp=crewMax(c);log('Patched up '+c.name+'.');toast(c.name+' is back on their feet','a');SFX.play('win');save();render();}
 function skillList(){return (SKILLS[S.cls]||[]).concat(SKILLS[S.bg]||[]).concat(SKILLS.general);}
 const bg=(id)=>S&&S.bg===id;
-function dmgBonus(){let d=sk('heavyhands')*2+sk('axeman')*2+sk('sharpknife')-(bg('gamer')?1:0);if(sk('rampage')&&C)d+=sk('rampage')*2*C.enemies.filter(e=>e.dead).length;return d;}
+function dmgBonus(){let d=sk('heavyhands')*2+sk('axeman')*2+sk('sharpknife')-(bg('gamer')?1:0);
+  if(setPerk('vsHuman')&&C){const t=C.enemies[C.target];if(t&&t.human)d+=Math.max(1,Math.round((t.max||20)*setPerk('vsHuman')*0.5));}if(sk('rampage')&&C)d+=sk('rampage')*2*C.enemies.filter(e=>e.dead).length;return d;}
 function learn(id){const def=skillList().find(s=>s.id===id);if(!def||S.sp<1||sk(id)>=def.max)return;if(def.req&&S.lvl<def.req){toast(def.n+' unlocks at level '+def.req);return;}S.skills[id]=sk(id)+1;S.sp--;SFX.play('ui');log('Learned '+def.n+' '+S.skills[id]+'.');save();render();}
 function respec(){if(S.stock.scrap<15){toast('Need 15 scrap');return;}S.stock.scrap-=15;S.sp+=Object.values(S.skills).reduce((a,b)=>a+b,0);S.skills={};toast('Skills reset');save();render();}
 
@@ -571,7 +573,7 @@ const VET_STEP=500000;
 function vetRank(){return Math.floor((S.steps.total||0)/VET_STEP);}
 const VET_TITLES=['','Veteran','Ranger','Pathfinder','Outrider','Long Walker','Legend of the Road'];
 function vetTitle(){const r=vetRank();return r?(VET_TITLES[Math.min(r,VET_TITLES.length-1)]+(r>=VET_TITLES.length?' '+(r-VET_TITLES.length+2):'')):'';}
-function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05));if(wxKind()==='snow')dist=Math.round(dist*1.1);S.walk.dist=dist;S.walk.progress=0;S.walk.toNext=dist;}
+function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05-setPerk('dist')));if(wxKind()==='snow')dist=Math.round(dist*1.1);S.walk.dist=dist;S.walk.progress=0;S.walk.toNext=dist;}
 function bossName(){if(eventNow()==='halloween')return 'The Gourd King';return BOSS_NAMES[hash(weekId()+'boss')%BOSS_NAMES.length];}
 function makeLoc(force,nameOverride){
   let type;
@@ -582,7 +584,7 @@ function makeLoc(force,nameOverride){
   if(roleLvl('scout')&&wxKind()!=='fog'){const r=rooms[rint(0,rooms.length-1)];const best=r.items.slice().sort((a,b)=>b.pts-a.pts)[0];r.peek=best?best.e+' '+best.n:'looks empty';}
   return loc;
 }
-function rarW(it){const r=RAR[it.r||'common'].w;return r>=3?1+sk('eagleeye')*0.15+sk('rng')*0.1:1;}
+function rarW(it){const r=RAR[it.r||'common'].w;return r>=3?1+sk('eagleeye')*0.15+sk('rng')*0.1+setPerk('rare'):1;}
 function rollRoom(r,loc){
   const lm=lootMult()*(loc.stronghold?1.4:1);const list=table(r.cats,r.shelf,r.gear).map(x=>({...x,w:x.w*rarW(x)}));const n=rint(1,3);const out=[];
   for(let i=0;i<n;i++){const it=wpick(list,'w');if(it.gear)out.push({id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r});else out.push({id:it.id,n:it.n,e:it.e,pts:Math.round(it.pts*lm),cat:it.cat,qty:it.qty,r:it.r});}
@@ -636,7 +638,7 @@ function rollDay(){
   if(S.steps.date&&S.steps.today>=0){S.steps.hist=(S.steps.hist||[]).filter(x=>x.d!==S.steps.date);
     S.steps.hist.unshift({d:S.steps.date,n:S.steps.today});S.steps.hist=S.steps.hist.slice(0,30);}
   S.steps.date=t;S.steps.today=0;S.steps.src={phone:0,typed:0,walk:0};S.steps.lastSync=0;S.steps.lastSyncDate='';S.flags.roadCheck=0;
-  S.hp=Math.min(maxHp(),S.hp+25+sk('longhaul')*10+sk('earlyriser')*5+(S.base&&S.base.t==='house'?1:0));
+  S.hp=Math.min(maxHp(),S.hp+25+sk('longhaul')*10+sk('earlyriser')*5+(S.base&&S.base.t==='house'?1:0)+setPerk('morningHp'));
   if(S.base){const br=S.base.rooms.barrel||0;if(br){const w=br+(wxKind()==='rain'||wxKind()==='storm'?3:0);S.stock.water+=w;log('The rain barrel gave '+w+' water.');}
     const g=S.base.rooms.garden||0;if(g){const per=3+(bg('farmer')?2:0)+sk('greenthumb');S.stock.food+=per*g;log('The garden gave '+(per*g)+' food.');}if(S.base.t==='diner'){S.stock.food+=2;}}
   loseHydro(20);if(hydroState()==='empty'){S.hp=Math.max(1,S.hp-5);log('You woke up dried out. Find water.');}
@@ -841,6 +843,156 @@ function closeWeek(){
   S.recapDue=r.week;
 }
 
+/* ================= the gumball machines ================= */
+// Steps are the only currency: S.wallet is lifetime steps you have not spent.
+// Two machines, separate pity counters. Odds are printed in the game because a
+// gacha that hides its rates is a gacha you should not trust.
+const GACHA={
+  cloth:{n:'Fits Machine', cost:4000, kind:'cloth'},
+  weapon:{n:'Arms Machine', cost:6000, kind:'weapon'},
+};
+const GACHA_ODDS=[['common',55],['rare',30],['epic',12],['legendary',3]];
+const GACHA_PITY=10;                        // every 10th crank is epic or better
+function gState(k){if(!S.gacha)S.gacha={};if(!S.gacha[k])S.gacha[k]={rolls:0,pity:0};return S.gacha[k];}
+function gRarity(k){
+  const g=gState(k);
+  if(g.pity>=GACHA_PITY-1)return Math.random()<0.22?'legendary':'epic';
+  let r=Math.random()*100;
+  for(const [rar,w] of GACHA_ODDS){if(r<w)return rar;r-=w;}
+  return 'common';
+}
+function gPool(kind,rar){
+  if(kind==='weapon')
+    return Object.entries(GEAR).filter(([k,v])=>(v.r||'common')===rar).map(([k,v])=>({id:k,...v}));
+  const owned=S.cosmetics||[];
+  return cosmeticPool().filter(c=>(c.r||'common')===rar&&!owned.includes(c.id));
+}
+function gPull(k){
+  const m=GACHA[k];const g=gState(k);
+  if((S.wallet||0)<m.cost){toast('Need '+fmt(m.cost-(S.wallet||0))+' more steps','d');return;}
+  S.wallet-=m.cost;g.rolls++;g.pity++;
+  let rar=gRarity(k);
+  let pool=gPool(m.kind,rar);
+  // If that tier is empty, try every OTHER tier - nearest first. The first cut
+  // only walked downward, and there are no common cosmetics in the game, so
+  // 55% of clothing cranks found nothing and silently refunded.
+  if(!pool.length){
+    const order=['common','rare','epic','legendary'];
+    const from=order.indexOf(rar);
+    const tries=order.map((r,i)=>({r,d:Math.abs(i-from)})).filter(x=>x.r!==rar)
+      .sort((a,b)=>a.d-b.d||order.indexOf(a.r)-order.indexOf(b.r));
+    for(const t of tries){const pl=gPool(m.kind,t.r);if(pl.length){rar=t.r;pool=pl;break;}}
+  }
+  if(!pool.length){S.wallet+=m.cost;g.rolls--;g.pity--;toast('You already own everything in this machine','a');save();render();return;}
+  if(RAR[rar].w>=3)g.pity=0;                 // epic or better resets the counter
+  const it=pool[Math.floor(Math.random()*pool.length)];
+  let line='';
+  if(m.kind==='weapon'){
+    S.gear.push({uid:uid(),id:it.id,...GEAR[it.id]});
+    line=it.n;
+  }else{
+    S.cosmetics.push(it.id);
+    const slot=it.slot;S.av[slot]=it.key;     // put it on immediately, it is the fun part
+    line=it.n;
+  }
+  S.stock.scrap+=rar==='common'?2:0;          // a common still gives you something
+  log('Gumball machine: '+line+' ('+rar+').');
+  SFX.play(rar==='legendary'?'legend':rar==='epic'?'rare':'chest');
+  gachaSheet(k,{n:line,r:rar,slot:it.slot,key:it.key,id:it.id});
+  save();render();pushPlayer();
+}
+function gachaSheet(k,got){
+  const m=GACHA[k];const g=gState(k);
+  const col={common:'#b9b2a4',rare:'#5eadff',epic:'#be78ff',legendary:'#f5c842'}[got?got.r:'common'];
+  const left=GACHA_PITY-(g.pity%GACHA_PITY);
+  openSheet('<h2>'+esc(m.n)+'</h2>'
+    +(got?'<div class="gpull" style="text-align:center;margin:6px 0">'
+        +(m.kind==='cloth'?ART.avatarSVG(S.av,120):'<div style="font-size:52px">'+esc(GEAR[got.id]?GEAR[got.id].e:'🔩')+'</div>')
+        +'<div style="font-family:\'Bebas Neue\';font-size:26px;color:'+col+';letter-spacing:.04em">'+esc(got.n)+'</div>'
+        +'<div class="help rc-'+esc(got.r)+'">'+esc(got.r)+'</div></div>'
+      :'<div style="text-align:center">'+ART.gachaSVG(m.kind,110)+'</div>')
+    +'<div class="kv" style="margin-top:8px"><span>Your steps</span><b>'+fmt(S.wallet||0)+'</b>'
+      +'<span>A crank</span><b>'+fmt(m.cost)+'</b>'
+      +'<span>Cranks so far</span><b>'+g.rolls+'</b>'
+      +'<span>Guaranteed epic in</span><b>'+left+'</b></div>'
+    +'<div class="grid2" style="margin-top:10px">'
+      +'<button class="btn ghost" onclick="closeSheet()">Done</button>'
+      +'<button class="btn r" onclick="gPull(\''+k+'\')"'+((S.wallet||0)<m.cost?' disabled':'')+'>Crank again · '+fmt(m.cost)+'</button></div>'
+    +'<p class="help" style="margin-top:10px">Odds per crank: '+GACHA_ODDS.map(([r,w])=>w+'% '+r).join(' · ')
+      +'. Every '+GACHA_PITY+'th crank is epic or better. Clothes you already own never come up.</p>',true);
+}
+function renderGacha(){
+  const el=$('#gachaBody');if(!el)return;
+  el.innerHTML='<p class="help">Your unspent steps go in the slot. Nothing here can be bought with money, only with walking.</p>'
+    +'<div class="row" style="gap:10px;margin-top:10px;align-items:stretch">'
+    +Object.entries(GACHA).map(([k,m])=>{const g=gState(k);const can=(S.wallet||0)>=m.cost;
+      return '<div class="gmachine">'+ART.gachaSVG(m.kind,86)
+        +'<h3>'+esc(m.n)+'</h3>'
+        +'<div class="help">'+(m.kind==='cloth'?'clothes and looks':'weapons and gear')+'</div>'
+        +'<button class="btn sm '+(can?'r':'')+'" style="margin-top:8px;width:100%" onclick="gachaSheet(\''+k+'\')"'+(can?'':' disabled')+'>'+fmt(m.cost)+' steps</button>'
+        +'<div class="help" style="margin-top:4px">'+g.rolls+' cranked</div></div>';}).join('')
+    +'</div>'
+    +'<p class="help" style="margin-top:10px">Steps banked: <b style="color:var(--bone)">'+fmt(S.wallet||0)+'</b></p>';
+}
+/* ================= trophy sets ================= */
+// Six sets of four. Trophies are deliberately rare now, so a completed set is a
+// long grind - and each one pays a SMALL permanent perk. Small on purpose: this
+// is a third progression system next to levels and gear, and it must not become
+// the one that matters most.
+const TROPHY_SETS=[
+  {id:'home', n:'Home Comforts', e:'🏠', items:['teddy','globe','vinyl','polaroid'],
+   perk:'+2 HP every morning', apply:{morningHp:2}},
+  {id:'law',  n:'The Law',       e:'⭐', items:['badge','dogtag','wanted','handcuffs'],
+   perk:'+8% damage to raiders and gunners', apply:{vsHuman:0.08}},
+  {id:'rec',  n:'The Rec Room',  e:'🕹️', items:['comic','cards','dice','cart'],
+   perk:'+6% XP from everything', apply:{xp:0.06}},
+  {id:'care', n:'The Clinic',    e:'🩺', items:['steth','xray','pills','thermo'],
+   perk:'Medkits heal 8 more', apply:{med:8}},
+  {id:'road', n:'The Road',      e:'🗺️', items:['plate','sign','atlas','cruiser'],
+   perk:'Places are 4% closer together', apply:{dist:0.04}},
+  {id:'odd',  n:'Oddities',      e:'☄️', items:['skull','jar','meteor','globe'],
+   perk:'+8% chance at rare loot', apply:{rare:0.08}},
+];
+function trophyCount(id){return (S.shelf||[]).filter(x=>x.id===id).length;}
+function setDone(set){return set.items.every(i=>trophyCount(i)>0);}
+function setsDone(){return TROPHY_SETS.filter(setDone);}
+function setPerk(key){return setsDone().reduce((a,s)=>a+((s.apply&&s.apply[key])||0),0);}
+// Announce a set the moment it completes, once.
+function checkSets(){
+  if(!S.setsSeen)S.setsSeen=[];
+  for(const st of TROPHY_SETS){
+    if(S.setsSeen.includes(st.id))continue;
+    if(!setDone(st))continue;
+    S.setsSeen.push(st.id);
+    log('Set complete: '+st.n+'. '+st.perk+'.');
+    toast(st.e+' '+st.n+' complete · '+st.perk,'l');SFX.play('legend');save();
+  }
+}
+function trophySheet(){
+  const all=Object.entries(ITEMS).filter(([k,v])=>v.cat==='shelf');
+  const inSet={};TROPHY_SETS.forEach(st=>st.items.forEach(i=>{inSet[i]=inSet[i]||[];inSet[i].push(st.e);}));
+  const found=(S.shelf||[]).length, kinds=all.filter(([k])=>trophyCount(k)>0).length;
+  const card=st=>{
+    const have=st.items.filter(i=>trophyCount(i)>0).length;const done=have===st.items.length;
+    return '<div style="margin:10px 0;padding:10px 12px;border-radius:10px;background:'+(done?'rgba(127,191,77,.12)':'rgba(255,255,255,.04)')
+      +';border-left:4px solid '+(done?'var(--rot)':'var(--line)')+'">'
+      +'<div style="font-weight:800;color:var(--bone)">'+st.e+' '+esc(st.n)+' <span class="help">'+have+'/'+st.items.length+'</span></div>'
+      +'<div class="help" style="margin:2px 0 6px;color:'+(done?'var(--rot)':'var(--muted)')+'">'+(done?'✓ ':'')+esc(st.perk)+'</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+st.items.map(i=>{
+          const it=ITEMS[i];const n=trophyCount(i);
+          return '<div title="'+esc(it?it.n:i)+'" style="width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;'
+            +'background:'+(n?'rgba(255,255,255,.07)':'rgba(0,0,0,.25)')+';border:1px solid var(--line);'+(n?'':'filter:grayscale(1);opacity:.32')+'">'
+            +(n?it.e:'❔')+(n>1?'<b style="font-size:9px;position:relative;top:8px;left:-6px;color:var(--amber)">'+n+'</b>':'')+'</div>';}).join('')
+      +'</div></div>';};
+  const loose=all.filter(([k])=>!inSet[k]);
+  openSheet('<h2>Trophy room</h2>'
+    +'<p class="help">'+kinds+' of '+all.length+' kinds found · '+found+' on the shelf · '+setsDone().length+' of '+TROPHY_SETS.length+' sets complete</p>'
+    +TROPHY_SETS.map(card).join('')
+    +(loose.length?'<div class="section-label" style="margin-top:12px">Not in a set</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'
+      +loose.map(([k,it])=>{const n=trophyCount(k);return '<div title="'+esc(it.n)+'" style="width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;background:'+(n?'rgba(255,255,255,.07)':'rgba(0,0,0,.25)')+';border:1px solid var(--line);'+(n?'':'filter:grayscale(1);opacity:.32')+'">'+(n?it.e:'❔')+'</div>';}).join('')+'</div>':'')
+    +'<p class="help" style="margin-top:12px">Trophies are rare on purpose. A cat brings them back more often than you find them.</p>'
+    +'<button class="btn r wide" style="margin-top:10px" onclick="closeSheet()">Close</button>',true);
+}
 /* ================= the wall ================= */
 // Motivation, not currency: nothing here gives a reward, it just remembers.
 const ACHV=[
@@ -1015,7 +1167,7 @@ function act(kind){
     if(S.loc&&g.id!=='whisper')S.loc.noise=Math.min(100,S.loc.noise+Math.max(5,25-sk('silencer')*8));
   }
   else if(kind==='brace'){C.brace=true;clog('You brace.','you');}
-  else if(kind==='med'){const m=S.pack.find(p=>p.cat==='meds')||(S.stock.meds>0?{stock:true}:null);if(!m){toast('No meds');return;}const heal=(m.id==='kit'?70:m.id==='abx'?45:35)+sk('fielddressing')*10;if(m.stock)S.stock.meds--;else S.pack=S.pack.filter(p=>p!==m);S.hp=Math.min(maxHp(),S.hp+heal);clog('You patch up: +'+heal+' HP.','good');SFX.play('loot');}
+  else if(kind==='med'){const m=S.pack.find(p=>p.cat==='meds')||(S.stock.meds>0?{stock:true}:null);if(!m){toast('No meds');return;}const heal=(m.id==='kit'?70:m.id==='abx'?45:35)+setPerk('med')+sk('fielddressing')*10;if(m.stock)S.stock.meds--;else S.pack=S.pack.filter(p=>p!==m);S.hp=Math.min(maxHp(),S.hp+heal);clog('You patch up: +'+heal+' HP.','good');SFX.play('loot');}
   else if(kind==='flee'){if(C.where==='raid'||C.where==='horde'){toast('Nowhere to run. This is your base.');return;}
     if(Math.random()<0.7){C.fled=true;clog('You break away and run.','sys');const drop=Math.ceil(S.pack.length*0.25);for(let i=0;i<drop&&S.pack.length;i++)S.pack.splice(rint(0,S.pack.length-1),1);endCombat(false);return;}
     else clog('You stumble. They close in.','hit');
@@ -1213,7 +1365,7 @@ const TRADE=[{id:'bandage',n:'Bandages',e:'🩹',c:10,give:s=>s.meds++},{id:'bea
 function trade(id){const t=TRADE.find(x=>x.id===id);if(!t)return;if(!S.base){toast('The trader only comes to a base');return;}let c=t.c;c=Math.max(1,Math.round(c*(1-sk('haggler')*0.1-sk('trader')*0.15)));if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}S.stock.scrap-=c;t.give(S.stock);log('Bought '+t.n+' from the trader for '+c+' scrap.');toast(t.e+' '+t.n,'a');SFX.play('chest');save();render();}
 function renderTrader(){const el=$('#trader');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first. The trader only stops where there are walls.</p>';return;}
   el.innerHTML=TRADE.map(t=>{let c=Math.max(1,Math.round(t.c*(1-sk('haggler')*0.1-sk('trader')*0.15)));return `<button class="tr${S.stock.scrap<c?' off':''}" onclick="trade('${t.id}')"><span class="e">${t.e}</span><b>${t.n}</b><span class="chip a">${c}🔩</span></button>`;}).join('');}
-function heal(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.meds<1){toast('No meds in stash');return;}S.stock.meds--;S.hp=Math.min(maxHp(),S.hp+40+sk('fielddressing')*10);save();render();}
+function heal(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.meds<1){toast('No meds in stash');return;}S.stock.meds--;S.hp=Math.min(maxHp(),S.hp+40+sk('fielddressing')*10+setPerk('med'));save();render();}
 function eat(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.food<1){toast('No food in stash');return;}S.stock.food--;S.hp=Math.min(maxHp(),S.hp+15+sk('comfortfood')*5+(bg('chef')?10:0)+(bg('farmer')?5:0));save();render();}
 function equip(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;
   if(g.broken&&S.eq[g.slot]!==uidv){toast(g.n+' is wrecked. Repair it first.','d');return;}
@@ -1723,6 +1875,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.23',d:'Sep 17',t:'Gumball machines, and trophies that matter',
+  i:['TWO MACHINES on the Base tab. Your unspent steps go in the slot - nothing here costs money, only walking. The Fits Machine gives clothes, the Arms Machine gives weapons.',
+     'Odds are printed on the machine: 55/30/12/3. Every 10th crank is guaranteed epic or better. Clothes you already own never come up.',
+     'New legendary: the AXOLOTL ONESIE. Pink, frilly, and the best thing in the game.',
+     'TROPHIES NOW DO SOMETHING. Six sets of four - Home Comforts, The Law, The Rec Room, The Clinic, The Road, Oddities. Complete a set and keep a small permanent perk forever.',
+     '14 new trophies, and every trophy is now MUCH rarer. It is a grind on purpose. Base tab, Trophies, Trophy room.']},
  {v:'6.22',d:'Sep 17',t:'Typing your steps no longer freezes them',
   i:['Typing a total and your phone sending a total are two different readings of the same day. They used to share one baseline, so typing 5,000 when your phone had 3,200 made every later sync look like you had walked backwards - and it was refused until your phone caught up.',
      'Each now keeps its own reading and the day only ever goes up. Type 5,000, walk 200, and it says 5,200.',
@@ -1977,14 +2135,16 @@ function renderOnline(){
   if(!o.ok){body=`${o.err?`<div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;background:rgba(230,62,92,.18);border-left:4px solid #e63e5c"><b style="color:#ff8a92">${esc(o.err)}</b><div class="help" style="margin-top:4px">Sign back in with your handle and your 6-digit PIN, or your account key. Your character on this phone is not touched.</div><button class="btn sm r" style="margin-top:8px" onclick="signInSheet()">Sign in again</button></div>`:''}<div class="row"><input id="handleInput" type="text" maxlength="20" placeholder="handle, e.g. celeste" value="${esc(o.handle||slug(S.name))}" style="flex:1;min-width:140px"><button class="btn r" onclick="goOnline($('#handleInput').value,$('#tokenInput').value)">Go online</button></div><input id="tokenInput" type="text" placeholder="account key (only if moving from another browser)" style="margin-top:8px;font-size:12px">${o.err?`<p class="help" style="color:#ff8a92">${esc(o.err)}</p>`:''}`;}
   else{body=`<div class="kv"><span>Handle</span><b>@${esc(o.handle)}</b><span>Last phone sync</span><b>${o.lastPost?timeStr(o.lastPost)+' today':'none yet'}</b><span>Server</span><b>${o.err?'<span style="color:#ff8a92">'+esc(o.err)+'</span>':'ok'}</b></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pullSteps();loadFriends();partySync();toast('Syncing')">Sync now</button><button class="btn sm ghost" onclick="testOnline()">Test connection</button><button class="btn sm ghost" onclick="copyText(O().token,'')">Copy account key</button><button class="btn sm ghost" onclick="signInSheet()">Re-enter my key</button></div><p class="help">Account key = how to move to another browser or phone. There, type this handle, paste the key, and your save comes with it.</p>`;}
   $('#onlineBody').innerHTML=body;
-  try{checkAchv();}catch(e){}
+  try{checkAchv();checkSets();}catch(e){}
   // fold summaries carry the live state, so a closed fold still tells you something
   try{const bf=$('#buildFold');
     if(bf){const rooms=S.base?Object.values(S.base.rooms||{}).reduce((a,b)=>a+b,0):0;
       bf.textContent=!S.base?'claim a base first':(S.work?('building '+BUILD[S.work.k].n+'...'):(rooms+' room'+(rooms===1?'':'s')+' · '+fmt(S.stock.scrap)+' scrap'));}
     const tf=$('#traderFold');
     if(tf)tf.textContent=S.base?(fmt(S.stock.scrap)+' scrap to spend'):'needs a base';
-    const sf=$('#shelfSubFold');if(sf)sf.textContent=(S.shelf||[]).length+' found';
+    const sf=$('#shelfSubFold');if(sf)sf.textContent=setsDone().length+'/'+TROPHY_SETS.length+' sets';
+    renderGacha();
+    const sl=$('#setsLine');if(sl)sl.textContent=setsDone().length?setsDone().map(x=>x.e).join(' ')+' complete':'no sets yet';
   }catch(e){}
   try{const got=Object.keys(S.achv||{}).length;const ws=$('#wallSub');if(ws)ws.textContent=got+'/'+ACHV.length;
     const wl=$('#wallLine');if(wl){const last=(S.weeks||[])[0];

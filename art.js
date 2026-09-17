@@ -14,6 +14,7 @@ const TOPS={hoodie:{n:'Hoodie',r:'common'},varsity:{n:'Varsity jacket',r:'rare'}
   onesie_bear:{n:'Bear onesie',r:'rare',kind:'onesie',base:'#8a5a3a',belly:'#d9b48a',ears:'round',earIn:'#d9b48a'},
   onesie_bunny:{n:'Bunny onesie',r:'epic',kind:'onesie',base:'#ffd6e4',belly:'#fff',ears:'long',earIn:'#ff8ab8'},
   onesie_shark:{n:'Shark onesie',r:'epic',kind:'onesie',base:'#6a8aa8',belly:'#e8f0f6',ears:'fin',teeth:true},
+  onesie_axolotl:{n:'Axolotl onesie',r:'legendary',kind:'onesie',base:'#ffb3d1',belly:'#fff0f6',ears:'frills',earIn:'#ff6fa8'},
   onesie_dino:{n:'Dino onesie',r:'epic',kind:'onesie',base:'#5aa86a',belly:'#e0d890',ears:'spikes'},
   onesie_snowfox:{n:'Snow fox onesie',r:'epic',kind:'onesie',base:'#f4f0ea',belly:'#fff',ears:'pointy',earIn:'#ff9ab0'},
   onesie_sparkmouse:{n:'Sparkmouse onesie',r:'legendary',kind:'onesie',base:'#f5d642',belly:'#f5d642',ears:'longblack',earIn:'#f5d642',cheeks:'#e63e3e',bolt:true},
@@ -194,8 +195,44 @@ function onesieEars(top,o){const t=TOPS[top];if(!t||t.kind!=='onesie')return '';
     case 'pointy':return `<g ${o}><path d="M18 22 l-2 -18 l14 12z" fill="${b}"/><path d="M20 18 l-1 -9 l7 6z" fill="${i}"/><path d="M82 22 l2 -18 l-14 12z" fill="${b}"/><path d="M80 18 l1 -9 l-7 6z" fill="${i}"/></g>`;
     case 'fin':return `<g ${o}><path d="M44 12 q6 -16 14 -4 l-2 8z" fill="${b}"/></g>`;
     case 'spikes':return `<g ${o}><path d="M30 14 l5 -12 l6 10z M46 10 l5 -12 l6 10z M62 14 l5 -12 l6 10z" fill="${t.belly}"/></g>`;
+    case 'frills':return `<g ${o}><g fill="${i}" opacity=".95">`
+      +[[20,16],[26,9],[74,9],[80,16]].map(([x,y],n)=>{const f=n<2?-1:1;
+        return `<path d="M${x} ${y+12} q${f*-7} -6 ${f*-3} -13 q${f*5} 3 ${f*6} 10z"/>`
+             + `<path d="M${x+f*4} ${y+13} q${f*-9} -4 ${f*-7} -12 q${f*7} 5 ${f*9} 11z"/>`;}).join('')
+      +`</g><circle cx="38" cy="19" r="3" fill="${i}" opacity=".5"/><circle cx="62" cy="19" r="3" fill="${i}" opacity=".5"/></g>`;
     case 'frogeyes':return `<g ${o}><circle cx="30" cy="12" r="8" fill="${b}"/><circle cx="30" cy="12" r="4.5" fill="#fff"/><circle cx="31" cy="12" r="2.2" fill="#1e1418"/><circle cx="70" cy="12" r="8" fill="${b}"/><circle cx="70" cy="12" r="4.5" fill="#fff"/><circle cx="69" cy="12" r="2.2" fill="#1e1418"/></g>`;
   }return '';}
+// A gumball machine. `spin` tilts the crank, `drop` sends a capsule down the
+// chute - both are pure CSS classes on the wrapper, so nothing animates unless
+// the caller asks and reduced-motion still wins.
+function gachaSVG(kind,size,opts){
+  opts=opts||{};const s=size||120;
+  const body=kind==='weapon'?'#8a2230':'#2d5faa';
+  const trim=kind==='weapon'?'#e2503f':'#5eadff';
+  const caps=['#ff8ab8','#ffd166','#7fbf4d','#5eadff','#ffa500','#be78ff','#e8e0d0'];
+  let balls='';
+  for(let i=0;i<22;i++){
+    const a=(i*137.5)%360, r=6+((i*7)%20);
+    const x=50+Math.cos(a*Math.PI/180)*r, y=40+Math.sin(a*Math.PI/180)*r*0.82;
+    balls+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="${caps[i%caps.length]}"/>`;
+  }
+  return `<svg viewBox="0 0 100 130" width="${s}" height="${s*1.3}" class="gacha${opts.spin?' spin':''}" aria-hidden="true">
+    <ellipse cx="50" cy="125" rx="34" ry="5" fill="rgba(0,0,0,.35)"/>
+    <rect x="18" y="86" width="64" height="34" rx="6" fill="${body}"/>
+    <rect x="18" y="86" width="64" height="6" rx="3" fill="${trim}"/>
+    <circle cx="50" cy="42" r="32" fill="#cfe6f5" opacity=".18"/>
+    <g clip-path="url(#gd${kind})">${balls}</g>
+    <clipPath id="gd${kind}"><circle cx="50" cy="42" r="31"/></clipPath>
+    <circle cx="50" cy="42" r="32" fill="none" stroke="${trim}" stroke-width="3"/>
+    <ellipse cx="40" cy="28" rx="11" ry="7" fill="#fff" opacity=".28" transform="rotate(-25 40 28)"/>
+    <rect x="16" y="72" width="68" height="10" rx="4" fill="${body}"/>
+    <rect x="38" y="100" width="24" height="16" rx="3" fill="#0e0e12"/>
+    <rect x="38" y="100" width="24" height="16" rx="3" fill="none" stroke="${trim}" stroke-width="2"/>
+    <g class="crank"><circle cx="76" cy="96" r="7" fill="${trim}"/><rect x="74.5" y="89" width="3" height="8" rx="1.5" fill="#e8e0d0"/></g>
+    ${opts.drop?`<circle class="cap" cx="50" cy="60" r="6" fill="${opts.drop}"/>`:''}
+    <text x="50" y="112" text-anchor="middle" font-size="7" fill="#e8e0d0" opacity=".8" font-family="monospace">${kind==='weapon'?'ARMS':'FITS'}</text>
+  </svg>`;
+}
 function avatarSVG(av,size,opts){
   av=av||{};opts=opts||{};const skin=SKINS[av.skin||0]||SKINS[0];const hc=HAIR_COLORS[av.hairColor||0]||HAIR_COLORS[0];const style=av.hair||'short';const tc=TOP_COLORS[av.topColor||0]||TOP_COLORS[0];
   const mood=opts.mood||'';const weapon=opts.weapon||'';const bs=opts.style||AV_STYLE;
@@ -318,5 +355,5 @@ function petSVG(kind,size,coat,opts){
 const imgCache=new Map();
 function spriteImg(svg){let i=imgCache.get(svg);if(i)return i;i=new Image();i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);imgCache.set(svg,i);if(imgCache.size>60){const k=imgCache.keys().next().value;imgCache.delete(k);}return i;}
 function randomAv(){return {skin:Math.floor(Math.random()*SKINS.length),hair:HAIR_STYLES[Math.floor(Math.random()*HAIR_STYLES.length)],hairColor:Math.floor(Math.random()*HAIR_COLORS.length),eyes:EYES[Math.floor(Math.random()*EYES.length)],top:'hoodie',topColor:Math.floor(Math.random()*TOP_COLORS.length),hat:'',acc:''};}
-return {SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,CAT_COATS,DOG_COATS,randomCoat,coatInfo,avatarSVG,setStyle,bodyParts,zombieSVG,petSVG,spriteImg,randomAv};
+return {gachaSVG,SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,CAT_COATS,DOG_COATS,randomCoat,coatInfo,avatarSVG,setStyle,bodyParts,zombieSVG,petSVG,spriteImg,randomAv};
 })();

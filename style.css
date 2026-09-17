@@ -334,3 +334,16 @@ a{color:var(--amber)}
   min-width:15px;height:15px;line-height:15px;text-align:center;border-radius:8px;font-weight:800}
 @keyframes raidpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.13)}}
 .poi.raid.t5{animation-duration:1.1s}
+
+/* ---- v6.23 gacha machines ---- */
+.gacha{display:block;margin:0 auto}
+.gacha .crank{transform-origin:76px 96px}
+.gacha.spin .crank{animation:crank .7s ease-in-out}
+@keyframes crank{to{transform:rotate(360deg)}}
+.gacha .cap{animation:capdrop .9s cubic-bezier(.4,1.3,.6,1) forwards}
+@keyframes capdrop{0%{transform:translateY(0);opacity:0}
+  25%{opacity:1}60%{transform:translateY(46px)}75%{transform:translateY(40px)}100%{transform:translateY(46px);opacity:1}}
+.gmachine{flex:1;min-width:0;text-align:center;padding:10px 6px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.gmachine h3{margin:6px 0 2px;font-family:'Bebas Neue';letter-spacing:.05em;font-size:19px;color:var(--bone)}
+.gpull{animation:gpull .5s ease-out}
+@keyframes gpull{0%{transform:scale(.6) rotate(-8deg);opacity:0}60%{transform:scale(1.12)}100%{transform:none;opacity:1}}
