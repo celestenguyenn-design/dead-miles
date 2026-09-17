@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.0';
+const VERSION='6.1';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -282,6 +282,69 @@ async function restoreCloudSnap(id){
     log('Restored the server save from '+ago(new Date((r&&r.at)||Date.now()).getTime())+'.');
     save();render();toast('Save restored','z');pushPlayer();
   }catch(e){toast(e.message,'d');}
+}
+
+// ---- identity mirror (v6.1): who you are, kept in four places at once ----
+// localStorage is the one that gets wiped. A cookie, IndexedDB and the cache
+// store are separate buckets and usually survive when it does.
+const ID_KEY='deadmiles.id';
+function idbOpen(){return new Promise((res,rej)=>{try{const r=indexedDB.open('deadmiles',1);
+  r.onupgradeneeded=()=>{try{r.result.createObjectStore('kv');}catch(e){}};
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}catch(e){rej(e);}});}
+function idbPut(v){idbOpen().then(db=>{const tx=db.transaction('kv','readwrite');tx.objectStore('kv').put(v,'id');}).catch(()=>{});}
+function idbGet(){return idbOpen().then(db=>new Promise(res=>{try{const q=db.transaction('kv','readonly').objectStore('kv').get('id');
+  q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null);}catch(e){res(null);}})).catch(()=>null);}
+function identWrite(h,t){
+  if(!h||!t)return;const v=JSON.stringify({h:h,t:t});
+  try{localStorage.setItem(ID_KEY,v);}catch(e){}
+  try{document.cookie='dm_id='+encodeURIComponent(v)+';max-age=34560000;path=/;samesite=lax';}catch(e){}
+  idbPut(v);
+  try{if(window.caches)caches.open('deadmiles-id').then(c=>c.put('/id',new Response(v))).catch(()=>{});}catch(e){}
+}
+function identLocal(){
+  try{const r=localStorage.getItem(ID_KEY);if(r)return JSON.parse(r);}catch(e){}
+  try{const m=document.cookie.match(/(?:^|; )dm_id=([^;]*)/);if(m)return JSON.parse(decodeURIComponent(m[1]));}catch(e){}
+  return null;
+}
+async function identFind(){
+  const a=identLocal();if(a&&a.h&&a.t)return a;
+  try{const r=await idbGet();if(r){const o=JSON.parse(r);if(o&&o.h&&o.t)return o;}}catch(e){}
+  try{if(window.caches){const c=await caches.open('deadmiles-id');const m=await c.match('/id');
+    if(m){const o=JSON.parse(await m.text());if(o&&o.h&&o.t)return o;}}}catch(e){}
+  return null;
+}
+// Blank launch, but something still remembers the handle: offer it straight away.
+async function identBoot(){
+  if(S&&S.onboarded)return false;
+  const id=await identFind();if(!id)return false;
+  openSheet('<h2>Welcome back</h2><p>This phone lost the game data, but it still remembers who you are: <b style="color:var(--bone)">@'+esc(id.h)+'</b>. Your character is safe on the server.</p><div class="grid2"><button class="btn ghost" onclick="closeSheet();onboard()">Start fresh instead</button><button class="btn r" id="idGo">Bring my character back</button></div>',true);
+  $('#idGo').onclick=()=>{closeSheet();goOnline(id.h,id.t);};
+  return true;
+}
+
+// ---- recovery code: four words that get you back in from anywhere ----
+const RC_WORDS=['amber','anchor','apple','arrow','ashes','badge','barn','beacon','birch','bishop','blanket','bottle','bramble','bridge','bucket','cabin','candle','canyon','cedar','cellar','chapel','cider','clover','copper','cotton','crimson','crow','dagger','daisy','dawn','diesel','ember','falcon','fennel','ferry','fiddle','flint','fossil','gable','garnet','ginger','granite','gravel','harbor','harvest','hazel','hollow','ivory','jasper','kettle','lantern','ledger','linen','locket','maple','marble','meadow','mercy','mitten','moss','nectar','needle','orchard','otter','pantry','pebble','pewter','pigeon','pillar','plum','quarry','quilt','raven','ribbon','ridge','rooster','rusty','saddle','sage','satchel','shovel','silver','sparrow','spruce','stable','sugar','sulfur','thicket','thimble','thunder','timber','tinder','torch','trellis','tulip','velvet','walnut','willow','window','winter','yarrow'];
+function makeCode(){let a=[];for(let i=0;i<4;i++)a.push(RC_WORDS[Math.floor(Math.random()*RC_WORDS.length)]);return a.join('-');}
+async function setRecovery(code){
+  const o=O();if(!o.ok){toast('Go online first','d');return;}
+  code=String(code||'').trim().toLowerCase();
+  if(code.length<8){toast('That code is too short','d');return;}
+  try{const ok=await rpc('set_recovery',{p_handle:o.handle,p_token:o.token,p_code:code});
+    if(!ok){toast('Could not save that code. Run round eight of the setup page first.','d');return;}
+    S.recovery=code;identWrite(o.handle,o.token);save();renderRecov();toast('Recovery code saved','z');
+  }catch(e){toast('Could not save that code. Run round eight of the setup page first.','d');}
+}
+function newRecovery(){setRecovery(makeCode());}
+function copyRecovery(){try{navigator.clipboard.writeText('Dead Miles - handle @'+O().handle+' - recovery code '+(S.recovery||''));toast('Copied','z');}catch(e){}}
+function renderRecov(){
+  const el=$('#recovBody');if(!el)return;const o=O();
+  if(!o.ok){el.innerHTML='<p class="help">Go online first (above) and your recovery code appears here.</p>';return;}
+  const c=S.recovery||'';
+  el.innerHTML='<p class="help">Four words. Write them down, or screenshot them. If this phone ever loses the game - wiped, deleted, new phone - you type your handle and these four words and your character comes straight back. Nothing else needed.</p>'
+    +(c?'<div style="margin:10px 0;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.06);border-left:4px solid var(--blood);font-size:19px;font-weight:800;letter-spacing:.4px;color:var(--bone);word-break:break-word">'+esc(c)+'</div><p class="help">Your handle: <b>@'+esc(o.handle)+'</b></p>'
+        :'<p class="help" style="color:#ffb35c">You do not have one yet. Make one now - it takes one tap.</p>')
+    +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="newRecovery()">'+(c?'Give me different words':'Make my recovery code')+'</button>'
+    +(c?'<button class="btn sm ghost" onclick="copyRecovery()">Copy it</button>':'')+'</div>';
 }
 function save(quiet){try{
   if(S&&S.pets&&S.petActive){const ap=S.pets.find(p=>p.id===S.petActive);if(ap){ap.xp=S.petXp||0;ap.name=S.petName||ap.name;}}
@@ -859,9 +922,10 @@ async function goOnline(handle,token){
   if(token&&token.trim())o.token=token.trim();if(!o.token)o.token=uid()+uid()+uid();
   try{const ok=await rpc('register_player',{p_handle:handle,p_token:o.token,p_name:S.name||handle});
     if(!ok){o.ok=false;o.err='The handle "'+handle+'" is already registered. If it is yours from another browser, paste that browser\'s account key below. Otherwise pick another handle.';toast(o.err,'d');save();render();return;}
-    o.handle=handle;o.ok=true;o.err='';log('Online as @'+handle+'.');toast('Online as @'+handle,'z');save();render();
+    o.handle=handle;o.ok=true;o.err='';identWrite(handle,o.token);log('Online as @'+handle+'.');toast('Online as @'+handle,'z');save();render();
     if(token&&token.trim()){try{const b=await rpc('get_base',{p_handle:handle});const cs=b&&b.public&&b.public.save;
       if(cs&&cs.onboarded){const cloudAt=cs.savedAt||0;const localAt=S.savedAt||0;const localNewer=S.onboarded&&(localAt>cloudAt+60000||(S.steps&&S.steps.total)>((cs.steps&&cs.steps.total)||0));
+        if(!S.onboarded){const keep=S.online;S=Object.assign(fresh(),cs);S.online=keep;S.combat=false;S.journal=[];ensureState();log('Brought your character back from the server.');save();closeSheet();render();toast('Welcome back, '+(S.name||handle),'z');identWrite(handle,o.token);pushPlayer();return;}
         openSheet(`<h2>Found your save</h2><div class="big">${ART.avatarSVG(cs.av||S.av,70)}</div><p><b style="color:var(--bone)">${esc(cs.name||handle)}</b>, level ${cs.lvl||1}, ${fmt((cs.steps&&cs.steps.total)||0)} lifetime steps${cs.base?', base at '+esc(cs.base.n):''}.<br><span class="help">Cloud copy saved ${cloudAt?ago(cloudAt):'at an unknown time'}${S.onboarded?' · this phone saved '+(localAt?ago(localAt):'at an unknown time'):''}.</span></p>${localNewer?'<p style="color:#ff8a92"><b>Careful:</b> what is on this phone looks NEWER than the cloud copy. Restoring would roll you back. Keep this one unless you know the cloud copy is the right one.</p>':'<p>Restore it here? What is on this device right now gets replaced (a backup is kept under Settings for 7 days).</p>'}<div class="grid2"><button class="btn${localNewer?' r':''}" onclick="closeSheet();pushPlayer()">Keep this one</button><button class="btn${localNewer?'':' r'}" id="restoreBtn">Restore the cloud copy</button></div>`,true);
         $('#restoreBtn').onclick=()=>{try{localStorage.setItem('deadmiles.backup',JSON.stringify({t:Date.now(),why:'before cloud restore',s:S}));}catch(e){}const keep=S.online;S=Object.assign(fresh(),cs);S.online=keep;S.combat=false;S.journal=[];ensureState();log('Restored your save from the cloud.');save();closeSheet();render();toast('Save restored. Undo is under Settings.','z');pushPlayer();};return;}
       else if(!S.onboarded){toast('That handle and key match, but there is no saved character on the server yet.','d');return;}}catch(e){if(!S.onboarded){toast('Could not reach the server to find that save. Try again.','d');return;}}}
@@ -1077,7 +1141,7 @@ function render(){
   $('#shelfSub').textContent=S.shelf.length+' found';const shelfIds=Object.entries(ITEMS).filter(([k,v])=>v.cat==='shelf');const owned=S.shelf.reduce((m,x)=>{m[x.id]=(m[x.id]||0)+1;return m;},{});
   $('#shelf').innerHTML=shelfIds.map(([k,v])=>`<div class="it${owned[k]?'':' locked'}"><div class="e">${v.e}</div><span class="rc-${v.r}">${v.n}${owned[k]>1?' x'+owned[k]:''}</span></div>`).join('');
   $('#goalInput').value=S.goal;$('#nameInput').value=S.name;$('#sfxBtn').textContent=S.sfx?'On':'Off';const vs=$('#verSub');if(vs)vs.textContent='v'+VERSION;const bi=backupInfo();const ub=$('#undoRow');if(ub){ub.hidden=!bi;if(bi)$('#undoBtn').textContent='Undo restore (put back the save from '+ago(bi.t)+')';}
-  const snList=snapshots();const snEl=$('#snapList');if(snEl)snEl.innerHTML=snList.length?snList.map((s,i)=>`<div class="lbrow"><div class="rk">${i+1}</div><div class="nm">${esc(s.name||'Survivor')} · level ${s.lvl}<small>${fmt(s.steps)} lifetime steps · ${esc(ago(s.t))}${s.why&&s.why!=='auto'?' · '+esc(s.why):''}</small></div><div class="sc"><button class="btn xs" onclick="restoreSnapshot(${i})">Go back</button></div></div>`).join(''):'<p class="help">None yet. The game keeps one an hour, plus one before anything risky.</p>';if(CLOUD_SNAPS===null&&O().ok)loadCloudSnaps();else renderCloudSnaps();
+  const snList=snapshots();const snEl=$('#snapList');if(snEl)snEl.innerHTML=snList.length?snList.map((s,i)=>`<div class="lbrow"><div class="rk">${i+1}</div><div class="nm">${esc(s.name||'Survivor')} · level ${s.lvl}<small>${fmt(s.steps)} lifetime steps · ${esc(ago(s.t))}${s.why&&s.why!=='auto'?' · '+esc(s.why):''}</small></div><div class="sc"><button class="btn xs" onclick="restoreSnapshot(${i})">Go back</button></div></div>`).join(''):'<p class="help">None yet. The game keeps one an hour, plus one before anything risky.</p>';if(CLOUD_SNAPS===null&&O().ok)loadCloudSnaps();else renderCloudSnaps();renderRecov();
   // county
   renderMap();renderParty();renderBoss();renderDeal();renderEvent();renderStory();renderShop();renderPet();
   const tier=TIERS[S.league.tier];$('#tierBadge').textContent=tier.e;$('#tierName').textContent=tier.n;$('#tierSub').textContent='Tier '+(S.league.tier+1)+' of '+TIERS.length+' · stash x'+tier.mult;
@@ -1247,7 +1311,7 @@ function lookSheet(onDone){
 }
 
 /* ================= onboarding ================= */
-function restoreSheet(){openSheet(`<h2>Restore a save</h2><p>Type the handle you played under and paste the <b>account key</b> from Settings on the phone or browser you played on before (Base tab, Settings, Copy account key). If that copy is gone, ask Celeste for a fresh key.</p><input id="rsHandle" type="text" maxlength="20" placeholder="handle, e.g. bel" style="width:100%;margin:6px 0"><input id="rsKey" type="text" placeholder="account key" style="width:100%;margin:6px 0 12px;font-size:12px"><div class="grid2"><button class="btn ghost" onclick="onboard()">Back</button><button class="btn r" onclick="goOnline($('#rsHandle').value,$('#rsKey').value)">Find my save</button></div>`,true);}
+function restoreSheet(){openSheet(`<h2>Restore a save</h2><p>Type the handle you played under and type your <b>four-word recovery code</b> (Base tab, Settings, Recovery code). The long <b>account key</b> works here too if you still have it.</p><input id="rsHandle" type="text" maxlength="20" placeholder="handle, e.g. bel" style="width:100%;margin:6px 0"><input id="rsKey" type="text" placeholder="recovery code, or account key" style="width:100%;margin:6px 0 12px;font-size:12px"><div class="grid2"><button class="btn ghost" onclick="onboard()">Back</button><button class="btn r" onclick="goOnline($('#rsHandle').value,$('#rsKey').value)">Find my save</button></div>`,true);}
 function onboard(){
   let cls='brawler';let bgSel='farmer';
   const draw=()=>{$('#sheet').innerHTML=`<h2>Hollow County</h2><p>The county fell three weeks ago. Every real step you take is a step down the road: houses to loot, walkers inside them, raiders who want what you carry. Pick a class.</p>
@@ -1396,9 +1460,10 @@ function whileYouWereOut(){
 function start(){
   S=load()||fresh();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
   wire();render();fetchWeather();
-  if(!S.onboarded)onboard();else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else whileYouWereOut();autoSyncFromUrl();}
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
+  if(!S.onboarded){identBoot().then(found=>{if(!found)onboard();});}else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else whileYouWereOut();autoSyncFromUrl();}
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){S.lastOpen=Date.now();const bb=board();S.lastRank=bb.findIndex(r=>r.me)+1;save();}});
-  if(O().ok){pullSteps();loadFriends();partySync();pushPlayer();bossSync();}
+  if(O().ok){identWrite(O().handle,O().token);pullSteps();loadFriends();partySync();pushPlayer();bossSync();}
   setInterval(()=>{if(document.visibilityState==='visible'&&!C){render();if(O().ok){pullSteps();partySync();}}},60000);
   setInterval(()=>{if(document.visibilityState==='visible'&&O().ok){loadFriends();pushPlayer();}},180000);
   if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}

@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=6.0">
+<link rel="stylesheet" href="style.css?v=6.1">
 </head>
 <body>
 <div id="app">
@@ -121,6 +121,7 @@
           <div class="row"><button class="btn sm ghost" id="demoBtn">Demo: +300 steps</button><span class="help">Try it at your desk.</span></div>
           <div class="row"><button class="btn sm" id="updateBtn">Update the game now</button><span class="help">Pulls the newest version.</span></div>
           <div class="row" id="undoRow" hidden><button class="btn sm" id="undoBtn">Undo restore</button></div>
+          <div class="card" style="background:var(--ash2)"><h2>Recovery code <span class="sub">how you get back in</span></h2><div id="recovBody"></div></div>
           <div class="card" style="background:var(--ash2)"><h2>Save to a file <span class="sub">your own backup</span></h2><p class="help">Phones can lose website data, and deleting the home-screen icon can take the save with it. Keep a file somewhere safe and you can always come back.</p><div class="row" style="margin-top:8px"><button class="btn sm r" onclick="exportSave()">Save to a file</button><label class="btn sm" style="cursor:pointer">Load from a file<input type="file" accept="application/json,.json" style="display:none" onchange="importSave(this)"></label></div></div>
           <div class="card" style="background:var(--ash2)"><h2>Restore points <span class="sub">this phone</span></h2><p class="help">Automatic snapshots of your save. If you ever lose progress, come here and go back.</p><div class="lb" id="snapList" style="margin-top:8px"></div></div>
           <div class="card" style="background:var(--ash2)"><h2>Restore points <span class="sub">cloud</span></h2><p class="help">Kept on the server, so they survive losing the phone, deleting the app or a wipe. One an hour, plus one every time something tries to save over you with a smaller character.</p><div class="lb" id="cloudSnapList" style="margin-top:8px"></div><button class="btn ghost" style="margin-top:8px" onclick="loadCloudSnaps()">Check the server</button></div>
@@ -156,8 +157,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=6.0"></script>
-<script src="street.js?v=6.0"></script>
-<script src="game.js?v=6.0"></script>
+<script src="art.js?v=6.1"></script>
+<script src="street.js?v=6.1"></script>
+<script src="game.js?v=6.1"></script>
 </body>
 </html>
