@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.28';
+const VERSION='6.29';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -222,6 +222,9 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
 function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
   if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];
+  // v6.29 spent a flare before the gear check, so backing out of "no weapon
+  // equipped" burned it. Hand today's back, once, to anyone upgrading.
+  if(S.flareFix!==1){S.flareFix=1;S.flares.used=0;}
   if(S.flare&&S.flare.endsAt<=Date.now())S.flare=null;}
 function migrate(o){
   if(!o)return null;if(o.v===3)return o;
@@ -2056,6 +2059,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.29',d:'Sep 17',t:'Flares are not spent until the fight starts',
+  i:['Joining a raid bare-handed showed the "no weapon equipped" warning - and took your flare anyway, even if you backed out. The raid never happened and the flare was gone.',
+     'A flare is now only spent when the fight actually begins. Back out at the weapon warning and it costs you nothing, and the raid is still there to try again.',
+     'Everyone gets today\'s flares handed back, once, since the bug ate them.']},
  {v:'6.28',d:'Sep 17',t:'A way out of every screen, and honest odds',
   i:['The gumball machine had no exit - only "Prize list" and "Crank again". Every popup in the game now has an X in the corner as well, so a screen can never trap you again.',
      'THE ODDS WERE WRONG. The clothes machine said "55% common", but there are no common clothes - those cranks were quietly rolling into rare. It now prints what it actually does: 3% legendary, 12% epic, 85% rare.',

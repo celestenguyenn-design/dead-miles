@@ -294,9 +294,13 @@ async function enterRaid(r,remote){
   if(S.loc||S.combat){toast('Finish what you are doing first');return;}
   const st=await raidSync(r,0);
   if(st&&st.hp===0){toast('Someone already put it down');if(remote)render();else raidSheet(r);return;}
-  if(remote&&!spendFlare()){toast('Out of flares until tomorrow','d');return;}
+  // Only CHECK the flare here. gearCheck can still stop the fight - she backs
+  // out at "no weapon equipped" and the raid never happens - so the flare is
+  // not spent until the fight actually starts, below.
+  if(remote&&flaresLeft()<=0){toast('Out of flares until tomorrow','d');return;}
   closeSheet();
   gearCheck(()=>{
+    if(remote&&!spendFlare()){toast('Out of flares until tomorrow','d');return;}
     const T=r.T;
     const boss=mk('bloater');
     boss.n=r.boss;boss.raid=r.id;boss.warden=true;
