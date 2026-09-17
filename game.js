@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.7';
+const VERSION='6.8';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1283,6 +1283,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.8',d:'Sep 17',t:'Run your Health shortcut from inside the game',
+  i:['The game is not allowed to read Apple Health - your shortcut reads it and sends the number, and the game only reads what the server already has.',
+     'So when nothing has arrived today, the Steps card now offers a Run my Health shortcut button. One tap, it runs, your steps land.',
+     'Typing your Health total into the box and tapping Sync always works too.',
+     'To make it automatic: Shortcuts app, Automation tab, Time of Day, a few times a day, Run Immediately.']},
  {v:'6.7',d:'Sep 17',t:'The game notices when it is signed out',
   i:['If a copy of the game is holding an old account key, saves quietly went nowhere and it still looked online. Now it notices, says so, and shows the way back in.',
      'Your 6-digit PIN works in that box too, so you never have to keep the long key anywhere.']},
@@ -1331,11 +1336,26 @@ function newsCheck(){
 }
 function cmpVer(a,b){const x=String(a).split('.').map(Number),y=String(b).split('.').map(Number);
   for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d;}return 0;}
+// A web page cannot read Apple Health. The Shortcut does that and posts the
+// number; the game only reads what the server already has. So when the server
+// has nothing for today, offer to RUN the Shortcut instead of checking again.
+const SC_NAME='Dead Miles Steps';
+function runShortcut(){
+  toast('Opening Shortcuts...');
+  // it takes a moment to run and post, so check a few times on the way back
+  [2000,5000,9000,15000].forEach(t=>setTimeout(()=>{if(O().ok)pullSteps();},t));
+  try{location.href='shortcuts://run-shortcut?name='+encodeURIComponent(S.scName||SC_NAME);}
+  catch(e){toast('Could not open Shortcuts','d');}
+}
+function renameShortcut(){
+  const n=prompt('What is your Shortcut called, exactly as it appears in the Shortcuts app?',S.scName||SC_NAME);
+  if(n===null)return;S.scName=n.trim()||SC_NAME;save();render();toast('Saved','z');
+}
 function syncNow(){
   const o=O();if(!o.ok){toast('Go online first (Settings)','d');return;}
   toast('Checking the server...');
   Promise.resolve(pullSteps()).then(()=>{loadFriends();partySync();bossSync();checkUpdate();
-    if(!o.lastPost)toast('The server has no steps from your phone today. Run the shortcut once.','d');});
+    if(!o.lastPost)toast('Still nothing from your phone. The game cannot read Health - run your shortcut, or type the total.','d');});
 }
 // iPhone keeps a home-screen app frozen for days. Resuming it used to show
 // yesterday's numbers until a timer happened to fire, which is why deleting and
@@ -1360,10 +1380,21 @@ function renderOnline(){
     if(!o.ok){sHelp.innerHTML='Go online in Settings and set up the phone shortcut once: your Health steps then land here on their own.';}
     else{const t=o.lastPull||0;const mins=t?Math.round((Date.now()-t)/60000):-1;
       const when=mins<0?'not yet this session':(mins<1?'just now':mins+' min ago');
-      const post=o.lastPost?('Your phone last sent steps at '+timeStr(o.lastPost)+'.'):'Your phone has not sent any steps yet today.';
-      sHelp.innerHTML='<b style="color:var(--bone)">Checked the server '+esc(when)+'.</b> '+esc(post)
-        +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="syncNow()">Sync my steps now</button></div>'
-        +'<span class="help">It checks on its own every minute and the moment you open the game. If a number looks stuck, tap this - you never need to delete the icon.</span>';}
+      if(!o.lastPost){
+        sHelp.innerHTML='<div style="padding:10px 12px;border-radius:8px;background:rgba(255,165,0,.14);border-left:4px solid #ffa500">'
+          +'<b style="color:var(--bone)">Nothing from your phone today.</b>'
+          +'<div class="help" style="margin-top:4px">The game is not allowed to read Apple Health. Your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number. Run it and your steps land here.</div>'
+          +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run my Health shortcut</button>'
+          +'<button class="btn sm ghost" onclick="syncNow()">Just check again</button></div>'
+          +'<div class="help" style="margin-top:6px">Or type today\'s total from the Health app in the box above and tap Sync - that always works. '
+          +'<a href="#" onclick="renameShortcut();return false;" style="color:var(--sky)">Shortcut named something else?</a></div></div>'
+          +'<span class="help" style="display:block;margin-top:6px">Checked the server '+esc(when)+'. To make this automatic: Shortcuts app, Automation tab, Time of Day, a few times a day, Run Immediately.</span>';
+      }else{
+        sHelp.innerHTML='<b style="color:var(--bone)">Checked the server '+esc(when)+'.</b> Your phone last sent steps at '+esc(timeStr(o.lastPost))+'.'
+          +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="syncNow()">Sync my steps now</button>'
+          +'<button class="btn sm ghost" onclick="runShortcut()">Run my Health shortcut</button></div>'
+          +'<span class="help">It checks on its own every minute and the moment you open the game. You never need to delete the icon.</span>';
+      }}
   }
   const sh=$('#shortcutHelp');if(sh){const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=o.handle+'|'+o.token+'|';sh.innerHTML=o.ok?`<b>iPhone, one time.</b> Two things to copy:<br>
   <div class="section-label" style="margin-top:8px">A. The address</div><input id="syncUrl" readonly value="${esc(url)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncUrl').value,'syncUrl')">Copy address</button>
