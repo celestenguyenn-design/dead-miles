@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.9';
+const VERSION='6.10';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1189,7 +1189,7 @@ function render(){
   $('#shelfSub').textContent=S.shelf.length+' found';const shelfIds=Object.entries(ITEMS).filter(([k,v])=>v.cat==='shelf');const owned=S.shelf.reduce((m,x)=>{m[x.id]=(m[x.id]||0)+1;return m;},{});
   $('#shelf').innerHTML=shelfIds.map(([k,v])=>`<div class="it${owned[k]?'':' locked'}"><div class="e">${v.e}</div><span class="rc-${v.r}">${v.n}${owned[k]>1?' x'+owned[k]:''}</span></div>`).join('');
   $('#goalInput').value=S.goal;$('#nameInput').value=S.name;$('#sfxBtn').textContent=S.sfx?'On':'Off';const vs=$('#verSub');if(vs)vs.textContent='v'+VERSION;const bi=backupInfo();const ub=$('#undoRow');if(ub){ub.hidden=!bi;if(bi)$('#undoBtn').textContent='Undo restore (put back the save from '+ago(bi.t)+')';}
-  const snList=snapshots();const snEl=$('#snapList');if(snEl)snEl.innerHTML=snList.length?snList.map((s,i)=>`<div class="lbrow"><div class="rk">${i+1}</div><div class="nm">${esc(s.name||'Survivor')} · level ${s.lvl}<small>${fmt(s.steps)} lifetime steps · ${esc(ago(s.t))}${s.why&&s.why!=='auto'?' · '+esc(s.why):''}</small></div><div class="sc"><button class="btn xs" onclick="restoreSnapshot(${i})">Go back</button></div></div>`).join(''):'<p class="help">None yet. The game keeps one an hour, plus one before anything risky.</p>';if(CLOUD_SNAPS===null&&O().ok)loadCloudSnaps();else renderCloudSnaps();renderRecov();
+  const snList=snapshots();const snEl=$('#snapList');if(snEl)snEl.innerHTML=snList.length?snList.map((s,i)=>`<div class="lbrow"><div class="rk">${i+1}</div><div class="nm">${esc(s.name||'Survivor')} · level ${s.lvl}<small>${fmt(s.steps)} lifetime steps · ${esc(ago(s.t))}${s.why&&s.why!=='auto'?' · '+esc(s.why):''}</small></div><div class="sc"><button class="btn xs" onclick="restoreSnapshot(${i})">Go back</button></div></div>`).join(''):'<p class="help">None yet. The game keeps one an hour, plus one before anything risky.</p>';if(CLOUD_SNAPS===null&&O().ok)loadCloudSnaps();else renderCloudSnaps();renderRecov();renderStepSync();
   // county
   renderMap();renderParty();renderBoss();renderDeal();renderEvent();renderStory();renderShop();renderPet();
   const tier=TIERS[S.league.tier];$('#tierBadge').textContent=tier.e;$('#tierName').textContent=tier.n;$('#tierSub').textContent='Tier '+(S.league.tier+1)+' of '+TIERS.length+' · stash x'+tier.mult;
@@ -1283,6 +1283,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.10',d:'Sep 17',t:'Everything for the shortcut in one place',
+  i:['Settings now has a Phone step sync card that is always there: run the shortcut, fix its code, or rename it.',
+     'Before this, Fix my shortcut only appeared when you were signed in and nothing had arrived - so it hid exactly when you needed it.']},
  {v:'6.9',d:'Sep 17',t:'Your shortcut gets a key that never changes',
   i:['Your phone shortcut carries a code proving the steps are yours - and that code used to be your account key, so recovering your account quietly broke step syncing. The shortcut kept firing every hour and kept getting turned away, with nothing to tell you.',
      'It now has its own permanent code that nothing ever changes. Update your shortcut once and it is done forever.',
@@ -1358,6 +1361,17 @@ function runShortcut(){
   try{location.href='shortcuts://run-shortcut?name='+encodeURIComponent(S.scName||SC_NAME);}
   catch(e){toast('Could not open Shortcuts','d');}
 }
+function renderStepSync(){
+  const el=$('#stepSyncBody');if(!el)return;const o=O();
+  if(!o.ok){el.innerHTML='<p class="help">Sign in above first. Your shortcut code lives on the server, so the game has to be online to show it to you.</p>';return;}
+  const posted=o.lastPost?('Your phone last sent steps at <b>'+esc(timeStr(o.lastPost))+'</b>.')
+    :'<span style="color:#ffb35c">Your phone has not sent any steps today.</span>';
+  el.innerHTML='<p class="help">The game cannot read Apple Health - your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number here. '+posted+'</p>'
+    +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run it now</button>'
+    +'<button class="btn sm" onclick="fixShortcut()">Fix my shortcut</button>'
+    +'<button class="btn sm ghost" onclick="renameShortcut()">Rename</button></div>'
+    +'<p class="help" style="margin-top:8px">If the shortcut runs but nothing arrives, the code inside it is out of date - that happens after you recover your account. <b>Fix my shortcut</b> gives you the new one.</p>';
+}
 function fixShortcut(){
   const o=O();if(!o.ok){toast('Go online first','d');return;}
   fetchStepKey().then(()=>{
@@ -1405,7 +1419,7 @@ function renderOnline(){
   $('#onlineBody').innerHTML=body;
   const sHelp=$('#stepsHelp');
   if(sHelp){
-    if(!o.ok){sHelp.innerHTML='Go online in Settings and set up the phone shortcut once: your Health steps then land here on their own.';}
+    if(!o.ok){sHelp.innerHTML='<span style="color:#ffb35c">The game is signed out, so steps cannot arrive.</span> Open <b>Base</b>, then <b>Settings</b>, and sign in - then <b>Phone step sync</b> there has everything for your shortcut.';}
     else{const t=o.lastPull||0;const mins=t?Math.round((Date.now()-t)/60000):-1;
       const when=mins<0?'not yet this session':(mins<1?'just now':mins+' min ago');
       if(!o.lastPost){
@@ -1422,7 +1436,7 @@ function renderOnline(){
         sHelp.innerHTML='<b style="color:var(--bone)">Checked the server '+esc(when)+'.</b> Your phone last sent steps at '+esc(timeStr(o.lastPost))+'.'
           +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="syncNow()">Sync my steps now</button>'
           +'<button class="btn sm ghost" onclick="runShortcut()">Run my Health shortcut</button></div>'
-          +'<span class="help">It checks on its own every minute and the moment you open the game. You never need to delete the icon.</span>';
+          +'<span class="help">It checks on its own every minute and the moment you open the game. You never need to delete the icon. <a href="#" onclick="fixShortcut();return false;" style="color:var(--sky)">Fix my shortcut</a></span>';
       }}
   }
   const sh=$('#shortcutHelp');if(sh){const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=stepCode();if(o.ok&&!o.stepKey)fetchStepKey();sh.innerHTML=o.ok?`<b>iPhone, one time.</b> Two things to copy:<br>
