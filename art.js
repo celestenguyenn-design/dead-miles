@@ -30,9 +30,9 @@ function hairBack(style,c){
   switch(style){
     case 'buzz':return '';
     case 'mohawk':return '';
-    case 'bob':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v20 q0 8 -8 8 h-64 q-8 0 -8 -8z" fill="${c}"/>`;
-    case 'long':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v54 q0 8 -8 8 h-64 q-8 0 -8 -8z" fill="${c}"/>`;
-    case 'wavy':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v46 q-5 8 -10 0 q-5 8 -10 0 q-5 8 -10 0 q-5 8 -10 0 q-5 8 -10 0 q-5 8 -10 0 q-5 8 -10 0 q-5 8 -10 0z" fill="${c}"/>`;
+    case 'bob':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v14 q0 10 -5 14 q-4 3 -7 -1 q-3 -5 -2 -13 h-52 q1 8 -2 13 q-3 4 -7 1 q-5 -4 -5 -14z" fill="${c}"/>`;
+    case 'long':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v12 q0 26 -5 42 q-3 8 -9 6 q-5 -2 -4 -8 q4 -20 3 -40 h-50 q1 20 -3 40 q-1 6 -6 8 q-6 2 -9 -6 q-5 -16 -5 -42z" fill="${c}"/>`;
+    case 'wavy':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v10 q0 24 -4 38 q-4 9 -9 2 q-4 -5 -1 -12 q5 -14 4 -30 h-50 q1 16 4 30 q3 7 -1 12 q-5 7 -9 -2 q-4 -14 -4 -38z" fill="${c}"/>`;
     case 'wolfcut':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v30 l-7 10 l-6 -10 l-7 10 l-6 -10 l-7 10 l-7 -10 l-7 10 l-6 -10 l-7 10 l-6 -10 l-7 10 l-7 -10z" fill="${c}"/>`;
     case 'hime':return `<path d="M10 58 q0 -50 40 -50 q40 0 40 50 v62 h-14 v-48 h-52 v48 h-14z" fill="${c}"/>`;
     case 'ponytail':return dome+`<path d="M86 50 q20 8 14 40 q-4 12 -12 10 q6 -22 -6 -40z" fill="${c}"/>`;
@@ -81,16 +81,43 @@ function mouth(mood){
   if(mood==='angry')return `<path d="M42 73 q8 -6 16 0" stroke="#1a1020" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
   return `<path d="M45 69 q5 5 10 0" stroke="#7a3a3a" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
 }
+// The torso was a rounded rectangle, which is why everyone read as boxy. This
+// is a real silhouette: shoulders, a waist, hips. `build` chooses the numbers,
+// so it is one shape function rather than three sets of hand-drawn clothes.
+const BUILDS={
+  neutral:{sh:40,wa:37,hip:40,name:'Straight'},
+  curvy:  {sh:36,wa:28,hip:46,name:'Curvy'},
+  athletic:{sh:43,wa:33,hip:37,name:'Athletic'},
+  slim:   {sh:32,wa:27,hip:33,name:'Slim'},
+};
+let AV_BUILD='neutral';
+function setBuild(b){if(BUILDS[b])AV_BUILD=b;}
+function buildOf(av){return BUILDS[(av&&av.build)||AV_BUILD]||BUILDS.neutral;}
+// y76 shoulders -> y95 waist -> y110 hips
+function torsoSil(b,pad){
+  pad=pad||0;
+  const S=b.sh/2+pad, W=b.wa/2+pad, H=b.hip/2+pad;
+  const r=Math.min(8,S-2);
+  return `M${(50-S).toFixed(1)} 83 q0 -7 ${r} -7 h${(2*S-2*r).toFixed(1)} q${r} 0 ${r} 7`
+    +` C${(50+S).toFixed(1)} 89 ${(50+W).toFixed(1)} 90 ${(50+W).toFixed(1)} 96`
+    +` C${(50+W).toFixed(1)} 102 ${(50+H).toFixed(1)} 103 ${(50+H).toFixed(1)} 109`
+    +` q0 5 -6 5 h${(-(2*H-12)).toFixed(1)} q-6 0 -6 -5`
+    +` C${(50-H).toFixed(1)} 103 ${(50-W).toFixed(1)} 102 ${(50-W).toFixed(1)} 96`
+    +` C${(50-W).toFixed(1)} 90 ${(50-S).toFixed(1)} 89 ${(50-S).toFixed(1)} 83z`;
+}
+let TOP_AV=null;
 function topShape(top,c){
-  const base=`<rect x="30" y="76" width="40" height="32" rx="9" fill="${c}"/>`;
+  const bd=buildOf(TOP_AV);
+  const base=`<path d="${torsoSil(bd)}" fill="${c}"/>`;
   const t=TOPS[top];
-  if(t&&t.kind==='dress'){const w=t.gown?58:50;let s=`<path d="M32 76 h36 l${(w-36)/2} 40 h-${w}z" fill="${t.c1}"/><path d="M40 76 q10 6 20 0" stroke="rgba(0,0,0,.25)" stroke-width="3" fill="none"/>`;
+  if(t&&t.kind==='dress'){const w=t.gown?60:52;const S=bd.sh/2,W=bd.wa/2;
+    let s=`<path d="M${50-S} 83 q0 -7 7 -7 h${2*S-14} q7 0 7 7 C${50+S} 89 ${50+W} 90 ${50+W} 96 L${50+w/2} 118 h${-w} L${50-W} 96 C${50-W} 90 ${50-S} 89 ${50-S} 83z" fill="${t.c1}"/><path d="M40 76 q10 6 20 0" stroke="rgba(0,0,0,.25)" stroke-width="3" fill="none"/>`;
     if(t.dots)s+=`<circle cx="42" cy="90" r="2" fill="${t.dots}"/><circle cx="56" cy="98" r="2" fill="${t.dots}"/><circle cx="48" cy="106" r="2" fill="${t.dots}"/><circle cx="60" cy="110" r="2" fill="${t.dots}"/>`;
     if(t.plaid)s+=`<path d="M30 88 h40 M28 100 h44 M42 76 v40 M56 76 v40" stroke="rgba(0,0,0,.35)" stroke-width="2"/><rect x="40" y="76" width="20" height="10" fill="#f6f2ea"/>`;
     if(t.cross)s+=`<rect x="44" y="84" width="12" height="12" fill="#fff" stroke="#ddd"/><path d="M50 86 v8 M46 90 h8" stroke="#c22b3a" stroke-width="2.4"/><path d="M32 76 h36" stroke="#5fb3c9" stroke-width="4"/>`;
     if(t.gown)s+=`<path d="M25 116 q25 -10 50 0" stroke="#fff" stroke-width="2" fill="none" opacity=".7"/><path d="M50 78 l3 6 l6 1 l-4 4 l1 6 l-6 -3 l-6 3 l1 -6 l-4 -4 l6 -1z" fill="#fff" opacity=".9"/><path d="M27 104 q23 -8 46 0" stroke="#fff" stroke-width="1.5" fill="none" opacity=".5"/>`;
     return s;}
-  if(t&&t.kind==='onesie'){let s=`<rect x="27" y="76" width="46" height="36" rx="13" fill="${t.base}"/><ellipse cx="50" cy="96" rx="12" ry="13" fill="${t.belly}"/><path d="M50 78 v12" stroke="rgba(0,0,0,.25)" stroke-width="2"/>`;
+  if(t&&t.kind==='onesie'){let s=`<path d="${torsoSil(bd,3)}" fill="${t.base}"/><ellipse cx="50" cy="98" rx="12" ry="13" fill="${t.belly}"/><path d="M50 78 v12" stroke="rgba(0,0,0,.25)" stroke-width="2"/>`;
     if(t.pat==='cow')s+=`<ellipse cx="35" cy="86" rx="5" ry="4" fill="#2c2c36"/><ellipse cx="64" cy="102" rx="5" ry="4" fill="#2c2c36"/>`;
     if(t.teeth)s+=`<path d="M40 80 l3 5 l3 -5 l3 5 l3 -5 l3 5 l3 -5 l3 5 l3 -5" stroke="#fff" stroke-width="2" fill="none"/>`;
     if(t.bolt)s+=`<path d="M52 84 l-6 10 h5 l-3 9 l8 -12 h-5 l3 -7z" fill="#8a5a1a"/>`;
@@ -176,11 +203,13 @@ function bodyParts(style,skin,tc,top,weapon){
   if(style==='sticker'){
     const o='stroke="#1e1418" stroke-width="2.6" stroke-linejoin="round"';const kind=outfitKind(top);const od=TOPS[top]||{};
     const legCol=kind==='onesie'?od.base:kind==='dress'?skin:'#2a2a30';
-    const legs=kind==='onesie'?`<rect x="36" y="100" width="12" height="20" rx="6" fill="${od.base}" ${o}/><rect x="52" y="100" width="12" height="20" rx="6" fill="${od.base}" ${o}/><ellipse cx="42" cy="121" rx="9" ry="5" fill="${od.belly}" ${o}/><ellipse cx="58" cy="121" rx="9" ry="5" fill="${od.belly}" ${o}/>`
+    const _lb=buildOf(TOP_AV);const _lg=Math.round(50-_lb.hip/4-6),_rg=Math.round(50+_lb.hip/4-6);
+    const legs=kind==='onesie'?`<rect x="${_lg}" y="100" width="12" height="20" rx="6" fill="${od.base}" ${o}/><rect x="${_rg}" y="100" width="12" height="20" rx="6" fill="${od.base}" ${o}/><ellipse cx="42" cy="121" rx="9" ry="5" fill="${od.belly}" ${o}/><ellipse cx="58" cy="121" rx="9" ry="5" fill="${od.belly}" ${o}/>`
       :`<rect x="36" y="100" width="12" height="18" rx="6" fill="${legCol}" ${o}/><rect x="52" y="100" width="12" height="18" rx="6" fill="${legCol}" ${o}/><path d="M33 113 h17 v9 q0 4 -4 4 h-9 q-4 0 -4 -4z M50 113 h17 v9 q0 4 -4 4 h-9 q-4 0 -4 -4z" fill="${kind==='dress'?'#3a2a44':'#1a1a1e'}" ${o}/>`;
     const torso=`<g ${o}>${topShape(top,tc)}</g>`;
     const sleeve=kind==='onesie'?od.base:kind==='dress'?skin:tc;const hand=kind==='onesie'?od.belly:skin;
-    const arms=`<rect x="18" y="79" width="14" height="21" rx="7" fill="${sleeve}" ${o}/><rect x="68" y="79" width="14" height="21" rx="7" fill="${sleeve}" ${o}/><circle cx="25" cy="101" r="6" fill="${hand}" ${o}/><circle cx="75" cy="101" r="6" fill="${hand}" ${o}/>`;
+    const _b=buildOf(TOP_AV);const _ax=50-_b.sh/2-12,_bx=50+_b.sh/2-2;
+    const arms=`<rect x="${_ax}" y="79" width="14" height="21" rx="7" fill="${sleeve}" ${o}/><rect x="${_bx}" y="79" width="14" height="21" rx="7" fill="${sleeve}" ${o}/><circle cx="${_ax+7}" cy="101" r="6" fill="${hand}" ${o}/><circle cx="${_bx+7}" cy="101" r="6" fill="${hand}" ${o}/>`;
     return {back:legs+torso+arms+`<g ${o}>${wpn}</g>`,head:`<path d="M12 50 q0 -40 38 -40 q38 0 38 40 v7 q0 25 -38 25 q-38 0 -38 -25z" fill="${skin}" ${o}/><ellipse cx="24" cy="67" rx="7" ry="4.5" fill="#ff8ab8" opacity=".6"/><ellipse cx="76" cy="67" rx="7" ry="4.5" fill="#ff8ab8" opacity=".6"/><path d="M20 26 l2 -5 l2 5 l5 2 l-5 2 l-2 5 l-2 -5 l-5 -2z" fill="#fff" opacity=".9"/>`};
   }
   // classic
@@ -259,7 +288,7 @@ function gachaSVG(kind,size,opts){
 function avatarSVG(av,size,opts){
   av=av||{};opts=opts||{};const skin=SKINS[av.skin||0]||SKINS[0];const hc=HAIR_COLORS[av.hairColor||0]||HAIR_COLORS[0];const style=av.hair||'short';const tc=TOP_COLORS[av.topColor||0]||TOP_COLORS[0];
   const mood=opts.mood||'';const weapon=opts.weapon||'';const bs=opts.style||AV_STYLE;
-  const w=size||100,h=Math.round((size||100)*1.3);const bp=bodyParts(bs,skin,tc,av.top||'hoodie',weapon);
+  const w=size||100,h=Math.round((size||100)*1.3);TOP_AV=av;const bp=bodyParts(bs,skin,tc,av.top||'hoodie',weapon);
   const o=bs==='sticker'?'stroke="#1e1418" stroke-width="2.2" stroke-linejoin="round"':bs==='bean'?'stroke="#2a1a14" stroke-width="1.4" stroke-linejoin="round"':'';
   const ot=TOPS[av.top||'hoodie'];const hooded=!av.hat&&ot&&ot.kind==='onesie';const uid=++AV_UID;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -8 100 138" width="${w}" height="${h}" ${opts.attrs||''} aria-hidden="true">
@@ -381,5 +410,5 @@ function petSVG(kind,size,coat,opts){
 const imgCache=new Map();
 function spriteImg(svg){let i=imgCache.get(svg);if(i)return i;i=new Image();i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);imgCache.set(svg,i);if(imgCache.size>60){const k=imgCache.keys().next().value;imgCache.delete(k);}return i;}
 function randomAv(){return {skin:Math.floor(Math.random()*SKINS.length),hair:HAIR_STYLES[Math.floor(Math.random()*HAIR_STYLES.length)],hairColor:Math.floor(Math.random()*HAIR_COLORS.length),eyes:EYES[Math.floor(Math.random()*EYES.length)],top:'hoodie',topColor:Math.floor(Math.random()*TOP_COLORS.length),hat:'',acc:''};}
-return {gachaSVG,SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,CAT_COATS,DOG_COATS,randomCoat,coatInfo,avatarSVG,setStyle,bodyParts,zombieSVG,petSVG,spriteImg,randomAv};
+return {gachaSVG,BUILDS,setBuild,SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,CAT_COATS,DOG_COATS,randomCoat,coatInfo,avatarSVG,setStyle,bodyParts,zombieSVG,petSVG,spriteImg,randomAv};
 })();

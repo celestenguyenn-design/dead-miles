@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.24';
+const VERSION='6.25';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1875,6 +1875,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.25',d:'Sep 17',t:'Your body is not a box any more',
+  i:['The torso was literally a rounded rectangle, which is why everyone looked boxy. It is a real silhouette now - shoulders, a waist, hips.',
+     'FOUR BUILDS in the character editor: Straight, Curvy, Athletic, Slim. Arms and legs follow whichever you pick.',
+     'Long, wavy and bob hair used to fall as a solid block twice the width of the body. They taper into side locks now, so you can actually see your shape.']},
  {v:'6.24',d:'Sep 17',t:'Onesies have hoods now',
   i:['Onesies used to stick ears on top of your hair, so they read as hair with ears rather than a costume. They have a proper hood now, in the costume colour, with your face framed in it and your fringe showing.',
      'The axolotl grew real gills - three feathery stalks a side instead of two little dots.',
@@ -2242,6 +2246,7 @@ function lookSheet(onDone){
     const opt=(arr,cur,set,label)=>arr.map(v=>`<button class="${cur===v?'on':''}" data-set="${set}" data-v="${v}">${label?label(v):v}</button>`).join('');
     const hats=[['',{n:'None',r:'common'}]].concat(Object.entries(ART.HATS));const tops=Object.entries(ART.TOPS);const accs=[['',{n:'None',r:'common'}]].concat(Object.entries(ART.ACCS));
     $('#sheet').innerHTML=`<h2>Your look</h2><div style="text-align:center">${ART.avatarSVG(av,120)}</div>
+    <div class="section-label">Build</div><div class="opts" style="margin:6px 0 10px">${Object.entries(ART.BUILDS).map(([k,b])=>`<button class="${(av.build||'neutral')===k?'on':''}" data-set="build" data-v="${k}">${b.name}</button>`).join('')}</div>
     <div class="section-label">Skin</div><div class="opts" style="margin:6px 0 10px">${sw(ART.SKINS,av.skin,'skin')}</div>
     <div class="section-label">Hair <span class="help">more in the Boutique</span></div><div class="opts" style="margin:6px 0 10px">${opt(ART.HAIR_STYLES.concat(Object.keys(ART.HAIR_SHOP).filter(k=>own('hair',k))),av.hair,'hair',v=>(ART.HAIR_SHOP[v]||{}).n||v)}</div>
     <div class="section-label">Hair color</div><div class="opts" style="margin:6px 0 10px">${sw(ART.HAIR_COLORS,av.hairColor,'hairColor')}</div>
