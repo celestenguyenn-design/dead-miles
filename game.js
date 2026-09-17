@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.2';
+const VERSION='6.3';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -324,26 +324,36 @@ async function identBoot(){
 
 // ---- recovery code: four words that get you back in from anywhere ----
 const RC_WORDS=['amber','anchor','apple','arrow','ashes','badge','barn','beacon','birch','bishop','blanket','bottle','bramble','bridge','bucket','cabin','candle','canyon','cedar','cellar','chapel','cider','clover','copper','cotton','crimson','crow','dagger','daisy','dawn','diesel','ember','falcon','fennel','ferry','fiddle','flint','fossil','gable','garnet','ginger','granite','gravel','harbor','harvest','hazel','hollow','ivory','jasper','kettle','lantern','ledger','linen','locket','maple','marble','meadow','mercy','mitten','moss','nectar','needle','orchard','otter','pantry','pebble','pewter','pigeon','pillar','plum','quarry','quilt','raven','ribbon','ridge','rooster','rusty','saddle','sage','satchel','shovel','silver','sparrow','spruce','stable','sugar','sulfur','thicket','thimble','thunder','timber','tinder','torch','trellis','tulip','velvet','walnut','willow','window','winter','yarrow'];
-function makeCode(){let a=[];for(let i=0;i<4;i++)a.push(RC_WORDS[Math.floor(Math.random()*RC_WORDS.length)]);return a.join('-');}
+function makeCode(){let a=[];for(let i=0;i<4;i++)a.push(RC_WORDS[Math.floor(Math.random()*RC_WORDS.length)]);return a.join(' ');}
+function copyRecovery(){try{navigator.clipboard.writeText('Dead Miles - handle @'+O().handle+' - recovery code '+(S.recovery||''));toast('Copied','z');}catch(e){}}
+function normCode(c){return String(c||'').trim().toLowerCase().replace(/\s+/g,' ');}
 async function setRecovery(code){
   const o=O();if(!o.ok){toast('Go online first','d');return;}
-  code=String(code||'').trim().toLowerCase();
-  if(code.length<8){toast('That code is too short','d');return;}
-  try{const ok=await rpc('set_recovery',{p_handle:o.handle,p_token:o.token,p_code:code});
-    if(!ok){toast('Could not save that code. Run round eight of the setup page first.','d');return;}
-    S.recovery=code;identWrite(o.handle,o.token);save();renderRecov();toast('Recovery code saved','z');
-  }catch(e){toast('Could not save that code. Run round eight of the setup page first.','d');}
+  const c=normCode(code);
+  if(c.length<10){toast('Make it at least 10 characters','d');return;}
+  let r;
+  try{r=await rpc('set_recovery',{p_handle:o.handle,p_token:o.token,p_code:c});}
+  catch(e){toast('Could not reach the server. Try again.','d');return;}
+  if(r==='taken'){toast('Someone already uses that one. Pick something else.','d');
+    const w=$('#recovWarn');if(w){w.textContent='Already taken by another player. Try adding a word, or something only you would say.';w.style.display='block';}return;}
+  if(r==='short'){toast('Make it at least 10 characters','d');return;}
+  if(r==='weak'){toast('Too easy to guess. Pick something personal.','d');return;}
+  if(r!=='ok'){toast('Could not save that code. Run round eight of the setup page first.','d');return;}
+  S.recovery=c;identWrite(o.handle,o.token);save();renderRecov();toast('Recovery code saved','z');
 }
-function newRecovery(){setRecovery(makeCode());}
-function copyRecovery(){try{navigator.clipboard.writeText('Dead Miles - handle @'+O().handle+' - recovery code '+(S.recovery||''));toast('Copied','z');}catch(e){}}
+function saveTypedRecovery(){const el=$('#recovInput');if(el)setRecovery(el.value);}
+function suggestRecovery(){const el=$('#recovInput');if(el){el.value=makeCode();el.focus();}}
 function renderRecov(){
   const el=$('#recovBody');if(!el)return;const o=O();
-  if(!o.ok){el.innerHTML='<p class="help">Go online first (above) and your recovery code appears here.</p>';return;}
+  if(!o.ok){el.innerHTML='<p class="help">Go online first (above) and you can set your recovery code here.</p>';return;}
   const c=S.recovery||'';
-  el.innerHTML='<p class="help">Four words. Write them down, or screenshot them. If this phone ever loses the game - wiped, deleted, new phone - you type your handle and these four words and your character comes straight back. Nothing else needed.</p>'
-    +(c?'<div style="margin:10px 0;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.06);border-left:4px solid var(--blood);font-size:19px;font-weight:800;letter-spacing:.4px;color:var(--bone);word-break:break-word">'+esc(c)+'</div><p class="help">Your handle: <b>@'+esc(o.handle)+'</b></p>'
-        :'<p class="help" style="color:#ffb35c">You do not have one yet. Make one now - it takes one tap.</p>')
-    +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="newRecovery()">'+(c?'Give me different words':'Make my recovery code')+'</button>'
+  el.innerHTML='<p class="help">Pick a phrase you will actually remember - a lyric, an inside joke, your cat plus a year. At least 10 characters. Capital letters and extra spaces do not matter.</p>'
+    +(c?'<div style="margin:10px 0;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.06);border-left:4px solid var(--blood);font-size:19px;font-weight:800;color:var(--bone);word-break:break-word">'+esc(c)+'</div><p class="help">Your handle: <b>@'+esc(o.handle)+'</b>. Typing these two on any phone brings your character back.</p>'
+        :'<p class="help" style="color:#ffb35c">You do not have one yet. Without it, losing this phone means losing your character.</p>')
+    +'<input id="recovInput" type="text" maxlength="60" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="'+(c?'a new phrase':'your phrase, e.g. mango ate my homework')+'" style="width:100%;margin:8px 0">'
+    +'<p class="help" id="recovWarn" style="display:none;color:#ff8a92"></p>'
+    +'<div class="row"><button class="btn sm r" onclick="saveTypedRecovery()">'+(c?'Change my code':'Save my code')+'</button>'
+    +'<button class="btn sm ghost" onclick="suggestRecovery()">Suggest one</button>'
     +(c?'<button class="btn sm ghost" onclick="copyRecovery()">Copy it</button>':'')+'</div>';
 }
 function save(quiet){try{
@@ -1235,6 +1245,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.3',d:'Sep 17',t:'Write your own recovery code',
+  i:['Settings, Recovery code: type any phrase you will remember - a lyric, an inside joke, your cat plus a year. Ten characters or more.',
+     'Capital letters and extra spaces do not matter, so typing it back months later still works.',
+     'Codes are unique. If someone already uses yours, the game says so and you pick another.']},
  {v:'6.2',d:'Sep 17',t:'Steps sync the moment you open the game',
   i:['Reopening the game now checks the server straight away. No more waiting, and no reason to ever delete the home-screen icon.',
      'The Steps card shows when it last checked and when your phone last sent anything, with a Sync my steps now button right there.',
