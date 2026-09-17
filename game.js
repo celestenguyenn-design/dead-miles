@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.36';
+const VERSION='6.37';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -24,13 +24,33 @@ const ITEMS={
   bandage:{n:'Bandages',e:'🩹',pts:8,cat:'meds',w:8,r:'common'},pain:{n:'Painkillers',e:'💊',pts:10,cat:'meds',w:6,r:'uncommon'},abx:{n:'Antibiotics',e:'💉',pts:16,cat:'meds',w:3,r:'rare'},kit:{n:'Trauma kit',e:'🧰',pts:24,cat:'meds',w:1.5,r:'epic'},
   scrap:{n:'Scrap metal',e:'🔩',pts:4,cat:'scrap',w:10,r:'common'},tape:{n:'Duct tape',e:'🧻',pts:5,cat:'scrap',w:7,r:'common'},nails:{n:'Box of nails',e:'🔨',pts:5,cat:'scrap',w:6,r:'common'},wire:{n:'Copper wire',e:'🧵',pts:4,cat:'scrap',w:6,r:'common'},battery:{n:'Car battery',e:'🔋',pts:10,cat:'scrap',w:2.5,r:'uncommon'},fuel:{n:'Fuel can',e:'⛽',pts:12,cat:'scrap',w:2,r:'rare'},
   ammo:{n:'Box of rounds (x6)',e:'📦',pts:14,cat:'ammo',w:2.5,qty:6,r:'uncommon'},shells:{n:'Shotgun shells (x4)',e:'🟥',pts:16,cat:'ammo',w:1.2,qty:4,r:'rare'},
+  bolts:{n:'Bundle of bolts (x8)',e:'🎯',pts:12,cat:'ammo',w:7,qty:8,r:'common'},
+  // drinks and snacks, v6.37 - each does something different
+  energy:{n:'Energy drink',e:'🥤',pts:9,cat:'drink',w:5,r:'uncommon',drink:'energy'},
+  soda:{n:'Can of soda',e:'🧃',pts:6,cat:'drink',w:8,r:'common',drink:'soda'},
+  wine:{n:'Bottle of wine',e:'🍷',pts:14,cat:'drink',w:3,r:'rare',drink:'wine'},
+  brew:{n:'Cold brew',e:'☕',pts:10,cat:'drink',w:4,r:'uncommon',drink:'brew'},
+  bar:{n:'Protein bar',e:'🍫',pts:5,cat:'snack',w:9,r:'common',snack:'bar'},
+  chips:{n:'Bag of chips',e:'🍟',pts:4,cat:'snack',w:9,r:'common',snack:'chips'},
+  nuts:{n:'Trail mix',e:'🥜',pts:6,cat:'snack',w:7,r:'common',snack:'nuts'},
+  gum:{n:'Stick of gum',e:'🍬',pts:3,cat:'snack',w:6,r:'common',snack:'gum'},
   key:{n:'Chest key',e:'🗝️',pts:0,cat:'key',w:0,r:'rare'},chest:{n:'Locked chest',e:'🧳',pts:0,cat:'chest',w:0,r:'epic'},
   handcuffs:{n:'Rusted handcuffs',e:'⛓️',pts:22,cat:'shelf',w:0.4,r:'rare'},cruiser:{n:'Cruiser keys',e:'🔑',pts:24,cat:'shelf',w:0.4,r:'rare'},cards:{n:'Rookie card',e:'🃏',pts:26,cat:'shelf',w:0.38,r:'rare'},dice:{n:'Loaded dice',e:'🎲',pts:20,cat:'shelf',w:0.42,r:'rare'},cart:{n:'Game cartridge',e:'🕹️',pts:30,cat:'shelf',w:0.3,r:'epic'},steth:{n:'Stethoscope',e:'🩺',pts:24,cat:'shelf',w:0.4,r:'rare'},xray:{n:'Chest x-ray',e:'🫁',pts:22,cat:'shelf',w:0.4,r:'rare'},pills:{n:'Labelled pill bottle',e:'💊',pts:20,cat:'shelf',w:0.44,r:'rare'},thermo:{n:'Cracked thermometer',e:'🌡️',pts:18,cat:'shelf',w:0.44,r:'rare'},plate:{n:'Licence plate',e:'🪧',pts:20,cat:'shelf',w:0.42,r:'rare'},sign:{n:'Bent road sign',e:'🛑',pts:22,cat:'shelf',w:0.4,r:'rare'},atlas:{n:'County atlas',e:'🗺️',pts:26,cat:'shelf',w:0.36,r:'rare'},jar:{n:'Jar of something',e:'🫙',pts:34,cat:'shelf',w:0.22,r:'epic'},meteor:{n:'Meteorite shard',e:'☄️',pts:45,cat:'shelf',w:0.14,r:'epic'},
   vinyl:{n:'Vinyl record',e:'💿',pts:25,cat:'shelf',w:0.45,r:'rare'},polaroid:{n:'Old polaroid',e:'📸',pts:20,cat:'shelf',w:0.5,r:'rare'},teddy:{n:'One-eyed teddy',e:'🧸',pts:18,cat:'shelf',w:0.54,r:'rare'},watch:{n:'Gold watch',e:'⌚',pts:28,cat:'shelf',w:0.32,r:'epic'},globe:{n:'Snow globe',e:'🔮',pts:30,cat:'shelf',w:0.27,r:'epic'},comic:{n:'Comic issue #1',e:'📖',pts:20,cat:'shelf',w:0.45,r:'rare'},badge:{n:'Sheriff badge',e:'⭐',pts:40,cat:'shelf',w:0.14,r:'legendary'},dogtag:{n:'Soldier dog tag',e:'🏷️',pts:35,cat:'shelf',w:0.0,r:'epic'},skull:{n:'Raider skull mask',e:'💀',pts:45,cat:'shelf',w:0.0,r:'legendary'},wanted:{n:'Wanted poster',e:'📜',pts:60,cat:'shelf',w:0.0,r:'legendary'}
 };
 const GEAR={
   pipe:{n:'Lead pipe',e:'🪈',slot:'melee',dmg:[8,13],dur:6,w:6,pts:10,r:'common'},bat:{n:'Baseball bat',e:'⚾',slot:'melee',dmg:[9,15],dur:5,w:5,pts:14,r:'common'},crowbar:{n:'Crowbar',e:'🔧',slot:'melee',dmg:[11,17],dur:8,w:3,pts:18,r:'uncommon'},machete:{n:'Machete',e:'🔪',slot:'melee',dmg:[14,21],dur:7,w:2,pts:26,r:'rare'},axe:{n:'Fire axe',e:'🪓',slot:'melee',dmg:[18,26],dur:6,w:1.2,pts:34,r:'rare'},sledge:{n:'Sledgehammer',e:'🔨',slot:'melee',dmg:[22,32],dur:5,w:.6,pts:40,r:'epic'},
+  // melee added v6.37
+  hatchet:{n:'Hatchet',e:'🪓',slot:'melee',dmg:[10,16],dur:7,w:5,pts:13,r:'common'},
+  cleaver:{n:'Meat cleaver',e:'🔪',slot:'melee',dmg:[12,18],dur:6,w:4,pts:16,r:'uncommon'},
+  sickle:{n:'Farm sickle',e:'🌾',slot:'melee',dmg:[13,19],dur:7,w:3.5,pts:19,r:'uncommon'},
+  spear:{n:'Pipe spear',e:'🔱',slot:'melee',dmg:[15,22],dur:9,w:2.2,pts:24,r:'uncommon',quiet:true},
+  barbed:{n:'Barbed bat',e:'🏏',slot:'melee',dmg:[17,27],dur:4,w:1.6,pts:30,r:'rare'},
+  katana:{n:'Katana',e:'🗡️',slot:'melee',dmg:[20,29],dur:10,w:.7,pts:46,r:'epic',quiet:true},
   pistol:{n:'9mm pistol',e:'🔫',slot:'ranged',dmg:[22,30],dur:10,ammo:'ammo',w:1.2,pts:30,r:'rare'},shotgun:{n:'Pump shotgun',e:'🎯',slot:'ranged',dmg:[34,50],dur:6,ammo:'shells',w:.5,pts:45,r:'epic'},
+  // ranged added v6.37 - both use bolts, and both give some of them back
+  bow:{n:'Hunting bow',e:'🏹',slot:'ranged',dmg:[16,24],dur:14,ammo:'bolts',w:2.5,pts:26,r:'uncommon',quiet:true,recover:0.55},
+  crossbow:{n:'Crossbow',e:'🎯',slot:'ranged',dmg:[28,38],dur:9,ammo:'bolts',w:1,pts:42,r:'rare',quiet:true,recover:0.4},
   jacket:{n:'Leather jacket',e:'🧥',slot:'armor',dr:2,w:4,pts:14,r:'common'},pads:{n:'Hockey pads',e:'🏒',slot:'armor',dr:4,w:2,pts:20,r:'uncommon'},vest:{n:'Riot vest',e:'🦺',slot:'armor',dr:6,w:.9,pts:34,r:'rare'},
   helmet:{n:'Motorcycle helmet',e:'⛑️',slot:'head',dr:2,w:2.5,pts:12,r:'common'},riot:{n:'Riot helmet',e:'🪖',slot:'head',dr:3,w:1,pts:22,r:'rare'},
   pack2:{n:'Hiking pack',e:'🎒',slot:'bag',cap:6,w:1.5,pts:16,r:'uncommon'},pack3:{n:'Military ruck',e:'🪖',slot:'bag',cap:12,w:.5,pts:28,r:'rare'},
@@ -42,22 +62,22 @@ const GEAR={
   nightingale:{n:'Nightingale',e:'🦺',slot:'armor',dr:4,w:0,pts:85,r:'legendary',legend:'Heals 5 HP every combat round'}
 };
 const LEGEND_IDS=['mercy','lastword','oldreliable','whisper','nightingale'];
-const CAT_LABEL={food:'Food',water:'Water',meds:'Meds',scrap:'Scrap',ammo:'Ammo',shelf:'Trophy',key:'Key',chest:'Chest',gear:'Gear',cosmetic:'Cosmetic',candy:'Candy'};
+const CAT_LABEL={food:'Food',water:'Water',drink:'Drink',snack:'Snack',meds:'Meds',scrap:'Scrap',ammo:'Ammo',shelf:'Trophy',key:'Key',chest:'Chest',gear:'Gear',cosmetic:'Cosmetic',candy:'Candy'};
 const byCat=(c)=>Object.entries(ITEMS).filter(([k,v])=>v.cat===c&&v.w>0).map(([k,v])=>({id:k,...v}));
 function table(cats,shelfW,gearW){const out=[];for(const c of cats)out.push(...byCat(c));if(shelfW)out.push(...byCat('shelf').map(x=>({...x,w:x.w*shelfW})));if(gearW)out.push(...Object.entries(GEAR).filter(([k,v])=>v.w>0).map(([k,v])=>({id:k,gear:true,...v,w:v.w*gearW})));return out;}
 function cosmeticPool(){const out=[];for(const [k,v] of Object.entries(ART.HATS))if(!v.lock)out.push({id:'hat:'+k,slot:'hat',key:k,n:v.n,r:v.r});for(const [k,v] of Object.entries(ART.TOPS))if(v.r!=='common')out.push({id:'top:'+k,slot:'top',key:k,n:v.n,r:v.r});for(const [k,v] of Object.entries(ART.ACCS))out.push({id:'acc:'+k,slot:'acc',key:k,n:v.n,r:v.r});return out;}
 const COS_W={rare:3,epic:1,legendary:.2};
 
 const LOCS=[
-  {t:'house',n:['Ranch house','Two-story colonial','Duplex','Bungalow','Split-level','Farmhouse'],e:'🏠',w:38,rooms:[{n:'Kitchen',noise:32,cats:['food','water'],shelf:.3},{n:'Bedroom',noise:18,cats:['scrap'],shelf:2.2,gear:.3,keyish:true},{n:'Bathroom',noise:22,cats:['meds'],shelf:.2},{n:'Garage',noise:40,cats:['scrap'],shelf:.4,gear:1.4}],threat:1},
-  {t:'pharmacy',n:['Corner pharmacy','Drugmart','Hollow Rx'],e:'💊',w:11,rooms:[{n:'Front counter',noise:25,cats:['meds','water'],shelf:.2},{n:'Back room',noise:30,cats:['meds'],shelf:.3,keyish:true},{n:'Storage',noise:38,cats:['meds','scrap'],shelf:.2,gear:.3}],threat:1.2},
-  {t:'gas',n:['Gas & Go','Stop-N-Fuel','Pump station'],e:'⛽',w:12,rooms:[{n:'Snack shelves',noise:26,cats:['food','water'],shelf:.3},{n:'Pumps',noise:44,cats:['scrap'],shelf:.1},{n:'Office',noise:30,cats:['scrap'],shelf:.8,gear:.9,keyish:true}],threat:1},
-  {t:'grocery',n:['Family grocery','Corner mart','Foodway'],e:'🛒',w:12,rooms:[{n:'Canned goods',noise:28,cats:['food'],shelf:.2},{n:'Freezer',noise:36,cats:['food','water'],shelf:.1},{n:'Stockroom',noise:34,cats:['scrap','food'],shelf:.3},{n:'Registers',noise:30,cats:['scrap'],shelf:1.4,keyish:true}],threat:1.3},
-  {t:'police',n:['Police substation','Sheriff outpost'],e:'🚓',w:5,rooms:[{n:'Locker room',noise:34,cats:['ammo'],shelf:.4,gear:1.6,keyish:true},{n:'Armory cage',noise:44,cats:['ammo'],shelf:.3,gear:2.5},{n:'Break room',noise:24,cats:['food','water'],shelf:.3}],threat:1.6},
+  {t:'house',n:['Ranch house','Two-story colonial','Duplex','Bungalow','Split-level','Farmhouse'],e:'🏠',w:38,rooms:[{n:'Kitchen',noise:32,cats:['food','water','snack','drink'],shelf:.3},{n:'Bedroom',noise:18,cats:['scrap'],shelf:2.2,gear:.3,keyish:true},{n:'Bathroom',noise:22,cats:['meds'],shelf:.2},{n:'Garage',noise:40,cats:['scrap','ammo'],shelf:.4,gear:1.4}],threat:1},
+  {t:'pharmacy',n:['Corner pharmacy','Drugmart','Hollow Rx'],e:'💊',w:11,rooms:[{n:'Front counter',noise:25,cats:['meds','drink','snack'],shelf:.2},{n:'Back room',noise:30,cats:['meds'],shelf:.3,keyish:true},{n:'Storage',noise:38,cats:['meds','scrap'],shelf:.2,gear:.3}],threat:1.2},
+  {t:'gas',n:['Gas & Go','Stop-N-Fuel','Pump station'],e:'⛽',w:12,rooms:[{n:'Snack shelves',noise:26,cats:['snack','drink','food','water'],shelf:.3},{n:'Pumps',noise:44,cats:['scrap'],shelf:.1},{n:'Office',noise:30,cats:['scrap'],shelf:.8,gear:.9,keyish:true}],threat:1},
+  {t:'grocery',n:['Family grocery','Corner mart','Foodway'],e:'🛒',w:12,rooms:[{n:'Canned goods',noise:28,cats:['food','snack'],shelf:.2},{n:'Freezer',noise:36,cats:['food','drink'],shelf:.1},{n:'Stockroom',noise:34,cats:['scrap','food','drink','snack'],shelf:.3},{n:'Registers',noise:30,cats:['scrap'],shelf:1.4,keyish:true}],threat:1.3},
+  {t:'police',n:['Police substation','Sheriff outpost'],e:'🚓',w:5,rooms:[{n:'Locker room',noise:34,cats:['ammo'],shelf:.4,gear:1.6,keyish:true},{n:'Armory cage',noise:44,cats:['ammo'],shelf:.3,gear:2.5},{n:'Break room',noise:24,cats:['drink','snack','food'],shelf:.3}],threat:1.6},
   {t:'clinic',n:['Urgent care','Hollow County clinic'],e:'🏥',w:6,rooms:[{n:'Exam room',noise:24,cats:['meds'],shelf:.3},{n:'Pharmacy cage',noise:36,cats:['meds'],shelf:.2},{n:'Supply closet',noise:34,cats:['meds','scrap'],shelf:.2,keyish:true}],threat:1.4},
-  {t:'hardware',n:['Hardware store','Lumber yard'],e:'🧰',w:8,rooms:[{n:'Tool wall',noise:30,cats:['scrap'],shelf:.3,gear:1.8},{n:'Yard',noise:38,cats:['scrap'],shelf:.2},{n:'Back office',noise:26,cats:['scrap','water'],shelf:.9,keyish:true}],threat:1.1},
+  {t:'hardware',n:['Hardware store','Lumber yard'],e:'🧰',w:8,rooms:[{n:'Tool wall',noise:30,cats:['scrap','ammo'],shelf:.3,gear:1.8},{n:'Yard',noise:38,cats:['scrap','ammo'],shelf:.2},{n:'Back office',noise:26,cats:['scrap','water'],shelf:.9,keyish:true}],threat:1.1},
   {t:'surplus',n:['Army surplus','Hunting outfitter'],e:'🎖️',w:3,rooms:[{n:'Front racks',noise:30,cats:['ammo','food'],shelf:.3,gear:1.6},{n:'Gun counter',noise:40,cats:['ammo'],shelf:.2,gear:3,keyish:true},{n:'Back room',noise:34,cats:['scrap'],shelf:.5,gear:1}],threat:1.7},
-  {t:'diner',n:['Burger joint','Diner','Pizza place','Taco spot'],e:'🍔',w:8,rooms:[{n:'Counter',noise:26,cats:['food','water'],shelf:.3},{n:'Kitchen',noise:34,cats:['food'],shelf:.2,gear:.4},{n:'Walk-in freezer',noise:40,cats:['food','water'],shelf:.1},{n:'Manager\'s office',noise:24,cats:['scrap'],shelf:1,keyish:true}],threat:1.1},
+  {t:'diner',n:['Burger joint','Diner','Pizza place','Taco spot'],e:'🍔',w:8,rooms:[{n:'Counter',noise:26,cats:['food','drink','snack'],shelf:.3},{n:'Kitchen',noise:34,cats:['food'],shelf:.2,gear:.4},{n:'Walk-in freezer',noise:40,cats:['food','drink'],shelf:.1},{n:'Manager\'s office',noise:24,cats:['scrap'],shelf:1,keyish:true}],threat:1.1},
   {t:'stronghold',n:['Raider stronghold'],e:'🏴',w:0,rooms:[{n:'Tents',noise:36,cats:['food','water','ammo'],shelf:.8,gear:1.2,stage:1},{n:'Loot pile',noise:40,cats:['scrap','meds','ammo'],shelf:2,gear:2,stage:2,keyish:true},{n:'Boss trailer',noise:44,cats:['ammo','meds'],shelf:3,gear:2.5,stage:3,keyish:true}],threat:3,stronghold:true}
 ];
 const DISTRICTS=[
@@ -221,7 +241,7 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
 function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
-  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(S.parts===undefined)S.parts=0;
+  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(S.parts===undefined)S.parts=0;if(S.buff===undefined)S.buff=null;
   // A temper can lower a weapon's ceiling, so never let a stored durability
   // sit above it - that renders as "9 / 7" and repairs would read as free.
   for(const g of (S.gear||[])){
@@ -489,12 +509,55 @@ function roleLvl(role){let b=0;for(const c of activeCrew())if(c.role===role)b=Ma
 function crewSlots(){return 1+(S.base&&S.base.rooms.bunk?S.base.rooms.bunk:0);}
 function crewXp(n){for(const c of activeCrew()){c.xp+=n;if(c.xp>=c.lvl*6&&c.lvl<5){c.xp-=c.lvl*6;c.lvl++;log(c.name+' is now level '+c.lvl+'.');}}}
 const HYDRO_STEPS=900;
+/* ================= DRINKS AND SNACKS (v6.37) =================
+   Water used to be one undifferentiated counter. These are individual things
+   you find and choose to use, and each one is a small trade rather than a
+   straight upgrade - the wine heals the most and makes you miss more. */
+const DRINKS={
+  energy:{n:'Energy drink',e:'🥤',hyd:20,buff:'wired',d:'+20 water, and you hit 15% harder in your next fight'},
+  soda:  {n:'Can of soda', e:'🧃',hyd:32,buff:'sugar',d:'+32 water now, but you get thirsty faster for the rest of the day'},
+  wine:  {n:'Bottle of wine',e:'🍷',hyd:12,hp:22,buff:'numb',d:'+12 water, +22 HP, and you miss more in your next fight'},
+  brew:  {n:'Cold brew',   e:'☕',hyd:16,buff:'sharp',d:'+16 water, and your first hit next fight lands 50% harder'},
+};
+const SNACKS={
+  bar:  {n:'Protein bar',e:'🍫',hp:9,d:'+9 HP'},
+  nuts: {n:'Trail mix',  e:'🥜',hp:7,hyd:4,d:'+7 HP and a little water'},
+  chips:{n:'Bag of chips',e:'🍟',hp:5,hyd:-6,d:'+5 HP, but salty - costs you water'},
+  gum:  {n:'Stick of gum',e:'🍬',hp:2,hyd:6,d:'+2 HP, +6 water. Better than nothing'},
+};
+const BUFF_TEXT={wired:'Wired: +15% damage',sharp:'Sharp: your first hit lands 50% harder',
+  numb:'Numb: you miss more often',sugar:'Sugar crash: thirsty faster today'};
+function buffOn(k){return S.buff&&S.buff.k===k&&(S.buff.fights>0);}
+function setBuff(k){S.buff={k,fights:1};}
+function buffClear(){if(S.buff&&S.buff.fights>0){S.buff.fights--;if(S.buff.fights<=0)S.buff=null;}}
+function useDrink(uidv){
+  const it=S.pack.find(x=>x.uid===uidv);if(!it||!it.drink)return;
+  const d=DRINKS[it.drink];if(!d)return;
+  S.pack=S.pack.filter(x=>x.uid!==uidv);
+  S.hydro=Math.max(0,Math.min(100,(S.hydro===undefined?100:S.hydro)+d.hyd));
+  if(d.hp)S.hp=Math.min(maxHp(),S.hp+d.hp);
+  if(d.buff==='sugar')S.sugarDay=S.steps.date; else if(d.buff)setBuff(d.buff);
+  log('You drink the '+d.n.toLowerCase()+'. '+d.d);
+  toast(d.n+' · '+(d.buff&&d.buff!=='sugar'?BUFF_TEXT[d.buff]:'water '+Math.round(S.hydro)+'%'),'z');
+  SFX.play('ui');save();render();
+}
+function useSnack(uidv){
+  const it=S.pack.find(x=>x.uid===uidv);if(!it||!it.snack)return;
+  const k=SNACKS[it.snack];if(!k)return;
+  S.pack=S.pack.filter(x=>x.uid!==uidv);
+  S.hp=Math.min(maxHp(),S.hp+(k.hp||0));
+  if(k.hyd)S.hydro=Math.max(0,Math.min(100,(S.hydro===undefined?100:S.hydro)+k.hyd));
+  log('You eat the '+k.n.toLowerCase()+'. '+k.d);
+  toast(k.n+' · +'+k.hp+' HP','z');SFX.play('ui');save();render();
+}
 function hydroState(){const h=S.hydro===undefined?100:S.hydro;return h>=60?'ok':h>=30?'thirsty':h>0?'parched':'empty';}
 function hydroDmg(){const s=hydroState();return s==='ok'?1:s==='thirsty'?0.9:0.8;}
 function hydroHpMult(){const s=hydroState();return (s==='parched'||s==='empty')?0.85:1;}
 function hydroLabel(){const s=hydroState();return s==='ok'?'Hydrated':s==='thirsty'?'Thirsty':s==='parched'?'Parched':'Dried out';}
 function drink(n){if(S.stock.water<1){toast('No water in the stash');return false;}S.stock.water--;S.hydro=Math.min(100,(S.hydro||0)+(n||35));log('You drink. Hydration '+Math.round(S.hydro)+'%.');toast('Water: '+Math.round(S.hydro)+'%','z');SFX.play('ui');save();render();return true;}
-function loseHydro(n){const was=hydroState();S.hydro=Math.max(0,(S.hydro===undefined?100:S.hydro)-n);
+function loseHydro(n){
+  if(S.sugarDay===S.steps.date)n=Math.round(n*1.25);   // soda: thirstier all day
+const was=hydroState();S.hydro=Math.max(0,(S.hydro===undefined?100:S.hydro)-n);
   if(S.hydro<=10&&S.stock.water>0){S.stock.water--;S.hydro=Math.min(100,S.hydro+35);log('You stopped for water without thinking about it.');}
   const now=hydroState();if(now!==was&&now!=='ok'){toast(hydroLabel()+(now==='thirsty'?'. Drink soon.':'. Your hits are weaker.'),'d');}}
 function crewMax(c){return 40+12*(c.lvl||1);}
@@ -1374,7 +1437,8 @@ function act(kind){
   // nothing wears down.
   if(kind==='attack'||kind==='fists'){const w=kind==='fists'?null:eqItem('melee');const dm=w?wDmg(w):baseDmg();
     if(Math.random()<t.dodge){clog(t.n+' sidesteps your swing.','');SFX.play('miss');}
-    else if(Math.random()<0.9){let d=Math.round((rint(dm[0],dm[1])+(S.lvl-1)+(w?dmgBonus():0))*hydroDmg());dealTo(t,d,'You hit '+t.n+(w?' with the '+w.n:' bare-handed'),'slash');SFX.play('hit');
+    else if(Math.random()<(buffOn('numb')?0.72:0.9)){let d=Math.round((rint(dm[0],dm[1])+(S.lvl-1)+(w?dmgBonus():0))*hydroDmg()*(buffOn('wired')?1.15:1));
+      if(buffOn('sharp')&&!C.sharpUsed){C.sharpUsed=true;d=Math.round(d*1.5);clog('Cold brew. That one landed properly.','good');}dealTo(t,d,'You hit '+t.n+(w?' with the '+w.n:' bare-handed'),'slash');SFX.play('hit');
       if(w&&w.id==='lastword'&&Math.random()<0.3){t.stun=1;clog(t.n+' is knocked flat. It loses its next turn.','good');}
       const tp=temperOf(w);
       if(tp&&tp.twice&&Math.random()<tp.twice&&!t.dead&&t.hp>0){
@@ -1390,7 +1454,7 @@ function act(kind){
     else if(Math.random()<0.6+sk('bruiser')*0.12){const d=Math.round((rint(hd[0],hd[1])+dmgBonus())*1.6*hydroDmg())+(S.lvl-1);dealTo(t,d,'Heavy swing lands','heavy');SFX.play('hit');}
     else{clog('The heavy swing goes wide.','');SFX.play('miss');}
     w.dur-=2;breakWeapon(w);
-    if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+8);
+    if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+(w.quiet?3:8));
   }
   else if(kind==='shoot'){const g=eqItem('ranged');if(!g){toast('No gun');return;}const ammoItem=S.pack.find(p=>p.cat==='ammo'&&p.id===g.ammo);const stockAmmo=g.ammo==='ammo'?S.stock.ammo:0;
     const free=g.id==='mercy'&&Math.random()<0.35;
@@ -1400,8 +1464,15 @@ function act(kind){
     SFX.play('shot');
     const shots=1+((Math.random()<sk('doubletap')*0.1)?1:0);if(shots>1)clog('Double tap.','good');
     for(let s=0;s<shots;s++){const tt=targetEnemy();if(!tt)break;
-      if(Math.random()<0.92){let d=Math.round((rint(g.dmg[0],g.dmg[1])+(S.lvl-1)+sk('steadyaim')*3)*hydroDmg());if(sk('coldbarrel')&&!C.fired){d=Math.round(d*1.5);clog('Cold barrel. The first shot bites.','good');}if(Math.random()<sk('headshot')*0.1){d*=2;clog('Headshot.','good');}C.fired=true;tt.shot=true;C.muzzle=Date.now();dealTo(tt,d,'You fire the '+g.n,'shot');}else{C.fired=true;clog('The shot goes wide.','');}}
-    if(S.loc&&g.id!=='whisper')S.loc.noise=Math.min(100,S.loc.noise+Math.max(5,25-sk('silencer')*8));
+      if(Math.random()<(buffOn('numb')?0.74:0.92)){let d=Math.round((rint(wDmg(g)[0],wDmg(g)[1])+(S.lvl-1)+sk('steadyaim')*3)*hydroDmg()*(buffOn('wired')?1.15:1));if(sk('coldbarrel')&&!C.fired){d=Math.round(d*1.5);clog('Cold barrel. The first shot bites.','good');}if(Math.random()<sk('headshot')*0.1){d*=2;clog('Headshot.','good');}C.fired=true;tt.shot=true;C.muzzle=Date.now();dealTo(tt,d,'You fire the '+g.n,'shot');}else{C.fired=true;clog('The shot goes wide.','');}}
+    if(S.loc&&g.id!=='whisper')S.loc.noise=Math.min(100,S.loc.noise+Math.round(Math.max(5,25-sk('silencer')*8)*(g.quiet?0.3:1)));
+    // A bow gets most of its bolts back. That is the whole reason to carry one.
+    if(g.recover&&!free){
+      const back=(Math.random()<g.recover)?1:0;
+      if(back){const bundle=S.pack.find(x=>x.cat==='ammo'&&x.id===g.ammo);
+        if(bundle)bundle.qty++; else if(S.pack.length<capacity())S.pack.push({id:'bolts',...ITEMS.bolts,uid:uid(),qty:1,n:'Bolt (x1)'});
+        clog('You pull the bolt back out.','good');}
+    }
     // Guns wear like everything else now. Irongrip and jury-rig apply the same
     // way they do to a melee weapon.
     if(g.dur!==undefined&&!(Math.random()<sk('irongrip')*0.25)){
@@ -1467,7 +1538,7 @@ function enemyPhase(){
 }
 function dropLegend(why){const id=pick(LEGEND_IDS);S.gear.push({uid:uid(),id,...GEAR[id]});clog((why||'')+' LEGENDARY: '+GEAR[id].n+'. '+GEAR[id].legend+'.','good');toast('Legendary: '+GEAR[id].n,'l');SFX.play('legend');log('Found the legendary '+GEAR[id].n+'.');}
 function death(){
-  C.over=true;S.combat=false;const lost=packPts();SFX.play('dead');
+  C.over=true;S.combat=false;buffClear();const lost=packPts();SFX.play('dead');
   const where=C.where;if(where==='raid'&&S.raidPending){const p=S.raidPending;resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;}
   if(where==='boss')bossAfter(false);if(where==='horde')resolveHorde(true,false);if(where==='rival')nemWon();
   if(where==='liveraid'&&typeof liveRaidAfter==='function')liveRaidAfter(false);
@@ -1487,7 +1558,7 @@ function death(){
   C=null;
 }
 function endCombat(won){
-  if(!C)return;C.over=true;S.combat=false;
+  if(!C)return;C.over=true;S.combat=false;buffClear();
   const where=C.where;
   if(won){SFX.play('win');if(sk('secondwind'))S.hp=Math.min(maxHp(),S.hp+sk('secondwind')*6);
     log('Cleared '+C.enemies.length+' hostiles'+(where==='enter'&&S.loc?' inside '+S.loc.n:where==='road'?' on the road':'')+'.');
@@ -1521,6 +1592,7 @@ function renderCombat(){
   const SPARK={slash:'💢',heavy:'💥',shot:'✴️'};
   $('#sheet').innerHTML=`<h2>${C.where==='raid'?'Defend the base':C.where==='road'?'On the road':'Inside'} <span class="chip d" style="float:right">round ${C.turn}</span></h2>
   <div class="pbox${phurt?' hurt':''}"><div class="sp${plunge?' lunge':''}">${ART.avatarSVG(S.av,60,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',mood:S.hp<maxHp()*0.3?'angry':''})}${flash?'<span class="muzzle">✳️</span>':''}</div><div><div class="hplab"><span>You · DR ${dr()}</span><span>${S.hp} / ${maxHp()}</span></div><div class="hpbar"><i style="width:${S.hp/maxHp()*100}%"></i></div></div>${phurt?`<span class="dmg">-${C.pfx.d}</span>`:''}</div>
+  ${S.buff&&S.buff.fights>0?`<div class="help" style="margin-top:6px;color:var(--amber)">${esc(BUFF_TEXT[S.buff.k]||'')}</div>`:''}
   <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}${hit?`<span class="spark">${SPARK[e.fx.k||'slash']}</span>`:''}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
   <div class="acts">
     <button class="btn r" onclick="attackGuard()">${w?w.e+' '+esc(w.n)+(temperOf(w)?' <span class="chip s">'+esc(temperOf(w).n)+'</span>':''):'👊 Fists'}<small>${w?(wDmg(w)[0]+dmgBonus())+'-'+(wDmg(w)[1]+dmgBonus())+' · '+w.dur+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
@@ -2301,7 +2373,13 @@ function render(){
   $('#packSub').textContent=S.pack.length+' / '+capacity();$('#runMult').textContent='x'+runMult().toFixed(1);$('#packPts').textContent=fmt(packPts());$('#keyCount').textContent=S.keys;
   $('#bankBtn').disabled=!!S.loc||!S.pack.length||!!S.combat;$('#bankBtn').textContent=S.base?'Stash it at '+S.base.n:'Claim a base first';
   $('#packAlert').hidden=!S.pack.some(p=>p.cat==='chest'&&(S.keys>0||sk('lockpick')));
-  $('#packList').innerHTML=S.pack.length?S.pack.map(it=>`<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span>${esc(it.n)}${it.qty?' x'+it.qty:''}${it.cat==='chest'?`<button class="btn xs a" onclick="openChest('${it.uid}')">${S.keys>0?'Open':sk('lockpick')?'Pick':'Locked'}</button>`:`<span class="pt">+${it.pts}</span>`}</div>`).join(''):'<p class="help">Empty.</p>';
+  $('#packList').innerHTML=S.pack.length?S.pack.map(it=>{
+    const act=it.cat==='chest'?`<button class="btn xs a" onclick="openChest('${it.uid}')">${S.keys>0?'Open':sk('lockpick')?'Pick':'Locked'}</button>`
+      :it.drink?`<button class="btn xs" onclick="useDrink('${it.uid}')" title="${esc((DRINKS[it.drink]||{}).d||'')}">Drink</button>`
+      :it.snack?`<button class="btn xs" onclick="useSnack('${it.uid}')" title="${esc((SNACKS[it.snack]||{}).d||'')}">Eat</button>`
+      :`<span class="pt">+${it.pts}</span>`;
+    const sub=it.drink?(DRINKS[it.drink]||{}).d:it.snack?(SNACKS[it.snack]||{}).d:'';
+    return `<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span><span style="flex:1;min-width:0">${esc(it.n)}${it.qty?' x'+it.qty:''}${sub?`<br><span class="help" style="font-size:11px">${esc(sub)}</span>`:''}</span>${act}</div>`;}).join(''):'<p class="help">Empty.</p>';
   const GT={all:()=>true,weapons:g=>g.slot==='melee'||g.slot==='ranged',armor:g=>g.slot==='armor'||g.slot==='head',bags:g=>g.slot==='bag'};
   const RORD={common:0,uncommon:1,rare:2,epic:3,legendary:4};
   const gearShown=S.gear.filter(GT[GEAR_TAB]||GT.all).sort((a,b)=>((S.eq[b.slot]===b.uid)-(S.eq[a.slot]===a.uid))||(RORD[b.r||'common']-RORD[a.r||'common']));
@@ -2442,6 +2520,13 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.37',d:'Sep 17',t:'Eight new weapons, drinks that do things, and snacks',
+  i:['NEW MELEE: Hatchet, Meat cleaver, Farm sickle, Pipe spear, Barbed bat, and a KATANA. The katana is epic - 20-29 damage, ten swings, and quiet.',
+     'NEW RANGED: a Hunting bow and a Crossbow. Both use BOLTS, both are quiet, and both give bolts back - the bow gets 55% of them back, the crossbow 40%. That is the reason to carry one over a gun.',
+     'QUIET WEAPONS make far less noise indoors: the katana, spear, bow and crossbow. Noise is what brings more of them.',
+     'DRINKS, and they are not all the same. Energy drink: +20 water and you hit 15% harder next fight. Soda: +32 water now, but you get thirsty faster all day. Wine: +12 water, +22 HP, and you miss more next fight. Cold brew: your first hit next fight lands 50% harder.',
+     'SNACKS for small top-ups: protein bar +9 HP, trail mix +7 and a little water, chips +5 but salty so they cost you water, gum +2 and a sip.',
+     'Find them in kitchens, snack shelves, freezers, break rooms and counters. Everything sits in your pack with a Drink or Eat button and says what it does.']},
  {v:'6.36',d:'Sep 17',t:'Moving your base tells you what it costs',
   i:['MOVING YOUR BASE HAS ALWAYS DESTROYED EVERY ROOM YOU BUILT. It never said so - the button just read "Move base here (20 scrap)". Twenty scrap is not the price. The walls are.',
      'It now warns you first, listing exactly what you lose: the rooms, the steps and scrap they took, and the defense. A base with level 4 walls is over 26,000 steps of work.',
