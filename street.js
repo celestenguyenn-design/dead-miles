@@ -71,10 +71,17 @@ async function fetchPois(pos){
   updateMarkers();
 }
 function poiState(p){const st=streetState();const t=st.looted[p.id];if(t&&Date.now()-t<24*3600000)return 'looted';if(!STREET.pos)return 'far';return geoDist(p,STREET.pos)<=reachRadius()?'near':'far';}
+let RAID_WIN_SEEN=-1;
 function updateMarkers(){
   if(!STREET.map)return;const seen=new Set();
-  for(const p of STREET.pois){seen.add(p.id);const st=poiState(p);const html=`<div class="poi ${st}${p.t==='stronghold'?' sh':''}"><span>${p.e}</span></div>`;
-    if(!STREET.markers[p.id]){const m=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]})}).addTo(STREET.map);m.on('click',()=>tapPoi(p.id));STREET.markers[p.id]=m;}
+  // a new two-hour window means every marker is potentially a different thing
+  const w=raidWindow();
+  if(w!==RAID_WIN_SEEN){RAID_WIN_SEEN=w;for(const k in STREET.markers){STREET.map.removeLayer(STREET.markers[k]);delete STREET.markers[k];}}
+  for(const p of STREET.pois){seen.add(p.id);const st=poiState(p);const rd=raidAt(p);
+    const html=rd
+      ? `<div class="poi ${st} raid t${rd.tier}" style="--rc:${rd.T.col}"><span>${rd.T.e}</span><b>${rd.tier}</b></div>`
+      : `<div class="poi ${st}${p.t==='stronghold'?' sh':''}"><span>${p.e}</span></div>`;
+    if(!STREET.markers[p.id]){const m=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]})}).addTo(STREET.map);m.on('click',()=>{const rr=raidAt(p);if(rr)openRaid(p.id);else tapPoi(p.id);});STREET.markers[p.id]=m;}
     else STREET.markers[p.id].setIcon(L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]}));}
   for(const id of Object.keys(STREET.markers)){if(!seen.has(id)){STREET.map.removeLayer(STREET.markers[id]);delete STREET.markers[id];}}
   const near=STREET.pois.filter(p=>poiState(p)==='near').length;const n=$('#mapNear');if(n)n.textContent=near?near+' within reach':'Walk toward a marker';
@@ -115,8 +122,171 @@ function zombieTick(){
   for(const z of STREET.zombies){const d=geoDist(z,STREET.pos);const step=z.k==='runner'?3:1.6;if(d>1){z.lat+=(STREET.pos.lat-z.lat)/d*step;z.lon+=(STREET.pos.lon-z.lon)/d*step;z.m.setLatLng([z.lat,z.lon]);}
     if(d<=14){STREET.map.removeLayer(z.m);STREET.zombies=STREET.zombies.filter(x=>x!==z);toast('A '+z.k+' got to you','d');startCombat([mk(z.k)],'road');break;}}
 }
+function renderRaidList(){
+  const el=$('#raidList');if(!el)return;
+  const rs=liveRaids();
+  if(!rs.length){el.hidden=true;return;}
+  el.hidden=false;
+  rs.sort((a,b)=>b.tier-a.tier);
+  el.innerHTML='<h2>Live raids <span class="sub">'+rs.length+' nearby</span></h2>'
+    +'<p class="help">Two hours each. Everyone at the same place fights the same one.</p>'
+    +rs.slice(0,6).map(r=>{const near=raidNear(r);const done=(S.raidsDone||{})[r.id];
+      const mins=Math.max(0,Math.round((r.endsAt-Date.now())/60000));
+      return '<button class="lbrow" style="width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:9px 0" onclick="openRaid(\''+esc(r.poi)+'\')">'
+        +'<div class="rk" style="color:'+r.T.col+'">'+r.T.e+'</div>'
+        +'<div class="nm">'+esc(r.T.n)+' <span class="chip s">tier '+r.tier+'</span>'
+        +'<small>'+esc(r.n)+' · '+(mins>60?Math.floor(mins/60)+'h '+(mins%60)+'m':mins+'m')+' left'
+        +(done?' · cleared by you':near?' · in reach':' · walk closer')+'</small></div></button>';}).join('');
+}
 function renderStreet(){
   if(!STREET.on)return;const hd=homeDistance();
+  try{renderRaidList();}catch(e){}
   const el=$('#mapInfo');if(!el)return;
   el.innerHTML=`<span class="chip s">GPS ±${STREET.pos?Math.round(STREET.pos.acc):'?'} m</span><span class="chip" id="mapNear">${(n=>n?n+' within reach':'Walk toward a marker')(STREET.pois.filter(p=>poiState(p)==='near').length)}</span>${hd!==null?`<span class="chip a">Home ${Math.round(hd)} m</span>`:'<span class="chip">No home set</span>'}<span class="chip d">${STREET.zombies.length} on the street</span>`;
+}
+
+/* ================= LIVE RAIDS (v6.21) =================
+   A raid is a real place, for two hours, that everyone sees the same way.
+   Nothing schedules them: tier and boss are hashed from (place id + time
+   window), so two people standing at the same corner in the same window get
+   the same raid without the server being asked anything. The shared HP bar
+   rides on boss_hit, which already takes an arbitrary code - so live raids
+   needed no new SQL at all. */
+const RAID_WINDOW=2*3600000;                 // a raid lives two hours
+const RAID_TIERS=[
+  {t:1,n:'Stray pack',    e:'🧟', hp:1,  dmg:0.9, loot:1,   col:'#7fbf4d'},
+  {t:2,n:'Nest',          e:'🧟‍♂️',hp:2, dmg:1.1, loot:1.6, col:'#8fb3c9'},
+  {t:3,n:'Swarm',         e:'☣️', hp:3,  dmg:1.35,loot:2.4, col:'#e6a530'},
+  {t:4,n:'Bloated horror',e:'💀', hp:4,  dmg:1.6, loot:3.4, col:'#d0602e'},
+  {t:5,n:'The Tall One',  e:'👹', hp:6,  dmg:2.0, loot:5,   col:'#c22b3a'},
+];
+const RAID_NAMES=['Crawler','Husk','Screamer','Bruiser','Shambler','Wretch','Gorger','Pale Thing','Hollow Man','The Quiet'];
+// hash() is fine for picking one of a handful of things, but its low bits are
+// not uniform mod 100: the first cut of this put tier 5 at 0.3% instead of 5%,
+// so the best raid in the game would effectively never appear. One murmur-style
+// avalanche before the modulo fixes the spread.
+function rhash(str){
+  let h=Math.abs(hash(str))|0;
+  h^=h>>>13; h=Math.imul(h,0x5bd1e995); h^=h>>>15; h=Math.imul(h,0x27d4eb2d); h^=h>>>16;
+  return (h>>>0);
+}
+function raidWindow(t){return Math.floor((t||Date.now())/RAID_WINDOW);}
+function raidId(poiId,w){return 'r:'+poiId+':'+(w===undefined?raidWindow():w);}
+// ~1 in 7 places hosts a raid in a given window; the rare tiers stay rare.
+function raidAt(p,w){
+  w=(w===undefined)?raidWindow():w;
+  if(rhash(p.id+'|'+w+'|raid')%100>=15)return null;
+  const roll=rhash(p.id+'|'+w+'|tier')%100;
+  const tier=roll<35?1:roll<63?2:roll<83?3:roll<95?4:5;
+  const T=RAID_TIERS[tier-1];
+  return {id:raidId(p.id,w),poi:p.id,n:p.n,w,tier,T,
+    boss:RAID_NAMES[rhash(p.id+'|'+w+'|name')%RAID_NAMES.length]+' of '+p.n,
+    endsAt:(w+1)*RAID_WINDOW};
+}
+function liveRaids(){
+  if(!STREET.on||!STREET.pois.length)return [];
+  return STREET.pois.map(p=>raidAt(p)).filter(Boolean);
+}
+function raidNear(r){const p=STREET.pois.find(x=>x.id===r.poi);return p&&STREET.pos?geoDist(p,STREET.pos)<=reachRadius()*2:false;}
+
+let RAID_STATE=null;                          // last known shared HP for the open raid
+async function raidSync(r,dmg){
+  const o=O();if(!o.ok)return null;
+  try{const res=await rpc('boss_hit',{p_handle:o.handle,p_token:o.token,p_code:r.id,p_week:String(r.w),
+        p_dmg:Math.max(0,Math.round(dmg||0)),p_members:r.T.hp});
+    if(res&&!res.error){RAID_STATE=res;return res;}
+  }catch(e){}
+  return null;
+}
+function raidSheet(r){
+  const near=raidNear(r);const mine=(S.raidsDone||{})[r.id];
+  const left=Math.max(0,r.endsAt-Date.now());
+  const mins=Math.round(left/60000);
+  const hp=RAID_STATE?RAID_STATE.hp:null, max=RAID_STATE?RAID_STATE.max:null;
+  const dead=hp===0;
+  openSheet('<h2>'+esc(r.T.e+' '+r.T.n)+' <span class="sub">tier '+r.tier+'</span></h2>'
+    +'<p><b style="color:'+r.T.col+'">'+esc(r.boss)+'</b></p>'
+    +'<p class="help">'+esc(r.n)+' · '+(mins>60?Math.floor(mins/60)+'h '+(mins%60)+'m':mins+' min')+' left'
+      +(near?' · you are here':' · walk closer to join')+'</p>'
+    +(hp!==null?'<div class="progress" style="margin-top:8px"><div class="bar"><i style="width:'+Math.round(hp/max*100)+'%;background:linear-gradient(90deg,#8a2230,'+r.T.col+')"></i></div>'
+        +'<div class="row"><span>'+fmt(hp)+' / '+fmt(max)+'</span><span>'+(dead?'down':'everyone hits the same one')+'</span></div></div>':'')
+    +(RAID_STATE&&RAID_STATE.hits?'<p class="help" style="margin-top:6px">'+Object.keys(RAID_STATE.hits).length+' survivor'+(Object.keys(RAID_STATE.hits).length===1?'':'s')+' have hit it.</p>':'')
+    +'<p class="help" style="margin-top:8px">Tier '+r.tier+' drops '+(r.tier>=4?'a legendary chance and guaranteed rare gear':r.tier>=3?'guaranteed rare gear':'better than the street')+'. Your loot is your own - it does not split.</p>'
+    +'<div class="grid2" style="margin-top:10px">'
+    +'<button class="btn ghost" onclick="shareRaid(\''+esc(r.poi)+'\')">Invite a friend</button>'
+    +(mine?'<button class="btn" disabled>You fought this one</button>'
+      :dead?'<button class="btn" disabled>Already down</button>'
+      :near?'<button class="btn r" onclick="joinRaid(\''+esc(r.poi)+'\')">Join the raid</button>'
+      :'<button class="btn" disabled>Too far away</button>')
+    +'</div>'
+    +'<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet()">Back</button>',true);
+}
+async function openRaid(poiId){
+  const p=STREET.pois.find(x=>x.id===poiId);if(!p)return;
+  const r=raidAt(p);if(!r){toast('Nothing here now');return;}
+  RAID_STATE=null;raidSheet(r);
+  await raidSync(r,0);                       // read the shared bar without hitting it
+  if($('#modal').classList.contains('on'))raidSheet(r);
+}
+function shareRaid(poiId){
+  const p=STREET.pois.find(x=>x.id===poiId);const r=p&&raidAt(p);if(!r)return;
+  const mins=Math.max(0,Math.round((r.endsAt-Date.now())/60000));
+  const txt='Dead Miles raid: '+r.T.e+' '+r.T.n+' (tier '+r.tier+') at '+r.n+', '+mins+' min left. Get here and hit Join.';
+  if(navigator.share){navigator.share({text:txt}).catch(()=>{});return;}
+  copyText(txt,'');toast('Copied - send it to them','z');
+}
+async function joinRaid(poiId){
+  const p=STREET.pois.find(x=>x.id===poiId);const r=p&&raidAt(p);if(!r)return;
+  if(!raidNear(r)){toast('Walk closer to join');return;}
+  if((S.raidsDone||{})[r.id]){toast('You already fought this one');return;}
+  if(S.loc||S.combat){toast('Finish what you are doing first');return;}
+  const st=await raidSync(r,0);
+  if(st&&st.hp===0){toast('Someone already put it down');raidSheet(r);return;}
+  closeSheet();
+  gearCheck(()=>{
+    const T=r.T;
+    const boss=mk('bloater');
+    boss.n=r.boss;boss.raid=r.id;boss.warden=true;
+    boss.hp=boss.max=Math.round(boss.max*(1+T.hp*0.55));
+    boss.dmg=boss.dmg.map(x=>Math.round(x*T.dmg));
+    const en=[boss];
+    if(T.t>=3)en.unshift(mk('runner'));
+    if(T.t>=5)en.unshift(mk('gunner'));
+    S.raidCur={id:r.id,tier:T.t,loot:T.loot,n:r.boss,poi:r.poi};
+    startCombat(en,'liveraid');
+  });
+}
+// called from the combat resolver
+function liveRaidAfter(won){
+  const cur=S.raidCur;if(!cur)return;S.raidCur=null;
+  if(!S.raidsDone)S.raidsDone={};
+  const p=STREET.pois.find(x=>x.id===cur.poi);const r=p&&raidAt(p);
+  const dealt=won?9999:Math.round(400*cur.tier);
+  if(r)raidSync(r,dealt);
+  if(!won){log('The raid at '+cur.n+' beat you back. You can try again if it is still standing.');return;}
+  S.raidsDone[cur.id]=Date.now();
+  // trim old entries so the save does not grow forever
+  const keys=Object.keys(S.raidsDone);if(keys.length>60)keys.sort((a,b)=>S.raidsDone[a]-S.raidsDone[b]).slice(0,keys.length-60).forEach(k=>delete S.raidsDone[k]);
+  // Raid loot uses the game's own tables, just weighted hard toward gear and
+  // rerolled for rarity - a tier 5 should feel like a tier 5 without inventing
+  // a second item system that can drift from the first.
+  const got=[];const n=1+cur.tier;
+  const pool=table(['meds','ammo','scrap','food','water'], 2, 4+cur.tier*3)
+    .map(x=>({...x, w:x.w*rarW(x)*((RAR[x.r||'common'].w>=3)?(1+cur.tier*0.9):1)}));
+  for(let i=0;i<n;i++){
+    let it=wpick(pool,'w');
+    // tier 3+ will not hand you a common: reroll until it clears the floor
+    const floor=cur.tier>=3?3:cur.tier>=2?2:1;
+    for(let k=0;k<12&&RAR[it.r||'common'].w<floor;k++)it=wpick(pool,'w');
+    const packed=it.gear
+      ? {id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}
+      : {id:it.id,n:it.n,e:it.e,pts:Math.round(it.pts*cur.loot),cat:it.cat,qty:it.qty,r:it.r};
+    if(takeItem(packed,null))got.push(packed.n);
+  }
+  if(cur.tier>=4&&Math.random()<(cur.tier===5?0.5:0.22)){dropLegendQuiet();got.push('a LEGENDARY');}
+  S.stock.scrap+=6*cur.tier;S.keys+=cur.tier>=4?2:1;addXp(40*cur.tier);
+  ctEvent('kills',1);
+  log('Raid cleared: '+cur.n+' (tier '+cur.tier+'). +'+(6*cur.tier)+' scrap, +'+(cur.tier>=4?2:1)+' keys'+(got.length?', '+got.join(', '):'')+'.');
+  toast('Tier '+cur.tier+' raid cleared','l');SFX.play('legend');
+  save();render();pushPlayer();
 }

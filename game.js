@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.20';
+const VERSION='6.21';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -955,7 +955,7 @@ let C=null;
 function startCombat(enemies,where,job){
   C={enemies,where,job,turn:1,log:[],target:0,brace:false,over:false,fled:false};
   S.combat=true;SFX.play('growl');
-  const desc=where==='rival'?'Nadia\'s scouts step out of the dark.':where==='road'?'Something is in the road.':where==='boss'?bossName()+' steps out. Phase '+(S.bossFightsToday)+' of the week\'s hunt.':where==='watch'?'Watch duty. '+(WATCH_JOBS[C.job]?WATCH_JOBS[C.job].n+'.':''):where==='wave'?'The noise brought more.':where==='raid'?'Raiders are at your walls.':where==='horde'?'Horde night. They are over the fence.':S.loc&&S.loc.stronghold?['','At the gate.','Into the yard.','The boss trailer. '+bossName()+' is home.'][S.loc.stage+1]:'They were waiting inside '+(S.loc?S.loc.n:'the dark')+'.';
+  const desc=where==='rival'?'Nadia\'s scouts step out of the dark.':where==='road'?'Something is in the road.':where==='boss'?bossName()+' steps out. Phase '+(S.bossFightsToday)+' of the week\'s hunt.':where==='watch'?'Watch duty. '+(WATCH_JOBS[C.job]?WATCH_JOBS[C.job].n+'.':''):where==='wave'?'The noise brought more.':where==='raid'?'Raiders are at your walls.':where==='liveraid'?((S.raidCur?S.raidCur.n:'Something')+' is here, and it is not alone.'):where==='horde'?'Horde night. They are over the fence.':S.loc&&S.loc.stronghold?['','At the gate.','Into the yard.','The boss trailer. '+bossName()+' is home.'][S.loc.stage+1]:'They were waiting inside '+(S.loc?S.loc.n:'the dark')+'.';
   clog(desc+' '+enemies.length+' hostile'+(enemies.length>1?'s':'')+'.','sys');
   if(bg('gamer')){const bz=enemies.find(e=>e.boss&&e.g);if(bz)clog('Gamer instinct: '+bz.n+' - '+(GIMMICK_TEXT[bz.g]||bz.g)+'.','good');}
   let amb=0.15;if(wxKind()==='fog')amb+=0.1;if(roleLvl('scout')||sk('quickdraw')||sk('brave'))amb=0;
@@ -1064,6 +1064,7 @@ function death(){
   C.over=true;S.combat=false;const lost=packPts();SFX.play('dead');
   const where=C.where;if(where==='raid'&&S.raidPending){const p=S.raidPending;resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;}
   if(where==='boss')bossAfter(false);if(where==='horde')resolveHorde(true,false);if(where==='rival')nemWon();
+  if(where==='liveraid'&&typeof liveRaidAfter==='function')liveRaidAfter(false);
   const keepFrac=sk('fieldsurgeon')*0.25;const kept=keepFrac?S.pack.slice(0,Math.floor(S.pack.length*keepFrac)):[];S.pack=kept;S.run=0;S.loc=null;newDistance();S.hp=Math.round(maxHp()*(0.4+sk('fieldsurgeon')*0.15));
   const lostCrew=woundedCrew();if(lostCrew.length){const ids=lostCrew.map(c=>c.id);S.crew=S.crew.filter(c=>!ids.includes(c.id));S.active=S.active.filter(id=>!ids.includes(id));log('You went down and could not carry them out. '+lostCrew.map(c=>c.name).join(' and ')+' did not make it.');}
   // Only ordinary gear can be taken off you. An epic or legendary survives a
@@ -1089,6 +1090,7 @@ function endCombat(won){
     if(where==='watch'){watchReward(C.job);}
     if(where==='horde'){resolveHorde(true,true);}
     if(where==='boss'){bossAfter(true);}
+    if(where==='liveraid'&&typeof liveRaidAfter==='function'){liveRaidAfter(true);}
     if(where==='rival'){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:6});for(let i=0;i<3&&S.pack.length<capacity();i++)S.pack.push({id:'scrap',...ITEMS.scrap,uid:uid()});log('They ran. You took their ammo and scrap.');nemBeaten();}
     crewXp(2);
   }else{
@@ -1696,6 +1698,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.21',d:'Sep 17',t:'LIVE RAIDS',
+  i:['Real places near you host raids for two hours at a time. Walk to one, tap it, fight it.',
+     'Five tiers: Stray pack, Nest, Swarm, Bloated horror, and The Tall One. Tier 3 and up guarantee rare gear; tier 4 and 5 can drop a legendary.',
+     'Everyone standing at the same place in the same two hours sees the SAME raid and chips the SAME health bar. Your loot is your own - it does not split.',
+     'Invite a friend sends them the place and the timer. Raids show on the live map with their tier colour.',
+     'You can only fight a given raid once, and only if you are actually there.']},
  {v:'6.20',d:'Sep 17',t:'The road does not end any more',
   i:['The county used to stop at The Overpass, 320,000 steps. After that nothing new ever arrived again. Now the road keeps going - new districts every 100,000 steps, forever, each one richer and meaner than the last.',
      'Every 500,000 steps you earn a rank you carry: Veteran, Ranger, Pathfinder, Outrider, Long Walker. It shows on the road screen.',
