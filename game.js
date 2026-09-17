@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.4';
+const VERSION='6.5';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -332,12 +332,16 @@ async function setRecovery(code){
   if(c.length!==6){warn('Six digits, numbers only.');return;}
   let r;
   try{r=await rpc('set_recovery',{p_handle:o.handle,p_token:o.token,p_code:c});}
-  catch(e){toast('Could not reach the server. Try again.','d');return;}
+  catch(e){warn(/404|not find|does not exist/i.test(e.message)
+    ?'The PIN feature is not installed on the server yet. Run round eight of the setup page.'
+    :'Could not reach the server: '+e.message);return;}
   if(r==='taken'){warn('Someone already uses that PIN. Pick another.');return;}
   if(r==='format'){warn('Six digits, numbers only.');return;}
   if(r==='weak'){warn('Too easy to guess. Not 123456, not all the same digit.');return;}
   if(r==='busy'){warn('Too many changes in a row. Wait an hour and try again.');return;}
-  if(r!=='ok'){toast('Could not save that PIN. Run round eight of the setup page first.','d');return;}
+  if(r===true||r===false){warn('The server still has the OLD setup installed. Round eight was updated - run the newest one and try again.');return;}
+  if(r==='bad'){warn('The server did not accept your account key. Go offline and online again in Settings, then retry.');return;}
+  if(r!=='ok'){warn('The server answered "'+String(r)+'", which this version does not understand. Run the newest round eight.');return;}
   S.recovery=c;identWrite(o.handle,o.token);save();renderRecov();toast('PIN saved','z');
 }
 function saveTypedRecovery(){const el=$('#recovInput');if(el)setRecovery(el.value);}
