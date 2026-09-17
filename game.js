@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.45';
+const VERSION='6.46';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -227,7 +227,7 @@ const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic co
 
 /* ================= state ================= */
 let S=null;
-function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},infect:null,checkin:{date:'',n:0},ladder:{date:'',hit:[]},
+function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},infect:null,diff:'normal',checkin:{date:'',n:0},ladder:{date:'',hit:[]},
   steps:{total:0,today:0,date:todayStr(),lastSync:0,lastSyncDate:''},
   walk:{toNext:0,dist:500,district:0,houses:0,progress:0,banked:0},
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
@@ -241,7 +241,7 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
 function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
-  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.parts===undefined)S.parts=0;if(S.buff===undefined)S.buff=null;
+  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(S.parts===undefined)S.parts=0;if(S.buff===undefined)S.buff=null;
   // A temper can lower a weapon's ceiling, so never let a stored durability
   // sit above it - that renders as "9 / 7" and repairs would read as free.
   for(const g of (S.gear||[])){
@@ -565,16 +565,42 @@ function useSnack(uidv){
    health drops, drops further every day you leave it, and burns through you as
    you walk. Antibiotics cure it, and antibiotics are rare - which turns "I found
    loot" into "I found the RIGHT loot". */
-const INFECT_CHANCE=0.02, INFECT_PER_STEPS=400;
+/* ================= DIFFICULTY (v6.46) =================
+   Her friends want a grind; she cannot always get out. Those are not the same
+   request and no single set of numbers serves both. So it is a choice, per
+   player, changeable any time - and Normal is genuinely playable on a day you
+   barely move. */
+const DIFF={
+  normal:{n:'Survivor', d:'The county as it is meant to be. Fair on a day you barely move.',
+          enemy:1,   infect:1,   scrap:0.10, meds:3, raid:1},
+  hard:  {n:'Hardened', d:'Enemies hit harder, bites turn more often, death takes more.',
+          enemy:1.25,infect:1.8, scrap:0.20, meds:2, raid:1.15},
+  brutal:{n:'Hollow',   d:'For the people who asked for a grind. Do not pick this to relax.',
+          enemy:1.5, infect:2.6, scrap:0.30, meds:1, raid:1.3},
+};
+function diff(){return DIFF[(typeof S!=='undefined'&&S&&S.diff)||'normal']||DIFF.normal;}
+function setDiff(k){if(!DIFF[k])return;S.diff=k;log('Difficulty set to '+DIFF[k].n+'.');toast(DIFF[k].n,'a');save();render();}
+const INFECT_BASE=0.012, INFECT_PER_STEPS=600;
+/* Staging used to advance on CALENDAR DAYS, which meant a player who could not
+   get out for two days came back at stage 3 with a third of their health gone.
+   That punishes having a life, in a game whose whole point is to make walking
+   feel good. It only worsens when you get bitten AGAIN while already infected -
+   driven by what you do, never by time you were away. */
 function infect(){return (typeof S!=='undefined'&&S&&S.infect)||null;}
-function infectStage(){const f=infect();if(!f)return 0;
-  return Math.min(3,1+Math.max(0,Math.floor((Date.now()-f.at)/86400000)));}
-function infectPenalty(){return [0,0.15,0.25,0.35][infectStage()]||0;}
+function infectStage(){const f=infect();if(!f)return 0;return Math.min(3,f.stage||1);}
+function infectPenalty(){return [0,0.10,0.18,0.26][infectStage()]||0;}
+function infectChance(){return INFECT_BASE*(DIFF[S.diff||'normal'].infect);}
 function infectLabel(){return ['','Infected','Fevered','Failing'][infectStage()]||'';}
 function catchInfection(from){
-  if(infect())return;
   if(sk('ironjaw')&&Math.random()<0.25)return;
-  S.infect={at:Date.now(),from:from||'a bite'};
+  if(infect()){                                   // a second bite makes it worse
+    const f=S.infect;if((f.stage||1)>=3)return;
+    f.stage=(f.stage||1)+1;
+    clog('Another one got through. It is turning.','hit');
+    toast('Infection worse: '+infectLabel(),'d');
+    return;
+  }
+  S.infect={at:Date.now(),stage:1,from:from||'a bite'};
   clog('That one broke the skin. It is going to fester.','hit');
   log('You were bitten. Infection is setting in - your maximum health falls until you find antibiotics.');
   toast('INFECTED. Find antibiotics.','d');SFX.play('nemesis');
@@ -724,7 +750,7 @@ function encounterFor(loc){
   return out;
 }
 function strongholdStage(st){if(st===1)return [mk('raider'),mk('raider')];if(st===2)return [mk('raider'),mk('gunner'),mk('raider')];const b=mk('boss');b.n=bossName();b.hp=Math.round(b.hp*1.5);b.max=b.hp;b.wanted=true;b.g=BOSS_GIMMICK[b.n]||'crit';if(b.g==='shield')b.shield=30;if(b.g==='dodgy'){b.dodge=0.45;b.hp=Math.round(b.hp*0.7);b.max=b.hp;}if(b.g==='slow'){b.dmg=b.dmg.map(x=>Math.round(x*1.4));}return [mk('gunner'),b];}
-function mk(k){const e=ENEMIES[k];const scale=1+S.walk.district*0.12+S.league.tier*0.06+Math.max(0,S.lvl-5)*0.075;return {k,n:e.n,hp:Math.round(e.hp*scale),max:Math.round(e.hp*scale),dmg:e.dmg.map(x=>Math.round(x*scale)),hit:e.hit+(isNight()?0.04:0),xp:e.xp,dodge:e.dodge||0,fast:!!e.fast,burst:e.burst||0,scream:e.scream||0,human:!!e.human,boss:!!e.boss,dead:false,stun:0};}
+function mk(k){const e=ENEMIES[k];const scale=(1+S.walk.district*0.12+S.league.tier*0.06+Math.max(0,S.lvl-5)*0.075)*diff().enemy;return {k,n:e.n,hp:Math.round(e.hp*scale),max:Math.round(e.hp*scale),dmg:e.dmg.map(x=>Math.round(x*scale)),hit:e.hit+(isNight()?0.04:0),xp:e.xp,dodge:e.dodge||0,fast:!!e.fast,burst:e.burst||0,scream:e.scream||0,human:!!e.human,boss:!!e.boss,dead:false,stun:0};}
 
 /* ================= steps ================= */
 const WATCH_JOBS={
@@ -1571,7 +1597,7 @@ function act(kind){
     // Unlimited patch-ups meant ten meds were 400 extra HP and no boss could
     // ever out-damage a pack. Two a fight (three with Field Dressing) turns
     // "do I have meds" into "when do I spend one".
-    const cap=2+(sk('fielddressing')?1:0);
+    const cap=diff().meds+(sk('fielddressing')?1:0);
     if((C.meds||0)>=cap){toast('You can only patch up '+cap+' times in one fight','d');return;}
     C.meds=(C.meds||0)+1;const m=S.pack.find(p=>p.cat==='meds')||(S.stock.meds>0?{stock:true}:null);if(!m){toast('No meds');return;}const heal=(m.id==='kit'?70:m.id==='abx'?45:35)+setPerk('med')+sk('fielddressing')*10;if(m.stock)S.stock.meds--;else S.pack=S.pack.filter(p=>p!==m);S.hp=Math.min(maxHp(),S.hp+heal);clog('You patch up: +'+heal+' HP.','good');SFX.play('loot');}
   else if(kind==='swap'){
@@ -1659,7 +1685,7 @@ function enemyPhase(){
     const swings=(e.fast&&C.turn%2===0?2:1)+(frenzied?1:0);
     for(let i=0;i<swings;i++){if(Math.random()<e.hit-sk('adrenaline')*0.06-(e.human?sk('intimidate')*0.08:0)){let d=rint(e.dmg[0],e.dmg[1]);if(e.g==='crit'&&Math.random()<0.2){d*=2;clog('A brutal swing.','hit');}
       const guards=activeCrew();if(guards.length&&Math.random()<0.3){const gc=pick(guards);clog(e.n+' turns on '+gc.name+'.','hit');hurtCrew(gc,Math.max(1,d-2));continue;}
-      if(!e.human&&Math.random()<INFECT_CHANCE)catchInfection(e.n);
+      if(!e.human&&Math.random()<infectChance())catchInfection(e.n);
       hurt(d,e.n);
         if(e.g==='bleed'){C.bleed=Math.max(1,3-sk('clotting'));}if(e.g==='poison'){C.poison=Math.max(1,3-sk('clotting'));}
         if(e.g==='steal'&&S.pack.length&&Math.random()<0.3){const it=S.pack.splice(rint(0,S.pack.length-1),1)[0];clog(e.n+' lifts your '+it.n+' mid-swing.','hit');}}
@@ -1683,7 +1709,7 @@ function death(){
   // Death took your pack and one ordinary weapon and left the stash, keys,
   // parts, level and banked steps untouched - about one trip's worth. A fifth of
   // the scrap pile stings without undoing a week.
-  const scrapLost=Math.round((S.stock.scrap||0)*0.2);
+  const scrapLost=Math.round((S.stock.scrap||0)*diff().scrap);
   if(scrapLost>0){S.stock.scrap-=scrapLost;log('They went through the stash while you were down: -'+scrapLost+' scrap.');}
   const losable=S.gear.map((g,i)=>({g,i})).filter(x=>x.g.r!=='epic'&&x.g.r!=='legendary');
   let gearLost=null;
@@ -2262,6 +2288,15 @@ async function pushOff(){
   }catch(e){}
   S.push=false;save();toast('Notifications off');renderPush();
 }
+function renderDiff(){
+  const el=$('#diffBody');if(!el)return;
+  el.innerHTML='<p class="help">Change it whenever you like. Nothing you own is affected.</p>'
+    +Object.entries(DIFF).map(([k,d])=>{const on=(S.diff||'normal')===k;
+      return '<button class="btn wide'+(on?' r':' ghost')+'" style="margin-top:8px;text-align:left" onclick="setDiff(\''+k+'\')">'
+        +'<b>'+esc(d.n)+(on?' · on':'')+'</b><br><span class="help">'+esc(d.d)+'</span></button>';}).join('')
+    +'<p class="help" style="margin-top:10px">On '+esc(diff().n)+': enemies hit at '+Math.round(diff().enemy*100)+'%, a bite turns '
+      +(diff().infect===1?'at the base rate':Math.round(diff().infect*100)+'% as often')+', death takes '+Math.round(diff().scrap*100)+'% of your scrap, and you can patch up '+diff().meds+' time'+(diff().meds===1?'':'s')+' a fight.</p>';
+}
 async function renderPush(){
   const el=$('#pushBody');if(!el)return;const st=await pushState();const o=O();
   const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
@@ -2511,7 +2546,7 @@ function render(){
       const st=infectStage(),abx=S.pack.some(x=>x.id==='abx');
       ic.innerHTML='<h2 style="color:#ff8a92">'+esc(infectLabel())+' <span class="sub">stage '+st+' of 3</span></h2>'
         +'<p>A bite broke the skin'+(f.from?' ('+esc(f.from)+')':'')+'. Your maximum health is down <b>'+Math.round(infectPenalty()*100)+'%</b>, and you lose health as you walk.</p>'
-        +'<p class="help">It gets worse every day you leave it: 15% today, 25% tomorrow, 35% after that.</p>'
+        +'<p class="help">It does not get worse just because time passes - only if you take another bite while it is running. Time away from the game costs you nothing.</p>'
         +'<button class="btn r wide" style="margin-top:8px" onclick="cureInfection()">'
           +(abx?'Take the antibiotics':S.stock.meds>=4?'Burn 4 meds on it':'Need antibiotics, or 4 meds')+'</button>'
         +'<p class="help" style="margin-top:6px">Antibiotics turn up in pharmacies and clinics.</p>';}
@@ -2674,6 +2709,13 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.46',d:'Sep 17',t:'A DIFFICULTY SETTING, and infection that never punishes time away',
+  i:['You were right twice. Infection was too common AND it got worse just because days passed - so someone who could not get out for two days came back with a third of their health gone. That punishes having a life, in a game whose whole point is making walking feel good.',
+     'IT NO LONGER WORSENS WITH TIME. Ever. It only turns worse if you take ANOTHER bite while it is running. A week away costs you nothing.',
+     'It is also rarer and gentler: about 1% of a single-walker fight, 5% of a real scrap, and the health penalty is 10/18/26% instead of 15/25/35%.',
+     'AND THERE IS A DIFFICULTY SETTING NOW, in Settings. SURVIVOR is the county as it should be, fair on a day you barely move. HARDENED hits 25% harder, bites turn nearly twice as often, death takes more, and you get two patch-ups a fight. HOLLOW is for the people who asked for a grind: enemies at 150%, bites turn 2.6x as often, one patch-up a fight.',
+     'Change it whenever you like, and nothing you own is affected. Your friends can run Hollow while you run Survivor - the raids are still shared.',
+     'A RAID YOU HAVE CLEARED IS GREYED OUT now, both in the list and on the map - the pin goes grey with a tick instead of glowing at you, and it sinks to the bottom of the list. It stays visible because your friends may still want it.']},
  {v:'6.45',d:'Sep 17',t:'INFECTION, and death that costs something',
   i:['I measured the ordinary game the same way I measured raids. At level 8 and up, a walker costs you ZERO health and a raider costs eleven percent. The road had stopped being dangerous years before you noticed.',
      'INFECTION. A bite from the dead can infect you - about 1 in 10 of a rough fight, never from a raider, they are not dead. It does not kill you outright. It takes your CEILING: maximum health down 15%, then 25% tomorrow, then 35%, and it bleeds you as you walk.',

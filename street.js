@@ -179,13 +179,13 @@ function updateMarkers(){
   const w=raidWindow();
   if(w!==RAID_WIN_SEEN){RAID_WIN_SEEN=w;for(const k in STREET.markers){STREET.map.removeLayer(STREET.markers[k]);delete STREET.markers[k];}}
   for(const p of STREET.pois){seen.add(p.id);const st=poiState(p);const rd=raidAt(p);
+    const rdone=rd&&(S.raidsDone||{})[rd.id];
     const html=rd
-      ? `<div class="poi ${st} raid t${rd.tier}" style="--rc:${rd.T.col}"><span>${rd.T.e}</span><b>${rd.tier}</b></div>`
+      ? `<div class="poi ${st} raid t${rd.tier}${rdone?' rdone':''}" style="--rc:${rdone?'#6b6b74':rd.T.col}"><span>${rd.T.e}</span><b>${rdone?'✓':rd.tier}</b></div>`
       : `<div class="poi ${st}${p.t==='stronghold'?' sh':''}"><span>${p.e}</span></div>`;
     if(!STREET.markers[p.id]){const m=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]})}).addTo(STREET.map);m.on('click',()=>{const rr=raidAt(p);if(rr)openRaid(p.id);else tapPoi(p.id);});STREET.markers[p.id]=m;}
     else STREET.markers[p.id].setIcon(L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]}));}
   for(const id of Object.keys(STREET.markers)){if(!seen.has(id)){STREET.map.removeLayer(STREET.markers[id]);delete STREET.markers[id];}}
-  const near=STREET.pois.filter(p=>poiState(p)==='near').length;const n=$('#mapNear');if(n)n.textContent=near?near+' within reach':'Walk toward a marker';
 }
 function drawBase(){if(!S.base||!S.base.geo||!STREET.map)return;if(!STREET.baseMarker){STREET.baseMarker=L.marker([S.base.geo.lat,S.base.geo.lon],{icon:L.divIcon({className:'poi-wrap',html:'<div class="poi base"><span>🏚️</span></div>',iconSize:[40,40],iconAnchor:[20,20]})}).addTo(STREET.map);}else STREET.baseMarker.setLatLng([S.base.geo.lat,S.base.geo.lon]);}
 
@@ -243,7 +243,7 @@ function renderRaidList(){
       const mins=Math.max(0,Math.round((r.endsAt-Date.now())/60000));
       const left=mins>=60?Math.floor(mins/60)+'h '+(mins%60)+'m':mins+' min';
       const tag=done?['done','Cleared']:near?['near','Fight']:['far','Walk closer'];
-      return '<button class="raidrow" style="--rc:'+r.T.col+'" onclick="openRaid(\''+esc(r.poi)+'\')">'
+      return '<button class="raidrow'+(done?' rdone':'')+'" style="--rc:'+(done?'#6b6b74':r.T.col)+'" onclick="openRaid(\''+esc(r.poi)+'\')">'
         +'<span class="tb"><span class="e">'+r.T.e+'</span><span class="t">T'+r.tier+'</span></span>'
         +'<span class="mid"><b>'+esc(r.T.n)+'</b>'
           +'<span class="where">'+esc(r.n)+'</span>'
