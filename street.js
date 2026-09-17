@@ -49,14 +49,27 @@ function onPos(p){
 }
 
 /* ---------- places from OpenStreetMap ---------- */
-async function fetchPois(pos){
+async function fetchPois(pos,force){
   STREET.lastFetch=pos;const cell=(Math.round(pos.lat/0.004)*0.004).toFixed(3)+','+(Math.round(pos.lon/0.004)*0.004).toFixed(3);
-  try{const c=JSON.parse(localStorage.getItem('dm.pois.'+cell)||'null');if(c&&Date.now()-c.t<7*86400000){STREET.pois=c.pois;updateMarkers();$('#mapStatus').textContent=STREET.pois.length+' places nearby';return;}}catch(e){}
+  if(force)try{localStorage.removeItem('dm.pois.'+cell);}catch(e){}
+  else try{const c=JSON.parse(localStorage.getItem('dm.pois.'+cell)||'null');
+    if(c&&c.pois&&c.pois.length&&Date.now()-c.t<7*86400000){STREET.pois=c.pois;updateMarkers();$('#mapStatus').textContent=STREET.pois.length+' places nearby';return;}}catch(e){}
   $('#mapStatus').textContent='Looking up the buildings around you...';
   const q=`[out:json][timeout:25];(nwr(around:350,${pos.lat},${pos.lon})[amenity~"^(pharmacy|police|fuel|hospital|clinic|doctors|dentist|veterinary|fast_food|restaurant|cafe|bar|pub|ice_cream|school|college)$"];nwr(around:350,${pos.lat},${pos.lon})[shop~"^(supermarket|convenience|grocery|greengrocer|bakery|deli|hardware|doityourself|sports|hunting|weapons|outdoor)$"];nwr(around:400,${pos.lat},${pos.lon})[leisure=park];way(around:220,${pos.lat},${pos.lon})[building~"^(house|residential|apartments|detached|semidetached_house|terrace|yes|bungalow)$"];);out center 140;`;
   try{
-    const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
-    const j=await r.json();const pois=[];
+    const MIRRORS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+    let j=null,lastErr=null;
+    for(const url of MIRRORS){
+      try{
+        const r=await fetch(url,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+        if(!r.ok){lastErr=new Error('map server said '+r.status);continue;}
+        const got=await r.json();
+        if(got&&(got.elements||[]).length){j=got;break;}
+        j=j||got;                              // keep an empty answer, but keep trying the next mirror
+      }catch(e){lastErr=e;}
+    }
+    if(!j)throw (lastErr||new Error('no answer'));
+    const pois=[];
     for(const el of j.elements||[]){const lat=el.lat||(el.center&&el.center.lat),lon=el.lon||(el.center&&el.center.lon);if(lat==null)continue;const tg=el.tags||{};
       let kind=POI_KIND[tg.amenity]||POI_KIND[tg.shop]||(tg.leisure==='park'?POI_KIND.park:null);let housey=false;
       if(!kind){if(tg.building&&HOUSE_KINDS.includes(tg.building)){kind=[tg.building==='apartments'?'house':'house',tg.building==='apartments'?'🏢':'🏠'];housey=true;}else continue;}
@@ -65,9 +78,17 @@ async function fetchPois(pos){
     // keep every real business, plus the nearest 40 houses
     const biz=pois.filter(p=>!p.house);const houses=pois.filter(p=>p.house).sort((a,b)=>geoDist(a,pos)-geoDist(b,pos)).slice(0,40);
     STREET.pois=biz.concat(houses);
-    try{localStorage.setItem('dm.pois.'+cell,JSON.stringify({t:Date.now(),pois:STREET.pois}));}catch(e){}
-    $('#mapStatus').textContent=STREET.pois.length+' places nearby';
-  }catch(e){$('#mapStatus').textContent='Could not load the buildings around you (no connection?). Try Refresh.';}
+    // Never cache an empty answer. Overpass rate-limits by answering 200 with
+    // no elements, and a seven-day cache of that kills the map for a week.
+    if(STREET.pois.length)
+      try{localStorage.setItem('dm.pois.'+cell,JSON.stringify({t:Date.now(),pois:STREET.pois}));}catch(e){}
+    $('#mapStatus').textContent=STREET.pois.length
+      ? STREET.pois.length+' places nearby'
+      : 'The map server found nothing around you. It is usually just busy - tap Refresh places in a minute.';
+  }catch(e){
+    STREET.lastFetch=null;                     // let the next GPS ping try again
+    $('#mapStatus').textContent='Could not reach the map server ('+(e.message||'no connection')+'). Tap Refresh places.';
+  }
   updateMarkers();
 }
 function poiState(p){const st=streetState();const t=st.looted[p.id];if(t&&Date.now()-t<24*3600000)return 'looted';if(!STREET.pos)return 'far';return geoDist(p,STREET.pos)<=reachRadius()?'near':'far';}
@@ -142,7 +163,15 @@ function renderStreet(){
   if(!STREET.on)return;const hd=homeDistance();
   try{renderRaidList();}catch(e){}
   const el=$('#mapInfo');if(!el)return;
-  el.innerHTML=`<span class="chip s">GPS ±${STREET.pos?Math.round(STREET.pos.acc):'?'} m</span><span class="chip" id="mapNear">${(n=>n?n+' within reach':'Walk toward a marker')(STREET.pois.filter(p=>poiState(p)==='near').length)}</span>${hd!==null?`<span class="chip a">Home ${Math.round(hd)} m</span>`:'<span class="chip">No home set</span>'}<span class="chip d">${STREET.zombies.length} on the street</span>`;
+  const near=STREET.pois.filter(p=>poiState(p)==='near').length;
+  const lootedNear=STREET.pois.filter(p=>poiState(p)==='looted').length;
+  // "Nothing to loot" has two very different causes and they need different
+  // actions: no places found at all, versus places found but none in arm's reach.
+  const nearTxt=near?near+' within reach'
+    :!STREET.pois.length?'no places found here'
+    :lootedNear?'all cleared - they come back tomorrow'
+    :'walk toward a marker';
+  el.innerHTML=`<span class="chip s">GPS ±${STREET.pos?Math.round(STREET.pos.acc):'?'} m</span><span class="chip${near?'':' d'}" id="mapNear">${nearTxt}</span>${hd!==null?`<span class="chip a">Home ${Math.round(hd)} m</span>`:'<span class="chip">No home set</span>'}<span class="chip d">${STREET.zombies.length} on the street</span>`;
 }
 
 /* ================= LIVE RAIDS (v6.21) =================

@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.39';
+const VERSION='6.40';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2527,6 +2527,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.40',d:'Sep 17',t:'An empty live map could stay empty for a week',
+  i:['When the map server was busy it sometimes answered "here are your buildings" with an empty list - and the game CACHED that empty list for seven days. One bad moment and your whole area had nothing to loot until the cache expired. Empty answers are never cached now.',
+     'There is a second map server as a backup, so one being rate-limited no longer means no places at all.',
+     '"Refresh places" now really refetches instead of handing you the same cached list back.',
+     'The chip at the top tells you WHICH kind of empty you are looking at: "no places found here" (the lookup failed), "all cleared - they come back tomorrow" (you already looted them), or "walk toward a marker" (they are there, just not in arm\'s reach yet).',
+     'Worth knowing: you can only loot a place within about 35-70 metres, so having nothing in reach while standing still is normal. Zero markers on the map is not.']},
  {v:'6.39',d:'Sep 17',t:'The game can now tell you WHY your steps are not syncing',
   i:['There is a button on the Steps card: "Why aren\'t my steps syncing?" It walks the whole chain - your Shortcut, the server, the game, today\'s number - and names the link that is broken instead of leaving you to guess.',
      'It shows the real data at each step: how many step posts the server actually received today, the biggest one, how long ago it arrived, and what the game did with it.',
@@ -3130,7 +3136,7 @@ function wire(){
   $('#pedoBtn').onclick=pedoToggle;$('#clipBtn').onclick=readClipboard;$('#bankBtn').onclick=bank;$('#healBtn').onclick=heal;$('#eatBtn').onclick=eat;$('#dropBtn').onclick=supplyDrop;$('#drinkBtn').onclick=()=>drink();
   $('#lookBtn').onclick=()=>lookSheet();$('#respecBtn').onclick=respec;$('#bgBtn').onclick=()=>bgSheet(false);$('#sfxBtn').onclick=()=>{S.sfx=!S.sfx;save();render();if(S.sfx)SFX.play('ui');};
   $('#demoBtn').onclick=()=>{toast('+300 demo steps','z');addSteps(300,'demo');};$('#shareBtn').onclick=shareCard;
-  $('#streetBtn').onclick=streetStart;$('#mapBack').onclick=streetStop;$('#homeBtn').onclick=setHomeHere;$('#refreshPois').onclick=()=>{if(STREET.pos){STREET.lastFetch=null;try{Object.keys(localStorage).filter(k=>k.startsWith('dm.pois.')).forEach(k=>localStorage.removeItem(k));}catch(e){}fetchPois(STREET.pos);}};
+  $('#streetBtn').onclick=streetStart;$('#mapBack').onclick=streetStop;$('#homeBtn').onclick=setHomeHere;$('#refreshPois').onclick=()=>{if(STREET.pos){STREET.lastFetch=null;try{Object.keys(localStorage).filter(k=>k.startsWith('dm.pois.')).forEach(k=>localStorage.removeItem(k));}catch(e){}fetchPois(STREET.pos,true);}else toast('Waiting for GPS first','a');};
   $('#updateBtn').onclick=()=>{toast('Fetching the latest version');applyUpdate();};$('#updateBar').onclick=applyUpdate;
   $('#undoBtn').onclick=undoRestore;$('#resetBtn').onclick=()=>{openSheet('<h2>Reset everything?</h2><p>Base, crew, gear, skills and league history on this device will be gone.</p><div class="grid2"><button class="btn" onclick="closeSheet()">Keep playing</button><button class="btn d" onclick="hardReset()">Reset</button></div>');};
   $('#goalInput').onchange=()=>{const v=parseInt($('#goalInput').value,10);if(v>=1000){S.goal=v;save();render();}};
