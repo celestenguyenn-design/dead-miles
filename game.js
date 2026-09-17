@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.14';
+const VERSION='6.15';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -559,6 +559,8 @@ function nextStreakReward(){return STREAK_REWARDS.find(x=>x.d>S.streak.days);}
 function rollDay(){
   const t=todayStr();if(S.steps.date===t)return;
   snapshot('start of the day');
+  if(S.steps.date&&S.steps.today>=0){S.steps.hist=(S.steps.hist||[]).filter(x=>x.d!==S.steps.date);
+    S.steps.hist.unshift({d:S.steps.date,n:S.steps.today});S.steps.hist=S.steps.hist.slice(0,30);}
   S.steps.date=t;S.steps.today=0;S.steps.src={phone:0,typed:0,walk:0};S.steps.lastSync=0;S.steps.lastSyncDate='';S.flags.roadCheck=0;
   S.hp=Math.min(maxHp(),S.hp+25+sk('longhaul')*10+sk('earlyriser')*5+(S.base&&S.base.t==='house'?1:0));
   if(S.base){const br=S.base.rooms.barrel||0;if(br){const w=br+(wxKind()==='rain'||wxKind()==='storm'?3:0);S.stock.water+=w;log('The rain barrel gave '+w+' water.');}
@@ -1331,6 +1333,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.15',d:'Sep 17',t:'See your last seven days of steps',
+  i:['The Steps card now shows a week of daily totals, so a zero is never ambiguous - you can see at a glance whether it is a fresh day or something is stuck.',
+     'Tap any bar to see that day exact number. Today is the one with the ring.',
+     'When nothing has arrived yet it also tells you what you finished on yesterday.']},
  {v:'6.14',d:'Sep 17',t:'Good weapons are never destroyed outright',
   i:['An epic or legendary weapon hitting zero durability used to be deleted. Now it is wrecked instead: it stays in your pack and you repair it at the armory. Commons and rares still break for good.',
      'The combat log warns you at three swings left, then two, then one.',
@@ -1481,6 +1487,54 @@ function onResume(){
   if(typeof C==='undefined'||!C)render();
   checkUpdate();
 }
+// Seven days of steps. One series, so no legend - the heading names it. Today
+// is marked by a ring and a label, never by a different hue: colour follows the
+// thing being measured, not its position.
+const STEP_BAR='#4e8a2a';
+function stepDays(){
+  const out=[];const hist=(S.steps&&S.steps.hist)||[];
+  const d=new Date();d.setHours(12,0,0,0);
+  for(let i=6;i>=0;i--){
+    const x=new Date(d);x.setDate(d.getDate()-i);
+    const key=x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+    const rec=hist.find(h=>h.d===key);
+    out.push({key,letter:'SMTWTFS'[x.getDay()],
+      n:i===0?(S.steps.today||0):(rec?rec.n:null),
+      today:i===0, known:i===0||!!rec});
+  }
+  return out;
+}
+let STEP_PICK=-1;
+function pickDay(i){STEP_PICK=STEP_PICK===i?-1:i;renderStepHist();}
+function renderStepHist(){
+  const el=$('#stepHist');if(!el)return;
+  const days=stepDays();const known=days.filter(d=>d.known&&d.n!==null);
+  if(known.length<2&&!(S.steps.today>0)){el.innerHTML='<p class="help">Your day-by-day history starts building from today.</p>';return;}
+  const max=Math.max(1,...known.map(d=>d.n));
+  const sel=days[STEP_PICK];
+  const bars=days.map((d,i)=>{
+    const h=d.n===null?0:Math.max(3,Math.round(d.n/max*54));
+    const ring=d.today?'box-shadow:0 0 0 2px var(--ash2),0 0 0 4px rgba(232,224,208,.45);':'';
+    return '<button onclick="pickDay('+i+')" aria-label="'+esc(d.key)+': '+(d.n===null?'no record':fmt(d.n)+' steps')+'"'
+      +' style="flex:1;background:none;border:0;padding:0;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">'
+      +'<span style="height:56px;display:flex;align-items:flex-end;width:100%;justify-content:center">'
+      +(d.n===null
+        ? '<span style="width:70%;height:3px;border-radius:2px;background:var(--line)"></span>'
+        : '<span style="width:70%;height:'+h+'px;border-radius:4px 4px 0 0;background:'+STEP_BAR+';'+ring+'"></span>')
+      +'</span>'
+      +'<span class="help" style="font-size:11px;'+(d.today?'color:var(--bone);font-weight:700':'')+'">'+d.letter+'</span>'
+      +'</button>';
+  }).join('');
+  // selective labels only: today, and whichever day you tap
+  const todayN=days[6].n||0;
+  const yday=days[5];
+  let line='<b style="color:var(--bone)">'+fmt(todayN)+'</b> today';
+  if(yday.n!==null)line+=' · <b>'+fmt(yday.n)+'</b> yesterday';
+  if(sel&&sel.n!==null&&!sel.today)line=esc(sel.key)+': <b style="color:var(--bone)">'+fmt(sel.n)+'</b> steps';
+  el.innerHTML='<div class="section-label">Last 7 days</div>'
+    +'<div style="display:flex;gap:2px;align-items:flex-end;margin:6px 0 2px">'+bars+'</div>'
+    +'<p class="help" style="margin:2px 0 0">'+line+'</p>';
+}
 function renderOnline(){
   const o=O();const st=$('#onlineStatus');if(!st)return;
   st.textContent=o.ok?'@'+o.handle:(o.err?'error':'off');
@@ -1488,6 +1542,7 @@ function renderOnline(){
   if(!o.ok){body=`${o.err?`<div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;background:rgba(230,62,92,.18);border-left:4px solid #e63e5c"><b style="color:#ff8a92">${esc(o.err)}</b><div class="help" style="margin-top:4px">Sign back in with your handle and your 6-digit PIN, or your account key. Your character on this phone is not touched.</div><button class="btn sm r" style="margin-top:8px" onclick="signInSheet()">Sign in again</button></div>`:''}<div class="row"><input id="handleInput" type="text" maxlength="20" placeholder="handle, e.g. celeste" value="${esc(o.handle||slug(S.name))}" style="flex:1;min-width:140px"><button class="btn r" onclick="goOnline($('#handleInput').value,$('#tokenInput').value)">Go online</button></div><input id="tokenInput" type="text" placeholder="account key (only if moving from another browser)" style="margin-top:8px;font-size:12px">${o.err?`<p class="help" style="color:#ff8a92">${esc(o.err)}</p>`:''}`;}
   else{body=`<div class="kv"><span>Handle</span><b>@${esc(o.handle)}</b><span>Last phone sync</span><b>${o.lastPost?timeStr(o.lastPost)+' today':'none yet'}</b><span>Server</span><b>${o.err?'<span style="color:#ff8a92">'+esc(o.err)+'</span>':'ok'}</b></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pullSteps();loadFriends();partySync();toast('Syncing')">Sync now</button><button class="btn sm ghost" onclick="testOnline()">Test connection</button><button class="btn sm ghost" onclick="copyText(O().token,'')">Copy account key</button><button class="btn sm ghost" onclick="signInSheet()">Re-enter my key</button></div><p class="help">Account key = how to move to another browser or phone. There, type this handle, paste the key, and your save comes with it.</p>`;}
   $('#onlineBody').innerHTML=body;
+  renderStepHist();
   const sHelp=$('#stepsHelp');
   if(sHelp){
     if(!o.ok){sHelp.innerHTML='<span style="color:#ffb35c">The game is signed out, so steps cannot arrive.</span> Open <b>Base</b>, then <b>Settings</b>, and sign in - then <b>Phone step sync</b> there has everything for your shortcut.';}
@@ -1496,6 +1551,9 @@ function renderOnline(){
       if(!o.lastPost){
         sHelp.innerHTML='<div style="padding:10px 12px;border-radius:8px;background:rgba(255,165,0,.14);border-left:4px solid #ffa500">'
           +'<b style="color:var(--bone)">Nothing from your phone today.</b>'
+          +(function(){const y=stepDays()[5];return y&&y.n!==null
+             ? '<div class="help" style="margin-top:4px">Your count resets at midnight - yesterday you finished on <b>'+fmt(y.n)+'</b>. So a zero this early is normal; it only means trouble if it stays zero after you have walked.</div>'
+             : '';})()
           +'<div class="help" style="margin-top:4px">The game is not allowed to read Apple Health. Your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number. Run it and your steps land here.</div>'
           +'<div class="help" style="margin-top:6px">If it runs and nothing arrives, the code inside it is out of date - that happens after you recover your account. <a href="#" onclick="fixShortcut();return false;" style="color:var(--sky)">Fix my shortcut</a></div>'
           +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run my Health shortcut</button>'
