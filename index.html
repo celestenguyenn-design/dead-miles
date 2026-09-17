@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=6.16">
+<link rel="stylesheet" href="style.css?v=6.18">
 </head>
 <body>
 <div id="app">
@@ -83,6 +83,15 @@
     </section>
 
     <section class="view" id="v-you">
+      <div class="card">
+        <h2>Your record <span class="sub" id="wallSub"></span></h2>
+        <div class="row" style="margin-top:8px">
+          <button class="btn r" onclick="achvSheet()">The wall</button>
+          <button class="btn" onclick="recapSheet()">Last week</button>
+        </div>
+        <p class="help" style="margin-top:8px" id="wallLine"></p>
+      </div>
+      <div class="card" id="nemCard" hidden></div>
       <div class="card"><div class="you"><div id="youAv"></div><div><h2 id="youName"></h2><div class="kv" style="margin-top:6px" id="youKv"></div><div class="xp"><i id="youXp"></i></div></div></div>
         <div class="row" style="margin-top:10px"><button class="btn sm" id="lookBtn">Change look</button><span class="chip s" id="cosmeticCount"></span></div></div>
       <div class="card" id="petCard"></div>
@@ -160,8 +169,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=6.16"></script>
-<script src="street.js?v=6.16"></script>
-<script src="game.js?v=6.16"></script>
+<script src="art.js?v=6.18"></script>
+<script src="street.js?v=6.18"></script>
+<script src="game.js?v=6.18"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.16';
+const VERSION='6.18';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -441,6 +441,11 @@ const SFX={ctx:null,
       case 'growl':this.tone(70,.5,'sawtooth',.09,-30);this.noise(.4,.06);break;
       case 'chest':this.tone(200,.1,'square',.06);setTimeout(()=>this.tone(300,.1,'square',.06),100);setTimeout(()=>this.tone(600,.3,'triangle',.08),200);break;
       case 'ui':this.tone(500,.05,'sine',.04);break;
+      case 'step':this.noise(.04,.035);break;
+      case 'thunder':this.tone(48,.9,'sawtooth',.11,-24);this.noise(.7,.05);break;
+      case 'unlock':[659,880,1046].forEach((f,i)=>setTimeout(()=>this.tone(f,.18,'triangle',.07),i*110));break;
+      case 'nemesis':[196,165,131].forEach((f,i)=>setTimeout(()=>this.tone(f,.35,'sawtooth',.09),i*160));break;
+      case 'week':[523,659,784,1046,1318].forEach((f,i)=>setTimeout(()=>this.tone(f,.22,'triangle',.08),i*130));break;
       case 'arrive':[440,554].forEach((f,i)=>setTimeout(()=>this.tone(f,.15,'triangle',.07),i*120));break;
       case 'dead':[300,250,200,120].forEach((f,i)=>setTimeout(()=>this.tone(f,.3,'sawtooth',.08),i*180));break;
       case 'win':[523,659,784,1046].forEach((f,i)=>setTimeout(()=>this.tone(f,.18,'square',.07),i*90));break;
@@ -492,6 +497,35 @@ async function fetchWeather(){
 function isNight(){const h=new Date().getHours();return h>=20||h<6||(S.wx&&!S.wx.day&&h>=18);}
 function wxKind(){return S.wx?S.wx.kind:'clear';}
 function wxLabel(){const k=wxKind();const e={clear:'☀️',cloudy:'☁️',fog:'🌫️',rain:'🌧️',snow:'❄️',storm:'⛈️'}[k];let fx=[];if(k==='rain')fx.push('noise -10');if(k==='snow')fx.push('loot +10%, longer walks');if(k==='fog')fx.push('ambush +10%');if(k==='storm')fx.push('horde: +1 enemy, loot x1.3');if(isNight())fx.push('horde night: +1 enemy, loot x1.5');return (isNight()?'🌙 ':'')+e+' '+(S.wx?S.wx.temp+'°F ':'')+(k==='clear'?'':k)+(fx.length?' · '+fx.join(' · '):'');}
+// Weather already changed the numbers; nothing ever told her, so it could not
+// change a decision. These are the real modifiers, written out.
+function wxEffects(){
+  const k=wxKind(), night=isNight(), t=(S.wx&&S.wx.temp);
+  const out=[];
+  if(k==='storm')out.push({good:true, t:'Loot is 30% better - nobody else is out in this'},
+                          {good:false,t:'One extra walker in every encounter'});
+  if(k==='snow') out.push({good:true, t:'Loot is 10% better'},
+                          {good:false,t:'Places are 10% further apart'});
+  if(k==='rain') out.push({good:true, t:'You move quietly - searching makes far less noise'},
+                          {good:false,t:'Harder to spot trouble early'});
+  if(k==='fog')  out.push({good:false,t:'Ambushes are much more likely'},
+                          {good:false,t:'Harder to spot trouble early'});
+  if(k==='rain'||k==='storm')out.push({good:true,t:'The rain barrel fills faster'});
+  if(thirstMult()>1)out.push({good:false,t:'Hot and dry - you get thirsty about '+Math.round((thirstMult()-1)*100)+'% faster'});
+  if(thirstMult()<1)out.push({good:true,t:'Cool out - your water lasts longer'});
+  if(night)out.push({good:true,t:'Night: loot is 50% better'},{good:false,t:'Night: one extra walker in every encounter'});
+  if(!out.length)out.push({good:true,t:'Clear and quiet. Nothing helping you, nothing against you.'});
+  return out;
+}
+// The one genuinely new effect, and it makes water a decision: heat drains you.
+function thirstMult(){
+  const k=wxKind(), t=(S.wx&&typeof S.wx.temp==='number')?S.wx.temp:null;
+  let m=1;
+  if(k==='rain'||k==='snow')m*=0.8;
+  if(k==='storm')m*=0.9;
+  if(t!==null){ if(t>=30)m*=1.5; else if(t>=25)m*=1.25; else if(t<=5)m*=0.85; }
+  return Math.round(m*100)/100;
+}
 function lootMult(){let m=district().loot;if(wxKind()==='snow')m*=1.1;if(wxKind()==='storm')m*=1.3;if(isNight())m*=1.5+sk('nightowl')*0.1;return m;}
 
 /* ================= world ================= */
@@ -581,11 +615,201 @@ function rollWeek(){
   let delta=0;if(rank===1&&S.league.tier<TIERS.length-1)delta=1;else if(rank===all.length&&S.league.tier>0)delta=-1;
   S.league.history.unshift({week:S.league.week,score:S.league.score,rank,tier:S.league.tier,delta});
   S.league.tier+=delta;S.league.week=w;S.league.score=0;S.league.seen='';
+  try{closeWeek();}catch(e){}
+}
+/* ================= gifts ================= */
+// Send first, remove locally only once the server says ok - the reverse order
+// loses the item if the request fails.
+function giftSheet(uidv){
+  const g=(S.gear||[]).find(x=>x.uid===uidv);if(!g){toast('Gone from your pack');return;}
+  const o=O();if(!o.ok){toast('Go online first (Settings)','d');return;}
+  const mates=(friends||[]).filter(f=>f.handle&&f.handle!==o.handle&&!(S.hidden||[]).includes(f.handle));
+  if(!mates.length){openSheet('<h2>Send a gift</h2><p>Nobody on the board yet but you. Once your friends are online they show up here.</p><button class="btn r wide" onclick="closeSheet()">Close</button>',true);return;}
+  openSheet('<h2>Send '+esc(g.n)+'</h2>'
+    +'<p class="help">It leaves your pack and lands in theirs the next time they open the game. You cannot take it back.</p>'
+    +'<input id="giftNote" maxlength="120" placeholder="say something (optional)" style="width:100%;margin:8px 0">'
+    +mates.slice(0,10).map(f=>'<button class="btn wide" style="margin-top:6px" onclick="sendGift(\''+esc(uidv)+'\',\''+esc(f.handle)+'\')">'
+      +esc(f.name||f.handle)+' <span class="help">@'+esc(f.handle)+'</span></button>').join('')
+    +'<button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet()">Not now</button>',true);
+}
+async function sendGift(uidv,to){
+  const o=O();const g=(S.gear||[]).find(x=>x.uid===uidv);if(!g||!o.ok)return;
+  const note=($('#giftNote')&&$('#giftNote').value||'').slice(0,120);
+  closeSheet();toast('Sending...');
+  let r;
+  try{r=await rpc('send_gift',{p_handle:o.handle,p_token:o.token,p_to:to,p_item:g,p_note:note});}
+  catch(e){toast('Could not reach the server. Nothing was sent.','d');return;}
+  if(r!=='ok'){
+    toast(r==='nosuch'?'No player with that handle':r==='full'?'Their pack is full of gifts already':r==='self'?'That is you':'Could not send that','d');
+    return;}
+  // only now does it leave your pack
+  S.gear=S.gear.filter(x=>x.uid!==uidv);
+  for(const k in S.eq)if(S.eq[k]===uidv)S.eq[k]=null;
+  log('Sent '+g.n+' to @'+to+'.');toast(g.n+' sent','z');SFX.play('chest');save();render();pushPlayer();
+}
+async function takeGifts(){
+  const o=O();if(!o.ok)return;
+  let rows;try{rows=await rpc('take_gifts',{p_handle:o.handle,p_token:o.token});}catch(e){return;}
+  if(!rows||!rows.length)return;
+  const got=[];
+  for(const row of rows){
+    const it=row.item;if(!it||!it.id)continue;
+    const g=Object.assign({},it,{uid:uid()});delete g.broken;
+    S.gear.push(g);got.push({n:g.n||'something',from:row.from||'someone',note:row.note||'',r:g.r||'common'});
+  }
+  if(!got.length)return;
+  save();render();SFX.play('legend');
+  openSheet('<h2>'+(got.length===1?'A gift':got.length+' gifts')+'</h2>'
+    +got.map(x=>'<div style="padding:9px 0;border-bottom:1px solid var(--line)">'
+      +'<div><b class="rc-'+esc(x.r)+'">'+esc(x.n)+'</b> <span class="help">from '+esc(x.from)+'</span></div>'
+      +(x.note?'<div class="help" style="font-style:italic">"'+esc(x.note)+'"</div>':'')+'</div>').join('')
+    +'<button class="btn r wide" style="margin-top:12px" onclick="closeSheet()">Into the pack</button>',true);
+}
+/* ================= the nemesis ================= */
+// Nadia already existed as a name on the leaderboard and a voice in the dark.
+// This gives her a memory: she levels when she beats you, scars when you beat
+// her, and she takes something on her way out.
+const NEM_RANKS=['scout','lieutenant','right hand','second','equal','problem'];
+function nem(){return S.nem||(S.nem={lvl:1,beaten:0,lost:0,scars:0,last:'',taunt:''});}
+function nemName(){const n=nem();return "Nadia's "+(NEM_RANKS[Math.min(n.lvl-1,NEM_RANKS.length-1)]);}
+function nemPower(){const n=nem();return 1+(n.lvl-1)*0.22;}
+function nemWon(){ // she beat you
+  const n=nem();n.lvl=Math.min(6,n.lvl+1);n.lost++;n.last=todayStr();
+  const took=[];
+  if(S.stock.scrap>0){const g=Math.min(S.stock.scrap,5+n.lvl*3);S.stock.scrap-=g;took.push(g+' scrap');}
+  if((S.pack||[]).length){const i=rint(0,S.pack.length-1);took.push(S.pack[i].n);S.pack.splice(i,1);}
+  n.taunt=took.length?('She took '+took.join(' and ')+'.'):'She let you keep what you had. Worse, somehow.';
+  log(nemName()+' got the better of you. '+n.taunt+' She will be back, and harder.');
+  toast('Nadia levels up','d');SFX.play('nemesis');save();
+}
+function nemBeaten(){ // you beat her
+  const n=nem();n.beaten++;n.scars++;n.last=todayStr();
+  const scrap=8+n.lvl*4;S.stock.scrap+=scrap;addXp(20+n.lvl*10);
+  if(n.lvl>1&&Math.random()<0.5)n.lvl--;
+  n.taunt='';
+  log('You beat '+nemName()+'. +'+scrap+' scrap. She backs off - for now.');
+  toast('Nemesis beaten · +'+scrap+' scrap','l');SFX.play('win');save();
+}
+function nemCard(){
+  const n=nem();const el=$('#nemCard');if(!el)return;
+  if(!n.beaten&&!n.lost){el.hidden=true;return;}
+  el.hidden=false;
+  el.innerHTML='<h2>Nadia <span class="sub">'+esc(NEM_RANKS[Math.min(n.lvl-1,5)])+'</span></h2>'
+    +'<p class="help">You have beaten her <b>'+n.beaten+'</b> time'+(n.beaten===1?'':'s')+'. She has beaten you <b>'+n.lost+'</b>.'
+    +(n.taunt?' <span style="color:#ff8a92">'+esc(n.taunt)+'</span>':'')+'</p>'
+    +'<div class="progress" style="margin-top:8px"><div class="bar"><i style="width:'+(n.lvl/6*100)+'%;background:linear-gradient(90deg,#8a2230,#e2503f)"></i></div>'
+    +'<div class="row"><span>her crew: '+esc(NEM_RANKS[Math.min(n.lvl-1,5)])+'</span><span>'+(n.lvl>=6?'as good as you':'level '+n.lvl+' of 6')+'</span></div></div>'
+    +'<p class="help" style="margin-top:6px">Her scouts hit harder every time she wins. Beat them and she pulls back.</p>';
+}
+/* ================= the week in review ================= */
+// Everything here is a delta from marks taken at the start of the week, so no
+// new counters have to be maintained anywhere in the game loop.
+function wkMark(){return S.wkMark||(S.wkMark={kills:S.kills||0,lvl:S.lvl||1,places:S.walk.houses||0,legends:legendCount(),week:S.league.week});}
+function legendCount(){return (S.gear||[]).filter(g=>g.r==='legendary').length;}
+function bestDayThisWeek(){
+  const h=(S.steps&&S.steps.hist)||[];const days=[{d:S.steps.date,n:S.steps.today||0}].concat(h.slice(0,6));
+  return days.reduce((b,x)=>(x&&x.n>(b?b.n:-1))?x:b,null);
+}
+function buildRecap(){
+  const m=wkMark();const best=bestDayThisWeek();const hist=S.league.history[0];
+  return {week:m.week||S.league.week,
+    steps:(S.steps.weekId===weekId()?S.steps.week:S.steps.week)||0,
+    best:best?{d:best.d,n:best.n}:null,
+    kills:Math.max(0,(S.kills||0)-m.kills), places:Math.max(0,(S.walk.houses||0)-m.places),
+    lvl:Math.max(0,(S.lvl||1)-m.lvl), lvlNow:S.lvl||1,
+    legends:Math.max(0,legendCount()-m.legends),
+    rank:hist?hist.rank:null, tier:hist?hist.tier:S.league.tier, delta:hist?hist.delta:0,
+    streak:S.streak.days||0};
+}
+function recapCheck(){
+  if(!S.recapDue)return;
+  if($('#modal').classList.contains('on')){setTimeout(recapCheck,1500);return;}
+  const r=(S.weeks||[]).find(x=>x.week===S.recapDue);S.recapDue='';save();
+  if(r)recapSheet(r);
+}
+function recapSheet(r){SFX.play('week');
+  if(!r)r=(S.weeks&&S.weeks[0])||null;
+  if(!r){toast('Your first recap arrives at the end of this week');return;}
+  const row=(label,val,sub)=>'<div class="kv" style="grid-template-columns:1fr auto"><span>'+label+'</span><b>'+val+'</b></div>'+(sub?'<div class="help" style="margin:-4px 0 6px">'+sub+'</div>':'');
+  const medal=r.delta>0?'You went up a tier.':r.delta<0?'You dropped a tier.':'';
+  openSheet('<h2>Your week</h2>'
+    +'<div class="big" style="font-family:\'Bebas Neue\';font-size:46px;color:var(--rot);line-height:1">'+fmt(r.steps)+'</div>'
+    +'<p class="help" style="margin-top:-4px">steps walked'+(r.best?' · best day '+fmt(r.best.n):'')+'</p>'
+    +'<div style="margin-top:12px">'
+    +row('Walkers put down',fmt(r.kills))
+    +row('Places cleared',fmt(r.places))
+    +(r.lvl?row('Levels gained','+'+r.lvl,'You are level '+r.lvlNow+' now.'):'')
+    +(r.legends?row('Legendary finds',fmt(r.legends)):'')
+    +(r.rank?row('League finish','#'+r.rank,medal):'')
+    +(r.streak?row('Day streak',fmt(r.streak)):'')
+    +'</div>'
+    +'<button class="btn r wide" style="margin-top:12px" onclick="closeSheet()">Next week, then</button>',true);
+}
+function closeWeek(){
+  const r=buildRecap();
+  S.weeks=[r].concat(S.weeks||[]).slice(0,12);
+  S.wkMark={kills:S.kills||0,lvl:S.lvl||1,places:S.walk.houses||0,legends:legendCount(),week:weekId()};
+  S.recapDue=r.week;
+}
+
+/* ================= the wall ================= */
+// Motivation, not currency: nothing here gives a reward, it just remembers.
+const ACHV=[
+  {id:'first',   n:'First Steps',      d:'Walk 1,000 steps',            f:S=>S.steps.total>=1000},
+  {id:'k10',     n:'Getting the Hang', d:'Put down 10 walkers',         f:S=>S.kills>=10},
+  {id:'k100',    n:'Practised',        d:'Put down 100 walkers',        f:S=>S.kills>=100},
+  {id:'k500',    n:'County Legend',    d:'Put down 500 walkers',        f:S=>S.kills>=500},
+  {id:'s25k',    n:'Long Hauler',      d:'25,000 lifetime steps',       f:S=>S.steps.total>=25000},
+  {id:'s100k',   n:'Six Figures',      d:'100,000 lifetime steps',      f:S=>S.steps.total>=100000},
+  {id:'s250k',   n:'Quarter Million',  d:'250,000 lifetime steps',      f:S=>S.steps.total>=250000},
+  {id:'day10k',  n:'Ten Thousand',     d:'10,000 steps in one day',     f:S=>(S.steps.today||0)>=10000||((S.steps.hist||[]).some(h=>h.n>=10000))},
+  {id:'st7',     n:'A Full Week',      d:'7 day streak',                f:S=>(S.streakBest||S.streak.days||0)>=7},
+  {id:'st30',    n:'A Full Month',     d:'30 day streak',               f:S=>(S.streakBest||S.streak.days||0)>=30},
+  {id:'lvl10',   n:'Seasoned',         d:'Reach level 10',              f:S=>S.lvl>=10},
+  {id:'lvl25',   n:'Hardened',         d:'Reach level 25',              f:S=>S.lvl>=25},
+  {id:'base',    n:'Somewhere Safe',   d:'Claim a base',                f:S=>!!S.base},
+  {id:'built',   n:'Handy',            d:'Build 5 rooms',               f:S=>S.base?Object.values(S.base.rooms||{}).reduce((a,b)=>a+b,0)>=5:false},
+  {id:'legend',  n:'One of a Kind',    d:'Find a legendary',            f:S=>(S.gear||[]).some(g=>g.r==='legendary')},
+  {id:'shelf10', n:'Collector',        d:'10 trophies on the shelf',    f:S=>(S.shelf||[]).length>=10},
+  {id:'pet',     n:'Not Alone',        d:'Take in a companion',         f:S=>!!S.pet},
+  {id:'pets3',   n:'Full House',       d:'Three companions',            f:S=>(S.pets||[]).length>=3},
+  {id:'crew',    n:'A Crew',           d:'Three survivors with you',    f:S=>(S.crew||[]).length>=3},
+  {id:'boss',    n:'Warden Down',      d:'Kill a county boss',          f:S=>(S.bossKills||0)>=1},
+  {id:'horde',   n:'Held the Line',    d:'Survive a horde night',       f:S=>(S.hordeWins||0)>=1},
+  {id:'week',    n:'A Week in the Dead',d:'Finish a full week',         f:S=>(S.weeks||[]).length>=1},
+  {id:'tier',    n:'Moving Up',        d:'Climb a league tier',         f:S=>(S.league.history||[]).some(h=>h.delta>0)},
+  {id:'nem',     n:'Settled It',       d:'Beat your nemesis',           f:S=>(S.nem&&S.nem.beaten)>=1},
+];
+function checkAchv(){
+  if(!S.achv)S.achv={};let fresh=[];
+  for(const a of ACHV){ if(S.achv[a.id])continue;
+    let ok=false;try{ok=!!a.f(S);}catch(e){ok=false;}
+    if(ok){S.achv[a.id]=todayStr();fresh.push(a);} }
+  if(fresh.length){
+    for(const a of fresh)log('Milestone: '+a.n+' - '+a.d+'.');
+    toast(fresh.length===1?'Unlocked: '+fresh[0].n:fresh.length+' milestones unlocked','l');
+    SFX.play('unlock');save();
+  }
+  return fresh;
+}
+function achvSheet(){
+  if(!S.achv)S.achv={};
+  const got=ACHV.filter(a=>S.achv[a.id]).length;
+  const row=a=>{const on=!!S.achv[a.id];
+    return '<div style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);opacity:'+(on?1:.55)+'">'
+      +'<div style="width:26px;text-align:center;font-size:18px">'+(on?'🏅':'🔒')+'</div>'
+      +'<div style="flex:1"><div style="font-weight:700;color:'+(on?'var(--bone)':'var(--bone2)')+'">'+esc(a.n)+'</div>'
+      +'<div class="help">'+esc(a.d)+(on?' · '+esc(S.achv[a.id]):'')+'</div></div></div>';};
+  openSheet('<h2>The wall</h2>'
+    +'<p class="help">'+got+' of '+ACHV.length+' · things you have actually done out there.</p>'
+    +'<div class="progress" style="margin:8px 0 12px"><div class="bar"><i style="width:'+Math.round(got/ACHV.length*100)+'%;background:linear-gradient(90deg,var(--rot2),var(--rot))"></i></div></div>'
+    +ACHV.map(row).join('')
+    +'<button class="btn r wide" style="margin-top:12px" onclick="closeSheet()">Close</button>',true);
 }
 function checkMilestones(){for(let i=1;i<DISTRICTS.length;i++){if(S.steps.total>=DISTRICTS[i].steps&&!S.milestones.includes(i)){S.milestones.push(i);S.sp++;S.keys++;log('Milestone: '+fmt(DISTRICTS[i].steps)+' lifetime steps. '+DISTRICTS[i].n+' is open. +1 skill point, +1 key.');toast(DISTRICTS[i].n+' unlocked · +1 skill point','l');SFX.play('legend');}}}
 function addSteps(n,src){
   n=Math.floor(n);if(!(n>0))return;rollDay();rollWeek();S.lastAnim=Date.now();
-  if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(6);}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
+  if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(Math.max(3,Math.round(6*thirstMult())));}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
   if(src!=='carry'&&S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');streakReward();}
   if(S.loc||S.combat){S.walk.banked=(S.walk.banked||0)+n;if(src!=='carry'&&src!=='live')toast('+'+fmt(n)+' steps saved for after this stop','z');save();render();return;}
   let left=n;
@@ -606,7 +830,10 @@ function rivalAct(kind){
     else{loc.rival='';loc.rooms.forEach(rm=>{rm.items=rm.items.slice(0,1);});log(first+' got in first and stripped the place. Scraps left.');toast(first+' beat you to it','d');}}
   else if(kind==='wait'){loc.rival='';loc.cleared=true;S.walk.toNext=Math.min(S.walk.dist,S.walk.toNext+150);S.walk.progress=S.walk.dist-S.walk.toNext;log('You waited out '+first+'. They cleared the walkers for you; it cost you 150 steps of daylight.');ctEvent('places',1);}
   else if(kind==='trade'){if(S.pack.filter(x=>x.cat==='food').length<3){toast('Maya wants 3 food from your pack');return;}let n=0;S.pack=S.pack.filter(x=>{if(x.cat==='food'&&n<3){n++;return false;}return true;});for(let i=0;i<2;i++)S.pack.push({id:'abx',...ITEMS.abx,uid:uid()});loc.rival='';log('Traded 3 food to Maya for 2 antibiotics.');toast('Trade done','z');}
-  else if(kind==='fight'){loc.rival='';const en=[mk('raider'),mk('raider')];en.forEach(e=>{e.n="Nadia's scout";e.hp=Math.round(e.hp*0.8);e.max=e.hp;});startCombat(en,'rival');return;}
+  else if(kind==='fight'){loc.rival='';const pw=nemPower();const en=[mk('raider'),mk('raider')];
+    if(nem().lvl>=4)en.push(mk('gunner'));
+    en.forEach(e=>{e.n=nemName();e.hp=Math.round(e.hp*0.8*pw);e.max=e.hp;e.dmg=[Math.round(e.dmg[0]*pw),Math.round(e.dmg[1]*pw)];});
+    startCombat(en,'rival');return;}
   else if(kind==='slip'){loc.rival='';S.walk.toNext=Math.min(S.walk.dist,S.walk.toNext+100);S.walk.progress=S.walk.dist-S.walk.toNext;log('You slipped past Nadia\'s scouts. Cost you 100 steps.');}
   save();render();
 }
@@ -732,10 +959,17 @@ function dropLegend(why){const id=pick(LEGEND_IDS);S.gear.push({uid:uid(),id,...
 function death(){
   C.over=true;S.combat=false;const lost=packPts();SFX.play('dead');
   const where=C.where;if(where==='raid'&&S.raidPending){const p=S.raidPending;resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;}
-  if(where==='boss')bossAfter(false);if(where==='horde')resolveHorde(true,false);
+  if(where==='boss')bossAfter(false);if(where==='horde')resolveHorde(true,false);if(where==='rival')nemWon();
   const keepFrac=sk('fieldsurgeon')*0.25;const kept=keepFrac?S.pack.slice(0,Math.floor(S.pack.length*keepFrac)):[];S.pack=kept;S.run=0;S.loc=null;newDistance();S.hp=Math.round(maxHp()*(0.4+sk('fieldsurgeon')*0.15));
   const lostCrew=woundedCrew();if(lostCrew.length){const ids=lostCrew.map(c=>c.id);S.crew=S.crew.filter(c=>!ids.includes(c.id));S.active=S.active.filter(id=>!ids.includes(id));log('You went down and could not carry them out. '+lostCrew.map(c=>c.name).join(' and ')+' did not make it.');}
-  const gearLost=S.gear.length&&Math.random()<0.5?S.gear.splice(rint(0,S.gear.length-1),1)[0]:null;if(gearLost){for(const k in S.eq)if(S.eq[k]===gearLost.uid)S.eq[k]=null;}
+  // Only ordinary gear can be taken off you. An epic or legendary survives a
+  // death the same way it survives breaking - anything else makes one bad fight
+  // cost the rarest thing you own.
+  const losable=S.gear.map((g,i)=>({g,i})).filter(x=>x.g.r!=='epic'&&x.g.r!=='legendary');
+  let gearLost=null;
+  if(losable.length&&Math.random()<0.5){const pick=losable[rint(0,losable.length-1)];
+    gearLost=S.gear.splice(S.gear.indexOf(pick.g),1)[0];
+    for(const k in S.eq)if(S.eq[k]===gearLost.uid)S.eq[k]=null;}
   log('You went down. Your crew dragged you back to base. Pack lost ('+fmt(lost)+' pts)'+(gearLost?', and your '+gearLost.n+' is gone':'')+'.');
   save();render();
   openSheet(`<h2>You went down</h2><div class="big">${ART.avatarSVG(S.av,70,{mood:'dead'})}</div><p>Your crew dragged you out before they finished you. Everything in the pack is gone${gearLost?', and you lost your '+esc(gearLost.n):''}${lostCrew.length?'. '+esc(lostCrew.map(c=>c.name).join(' and '))+' did not make it out at all':''}. You wake up at base at ${Math.round(maxHp()*0.4)} HP.</p><button class="btn r wide" onclick="closeSheet()">Get up</button>`);
@@ -751,7 +985,7 @@ function endCombat(won){
     if(where==='watch'){watchReward(C.job);}
     if(where==='horde'){resolveHorde(true,true);}
     if(where==='boss'){bossAfter(true);}
-    if(where==='rival'){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:6});for(let i=0;i<3&&S.pack.length<capacity();i++)S.pack.push({id:'scrap',...ITEMS.scrap,uid:uid()});log('Nadia\'s scouts ran. You took their ammo and scrap.');}
+    if(where==='rival'){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:6});for(let i=0;i<3&&S.pack.length<capacity();i++)S.pack.push({id:'scrap',...ITEMS.scrap,uid:uid()});log('They ran. You took their ammo and scrap.');nemBeaten();}
     crewXp(2);
   }else{
     if(where==='enter'){S.loc=null;S.run=0;newDistance();log('You fled and lost part of the pack.');}
@@ -1137,7 +1371,7 @@ function pedoStop(silent){pedo.on=false;window.removeEventListener('devicemotion
 function syncTotal(v,src){rollDay();let delta=(S.steps.lastSyncDate===S.steps.date)?v-S.steps.lastSync:v-S.steps.today;
   if(delta<0){toast('That is fewer than the last sync ('+fmt(S.steps.lastSync)+').');return false;}
   S.steps.lastSync=v;S.steps.lastSyncDate=S.steps.date;if(delta===0){toast('Already synced to '+fmt(v));save();render();return true;}
-  toast('+'+fmt(delta)+' steps ('+src+')','z');addSteps(delta,src);return true;}
+  toast('+'+fmt(delta)+' steps ('+src+')','z');SFX.play('step');addSteps(delta,src);return true;}
 function autoSyncFromUrl(){try{const q=new URLSearchParams(location.search);const h=new URLSearchParams(location.hash.replace(/^#/,''));const v=parseInt(q.get('steps')||h.get('steps'),10);if(v>=0){syncTotal(v,'shortcut');history.replaceState(null,'',location.pathname);}}catch(e){}}
 async function readClipboard(){try{const t=await navigator.clipboard.readText();const m=String(t).replace(/,/g,'').match(/\d{2,6}/);if(!m){toast('No step count on the clipboard');return;}syncTotal(parseInt(m[0],10),'clipboard');}catch(e){toast('Clipboard is blocked here. Type it in Sync.');}}
 
@@ -1209,7 +1443,8 @@ function render(){
   $('#hpNum').textContent=S.hp+' / '+maxHp();$('#hpBar').style.width=clamp(S.hp/maxHp()*100,0,100)+'%';
   countTo($('#topSteps'),S.steps.today);
   $('#sceneTag').textContent=district().n+' · '+S.walk.houses+' places';$('#arriveTag').hidden=!S.loc;
-  const wt=$('#wxTag');wt.hidden=false;wt.textContent=wxLabel();
+  const wt=$('#wxTag');wt.hidden=false;wt.textContent=wxLabel()+' ⓘ';wt.onclick=wxSheet;wt.style.cursor='pointer';
+  wt.title='What the weather is doing to you';
   $('#pbar').style.width=(S.loc?100:(S.walk.dist?S.walk.progress/S.walk.dist*100:0))+'%';
   $('#pleft').innerHTML=S.loc?'<b>You are here.</b>':'Next place in <b>'+fmt(S.walk.toNext)+'</b> steps';
   $('#pright').innerHTML='Run <b>x'+runMult().toFixed(1)+'</b> · Pack <b>'+fmt(packPts())+'</b> pts';
@@ -1236,7 +1471,7 @@ function render(){
   $('#gearSub').textContent=S.gear.length+' pieces';
   $('#salvageAll').style.display=spare.length<2?'none':'';$('#salvageAll').textContent='Salvage '+spare.length+' spare common/uncommon for '+spare.reduce((t,x)=>t+salvageValue(x),0)+'🔩';
   $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':g.dmg[0]+'-'+g.dmg[1]+' dmg · '+(g.id==='oldreliable'?'never breaks':g.dur+'/'+GEAR[g.id].dur+' durability')):g.slot==='ranged'?g.dmg[0]+'-'+g.dmg[1]+' dmg · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';const sh=(g.r==='legendary'||g.r==='epic')?' shine'+(g.r==='legendary'?' leg':''):'';
-    return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${g.slot==='melee'&&g.dur<GEAR[g.id].dur&&g.id!=='oldreliable'?(canRepair?`<button class="btn sm${g.broken?' r':''}" onclick="repair('${g.uid}')">Repair 3🔩</button>`:(g.broken?'<span class="chip d">needs an armory</span>':'')):''}${S.base&&S.base.rooms.forge&&(g.up||0)<3?`<button class="btn sm" onclick="upgrade('${g.uid}')">Forge +${(g.up||0)+1} · ${UPG_COST[g.up||0]}🔩</button>`:''}<button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
+    return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${g.slot==='melee'&&g.dur<GEAR[g.id].dur&&g.id!=='oldreliable'?(canRepair?`<button class="btn sm${g.broken?' r':''}" onclick="repair('${g.uid}')">Repair 3🔩</button>`:(g.broken?'<span class="chip d">needs an armory</span>':'')):''}${S.base&&S.base.rooms.forge&&(g.up||0)<3?`<button class="btn sm" onclick="upgrade('${g.uid}')">Forge +${(g.up||0)+1} · ${UPG_COST[g.up||0]}🔩</button>`:''}<button class="btn sm ghost" onclick="giftSheet('${g.uid}')">Gift</button><button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
   // you
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
   $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):baseDmg()[0]+'-'+baseDmg()[1]} +${S.lvl-1}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
@@ -1357,6 +1592,16 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.18',d:'Sep 17',t:'Give something to a friend',
+  i:['Every item in your pack has a Gift button. Pick a friend, add a note, and it lands in their pack the next time they open the game.',
+     'It leaves your pack only once the server confirms it - if the send fails, you keep it.',
+     'Needs round twelve of the setup page run once.']},
+ {v:'6.17',d:'Sep 17',t:'Something to keep you going',
+  i:['THE WALL: 24 milestones for things you have actually done. You tab, Your record. Nothing gives a reward - it just remembers.',
+     'YOUR WEEK: when a week ends the game shows you what you did - steps, best day, walkers, places, levels, league finish. It appears on its own the next time you open the game.',
+     'NADIA IS REAL NOW: beat her scouts and she pulls back. Lose and she levels up, takes something of yours, and comes back harder. Six ranks.',
+     'WEATHER MEANS SOMETHING: tap the weather on the road to see exactly what it is doing to you today. Heat makes you thirsty faster, so water is now a real decision.',
+     'Also: dying can no longer take an epic or legendary off you, only ordinary gear.']},
  {v:'6.16',d:'Sep 17',t:'Things move now',
   i:['Your step count rolls up to its new number instead of snapping, and flashes green as it lands.',
      'Epic and legendary gear catches the light in your pack.',
@@ -1512,7 +1757,7 @@ let LAST_ACTIVE=Date.now();
 function onResume(){
   const away=Date.now()-LAST_ACTIVE;LAST_ACTIVE=Date.now();
   if(away>6*3600000){location.reload();return;}
-  if(O().ok){pullSteps();loadFriends();partySync();bossSync();}
+  if(O().ok){pullSteps();loadFriends();partySync();bossSync();takeGifts();}
   if(typeof C==='undefined'||!C)render();
   checkUpdate();
 }
@@ -1535,6 +1780,16 @@ function stepDays(){
 }
 let STEP_PICK=-1;
 function pickDay(i){STEP_PICK=STEP_PICK===i?-1:i;renderStepHist();}
+function wxSheet(){
+  const k=wxKind(),t=(S.wx&&S.wx.temp);
+  const name={clear:'Clear',rain:'Rain',storm:'Storm',snow:'Snow',fog:'Fog'}[k]||'Out there';
+  openSheet('<h2>'+esc(name)+(typeof t==='number'?' · '+t+'\u00b0':'')+(isNight()?' · night':'')+'</h2>'
+    +'<p class="help">What the weather is doing to you right now.</p>'
+    +wxEffects().map(e=>'<div style="display:flex;gap:9px;padding:7px 0;border-bottom:1px solid var(--line)">'
+      +'<span style="color:'+(e.good?'var(--rot)':'#ff8a92')+';font-weight:800">'+(e.good?'+':'-')+'</span>'
+      +'<span>'+esc(e.t)+'</span></div>').join('')
+    +'<button class="btn r wide" style="margin-top:12px" onclick="closeSheet()">Got it</button>',true);
+}
 function renderStepHist(){
   const el=$('#stepHist');if(!el)return;
   const days=stepDays();const known=days.filter(d=>d.known&&d.n!==null);
@@ -1571,6 +1826,12 @@ function renderOnline(){
   if(!o.ok){body=`${o.err?`<div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;background:rgba(230,62,92,.18);border-left:4px solid #e63e5c"><b style="color:#ff8a92">${esc(o.err)}</b><div class="help" style="margin-top:4px">Sign back in with your handle and your 6-digit PIN, or your account key. Your character on this phone is not touched.</div><button class="btn sm r" style="margin-top:8px" onclick="signInSheet()">Sign in again</button></div>`:''}<div class="row"><input id="handleInput" type="text" maxlength="20" placeholder="handle, e.g. celeste" value="${esc(o.handle||slug(S.name))}" style="flex:1;min-width:140px"><button class="btn r" onclick="goOnline($('#handleInput').value,$('#tokenInput').value)">Go online</button></div><input id="tokenInput" type="text" placeholder="account key (only if moving from another browser)" style="margin-top:8px;font-size:12px">${o.err?`<p class="help" style="color:#ff8a92">${esc(o.err)}</p>`:''}`;}
   else{body=`<div class="kv"><span>Handle</span><b>@${esc(o.handle)}</b><span>Last phone sync</span><b>${o.lastPost?timeStr(o.lastPost)+' today':'none yet'}</b><span>Server</span><b>${o.err?'<span style="color:#ff8a92">'+esc(o.err)+'</span>':'ok'}</b></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pullSteps();loadFriends();partySync();toast('Syncing')">Sync now</button><button class="btn sm ghost" onclick="testOnline()">Test connection</button><button class="btn sm ghost" onclick="copyText(O().token,'')">Copy account key</button><button class="btn sm ghost" onclick="signInSheet()">Re-enter my key</button></div><p class="help">Account key = how to move to another browser or phone. There, type this handle, paste the key, and your save comes with it.</p>`;}
   $('#onlineBody').innerHTML=body;
+  try{checkAchv();}catch(e){}
+  try{const got=Object.keys(S.achv||{}).length;const ws=$('#wallSub');if(ws)ws.textContent=got+'/'+ACHV.length;
+    const wl=$('#wallLine');if(wl){const last=(S.weeks||[])[0];
+      wl.textContent=last?('Last week: '+fmt(last.steps)+' steps, '+fmt(last.kills)+' walkers, '+fmt(last.places)+' places.')
+        :'Your first weekly recap lands when this week ends.';}
+    nemCard();}catch(e){}
   renderStepHist();
   const sHelp=$('#stepsHelp');
   if(sHelp){
@@ -1845,11 +2106,11 @@ function start(){
   S=load()||fresh();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
   wire();render();fetchWeather();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
-  if(!S.onboarded){identBoot().then(found=>{if(!found)onboard();});}else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else{whileYouWereOut();newsCheck();}autoSyncFromUrl();}
+  if(!S.onboarded){identBoot().then(found=>{if(!found)onboard();});}else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else{whileYouWereOut();newsCheck();recapCheck();}autoSyncFromUrl();}
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){LAST_ACTIVE=Date.now();S.lastOpen=Date.now();const bb=board();S.lastRank=bb.findIndex(r=>r.me)+1;save();}else{onResume();}});
   window.addEventListener('pageshow',e=>{if(e.persisted)onResume();});
   window.addEventListener('focus',()=>{if(Date.now()-LAST_ACTIVE>30000)onResume();});
-  if(O().ok){identWrite(O().handle,O().token);fetchStepKey();pullSteps();loadFriends();partySync();pushPlayer();bossSync();}
+  if(O().ok){identWrite(O().handle,O().token);fetchStepKey();pullSteps();loadFriends();partySync();pushPlayer();bossSync();takeGifts();}
   setInterval(()=>{if(document.visibilityState==='visible'&&!C){render();if(O().ok){pullSteps();partySync();}}},60000);
   setInterval(()=>{if(document.visibilityState==='visible'&&O().ok){loadFriends();pushPlayer();}},180000);
   if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
