@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.1';
+const VERSION='6.2';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -941,7 +941,7 @@ async function pullSteps(){
   try{const rows=await rpc('get_steps',{p_handle:o.handle,p_token:o.token,p_since:since.toISOString()});o.lastPull=Date.now();
     if(rows&&rows.length){const v=Math.max(...rows.map(r=>r.steps));if(v>(S.steps.lastSyncDate===S.steps.date?S.steps.lastSync:-1)){o.lastPost=new Date(rows[0].posted_at).getTime();syncTotal(v,'phone');}}
     o.err='';}catch(e){o.err=e.message;}
-  save();renderOnline();
+  save();if(typeof C==='undefined'||!C)render();else renderOnline();
 }
 let friends=[];
 async function loadFriends(){const o=O();if(!o.ok)return;try{rollWeek();friends=(await rpc('get_board',{p_week:S.league.week}))||[];o.err='';}catch(e){o.err=e.message;}renderFriends();}
@@ -1231,6 +1231,64 @@ function renderParty(){
   sub.textContent=members.length+' in party';
   el.innerHTML=`<div class="row"><span class="chip s">code: <b>${esc(S.party.code)}</b></span>${members.map(m=>`<span class="chip">${esc(m)}</span>`).join('')}<button class="btn xs ghost" onclick="partyLeave()">Leave</button></div><div class="stack" style="margin-top:10px">${PARTY_GOALS.map(g=>{const n=(prog[g.t]||0)+(S.party.pending[g.t]||0);const done=n>=g.goal;return `<div class="contract${done?' done':''}"><div><b>${CT_TYPES[g.t].n} ${fmt(g.goal)} ${CT_TYPES[g.t].u}</b><span>${g.t==='boss'?'Damage to '+bossName()+' from anyone in the party counts':'Everyone\'s progress adds up'}</span><div class="bar"><i style="width:${Math.min(100,n/g.goal*100)}%"></i></div></div><div class="num" style="font-size:20px;color:${done?'var(--rot)':'var(--bone2)'}">${fmt(Math.min(n,g.goal))}/${fmt(g.goal)}</div></div>`;}).join('')}</div><p class="help" style="margin-top:8px">Finish all four before Sunday night: +1 key and +300 points for everyone. Resets weekly (${w}).</p>`;
 }
+// ---- What's new: the game tells everyone itself (v6.2) ----
+// Newest first. Every player sees the entries they have not read yet, once,
+// the next time they open the game. Nobody has to be told anything by hand.
+const NEWS=[
+ {v:'6.2',d:'Sep 17',t:'Steps sync the moment you open the game',
+  i:['Reopening the game now checks the server straight away. No more waiting, and no reason to ever delete the home-screen icon.',
+     'The Steps card shows when it last checked and when your phone last sent anything, with a Sync my steps now button right there.',
+     'This screen. The game tells you what changed instead of someone having to message you.']},
+ {v:'6.1',d:'Sep 17',t:'You can never be locked out again',
+  i:['Settings has a Recovery code: four words. Write them down. Typing your handle and those four words on ANY phone or browser brings your whole character back.',
+     'The game now remembers who you are in four separate places, so one of them being wiped is survivable. If it ever launches blank it offers to bring your character back before anything else.',
+     'Go make your recovery code now. It takes one tap: Base, Settings, Recovery code.']},
+ {v:'6.0',d:'Sep 16',t:'Restore points in the cloud',
+  i:['The server keeps up to 24 older copies of your character - one an hour, plus one every time something tries to save over you with a smaller character.',
+     'Settings, Restore points (cloud): tap any of them to go back. Survives losing your phone.']},
+ {v:'5.9',d:'Sep 16',t:'Save to a file',
+  i:['Settings, Save to a file: keeps a copy in your Files or photos that nothing can touch.']},
+ {v:'5.5',d:'Sep 15',t:'Notifications',
+  i:['Settings, Notifications: the game can nudge you about horde night, a raid on your base, a streak about to break, or a rival passing you.']},
+];
+function newsHtml(list,title){
+  return '<h2>'+esc(title)+'</h2>'+list.map(n=>
+    '<div style="margin:0 0 16px"><div style="font-weight:800;color:var(--bone);font-size:17px">'+esc(n.t)+'</div>'
+    +'<div class="help" style="margin-bottom:6px">version '+esc(n.v)+' · '+esc(n.d)+'</div>'
+    +'<ul style="margin:0;padding-left:20px">'+n.i.map(x=>'<li style="margin:5px 0">'+esc(x)+'</li>').join('')+'</ul></div>').join('');
+}
+function newsSheet(){openSheet(newsHtml(NEWS,"What's new")+'<button class="btn r wide" onclick="closeSheet()">Close</button>',true);}
+function newsCheck(){
+  if(!S||!S.onboarded)return;
+  if($('#modal').classList.contains('on')){setTimeout(newsCheck,1500);return;}
+  const seen=S.newsSeen||'';
+  if(seen===VERSION)return;
+  // First time we have ever done this: show the latest entry only, not five.
+  const fresh=seen?NEWS.filter(n=>cmpVer(n.v,seen)>0):NEWS.slice(0,1);
+  S.newsSeen=VERSION;save();
+  if(!fresh.length)return;
+  openSheet(newsHtml(fresh,fresh.length>1?"What's new since you last played":"What's new")
+    +'<button class="btn r wide" onclick="closeSheet()">Got it</button>',true);
+}
+function cmpVer(a,b){const x=String(a).split('.').map(Number),y=String(b).split('.').map(Number);
+  for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d;}return 0;}
+function syncNow(){
+  const o=O();if(!o.ok){toast('Go online first (Settings)','d');return;}
+  toast('Checking the server...');
+  Promise.resolve(pullSteps()).then(()=>{loadFriends();partySync();bossSync();checkUpdate();
+    if(!o.lastPost)toast('The server has no steps from your phone today. Run the shortcut once.','d');});
+}
+// iPhone keeps a home-screen app frozen for days. Resuming it used to show
+// yesterday's numbers until a timer happened to fire, which is why deleting and
+// re-adding the icon "fixed" it. Now every resume pulls immediately.
+let LAST_ACTIVE=Date.now();
+function onResume(){
+  const away=Date.now()-LAST_ACTIVE;LAST_ACTIVE=Date.now();
+  if(away>6*3600000){location.reload();return;}
+  if(O().ok){pullSteps();loadFriends();partySync();bossSync();}
+  if(typeof C==='undefined'||!C)render();
+  checkUpdate();
+}
 function renderOnline(){
   const o=O();const st=$('#onlineStatus');if(!st)return;
   st.textContent=o.ok?'@'+o.handle:(o.err?'error':'off');
@@ -1238,6 +1296,16 @@ function renderOnline(){
   if(!o.ok){body=`<div class="row"><input id="handleInput" type="text" maxlength="20" placeholder="handle, e.g. celeste" value="${esc(o.handle||slug(S.name))}" style="flex:1;min-width:140px"><button class="btn r" onclick="goOnline($('#handleInput').value,$('#tokenInput').value)">Go online</button></div><input id="tokenInput" type="text" placeholder="account key (only if moving from another browser)" style="margin-top:8px;font-size:12px">${o.err?`<p class="help" style="color:#ff8a92">${esc(o.err)}</p>`:''}`;}
   else{body=`<div class="kv"><span>Handle</span><b>@${esc(o.handle)}</b><span>Last phone sync</span><b>${o.lastPost?timeStr(o.lastPost)+' today':'none yet'}</b><span>Server</span><b>${o.err?'<span style="color:#ff8a92">'+esc(o.err)+'</span>':'ok'}</b></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pullSteps();loadFriends();partySync();toast('Syncing')">Sync now</button><button class="btn sm ghost" onclick="testOnline()">Test connection</button><button class="btn sm ghost" onclick="copyText(O().token,'')">Copy account key</button></div><p class="help">Account key = how to move to another browser or phone. There, type this handle, paste the key, and your save comes with it.</p>`;}
   $('#onlineBody').innerHTML=body;
+  const sHelp=$('#stepsHelp');
+  if(sHelp){
+    if(!o.ok){sHelp.innerHTML='Go online in Settings and set up the phone shortcut once: your Health steps then land here on their own.';}
+    else{const t=o.lastPull||0;const mins=t?Math.round((Date.now()-t)/60000):-1;
+      const when=mins<0?'not yet this session':(mins<1?'just now':mins+' min ago');
+      const post=o.lastPost?('Your phone last sent steps at '+timeStr(o.lastPost)+'.'):'Your phone has not sent any steps yet today.';
+      sHelp.innerHTML='<b style="color:var(--bone)">Checked the server '+esc(when)+'.</b> '+esc(post)
+        +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="syncNow()">Sync my steps now</button></div>'
+        +'<span class="help">It checks on its own every minute and the moment you open the game. If a number looks stuck, tap this - you never need to delete the icon.</span>';}
+  }
   const sh=$('#shortcutHelp');if(sh){const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=o.handle+'|'+o.token+'|';sh.innerHTML=o.ok?`<b>iPhone, one time.</b> Two things to copy:<br>
   <div class="section-label" style="margin-top:8px">A. The address</div><input id="syncUrl" readonly value="${esc(url)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncUrl').value,'syncUrl')">Copy address</button>
   <div class="section-label" style="margin-top:10px">B. Your code</div><input id="syncPrefix" readonly value="${esc(prefix)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncPrefix').value,'syncPrefix')">Copy code</button>
@@ -1461,8 +1529,10 @@ function start(){
   S=load()||fresh();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
   wire();render();fetchWeather();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
-  if(!S.onboarded){identBoot().then(found=>{if(!found)onboard();});}else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else whileYouWereOut();autoSyncFromUrl();}
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){S.lastOpen=Date.now();const bb=board();S.lastRank=bb.findIndex(r=>r.me)+1;save();}});
+  if(!S.onboarded){identBoot().then(found=>{if(!found)onboard();});}else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else{whileYouWereOut();newsCheck();}autoSyncFromUrl();}
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){LAST_ACTIVE=Date.now();S.lastOpen=Date.now();const bb=board();S.lastRank=bb.findIndex(r=>r.me)+1;save();}else{onResume();}});
+  window.addEventListener('pageshow',e=>{if(e.persisted)onResume();});
+  window.addEventListener('focus',()=>{if(Date.now()-LAST_ACTIVE>30000)onResume();});
   if(O().ok){identWrite(O().handle,O().token);pullSteps();loadFriends();partySync();pushPlayer();bossSync();}
   setInterval(()=>{if(document.visibilityState==='visible'&&!C){render();if(O().ok){pullSteps();partySync();}}},60000);
   setInterval(()=>{if(document.visibilityState==='visible'&&O().ok){loadFriends();pushPlayer();}},180000);
