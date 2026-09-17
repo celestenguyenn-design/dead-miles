@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.33';
+const VERSION='6.34';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -37,7 +37,7 @@ const GEAR={
   // legendaries: never in the normal roll, only chests and bosses
   mercy:{n:'Mercy',e:'🎯',slot:'ranged',dmg:[38,54],ammo:'shells',w:0,pts:90,r:'legendary',legend:'Fires without a shell 35% of the time'},
   lastword:{n:'The Last Word',e:'⚾',slot:'melee',dmg:[16,24],dur:9,w:0,pts:80,r:'legendary',legend:'30% chance a hit knocks the enemy out of its next turn'},
-  oldreliable:{n:'Old Reliable',e:'🔧',slot:'melee',dmg:[12,19],dur:99,w:0,pts:70,r:'legendary',legend:'Never breaks'},
+  oldreliable:{n:'Old Reliable',e:'🔧',slot:'melee',dmg:[16,24],dur:20,w:0,pts:70,r:'legendary',legend:'20 swings between rebuilds - twice any other weapon - but the bill is the biggest in the county'},
   whisper:{n:'Whisper',e:'🔫',slot:'ranged',dmg:[24,32],ammo:'ammo',w:0,pts:85,r:'legendary',legend:'Makes no noise'},
   nightingale:{n:'Nightingale',e:'🦺',slot:'armor',dr:4,w:0,pts:85,r:'legendary',legend:'Heals 5 HP every combat round'}
 };
@@ -1326,7 +1326,7 @@ function swapSheet(){
     +'<div class="stack" style="margin-top:8px">'
     +opts.map(g=>'<button class="room2" onclick="doSwap(\''+g.uid+'\')"><div class="e">'+esc(g.e)+'</div>'
       +'<div class="t"><b class="rc-'+esc(g.r||'common')+'">'+esc(g.n)+'</b>'
-      +'<span>'+(g.dmg?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · ':'')+(temperOf(g)?esc(temperOf(g).n)+' · ':'')+(g.id==='oldreliable'?'never breaks':g.dur+' swing'+(g.dur===1?'':'s')+' left')+'</span></div></button>').join('')
+      +'<span>'+(g.dmg?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · ':'')+(temperOf(g)?esc(temperOf(g).n)+' · ':'')+(g.dur+' swing'+(g.dur===1?'':'s')+' left')+'</span></div></button>').join('')
     +'</div>'
     +'<button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet();renderCombat()">Never mind</button>',true);
 }
@@ -1340,13 +1340,13 @@ function doSwap(uidv){
 }
 function attackGuard(){
   const w=eqItem('melee');
-  if(w&&w.dur===1&&w.id!=='oldreliable'&&(w.r==='epic'||w.r==='legendary')&&C&&!C.durWarned){
+  if(w&&w.dur===1&&(w.r==='epic'||w.r==='legendary')&&C&&!C.durWarned){
     C.durWarned=true;
     if(!confirm('This swing is the last one your '+w.n+' has. It will be wrecked (you keep it, but it needs repairing). Swing anyway?'))return;
   }
   act('attack');
 }
-function breakWeapon(w){if(w.id==='oldreliable')return;if(w.dur>0)return;
+function breakWeapon(w){if(w.dur>0)return;
   const keep=(w.r==='epic'||w.r==='legendary');
   if(keep){w.broken=true;w.dur=0;S.eq.melee=null;
     clog('The '+w.n+' is wrecked - it stays in your pack. Repair it at the armory.','sys');
@@ -1501,7 +1501,7 @@ function renderCombat(){
   <div class="pbox${phurt?' hurt':''}"><div class="sp${plunge?' lunge':''}">${ART.avatarSVG(S.av,60,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',mood:S.hp<maxHp()*0.3?'angry':''})}${flash?'<span class="muzzle">✳️</span>':''}</div><div><div class="hplab"><span>You · DR ${dr()}</span><span>${S.hp} / ${maxHp()}</span></div><div class="hpbar"><i style="width:${S.hp/maxHp()*100}%"></i></div></div>${phurt?`<span class="dmg">-${C.pfx.d}</span>`:''}</div>
   <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}${hit?`<span class="spark">${SPARK[e.fx.k||'slash']}</span>`:''}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
   <div class="acts">
-    <button class="btn r" onclick="attackGuard()">${w?w.e+' '+esc(w.n)+(temperOf(w)?' <span class="chip s">'+esc(temperOf(w).n)+'</span>':''):'👊 Fists'}<small>${w?(wDmg(w)[0]+dmgBonus())+'-'+(wDmg(w)[1]+dmgBonus())+' · '+(w.id==='oldreliable'?'∞':w.dur)+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
+    <button class="btn r" onclick="attackGuard()">${w?w.e+' '+esc(w.n)+(temperOf(w)?' <span class="chip s">'+esc(temperOf(w).n)+'</span>':''):'👊 Fists'}<small>${w?(wDmg(w)[0]+dmgBonus())+'-'+(wDmg(w)[1]+dmgBonus())+' · '+w.dur+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
     <button class="btn" onclick="act('heavy')" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · ${60+sk('bruiser')*12}% hit · noisy</small></button>
     ${w?`<button class="btn" onclick="act('fists')">👊 Fists<small>${baseDmg()[0]}-${baseDmg()[1]} dmg · saves your ${esc(w.n)}</small></button>`:''}
     <button class="btn" onclick="swapSheet()">🔄 Switch weapon<small>${swapOptions().length} in your gear${w?' · costs your turn':' · free, hands empty'}</small></button>
@@ -2252,7 +2252,7 @@ function render(){
   $('#gearTabs').innerHTML=[['all','All',S.gear.length],['weapons','Weapons',S.gear.filter(GT.weapons).length],['armor','Armor',S.gear.filter(GT.armor).length],['bags','Bags',S.gear.filter(GT.bags).length]].map(([k,n,c])=>`<button class="${GEAR_TAB===k?'on':''}" onclick="gearTab('${k}')">${n} ${c}</button>`).join('');
   $('#gearSub').textContent=S.gear.length+' pieces · '+partsHave()+' parts';
   $('#salvageAll').style.display=spare.length<2?'none':'';$('#salvageAll').textContent='Salvage '+spare.length+' spare common/uncommon for '+spare.reduce((t,x)=>t+salvageValue(x),0)+'🔩';
-  const broke=S.gear.filter(g=>repairMax(g)&&repairMissing(g)&&g.id!=='oldreliable');
+  const broke=S.gear.filter(g=>repairMax(g)&&repairMissing(g));
   const ra=$('#repairAll');
   if(ra){
     const bill=broke.reduce((t,x)=>t+repairCost(x),0);
@@ -2260,8 +2260,8 @@ function render(){
     ra.textContent='Repair '+broke.length+' worn piece'+(broke.length===1?'':'s')+' for '+bill+'🔩'+(atBench()?' (bench price)':'');
     ra.classList.toggle('off',S.stock.scrap<Math.min(...broke.map(repairCost).concat([Infinity])));
   }
-  $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+(g.id==='oldreliable'?'never breaks':g.dur+'/'+repairMax(g)+' durability')):g.slot==='ranged'?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';const sh=(g.r==='legendary'||g.r==='epic')?' shine'+(g.r==='legendary'?' leg':''):'';
-    return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''}${temperOf(g)?` <span class="chip${g.temper==='perfect'?' a':g.temper==='crude'?' d':''}">${esc(temperOf(g).n)}</span>`:''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${repairMax(g)&&repairMissing(g)&&g.id!=='oldreliable'?`<button class="btn sm${g.broken?' r':''}${S.stock.scrap<repairCost(g)?' off':''}" onclick="repair('${g.uid}')">Repair ${repairCost(g)}🔩</button>`:''}${benchable(g)?`<button class="btn sm" onclick="benchSheet('${g.uid}')">🛠️ Workbench</button>`:''}<button class="btn sm ghost" onclick="giftSheet('${g.uid}')">Gift</button><button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
+  $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+(g.dur+'/'+repairMax(g)+' durability')):g.slot==='ranged'?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';const sh=(g.r==='legendary'||g.r==='epic')?' shine'+(g.r==='legendary'?' leg':''):'';
+    return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''}${temperOf(g)?` <span class="chip${g.temper==='perfect'?' a':g.temper==='crude'?' d':''}">${esc(temperOf(g).n)}</span>`:''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${repairMax(g)&&repairMissing(g)?`<button class="btn sm${g.broken?' r':''}${S.stock.scrap<repairCost(g)?' off':''}" onclick="repair('${g.uid}')">Repair ${repairCost(g)}🔩</button>`:''}${benchable(g)?`<button class="btn sm" onclick="benchSheet('${g.uid}')">🛠️ Workbench</button>`:''}<button class="btn sm ghost" onclick="giftSheet('${g.uid}')">Gift</button><button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
   // you
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
   $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):baseDmg()[0]+'-'+baseDmg()[1]} +${S.lvl-1}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
@@ -2385,6 +2385,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.34',d:'Sep 17',t:'Old Reliable is not an answer any more',
+  i:['Your friends were right: a weapon that NEVER breaks makes every other weapon in the game decoration. Old Reliable now has 20 swings before it needs rebuilding - still twice any other weapon, but no longer infinite.',
+     'The rebuild is 80 scrap, 40 at an armory: by far the biggest single bill in the county.',
+     'It hits harder to make up for it - 16-24, up from 12-19 - because at its old damage it would have been a legendary losing to a Fire axe.',
+     'It still cannot be LOST. It wrecks and waits in your pack like any legendary, it never disappears.',
+     'If you already own one, its durability drops to 20 when you update. Nothing is taken away from you.']},
  {v:'6.33',d:'Sep 17',t:'The Workbench, and raids that pay properly',
   i:['THE WORKBENCH. Every weapon and piece of armour has a 🛠️ Workbench button in Gear. Work it up to +3, or rework its TEMPER.',
      'PARTS are the new currency, and they come from exactly one place: breaking down gear. Walking does not earn them. A +3 legendary costs 66 parts - about nine epics fed into it - or 40 with a Forge. The Forge is now a 40% discount instead of a requirement.',
