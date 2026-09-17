@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.5';
+const VERSION='6.6';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -340,7 +340,8 @@ async function setRecovery(code){
   if(r==='weak'){warn('Too easy to guess. Not 123456, not all the same digit.');return;}
   if(r==='busy'){warn('Too many changes in a row. Wait an hour and try again.');return;}
   if(r===true||r===false){warn('The server still has the OLD setup installed. Round eight was updated - run the newest one and try again.');return;}
-  if(r==='bad'){warn('The server did not accept your account key. Go offline and online again in Settings, then retry.');return;}
+  if(r==='bad'){O().ok=false;O().err='Your account key is out of date on this device.';save();render();
+    signInSheet('This copy of the game is holding an old account key, so the server would not let it save your PIN. Sign in again and it will work.');return;}
   if(r!=='ok'){warn('The server answered "'+String(r)+'", which this version does not understand. Run the newest round eight.');return;}
   S.recovery=c;identWrite(o.handle,o.token);save();renderRecov();toast('PIN saved','z');
 }
@@ -1270,6 +1271,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.6',d:'Sep 17',t:'Sign in again without starting over',
+  i:['Settings, Online: a Re-enter my key button. If a copy of the game is holding an old account key, nothing it does reaches the server - now you can fix it in one step instead of resetting.',
+     'If saving your PIN fails because of that, the game opens the sign-in box for you and says why.']},
  {v:'6.4',d:'Sep 17',t:'Set your 6-digit PIN',
   i:['Settings, Recovery code: pick six digits. Your handle plus that PIN gets your character back on any phone, forever.',
      'Five wrong guesses locks it for 15 minutes, so nobody can sit there trying numbers.',
@@ -1334,7 +1338,7 @@ function renderOnline(){
   st.textContent=o.ok?'@'+o.handle:(o.err?'error':'off');
   let body='';
   if(!o.ok){body=`<div class="row"><input id="handleInput" type="text" maxlength="20" placeholder="handle, e.g. celeste" value="${esc(o.handle||slug(S.name))}" style="flex:1;min-width:140px"><button class="btn r" onclick="goOnline($('#handleInput').value,$('#tokenInput').value)">Go online</button></div><input id="tokenInput" type="text" placeholder="account key (only if moving from another browser)" style="margin-top:8px;font-size:12px">${o.err?`<p class="help" style="color:#ff8a92">${esc(o.err)}</p>`:''}`;}
-  else{body=`<div class="kv"><span>Handle</span><b>@${esc(o.handle)}</b><span>Last phone sync</span><b>${o.lastPost?timeStr(o.lastPost)+' today':'none yet'}</b><span>Server</span><b>${o.err?'<span style="color:#ff8a92">'+esc(o.err)+'</span>':'ok'}</b></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pullSteps();loadFriends();partySync();toast('Syncing')">Sync now</button><button class="btn sm ghost" onclick="testOnline()">Test connection</button><button class="btn sm ghost" onclick="copyText(O().token,'')">Copy account key</button></div><p class="help">Account key = how to move to another browser or phone. There, type this handle, paste the key, and your save comes with it.</p>`;}
+  else{body=`<div class="kv"><span>Handle</span><b>@${esc(o.handle)}</b><span>Last phone sync</span><b>${o.lastPost?timeStr(o.lastPost)+' today':'none yet'}</b><span>Server</span><b>${o.err?'<span style="color:#ff8a92">'+esc(o.err)+'</span>':'ok'}</b></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pullSteps();loadFriends();partySync();toast('Syncing')">Sync now</button><button class="btn sm ghost" onclick="testOnline()">Test connection</button><button class="btn sm ghost" onclick="copyText(O().token,'')">Copy account key</button><button class="btn sm ghost" onclick="signInSheet()">Re-enter my key</button></div><p class="help">Account key = how to move to another browser or phone. There, type this handle, paste the key, and your save comes with it.</p>`;}
   $('#onlineBody').innerHTML=body;
   const sHelp=$('#stepsHelp');
   if(sHelp){
@@ -1419,6 +1423,23 @@ function lookSheet(onDone){
 }
 
 /* ================= onboarding ================= */
+function signInSheet(msg){
+  const o=O();
+  openSheet('<h2>Sign in again</h2>'
+    +(msg?'<p style="color:#ff8a92">'+esc(msg)+'</p>':'')
+    +'<p>Type your handle and your account key (or your 6-digit PIN if you have one set). Your character on this device is not touched.</p>'
+    +'<input id="rsHandle" type="text" maxlength="20" placeholder="handle" value="'+esc(o.handle||'')+'" style="width:100%;margin:6px 0">'
+    +'<input id="rsKey" type="text" placeholder="6-digit PIN, or account key" style="width:100%;margin:6px 0 12px;font-size:12px">'
+    +'<div class="grid2"><button class="btn ghost" onclick="closeSheet()">Cancel</button>'
+    +'<button class="btn r" onclick="signInGo()">Sign in</button></div>',true);
+}
+async function signInGo(){
+  const h=$('#rsHandle').value,k=($('#rsKey').value||'').trim();
+  const before=S.onboarded;
+  closeSheet();
+  if(/^\d{6}$/.test(k))await recoverWithPin(h,k); else await goOnline(h,k);
+  if(O().ok){toast('Signed in','z');if(before)renderRecov();}
+}
 function restoreGo(){const h=$('#rsHandle').value,k=($('#rsKey').value||'').trim();
   if(/^\d{6}$/.test(k))return recoverWithPin(h,k);
   return goOnline(h,k);}
