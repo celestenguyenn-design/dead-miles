@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.29';
+const VERSION='6.30';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -207,7 +207,7 @@ const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic co
 
 /* ================= state ================= */
 let S=null;
-function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],
+function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],checkin:{date:'',n:0},ladder:{date:'',hit:[]},
   steps:{total:0,today:0,date:todayStr(),lastSync:0,lastSyncDate:''},
   walk:{toNext:0,dist:500,district:0,houses:0,progress:0,banked:0},
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
@@ -225,6 +225,7 @@ function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossK
   // v6.29 spent a flare before the gear check, so backing out of "no weapon
   // equipped" burned it. Hand today's back, once, to anyone upgrading.
   if(S.flareFix!==1){S.flareFix=1;S.flares.used=0;}
+  if(!S.checkin)S.checkin={date:'',n:0};if(!S.ladder)S.ladder={date:'',hit:[]};
   if(S.flare&&S.flare.endsAt<=Date.now())S.flare=null;}
 function migrate(o){
   if(!o)return null;if(o.v===3)return o;
@@ -1120,6 +1121,96 @@ function achvSheet(){
     +ACHV.map(row).join('')
     +'<button class="btn r wide" style="margin-top:12px" onclick="closeSheet()">Close</button>',true);
 }
+/* ================= DAILY CHECK-IN + TODAY'S STEP LADDER (v6.30) =================
+   Three reward systems already existed and all three are LONG: lifetime step
+   milestones, streak days, and the daily/weekly contracts. None of them pays
+   you for opening the game, and none of them pays you DURING a walk. These two
+   do, and they are deliberately small - they are the drip, not the meal.
+
+   The check-in cycle does NOT reset when she misses a day. Her streak already
+   punishes a missed day, and she works six days a week; a login gift that
+   resets is a punishment for having a job. It just advances on each day she
+   opens the game, and loops after the seventh. */
+const CHECKIN=[
+  {n:'5 scrap',           give:s=>{s.stock.scrap+=5;}},
+  {n:'2 food and 2 water',give:s=>{s.stock.food+=2;s.stock.water+=2;}},
+  {n:'a chest key',       give:s=>{s.keys++;}},
+  {n:'12 scrap and 25 XP',give:s=>{s.stock.scrap+=12;addXp(25);}},
+  {n:'2 meds',            give:s=>{s.stock.meds+=2;}},
+  {n:'4 rounds of ammo',  give:s=>{s.stock.ammo+=4;}},
+  {n:'a chest key and 20 scrap - day seven',give:s=>{s.keys++;s.stock.scrap+=20;addXp(50);}},
+];
+function checkinDay(){const c=S.checkin||(S.checkin={date:'',n:0});return c;}
+function checkinReady(){rollDay();return checkinDay().date!==S.steps.date;}
+function checkinNext(){return CHECKIN[checkinDay().n%CHECKIN.length];}
+function claimCheckin(){
+  if(!checkinReady()){toast('Already collected today');return;}
+  const c=checkinDay();const gift=CHECKIN[c.n%CHECKIN.length];
+  gift.give(S);c.n++;c.date=S.steps.date;
+  log('Daily check-in: '+gift.n+'.');
+  toast('Checked in: '+gift.n,(c.n%CHECKIN.length===0)?'l':'a');
+  SFX.play((c.n%CHECKIN.length===0)?'legend':'chest');
+  save();render();pushPlayer();
+}
+
+// Today's steps, paid out as you walk. Resets every night with the step count.
+// 10,000 is the one she asked for by name: a weapon, not a pile of scrap.
+const LADDER=[
+  {s:2500, n:'5 scrap',          give:s=>{s.stock.scrap+=5;addXp(10);}},
+  {s:5000, n:'2 food, 2 water',  give:s=>{s.stock.food+=2;s.stock.water+=2;addXp(15);}},
+  {s:7500, n:'a chest key',      give:s=>{s.keys++;}},
+  {s:10000,n:'a weapon',         weapon:true},
+  {s:15000,n:'15 scrap, 40 XP',  give:s=>{s.stock.scrap+=15;addXp(40);}},
+  {s:20000,n:'2 chest keys',     give:s=>{s.keys+=2;}},
+];
+// "Low tier" means what she said: the starter shelf, not a rare drop. Anything
+// better still has to come off the road.
+const LADDER_GUNS=['pipe','bat','crowbar','jacket','helmet','pads','pack2'];
+function ladderDay(){const l=S.ladder||(S.ladder={date:'',hit:[]});if(l.date!==S.steps.date){l.date=S.steps.date;l.hit=[];}return l;}
+function ladderNext(){const l=ladderDay();return LADDER.find(x=>!l.hit.includes(x.s));}
+function checkLadder(){
+  const l=ladderDay();const today=S.steps.today||0;
+  for(const step of LADDER){
+    if(l.hit.includes(step.s)||today<step.s)continue;
+    l.hit.push(step.s);
+    if(step.weapon){
+      const id=LADDER_GUNS[Math.floor(Math.random()*LADDER_GUNS.length)];
+      S.gear.push({uid:uid(),id,...GEAR[id]});
+      log(fmt(step.s)+' steps today: '+GEAR[id].n+'. It is in your gear.');
+      toast(fmt(step.s)+' steps: '+GEAR[id].n,'l');SFX.play('legend');
+    }else{
+      step.give(S);
+      log(fmt(step.s)+' steps today: '+step.n+'.');
+      toast(fmt(step.s)+' steps: '+step.n,'a');SFX.play('chest');
+    }
+  }
+}
+function renderCheckin(){
+  const el=$('#checkinCard');if(!el)return;
+  if(!checkinReady()){el.hidden=true;return;}
+  const c=checkinDay();const g=checkinNext();const day=(c.n%CHECKIN.length)+1;
+  el.hidden=false;
+  el.innerHTML='<h2>Daily check-in <span class="sub">day '+day+' of '+CHECKIN.length+'</span></h2>'
+    +'<p class="help">You opened the game. That is the whole requirement.</p>'
+    +'<div class="row" style="gap:5px;margin:10px 0">'
+    +CHECKIN.map((x,i)=>'<span class="chip'+(i<day-1?' z':i===day-1?' a':'')+'" style="flex:1;text-align:center;padding:6px 2px'+(i>day-1?';opacity:.45':'')+'">'+(i<day-1?'✓':i+1)+'</span>').join('')
+    +'</div>'
+    +'<button class="btn r wide" onclick="claimCheckin()">Collect '+esc(g.n)+'</button>';
+}
+function renderLadder(){
+  const el=$('#ladderBox');if(!el)return;
+  const l=ladderDay();const today=S.steps.today||0;const next=ladderNext();
+  el.innerHTML='<div class="section-label">Today\'s rewards</div>'
+    +'<div class="stack" style="margin-top:6px">'
+    +LADDER.map(x=>{const got=l.hit.includes(x.s);const pct=Math.min(100,today/x.s*100);
+      return '<div class="contract'+(got?' done':'')+'"><div><b>'+fmt(x.s)+' steps</b>'
+        +'<span>'+(got?'Collected. ':'')+esc(x.n)+'</span>'
+        +'<div class="bar"><i style="width:'+pct+'%"></i></div></div>'
+        +'<div class="num" style="font-size:18px;color:'+(got?'var(--rot)':'var(--bone2)')+'">'+(got?'✓'
+          :fmt(Math.max(0,x.s-today))+'<span class="help" style="display:block;font-size:10px;font-weight:400">to go</span>')+'</div></div>';}).join('')
+    +'</div>'
+    +'<p class="help" style="margin-top:6px">'+(next?fmt(Math.max(0,next.s-today))+' more steps for '+esc(next.n)+'.':'Every reward collected today. Come back tomorrow.')+' Resets at midnight with your step count.</p>';
+}
 function checkMilestones(){
   const top=unlockedDistrict();
   for(let i=1;i<=top;i++){
@@ -1143,7 +1234,7 @@ function addSteps(n,src){
   // counted+manual===today invariant survives.
   if(src==='live'){const r=syncReads();r.counted=(r.counted||0)+n;}
   if(src==='demo'){const r=syncReads();r.manual=(r.manual||0)+n;}
-  if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(Math.max(3,Math.round(6*thirstMult())));}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip'||src==='clipboard'||src==='shortcut')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
+  if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(Math.max(3,Math.round(6*thirstMult())));}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip'||src==='clipboard'||src==='shortcut')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);checkLadder();if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
   if(src!=='carry'&&S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');streakReward();}
   if(S.loc||S.combat){S.walk.banked=(S.walk.banked||0)+n;if(src!=='carry'&&src!=='live')toast('+'+fmt(n)+' steps saved for after this stop','z');save();render();return;}
   let left=n;
@@ -2035,7 +2126,10 @@ function renderContracts(){
   const d=S.ct.daily||[];const w=S.ct.weekly;$('#contractsSub').textContent=d.filter(c=>c.done).length+'/'+d.length+' today';
   const row=(t,n,goal,done,reward)=>`<div class="contract${done?' done':''}"><div><b>${CT_TYPES[t].n}${goal>1?' '+fmt(goal)+' '+CT_TYPES[t].u:''}</b><span>${done?'Done. ':''}${reward}</span><div class="bar"><i style="width:${Math.min(100,n/goal*100)}%"></i></div></div><div class="num" style="font-size:20px;color:${done?'var(--rot)':'var(--bone2)'}">${done?'✓':fmt(Math.min(n,goal))+'/'+fmt(goal)}</div></div>`;
   let html=d.map(c=>row(c.t,c.n,c.goal,c.done,'+'+c.reward.scrap+' scrap, +'+c.reward.xp+' XP'+(c.reward.key?', +1 key':''))).join('');
-  if(w){html+=`<div class="section-label" style="margin-top:6px">This week</div>`+w.goals.map(g=>row(g.t,g.n,g.goal,g.n>=g.goal,'Weekly: +1 key, a cosmetic, +200 pts')).join('');}
+  if(w){const left=w.goals.filter(g=>g.n<g.goal).length;
+    html+=`<div class="section-label" style="margin-top:10px">This week${w.done?' - done':''}</div>`
+      +`<p class="help" style="margin:0 0 6px">All three by Sunday night: +1 chest key, a cosmetic, +200 points.</p>`
+      +w.goals.map(g=>row(g.t,g.n,g.goal,g.n>=g.goal,g.n>=g.goal?'Done.':(left===1?'Last one this week.':left+' left this week'))).join('');}
   $('#contracts').innerHTML=html;
 }
 function renderMap(){
@@ -2059,6 +2153,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.30',d:'Sep 17',t:'Daily check-in and a reward ladder for today\'s steps',
+  i:['DAILY CHECK-IN. Open the game, tap once, get something. Seven days in the cycle: scrap, food and water, a chest key, meds, ammo, and a bigger day seven, then it loops.',
+     'MISSING A DAY DOES NOT RESET IT. Your streak already punishes a missed day and you work six days a week. The check-in just picks up where it left off.',
+     'TODAY\'S REWARDS ladder, in the Steps card. 2,500 gives scrap · 5,000 food and water · 7,500 a chest key · 10,000 A WEAPON · 15,000 scrap and XP · 20,000 two keys. It resets at midnight with your step count, and it shows how far you are from the next one.',
+     'The weekly quest was already in the game and easy to miss - it is in Contracts under "This week". Walk 35,000, put down 30 hostiles, claim a bounty, and you get a key, a cosmetic and 200 points.']},
  {v:'6.29',d:'Sep 17',t:'Flares are not spent until the fight starts',
   i:['Joining a raid bare-handed showed the "no weapon equipped" warning - and took your flare anyway, even if you backed out. The raid never happened and the flare was gone.',
      'A flare is now only spent when the fight actually begins. Back out at the weapon warning and it costs you nothing, and the raid is still there to try again.',
@@ -2310,7 +2409,7 @@ function wxSheet(){
     +'<button class="btn r wide" style="margin-top:12px" onclick="closeSheet()">Got it</button>',true);
 }
 function renderStepHist(){
-  syncMath();
+  syncMath();try{renderLadder();}catch(e){}
   const el=$('#stepHist');if(!el)return;
   const days=stepDays();const known=days.filter(d=>d.known&&d.n!==null);
   if(known.length<2&&!(S.steps.today>0)){el.innerHTML='<p class="help">Your day-by-day history starts building from today.</p>';return;}
@@ -2367,7 +2466,7 @@ function renderOnline(){
       +'<p class="help" style="margin-top:4px">'+esc(dm.d)+'</p>'
       +(vetRank()?'<p class="help" style="margin-top:6px;color:var(--amber)">'+esc(vetTitle())+' · '+fmt(S.steps.total)+' lifetime steps · '+esc(district().n)+'</p>':'');
     renderConvoy();}catch(e){}
-  try{renderCalls();}catch(e){}
+  try{renderCheckin();renderCalls();}catch(e){}
   renderStepHist();
   const sHelp=$('#stepsHelp');
   if(sHelp){

@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=6.29">
+<link rel="stylesheet" href="style.css?v=6.30">
 </head>
 <body>
 <div id="app">
@@ -36,6 +36,7 @@
       <div class="card" id="locCard" hidden></div>
       <div class="card steel" id="rivalCard" hidden></div>
       <div class="card" id="raidCard" hidden></div>
+      <div class="card" id="checkinCard" hidden></div>
       <div class="card" id="callCard" hidden></div>
       <div class="card" id="contractsCard"><h2>Contracts <span class="sub" id="contractsSub"></span></h2><div class="stack" id="contracts" style="margin-top:10px"></div></div>
       <div class="card">
@@ -52,6 +53,7 @@
         </div>
         <p class="help" id="syncMath" style="margin-top:6px"></p>
         <div id="stepHist" style="margin-top:10px"></div>
+        <div id="ladderBox" style="margin-top:10px"></div>
         <p class="help" style="margin-top:8px" id="stepsHelp">Go online in Settings and set up the phone shortcut once: your Health steps then land here on their own.</p>
       </div>
       <div class="card steel">
@@ -176,8 +178,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=6.29"></script>
-<script src="street.js?v=6.29"></script>
-<script src="game.js?v=6.29"></script>
+<script src="art.js?v=6.30"></script>
+<script src="street.js?v=6.30"></script>
+<script src="game.js?v=6.30"></script>
 </body>
 </html>
