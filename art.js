@@ -187,6 +187,20 @@ function bodyParts(style,skin,tc,top,weapon){
   return {back:`<rect x="36" y="100" width="11" height="22" rx="5" fill="#2a2a30"/><rect x="53" y="100" width="11" height="22" rx="5" fill="#2a2a30"/><rect x="34" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/><rect x="51" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/>${topShape(top,tc)}<rect x="21" y="82" width="11" height="22" rx="5" fill="${skin}"/><rect x="68" y="82" width="11" height="22" rx="5" fill="${skin}"/>${wpn}`,
     head:`<path d="M12 50 q0 -40 38 -40 q38 0 38 40 v6 q0 26 -38 26 q-38 0 -38 -26z" fill="${skin}"/><circle cx="24" cy="66" r="6" fill="#ff8ab8" opacity=".45"/><circle cx="76" cy="66" r="6" fill="#ff8ab8" opacity=".45"/>`};
 }
+let AV_UID=0;
+// The ears used to sit straight on the hair, so a onesie read as "hair with
+// ears stuck on" rather than a costume. A onesie needs a HOOD: a dome in the
+// costume's colour, over the hair, with a face hole cut out of it. Everything
+// about these reading as cute follows from that one shape.
+function onesieHood(top,o){
+  const t=TOPS[top];if(!t||t.kind!=='onesie')return '';
+  const b=t.base,i=t.earIn||t.belly||'#fff';
+  return `<g ${o}>
+    <path fill-rule="evenodd" fill="${b}" d="M3 60 q0 -56 47 -56 q47 0 47 56 q0 21 -9 31 q-14 -15 -38 -15 q-24 0 -38 15 q-9 -10 -9 -31z
+      M50 19 a31.5 30 0 1 0 0.1 0z"/>
+  </g>
+  <path fill="#000" opacity=".13" d="M21 42 q4 -24 29 -24 q25 0 29 24 q-6 -17 -29 -17 q-23 0 -29 17z"/>`;
+}
 function onesieEars(top,o){const t=TOPS[top];if(!t||t.kind!=='onesie')return '';const b=t.base,i=t.earIn||t.belly;
   switch(t.ears){
     case 'round':return `<g ${o}><circle cx="19" cy="17" r="9" fill="${b}"/><circle cx="19" cy="17" r="4.5" fill="${i}"/><circle cx="81" cy="17" r="9" fill="${b}"/><circle cx="81" cy="17" r="4.5" fill="${i}"/></g>`;
@@ -195,11 +209,20 @@ function onesieEars(top,o){const t=TOPS[top];if(!t||t.kind!=='onesie')return '';
     case 'pointy':return `<g ${o}><path d="M18 22 l-2 -18 l14 12z" fill="${b}"/><path d="M20 18 l-1 -9 l7 6z" fill="${i}"/><path d="M82 22 l2 -18 l-14 12z" fill="${b}"/><path d="M80 18 l1 -9 l-7 6z" fill="${i}"/></g>`;
     case 'fin':return `<g ${o}><path d="M44 12 q6 -16 14 -4 l-2 8z" fill="${b}"/></g>`;
     case 'spikes':return `<g ${o}><path d="M30 14 l5 -12 l6 10z M46 10 l5 -12 l6 10z M62 14 l5 -12 l6 10z" fill="${t.belly}"/></g>`;
-    case 'frills':return `<g ${o}><g fill="${i}" opacity=".95">`
-      +[[20,16],[26,9],[74,9],[80,16]].map(([x,y],n)=>{const f=n<2?-1:1;
-        return `<path d="M${x} ${y+12} q${f*-7} -6 ${f*-3} -13 q${f*5} 3 ${f*6} 10z"/>`
-             + `<path d="M${x+f*4} ${y+13} q${f*-9} -4 ${f*-7} -12 q${f*7} 5 ${f*9} 11z"/>`;}).join('')
-      +`</g><circle cx="38" cy="19" r="3" fill="${i}" opacity=".5"/><circle cx="62" cy="19" r="3" fill="${i}" opacity=".5"/></g>`;
+    case 'frills':{
+      // Three feathery gill stalks per side, fanning out and up off the hood -
+      // small tidy fronds just read as "pink ears", which is the thing she
+      // said she did not want.
+      const gill=(x,y,dir,len,ang)=>{
+        const ex=x+dir*len*Math.cos(ang), ey=y-len*Math.sin(ang);
+        return `<path d="M${x} ${y} Q${x+dir*len*0.45} ${y-len*0.75} ${ex.toFixed(1)} ${ey.toFixed(1)}"
+                 stroke="${i}" stroke-width="4" fill="none" stroke-linecap="round"/>`
+             + `<circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="5" fill="${i}"/>`
+             + `<circle cx="${(x+dir*len*0.5).toFixed(1)}" cy="${(y-len*0.42).toFixed(1)}" r="3.6" fill="${i}"/>`;
+      };
+      const side=(x,dir)=>gill(x,44,dir,17,0.15)+gill(x,34,dir,19,0.55)+gill(x,25,dir,16,1.0);
+      return `<g ${o}>${side(16,-1)}${side(84,1)}</g>`;
+    }
     case 'frogeyes':return `<g ${o}><circle cx="30" cy="12" r="8" fill="${b}"/><circle cx="30" cy="12" r="4.5" fill="#fff"/><circle cx="31" cy="12" r="2.2" fill="#1e1418"/><circle cx="70" cy="12" r="8" fill="${b}"/><circle cx="70" cy="12" r="4.5" fill="#fff"/><circle cx="69" cy="12" r="2.2" fill="#1e1418"/></g>`;
   }return '';}
 // A gumball machine. `spin` tilts the crank, `drop` sends a capsule down the
@@ -238,13 +261,16 @@ function avatarSVG(av,size,opts){
   const mood=opts.mood||'';const weapon=opts.weapon||'';const bs=opts.style||AV_STYLE;
   const w=size||100,h=Math.round((size||100)*1.3);const bp=bodyParts(bs,skin,tc,av.top||'hoodie',weapon);
   const o=bs==='sticker'?'stroke="#1e1418" stroke-width="2.2" stroke-linejoin="round"':bs==='bean'?'stroke="#2a1a14" stroke-width="1.4" stroke-linejoin="round"':'';
+  const ot=TOPS[av.top||'hoodie'];const hooded=!av.hat&&ot&&ot.kind==='onesie';const uid=++AV_UID;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -8 100 138" width="${w}" height="${h}" ${opts.attrs||''} aria-hidden="true">
-  ${o?`<g ${o}>${hairBack(style,hc)}</g>`:hairBack(style,hc)}
+  ${hooded?'':(o?`<g ${o}>${hairBack(style,hc)}</g>`:hairBack(style,hc))}
   ${bp.back}
   ${bp.head}
   ${eyes(av.eyes||'round',mood)}
   ${mouth(mood)}
-  ${o?`<g ${o}>${hairFront(style,hc)}</g>`:hairFront(style,hc)}
+  ${hooded?`<clipPath id="fh${uid}"><ellipse cx="50" cy="49" rx="31.5" ry="30"/></clipPath><g clip-path="url(#fh${uid})">${hairFront(style,hc)}</g>`
+    :(o?`<g ${o}>${hairFront(style,hc)}</g>`:hairFront(style,hc))}
+  ${hooded?onesieHood(av.top,o):''}
   ${av.hat?'':onesieEars(av.top||'hoodie',o)}
   ${o?`<g ${o}>${hatShape(av.hat,hc)}</g>`:hatShape(av.hat,hc)}
   ${accShape(av.acc)}

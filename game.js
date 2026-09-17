@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.23';
+const VERSION='6.24';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1875,6 +1875,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.24',d:'Sep 17',t:'Onesies have hoods now',
+  i:['Onesies used to stick ears on top of your hair, so they read as hair with ears rather than a costume. They have a proper hood now, in the costume colour, with your face framed in it and your fringe showing.',
+     'The axolotl grew real gills - three feathery stalks a side instead of two little dots.',
+     'Your hair is tucked in under the hood, so nothing hangs out the bottom any more.']},
  {v:'6.23',d:'Sep 17',t:'Gumball machines, and trophies that matter',
   i:['TWO MACHINES on the Base tab. Your unspent steps go in the slot - nothing here costs money, only walking. The Fits Machine gives clothes, the Arms Machine gives weapons.',
      'Odds are printed on the machine: 55/30/12/3. Every 10th crank is guaranteed epic or better. Clothes you already own never come up.',
