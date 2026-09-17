@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.27';
+const VERSION='6.28';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -869,6 +869,26 @@ function gPool(kind,rar){
   const owned=S.cosmetics||[];
   return cosmeticPool().filter(c=>(c.r||'common')===rar&&!owned.includes(c.id));
 }
+// The published odds have to be the REAL odds. There are no common cosmetics,
+// so the clothes machine printed "55% common" while gPull quietly rolled that
+// 55% into rare - and as she collects, whole tiers empty out and shift again.
+// This folds every empty tier into the nearest tier that still has something,
+// using the same order gPull's fallback walks.
+function gOdds(kind){
+  const order=['common','rare','epic','legendary'];
+  const out={};for(const r of order)out[r]=0;
+  for(const [rar,w] of GACHA_ODDS){
+    let land=rar;
+    if(!gPool(kind,rar).length){
+      const from=order.indexOf(rar);
+      const tries=order.map((r,i)=>({r,d:Math.abs(i-from)})).filter(x=>x.r!==rar)
+        .sort((a,b)=>a.d-b.d||order.indexOf(a.r)-order.indexOf(b.r));
+      land=(tries.find(t=>gPool(kind,t.r).length)||{}).r;
+    }
+    if(land)out[land]+=w;
+  }
+  return order.slice().reverse().filter(r=>out[r]>0).map(r=>[r,out[r]]);
+}
 function gPull(k){
   const m=GACHA[k];const g=gState(k);
   if((S.wallet||0)<m.cost){toast('Need '+fmt(m.cost-(S.wallet||0))+' more steps','d');return;}
@@ -923,7 +943,7 @@ function poolSheet(k){
       left=items.filter(x=>!x.have).length;
     }
     if(!items.length)return '';
-    const pct=(GACHA_ODDS.find(o=>o[0]===rar)||[0,0])[1];
+    const pct=(gOdds(m.kind).find(o=>o[0]===rar)||[0,0])[1];
     return '<div class="section-label" style="margin-top:12px;display:flex;justify-content:space-between">'
       +'<span class="rc-'+rar+'">'+rar.toUpperCase()+' · '+pct+'%</span>'
       +'<span class="help">'+(m.kind==='weapon'?items.length+' in the machine':left+' of '+items.length+' still to find')+'</span></div>'
@@ -938,7 +958,7 @@ function poolSheet(k){
   }).join('');
   const hero=m.kind==='cloth'&&!owned.includes('top:onesie_axolotl');
   openSheet('<h2>What is in the '+esc(m.n)+'</h2>'
-    +'<p class="help">'+fmt(m.cost)+' steps a crank · every '+GACHA_PITY+'th is epic or better'
+    +'<p class="help">'+fmt(m.cost)+' steps a crank'+(gOdds(m.kind).length?' · '+gOdds(m.kind).map(([r,w])=>w+'% '+r).join(' · '):'')+' · every '+GACHA_PITY+'th is epic or better'
       +(m.kind==='cloth'?' · clothes you own never come up again':' · weapons can repeat')+'</p>'
     +(hero?'<div style="margin:10px 0;padding:10px 12px;border-radius:10px;background:rgba(245,200,66,.12);border-left:4px solid var(--amber)">'
         +'<b style="color:var(--amber)">The one everyone wants</b>'
@@ -965,8 +985,10 @@ function gachaSheet(k,got){
     +'<div class="grid2" style="margin-top:10px">'
       +'<button class="btn ghost" onclick="poolSheet(\''+k+'\')">ⓘ Prize list</button>'
       +'<button class="btn r" onclick="gPull(\''+k+'\')"'+((S.wallet||0)<m.cost?' disabled':'')+'>Crank again · '+fmt(m.cost)+'</button></div>'
-    +'<p class="help" style="margin-top:10px">Odds per crank: '+GACHA_ODDS.map(([r,w])=>w+'% '+r).join(' · ')
-      +'. Every '+GACHA_PITY+'th crank is epic or better. Clothes you already own never come up.</p>',true);
+    +'<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet()">Done</button>'
+    +(gOdds(m.kind).length?'<p class="help" style="margin-top:10px">Odds per crank: '+gOdds(m.kind).map(([r,w])=>w+'% '+r).join(' · ')
+      +'. Every '+GACHA_PITY+'th crank is epic or better.'+(m.kind==='cloth'?' Clothes you already own never come up, so these shift as you collect.':'')+'</p>'
+      :'<p class="help" style="margin-top:10px">You own everything in this machine. Cranking it would just hand your steps back.</p>'),true);
 }
 function renderGacha(){
   const el=$('#gachaBody');if(!el)return;
@@ -2034,6 +2056,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.28',d:'Sep 17',t:'A way out of every screen, and honest odds',
+  i:['The gumball machine had no exit - only "Prize list" and "Crank again". Every popup in the game now has an X in the corner as well, so a screen can never trap you again.',
+     'THE ODDS WERE WRONG. The clothes machine said "55% common", but there are no common clothes - those cranks were quietly rolling into rare. It now prints what it actually does: 3% legendary, 12% epic, 85% rare.',
+     'The odds shift as you collect, because clothes you own never come up again, and the machine shows the real number every time you open it.']},
  {v:'6.27',d:'Sep 17',t:'Raid from anywhere, and typed steps that ADD',
   i:['RAID CALLS. Standing at a raid your friend found is no longer the only way in. Hit "Invite a friend" at a raid and everyone in your party (or everyone on your board) gets a Raid call on their home screen and a notification - wherever they live.',
      'FLARES are the daily energy for that. You get 3 a day plus one for every 6,000 steps you walk, up to 6. A remote seat costs one flare. Standing at the raid yourself is still FREE, because this is a walking game.',
@@ -2405,7 +2431,11 @@ function renderFriends(){
     <div class="sc">${fmt(lbVal(f))}${me?'':`<br><button class="btn xs" onclick="visitFriend(${idx})">Visit</button><br><button class="btn xs ghost" onclick="hideFriend('${f.handle}')">Hide</button>`}</div></div>`;}).join('')||'<p class="help">Nobody yet.</p>';
   if(hid.length)el.innerHTML+=`<div class="section-label" style="margin-top:12px">Hidden</div>`+hid.map(f=>`<div class="lbrow" style="opacity:.6"><div class="rk">·</div><div class="av">🚫</div><div class="nm">${esc(f.name)}<small>@${esc(f.handle)}</small></div><div class="sc"><button class="btn xs" onclick="unhideFriend('${f.handle}')">Unhide</button></div></div>`).join('');
 }
-function openSheet(html,lock){$('#sheet').innerHTML=html;$('#modal').classList.add('on');$('#modal').dataset.lock=lock?'1':'';}
+function openSheet(html,lock){
+  $('#sheet').innerHTML='<button class="sheetx" onclick="sheetX()" aria-label="Close">✕</button>'+html;
+  $('#modal').classList.add('on');$('#modal').dataset.lock=lock?'1':'';}
+// The X answers out loud when it will not close, instead of looking broken.
+function sheetX(){if(C&&!C.over){toast('Finish the fight first');return;}closeSheet();}
 function closeSheet(){if(C&&!C.over)return;$('#modal').classList.remove('on');}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal'&&!$('#modal').dataset.lock)closeSheet();});
 
