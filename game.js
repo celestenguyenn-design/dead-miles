@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.37';
+const VERSION='6.38';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1413,14 +1413,21 @@ function shootGuard(){
   }
   act('shoot');
 }
-function attackGuard(){
+// Ask before a swing that would wreck something rare. `cost` is how much
+// durability this particular swing burns - the heavy swing burns two.
+function swingGuard(kind,cost){
   const w=eqItem('melee');
-  if(w&&w.dur===1&&(w.r==='epic'||w.r==='legendary')&&C&&!C.durWarned){
+  if(w&&(w.r==='epic'||w.r==='legendary')&&w.dur>0&&w.dur<=cost&&C&&!C.durWarned){
+    const line=cost>1
+      ? 'A heavy swing costs TWO durability, and your '+w.n+' has '+w.dur+' left. It will be wrecked (you keep it, but it needs rebuilding). Swing anyway?'
+      : 'This swing is the last one your '+w.n+' has. It will be wrecked (you keep it, but it needs rebuilding). Swing anyway?';
+    if(!confirm(line))return;                 // set the flag ONLY once she says yes
     C.durWarned=true;
-    if(!confirm('This swing is the last one your '+w.n+' has. It will be wrecked (you keep it, but it needs repairing). Swing anyway?'))return;
   }
-  act('attack');
+  act(kind);
 }
+function attackGuard(){swingGuard('attack',1);}
+function heavyGuard(){swingGuard('heavy',2);}
 function breakWeapon(w){if(w.dur===undefined||w.dur>0)return;
   const slot=w.slot||'melee';                       // guns wear out too now
   const keep=(w.r==='epic'||w.r==='legendary');
@@ -1453,7 +1460,7 @@ function act(kind){
     if(Math.random()<t.dodge+0.1){clog(t.n+' ducks the big swing.','');SFX.play('miss');}
     else if(Math.random()<0.6+sk('bruiser')*0.12){const d=Math.round((rint(hd[0],hd[1])+dmgBonus())*1.6*hydroDmg())+(S.lvl-1);dealTo(t,d,'Heavy swing lands','heavy');SFX.play('hit');}
     else{clog('The heavy swing goes wide.','');SFX.play('miss');}
-    w.dur-=2;breakWeapon(w);
+    w.dur=Math.max(0,w.dur-2);breakWeapon(w);
     if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+(w.quiet?3:8));
   }
   else if(kind==='shoot'){const g=eqItem('ranged');if(!g){toast('No gun');return;}const ammoItem=S.pack.find(p=>p.cat==='ammo'&&p.id===g.ammo);const stockAmmo=g.ammo==='ammo'?S.stock.ammo:0;
@@ -1596,7 +1603,7 @@ function renderCombat(){
   <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}${hit?`<span class="spark">${SPARK[e.fx.k||'slash']}</span>`:''}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
   <div class="acts">
     <button class="btn r" onclick="attackGuard()">${w?w.e+' '+esc(w.n)+(temperOf(w)?' <span class="chip s">'+esc(temperOf(w).n)+'</span>':''):'👊 Fists'}<small>${w?(wDmg(w)[0]+dmgBonus())+'-'+(wDmg(w)[1]+dmgBonus())+' · '+w.dur+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
-    <button class="btn" onclick="act('heavy')" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · ${60+sk('bruiser')*12}% hit · noisy</small></button>
+    <button class="btn" onclick="heavyGuard()" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · ${60+sk('bruiser')*12}% hit · costs 2 durability</small></button>
     ${w?`<button class="btn" onclick="act('fists')">👊 Fists<small>${baseDmg()[0]}-${baseDmg()[1]} dmg · saves your ${esc(w.n)}</small></button>`:''}
     <button class="btn" onclick="swapSheet()">🔄 Switch weapon<small>${swapOptions().length} in your gear${w?' · costs your turn':' · free, hands empty'}</small></button>
     <button class="btn" onclick="shootGuard()" ${g&&(ammoN||g.id==='mercy')?'':'disabled'}>${g?g.e+' '+esc(g.n)+(temperOf(g)?' <span class="chip s">'+esc(temperOf(g).n)+'</span>':''):'🔫 No gun'}<small>${g?(wDmg(g)[0]+sk('steadyaim')*3)+'-'+(wDmg(g)[1]+sk('steadyaim')*3)+' · '+ammoN+' rounds'+(g.dur!==undefined?' · '+g.dur+' left':''):'find one'}</small></button>
@@ -2520,6 +2527,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.38',d:'Sep 17',t:'The heavy swing that ate a legendary without asking',
+  i:['A HEAVY SWING COSTS TWO DURABILITY and never warned you about it. A legendary sitting on 2 died to a single tap with no confirmation - that is your friend\'s "it swung two times and it broke". It was one swing that counted as two.',
+     'The heavy swing now asks first when it would wreck something rare, and the button says "costs 2 durability" so you can see it coming.',
+     'SAYING NO USED TO DISARM THE WARNING. The one-warning-per-fight flag was set before you answered, so declining meant your very next tap destroyed the weapon in silence. It is only armed when you say yes.',
+     'A heavy swing can no longer push durability below zero.',
+     'Not a bug, for the record: a Vicious double strike costs only ONE durability, and a Keen temper genuinely lowers a weapon\'s maximum by 2 - so its bar drops when you fit it.']},
  {v:'6.37',d:'Sep 17',t:'Eight new weapons, drinks that do things, and snacks',
   i:['NEW MELEE: Hatchet, Meat cleaver, Farm sickle, Pipe spear, Barbed bat, and a KATANA. The katana is epic - 20-29 damage, ten swings, and quiet.',
      'NEW RANGED: a Hunting bow and a Crossbow. Both use BOLTS, both are quiet, and both give bolts back - the bow gets 55% of them back, the crossbow 40%. That is the reason to carry one over a gun.',
