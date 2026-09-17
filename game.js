@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.3';
+const VERSION='6.4';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -322,39 +322,60 @@ async function identBoot(){
   return true;
 }
 
-// ---- recovery code: four words that get you back in from anywhere ----
-const RC_WORDS=['amber','anchor','apple','arrow','ashes','badge','barn','beacon','birch','bishop','blanket','bottle','bramble','bridge','bucket','cabin','candle','canyon','cedar','cellar','chapel','cider','clover','copper','cotton','crimson','crow','dagger','daisy','dawn','diesel','ember','falcon','fennel','ferry','fiddle','flint','fossil','gable','garnet','ginger','granite','gravel','harbor','harvest','hazel','hollow','ivory','jasper','kettle','lantern','ledger','linen','locket','maple','marble','meadow','mercy','mitten','moss','nectar','needle','orchard','otter','pantry','pebble','pewter','pigeon','pillar','plum','quarry','quilt','raven','ribbon','ridge','rooster','rusty','saddle','sage','satchel','shovel','silver','sparrow','spruce','stable','sugar','sulfur','thicket','thimble','thunder','timber','tinder','torch','trellis','tulip','velvet','walnut','willow','window','winter','yarrow'];
-function makeCode(){let a=[];for(let i=0;i<4;i++)a.push(RC_WORDS[Math.floor(Math.random()*RC_WORDS.length)]);return a.join(' ');}
-function copyRecovery(){try{navigator.clipboard.writeText('Dead Miles - handle @'+O().handle+' - recovery code '+(S.recovery||''));toast('Copied','z');}catch(e){}}
-function normCode(c){return String(c||'').trim().toLowerCase().replace(/\s+/g,' ');}
+// ---- recovery PIN: six digits that get you back in from anywhere ----
+function copyRecovery(){try{navigator.clipboard.writeText('Dead Miles - handle @'+O().handle+' - PIN '+(S.recovery||''));toast('Copied','z');}catch(e){}}
+function makePin(){let p='';for(let i=0;i<6;i++)p+=Math.floor(Math.random()*10);return p;}
 async function setRecovery(code){
   const o=O();if(!o.ok){toast('Go online first','d');return;}
-  const c=normCode(code);
-  if(c.length<10){toast('Make it at least 10 characters','d');return;}
+  const c=String(code||'').replace(/\D/g,'');
+  const warn=(m)=>{const w=$('#recovWarn');if(w){w.textContent=m;w.style.display='block';}toast(m,'d');};
+  if(c.length!==6){warn('Six digits, numbers only.');return;}
   let r;
   try{r=await rpc('set_recovery',{p_handle:o.handle,p_token:o.token,p_code:c});}
   catch(e){toast('Could not reach the server. Try again.','d');return;}
-  if(r==='taken'){toast('Someone already uses that one. Pick something else.','d');
-    const w=$('#recovWarn');if(w){w.textContent='Already taken by another player. Try adding a word, or something only you would say.';w.style.display='block';}return;}
-  if(r==='short'){toast('Make it at least 10 characters','d');return;}
-  if(r==='weak'){toast('Too easy to guess. Pick something personal.','d');return;}
-  if(r!=='ok'){toast('Could not save that code. Run round eight of the setup page first.','d');return;}
-  S.recovery=c;identWrite(o.handle,o.token);save();renderRecov();toast('Recovery code saved','z');
+  if(r==='taken'){warn('Someone already uses that PIN. Pick another.');return;}
+  if(r==='format'){warn('Six digits, numbers only.');return;}
+  if(r==='weak'){warn('Too easy to guess. Not 123456, not all the same digit.');return;}
+  if(r==='busy'){warn('Too many changes in a row. Wait an hour and try again.');return;}
+  if(r!=='ok'){toast('Could not save that PIN. Run round eight of the setup page first.','d');return;}
+  S.recovery=c;identWrite(o.handle,o.token);save();renderRecov();toast('PIN saved','z');
 }
 function saveTypedRecovery(){const el=$('#recovInput');if(el)setRecovery(el.value);}
-function suggestRecovery(){const el=$('#recovInput');if(el){el.value=makeCode();el.focus();}}
+function suggestRecovery(){const el=$('#recovInput');if(el){el.value=makePin();el.focus();}}
+// handle + PIN, from any phone. The device makes a new account key and the
+// server swaps to it once the PIN checks out.
+async function recoverWithPin(handle,pin){
+  const h=slug(handle);const c=String(pin||'').replace(/\D/g,'');
+  if(!h){toast('Type your handle','d');return false;}
+  if(c.length!==6){toast('The PIN is six digits','d');return false;}
+  const fresh=uid()+uid()+uid();
+  let r;
+  try{r=await rpc('recover_login',{p_handle:h,p_code:c,p_new_token:fresh});}
+  catch(e){toast('Could not reach the server. Try again.','d');return false;}
+  if(!r||!r.ok){
+    const e=r&&r.error;
+    if(e==='locked')toast('Too many wrong tries. Wait 15 minutes.','d');
+    else if(e==='none')toast('That handle has no PIN set. Use the account key instead.','d');
+    else toast('Wrong PIN'+(r&&typeof r.left==='number'?' - '+r.left+' tries left':'')+'.','d');
+    return false;
+  }
+  const o=O();o.handle=h;o.token=fresh;o.ok=false;
+  await goOnline(h,fresh);
+  return true;
+}
 function renderRecov(){
   const el=$('#recovBody');if(!el)return;const o=O();
-  if(!o.ok){el.innerHTML='<p class="help">Go online first (above) and you can set your recovery code here.</p>';return;}
+  if(!o.ok){el.innerHTML='<p class="help">Go online first (above) and you can set your PIN here.</p>';return;}
   const c=S.recovery||'';
-  el.innerHTML='<p class="help">Pick a phrase you will actually remember - a lyric, an inside joke, your cat plus a year. At least 10 characters. Capital letters and extra spaces do not matter.</p>'
-    +(c?'<div style="margin:10px 0;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.06);border-left:4px solid var(--blood);font-size:19px;font-weight:800;color:var(--bone);word-break:break-word">'+esc(c)+'</div><p class="help">Your handle: <b>@'+esc(o.handle)+'</b>. Typing these two on any phone brings your character back.</p>'
+  el.innerHTML='<p class="help">Six digits you will remember - not your phone passcode, and not 123456. This is how you get back in if you lose this phone.</p>'
+    +(c?'<div style="margin:10px 0;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.06);border-left:4px solid var(--blood);font-size:30px;font-weight:800;letter-spacing:6px;color:var(--bone)">'+esc(c)+'</div><p class="help">Your handle: <b>@'+esc(o.handle)+'</b>. Those two, on any phone, bring your character back.</p>'
         :'<p class="help" style="color:#ffb35c">You do not have one yet. Without it, losing this phone means losing your character.</p>')
-    +'<input id="recovInput" type="text" maxlength="60" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="'+(c?'a new phrase':'your phrase, e.g. mango ate my homework')+'" style="width:100%;margin:8px 0">'
+    +'<input id="recovInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="'+(c?'a new 6-digit PIN':'6 digits')+'" style="width:100%;margin:8px 0;font-size:24px;letter-spacing:6px;text-align:center">'
     +'<p class="help" id="recovWarn" style="display:none;color:#ff8a92"></p>'
-    +'<div class="row"><button class="btn sm r" onclick="saveTypedRecovery()">'+(c?'Change my code':'Save my code')+'</button>'
-    +'<button class="btn sm ghost" onclick="suggestRecovery()">Suggest one</button>'
-    +(c?'<button class="btn sm ghost" onclick="copyRecovery()">Copy it</button>':'')+'</div>';
+    +'<div class="row"><button class="btn sm r" onclick="saveTypedRecovery()">'+(c?'Change my PIN':'Save my PIN')+'</button>'
+    +'<button class="btn sm ghost" onclick="suggestRecovery()">Pick one for me</button>'
+    +(c?'<button class="btn sm ghost" onclick="copyRecovery()">Copy it</button>':'')+'</div>'
+    +'<p class="help" style="margin-top:8px">Five wrong guesses locks the PIN for 15 minutes, so nobody can sit and try numbers.</p>';
 }
 function save(quiet){try{
   if(S&&S.pets&&S.petActive){const ap=S.pets.find(p=>p.id===S.petActive);if(ap){ap.xp=S.petXp||0;ap.name=S.petName||ap.name;}}
@@ -1245,10 +1266,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
- {v:'6.3',d:'Sep 17',t:'Write your own recovery code',
-  i:['Settings, Recovery code: type any phrase you will remember - a lyric, an inside joke, your cat plus a year. Ten characters or more.',
-     'Capital letters and extra spaces do not matter, so typing it back months later still works.',
-     'Codes are unique. If someone already uses yours, the game says so and you pick another.']},
+ {v:'6.4',d:'Sep 17',t:'Set your 6-digit PIN',
+  i:['Settings, Recovery code: pick six digits. Your handle plus that PIN gets your character back on any phone, forever.',
+     'Five wrong guesses locks it for 15 minutes, so nobody can sit there trying numbers.',
+     'PINs are unique. If someone already uses yours, the game tells you to pick another.',
+     'Do this once. It is the difference between losing a phone and losing your character.']},
  {v:'6.2',d:'Sep 17',t:'Steps sync the moment you open the game',
   i:['Reopening the game now checks the server straight away. No more waiting, and no reason to ever delete the home-screen icon.',
      'The Steps card shows when it last checked and when your phone last sent anything, with a Sync my steps now button right there.',
@@ -1393,7 +1415,10 @@ function lookSheet(onDone){
 }
 
 /* ================= onboarding ================= */
-function restoreSheet(){openSheet(`<h2>Restore a save</h2><p>Type the handle you played under and type your <b>four-word recovery code</b> (Base tab, Settings, Recovery code). The long <b>account key</b> works here too if you still have it.</p><input id="rsHandle" type="text" maxlength="20" placeholder="handle, e.g. bel" style="width:100%;margin:6px 0"><input id="rsKey" type="text" placeholder="recovery code, or account key" style="width:100%;margin:6px 0 12px;font-size:12px"><div class="grid2"><button class="btn ghost" onclick="onboard()">Back</button><button class="btn r" onclick="goOnline($('#rsHandle').value,$('#rsKey').value)">Find my save</button></div>`,true);}
+function restoreGo(){const h=$('#rsHandle').value,k=($('#rsKey').value||'').trim();
+  if(/^\d{6}$/.test(k))return recoverWithPin(h,k);
+  return goOnline(h,k);}
+function restoreSheet(){openSheet(`<h2>Restore a save</h2><p>Type the handle you played under and type your <b>6-digit PIN</b> (Base tab, Settings, Recovery code). The long <b>account key</b> works here too if you still have it.</p><input id="rsHandle" type="text" maxlength="20" placeholder="handle, e.g. bel" style="width:100%;margin:6px 0"><input id="rsKey" type="text" placeholder="6-digit PIN, or account key" style="width:100%;margin:6px 0 12px;font-size:12px"><div class="grid2"><button class="btn ghost" onclick="onboard()">Back</button><button class="btn r" onclick="restoreGo()">Find my save</button></div>`,true);}
 function onboard(){
   let cls='brawler';let bgSel='farmer';
   const draw=()=>{$('#sheet').innerHTML=`<h2>Hollow County</h2><p>The county fell three weeks ago. Every real step you take is a step down the road: houses to loot, walkers inside them, raiders who want what you carry. Pick a class.</p>
