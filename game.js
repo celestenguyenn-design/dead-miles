@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.6';
+const VERSION='6.7';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -971,7 +971,19 @@ async function goOnline(handle,token){
 function compactSave(){const c=JSON.parse(JSON.stringify(S));delete c.online;delete c.journal;delete c.wx;delete c.combat;if(c.party)delete c.party.data;return c;}
 function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:S.stock.ammo}};}
 let pushTimer=0;let pushSoonTimer=0;function pushSoon(){clearTimeout(pushSoonTimer);pushSoonTimer=setTimeout(()=>pushPlayer(),8000);}
-function pushPlayer(){const o=O();if(!o.ok||!S.onboarded||STALE)return Promise.resolve();clearTimeout(pushTimer);return new Promise(res=>{pushTimer=setTimeout(async()=>{try{rollWeek();await rpc('save_player',{p_handle:o.handle,p_token:o.token,p_name:S.name,p_tier:S.league.tier,p_week:S.league.week,p_score:S.league.score,p_state:publicState()});o.err='';o.lastPush=Date.now();}catch(e){o.err=e.message;}save(true);res();},400);});}
+function pushPlayer(){const o=O();if(!o.ok||!S.onboarded||STALE)return Promise.resolve();clearTimeout(pushTimer);return new Promise(res=>{pushTimer=setTimeout(async()=>{try{rollWeek();
+  const ok=await rpc('save_player',{p_handle:o.handle,p_token:o.token,p_name:S.name,p_tier:S.league.tier,p_week:S.league.week,p_score:S.league.score,p_state:publicState()});
+  // save_player answers false - not an error - when the key is no longer valid.
+  // Without this the game looks online forever while nothing reaches the server.
+  if(ok===false){keyDead();save(true);res();return;}
+  o.err='';o.lastPush=Date.now();}catch(e){o.err=e.message;}save(true);res();},400);});}
+let KEY_WARNED=0;
+function keyDead(){
+  const o=O();o.ok=false;o.err='This device is signed out - its account key is out of date.';
+  if(Date.now()-KEY_WARNED>60000){KEY_WARNED=Date.now();
+    toast('Signed out: nothing was saving to the server. Sign in again in Settings.','d');}
+  if(typeof C==='undefined'||!C)render();
+}
 async function pullSteps(){
   const o=O();if(!o.ok)return;const since=new Date();since.setHours(0,0,0,0);
   try{const rows=await rpc('get_steps',{p_handle:o.handle,p_token:o.token,p_since:since.toISOString()});o.lastPull=Date.now();
@@ -1271,6 +1283,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.7',d:'Sep 17',t:'The game notices when it is signed out',
+  i:['If a copy of the game is holding an old account key, saves quietly went nowhere and it still looked online. Now it notices, says so, and shows the way back in.',
+     'Your 6-digit PIN works in that box too, so you never have to keep the long key anywhere.']},
  {v:'6.6',d:'Sep 17',t:'Sign in again without starting over',
   i:['Settings, Online: a Re-enter my key button. If a copy of the game is holding an old account key, nothing it does reaches the server - now you can fix it in one step instead of resetting.',
      'If saving your PIN fails because of that, the game opens the sign-in box for you and says why.']},
@@ -1337,7 +1352,7 @@ function renderOnline(){
   const o=O();const st=$('#onlineStatus');if(!st)return;
   st.textContent=o.ok?'@'+o.handle:(o.err?'error':'off');
   let body='';
-  if(!o.ok){body=`<div class="row"><input id="handleInput" type="text" maxlength="20" placeholder="handle, e.g. celeste" value="${esc(o.handle||slug(S.name))}" style="flex:1;min-width:140px"><button class="btn r" onclick="goOnline($('#handleInput').value,$('#tokenInput').value)">Go online</button></div><input id="tokenInput" type="text" placeholder="account key (only if moving from another browser)" style="margin-top:8px;font-size:12px">${o.err?`<p class="help" style="color:#ff8a92">${esc(o.err)}</p>`:''}`;}
+  if(!o.ok){body=`${o.err?`<div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;background:rgba(230,62,92,.18);border-left:4px solid #e63e5c"><b style="color:#ff8a92">${esc(o.err)}</b><div class="help" style="margin-top:4px">Sign back in with your handle and your 6-digit PIN, or your account key. Your character on this phone is not touched.</div><button class="btn sm r" style="margin-top:8px" onclick="signInSheet()">Sign in again</button></div>`:''}<div class="row"><input id="handleInput" type="text" maxlength="20" placeholder="handle, e.g. celeste" value="${esc(o.handle||slug(S.name))}" style="flex:1;min-width:140px"><button class="btn r" onclick="goOnline($('#handleInput').value,$('#tokenInput').value)">Go online</button></div><input id="tokenInput" type="text" placeholder="account key (only if moving from another browser)" style="margin-top:8px;font-size:12px">${o.err?`<p class="help" style="color:#ff8a92">${esc(o.err)}</p>`:''}`;}
   else{body=`<div class="kv"><span>Handle</span><b>@${esc(o.handle)}</b><span>Last phone sync</span><b>${o.lastPost?timeStr(o.lastPost)+' today':'none yet'}</b><span>Server</span><b>${o.err?'<span style="color:#ff8a92">'+esc(o.err)+'</span>':'ok'}</b></div><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pullSteps();loadFriends();partySync();toast('Syncing')">Sync now</button><button class="btn sm ghost" onclick="testOnline()">Test connection</button><button class="btn sm ghost" onclick="copyText(O().token,'')">Copy account key</button><button class="btn sm ghost" onclick="signInSheet()">Re-enter my key</button></div><p class="help">Account key = how to move to another browser or phone. There, type this handle, paste the key, and your save comes with it.</p>`;}
   $('#onlineBody').innerHTML=body;
   const sHelp=$('#stepsHelp');
