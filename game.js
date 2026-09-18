@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.55';
+const VERSION='6.56';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1279,7 +1279,7 @@ function gachaSheet(k,got){
       +'. Every '+GACHA_PITY+'th crank is epic or better.'+(m.kind==='cloth'?' Clothes you already own never come up, so these shift as you collect.':'')+'</p>'
       :'<p class="help" style="margin-top:10px">You own everything in this machine. Cranking it would just hand your steps back.</p>'),true);
 }
-function renderGacha(){
+function renderGacha(){if(offscreen('#gachaBody'))return;
   const el=$('#gachaBody');if(!el)return;
   el.innerHTML='<p class="help">Your unspent steps go in the slot. Nothing here can be bought with money, only with walking.</p>'
     +'<div class="row" style="gap:10px;margin-top:10px;align-items:stretch">'
@@ -2229,7 +2229,13 @@ function owns(slot,key){if(!key)return true;if(slot==='hair'&&ART.HAIR_STYLES.in
 function tryOn(id){const it=shopItems().find(x=>x.id===id);if(!it)return;const av=Object.assign({},S.av);av[it.slot]=it.key;const owned=S.cosmetics.includes(id);const can=(S.wallet||0)>=it.c;
   openSheet(`<h2>${esc(it.n)}</h2><div style="text-align:center">${ART.avatarSVG(av,130)}</div><p style="text-align:center"><span class="rc-${it.r}">${RAR[it.r].n}</span> · ${owned?'yours':fmt(it.c)+' steps'}<br><span class="help">Wallet: ${fmt(S.wallet||0)} steps</span></p><div class="grid2"><button class="btn" onclick="closeSheet()">Back</button>${owned?`<button class="btn r" onclick="wear('${it.slot}','${it.key}');closeSheet()">Wear it</button>`:`<button class="btn a" onclick="buyLook('${id}')" ${can?'':'disabled'}>${can?'Buy for '+fmt(it.c):'Walk '+fmt(it.c-(S.wallet||0))+' more'}</button>`}</div>`);}
 function buyLook(id){const it=shopItems().find(x=>x.id===id);if(!it||S.cosmetics.includes(id))return;if((S.wallet||0)<it.c){toast('Not enough steps yet');return;}S.wallet-=it.c;S.cosmetics.push(id);S.av[it.slot]=it.key;SFX.play('legend');log('Unlocked '+it.n+' for '+fmt(it.c)+' steps.');toast(it.n+' unlocked and on','l');save();closeSheet();render();pushPlayer();}
-function renderShop(){const el=$('#shop');if(!el)return;$('#walletSub').textContent=fmt(S.wallet||0)+' steps to spend';const items=shopItems();const groups=[['hair','Hairstyles'],['eyes','Eyes'],['hat','Hats'],['top','Outfits'],['acc','Accessories']];
+// render() runs on every batch of steps, and it redrew EVERY screen - including
+// the Boutique's 71 cosmetics, each with its own SVG - while she was looking at
+// the map. Measured at 3.65ms a call on a desktop, 30 times per 3,000 steps.
+// A panel nobody is looking at does not need redrawing; the nav re-renders on
+// switch, so whatever she opens is fresh.
+function offscreen(sel){const el=$(sel);const v=el&&el.closest('.view');return !!(v&&!v.classList.contains('on'));}
+function renderShop(){if(offscreen('#shop'))return;const el=$('#shop');if(!el)return;$('#walletSub').textContent=fmt(S.wallet||0)+' steps to spend';const items=shopItems();const groups=[['hair','Hairstyles'],['eyes','Eyes'],['hat','Hats'],['top','Outfits'],['acc','Accessories']];
   el.innerHTML=groups.map(([slot,label])=>`<div class="section-label" style="margin-top:8px">${label}</div><div class="shopgrid">${items.filter(i=>i.slot===slot).map(it=>{const av=Object.assign({},S.av);av[it.slot]=it.key;const owned=S.cosmetics.includes(it.id);return `<button class="shopit${owned?' own':''}" onclick="tryOn('${it.id}')">${ART.avatarSVG(av,54)}<b class="rc-${it.r}">${esc(it.n)}</b><span>${owned?'owned':fmt(it.c)}</span></button>`;}).join('')}</div>`).join('');}
 function wear(slot,key){if(!owns(slot,key))return;S.av[slot]=key;save();render();}
 
@@ -3010,6 +3016,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.56',d:'Sep 18',t:'The map should stop stuttering',
+  i:['TWO THINGS WERE WASTING WORK, both measured. Every GPS reading threw away and rebuilt all 44 map pins, even though nothing about them had changed - and each rebuilt pin restarted its little bounce, which is what the stutter actually was. A pin is only redrawn now when something about it is genuinely different. 880 rebuilds per twenty readings became zero.',
+     'And every batch of steps redrew EVERY screen, including the Boutique with all 71 pieces of clothing and their drawings, while you were looking at the map. Screens you are not looking at are left alone now, and refresh when you open them. That is about three quarters less work per step.',
+     'Nothing about how the map looks or behaves has changed.']},
  {v:'6.55',d:'Sep 18',t:'Watch duty was short two jobs a day',
   i:['THE COUNTER SAID 5, THE BOARD POSTED 3. Watch duty always put up exactly three jobs, while the number of watches you are allowed is 3 plus your Watchtower level, plus the Alarm bell, plus Well Stocked.',
      'So every upgrade that promises "+1 watch job per day" raised the allowance and added nothing to the board. The Watchtower, the bell and the skill were all doing nothing for watch duty. That is fixed - the board now posts as many jobs as you are allowed.',
@@ -3514,7 +3524,7 @@ function renderStepHist(){
     +'<div style="display:flex;gap:2px;align-items:flex-end;margin:6px 0 2px">'+bars+'</div>'
     +'<p class="help" style="margin:2px 0 0">'+line+'</p>';
 }
-function renderOnline(){
+function renderOnline(){if(offscreen('#onlineStatus'))return;
   const o=O();const st=$('#onlineStatus');if(!st)return;
   st.textContent=o.ok?'@'+o.handle:(o.err?'error':'off');
   let body='';
@@ -3705,7 +3715,7 @@ function classSheet(){let cls='brawler';const draw=()=>{$('#sheet').innerHTML=`<
 /* ================= wiring ================= */
 function wire(){
   document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{SFX.play('ui');if(typeof STREET!=='undefined'&&STREET.on){STREET.on=false;if(STREET.watch!==null){navigator.geolocation.clearWatch(STREET.watch);STREET.watch=null;}clearInterval(STREET.timer);$('#v-street').insertBefore($('#locCard'),$('#raidCard'));}document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.view').forEach(v=>{const on=v.id==='v-'+b.dataset.v;v.classList.toggle('on',on);
-      v.classList.remove('tabin');if(on&&!reduced){void v.offsetWidth;v.classList.add('tabin');}});$('#main').scrollTop=0;if(b.dataset.v==='street')animate();});
+      v.classList.remove('tabin');if(on&&!reduced){void v.offsetWidth;v.classList.add('tabin');}});$('#main').scrollTop=0;render();if(b.dataset.v==='street')animate();});
   // Two buttons instead of one, because "5,000" meant "add 5,000" to her and
   // "my total is 5,000" to the code, and nothing on screen said which.
   $('#syncInput').oninput=syncMath;syncMath();

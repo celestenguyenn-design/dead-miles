@@ -207,8 +207,13 @@ function updateMarkers(){
     const html=rd
       ? `<div class="poi ${st} raid t${rd.tier}${rdone?' rdone':''}" style="--rc:${rdone?'#6b6b74':rd.T.col}"><span>${rd.T.e}</span><b>${rdone?'✓':rd.tier}</b></div>`
       : `<div class="poi ${st}${p.t==='stronghold'?' sh':''}"><span>${p.e}</span></div>`;
-    if(!STREET.markers[p.id]){const m=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]})}).addTo(STREET.map);m.on('click',()=>{const rr=raidAt(p);if(rr)openRaid(p.id);else tapPoi(p.id);});STREET.markers[p.id]=m;}
-    else STREET.markers[p.id].setIcon(L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]}));}
+    const had=STREET.markers[p.id];
+    if(!had){const m=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]})}).addTo(STREET.map);m.on('click',()=>{const rr=raidAt(p);if(rr)openRaid(p.id);else tapPoi(p.id);});m._dmHtml=html;STREET.markers[p.id]=m;}
+    // setIcon THROWS AWAY the element and builds a new one. This ran on every pin
+    // on every GPS ping - 44 rebuilds a second while walking, for pins that had
+    // not changed - and each new element restarts its bob animation, which is
+    // what the stutter actually was. Only redraw a pin when its html differs.
+    else if(had._dmHtml!==html){had.setIcon(L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]}));had._dmHtml=html;}}
   for(const id of Object.keys(STREET.markers)){if(!seen.has(id)){STREET.map.removeLayer(STREET.markers[id]);delete STREET.markers[id];}}
 }
 function drawBase(){if(!S.base||!S.base.geo||!STREET.map)return;if(!STREET.baseMarker){STREET.baseMarker=L.marker([S.base.geo.lat,S.base.geo.lon],{icon:L.divIcon({className:'poi-wrap',html:'<div class="poi base"><span>🏚️</span></div>',iconSize:[40,40],iconAnchor:[20,20]})}).addTo(STREET.map);}else STREET.baseMarker.setLatLng([S.base.geo.lat,S.base.geo.lon]);}
