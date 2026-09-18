@@ -2071,6 +2071,16 @@ function moveBaseSheet(){
   const row=(a,b)=>'<span>'+a+'</span><b>'+b+'</b>';
   openSheet('<h2>'+esc(loc.e+' '+loc.n)+'</h2>'
     +'<p class="help">'+(first?'Your first base.':'Moving from '+esc(S.base.n)+'.')+' A base type is really just the one room it hands you for free, plus anything that keeps paying.</p>'
+    +(function(){
+      // The one thing about a base that is about WHERE it is rather than what it
+      // is: with the live map on you have to be within 60 m of it to stash, and
+      // stashing is where a run turns into points. A base you rarely walk past
+      // means carrying a full pack around - and a pack is lost if you go down.
+      if(!(typeof STREET!=='undefined'&&STREET.on&&loc.geo))return '';
+      const d=(typeof homeDistance==='function')?homeDistance():null;
+      return '<div class="note" style="margin-top:8px"><b>You stash here.</b> With the live map on you have to be standing within 60 m of your base to stash a pack, so pick somewhere you walk past anyway - home, work, the school run.'
+        +(d!==null?' Your current base is '+Math.round(d)+' m from here.':'')
+        +'</div>';})()
     +'<div class="section-label" style="margin-top:10px">What this place gives you</div>'
     +(gain.names.length
       ? '<div class="kv">'+row('Free right away',esc(gain.names.join(', ')))
@@ -2092,6 +2102,7 @@ function moveBaseSheet(){
       +row('Raiders hitting harder by now','+'+age+' raid power')
       +row('After moving','back to 0, and one raid-free day')+'</div>'
       +'<p class="help" style="margin-top:6px">Raids get stronger the longer you stay in one place - about +0.5 power a day. Moving resets that.</p>')
+    +'<p class="help" style="margin-top:10px">Only moving the map PIN? That is a different button - "Move my home pin here" on the map. It costs the same 20 scrap and keeps everything you built.</p>'
     +'<div class="grid2" style="margin-top:12px">'
     +'<button class="btn ghost" onclick="closeSheet()">Stay put</button>'
     +(!first&&S.stock.scrap<20
@@ -3183,7 +3194,8 @@ const NEWS=[
      'It is now a full comparison: the room the new building hands you free and what that would have cost you in steps and scrap, anything about it that keeps paying forever, everything you would demolish, and the defense you would drop.',
      'THE RAID CLOCK, which the game has never once mentioned: raiders hit HARDER the longer you stay in one place, about +0.5 power a day. Forty days in one base is +20. Moving resets it to zero and buys you a raid-free day. Your base card now shows how long you have held it and what that is costing you.',
      'What a base type really is: one free room, plus anything permanent. Only three are permanent - a GAS STATION is the only thing in the game that lowers how often you get raided (-30%, forever), HARDWARE takes 10% off every build forever, and a GROCERY, DINER or HOUSE pays you a little every morning. Every other base is a head start you could walk out and build yourself.',
-     '"Set my home here" on the map is a different button and now says so - it moves your home PIN only, costs 20 scrap and keeps everything you built. It is now called "Move my home pin here".']},
+     'WHERE your base sits matters too, and only for one reason: with the live map on you have to be within 60 m of it to STASH. Stashing is where a run turns into league points, heals you and feeds your crew - so put your base somewhere you walk past anyway. Nothing else cares where it is; you can build, work and fight from anywhere. The move screen now says this and shows how far the new spot is from your current base.',
+     '"Set my home here" on the map is a different button and now says so - it moves your home PIN only, costs 20 scrap and keeps everything you built. It is now called "Move my home pin here". If the spot is right but the pin is wrong, that is the button you want.']},
  {v:'6.65',d:'Sep 18',t:'Your step count fixes itself now',
   i:['v6.64 stopped the double-counting, but it left anyone already inflated to tap a button. That was our bug, not yours to clean up.',
      'Open the game and it repairs itself: hand-typed steps that were sitting on top of the same steps your phone counted come back out, and today, this week and your lifetime total all land on your phone\'s own reading. It says in your log exactly how many it took back.',
