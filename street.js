@@ -84,6 +84,14 @@ function streetStart(){
   if(!STREET.map){
     STREET.map=L.map('map',{zoomControl:false,attributionControl:true}).setView([40.71,-74.0],17);
     applyTiles();
+    // In Bloom every pin bobs forever and carries three shadow layers. While you
+    // drag or pinch, Leaflet is transforming the whole pane underneath 44 of
+    // them, and the browser has to keep repainting each one. Freeze the motion
+    // for the length of the gesture - it looks identical when the map is still,
+    // which is the only time you can see a 2px bob anyway.
+    const moving=(on)=>{const m=$('#v-map');if(m)m.classList.toggle('moving',on);};
+    STREET.map.on('movestart zoomstart dragstart',()=>moving(true));
+    STREET.map.on('moveend zoomend',()=>moving(false));
   }
   setTimeout(()=>{STREET.map.invalidateSize();if(STREET.pos)STREET.map.setView([STREET.pos.lat,STREET.pos.lon],17);},50);
   try{applyMapSkin();renderMapSkin();}catch(e){}

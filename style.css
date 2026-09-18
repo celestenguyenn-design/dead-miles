@@ -297,6 +297,14 @@ a{color:var(--amber)}
 .map-bloom .poi.near{animation:pulse 1.4s infinite}
 @keyframes bloombob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
 @media(prefers-reduced-motion:reduce){.map-bloom .poi{animation:none}}
+/* While the map is being dragged or pinched, stop the pins animating and drop
+   them to a single cheap shadow. 44 bobbing elements with three shadow layers
+   each is the most expensive thing on the screen, and it costs the most at
+   exactly the moment she is moving the map. Still map, full treatment. */
+.map-bloom.moving .poi,.map-bloom.moving .poi.near{animation:none}
+.map-bloom.moving .poi{box-shadow:0 2px 5px rgba(120,100,80,.3)}
+.moving .poi.near{animation:none}
+.moving .me-icon{animation:none}
 
 /* trader */
 .trade{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}

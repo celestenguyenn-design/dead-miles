@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.57';
+const VERSION='6.58';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3016,6 +3016,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.58',d:'Sep 18',t:'Dragging and pinching the map should be smoother',
+  i:['ON THE BLOOM MAP every pin gently bobs, and each one carries three layers of shadow. With 44 places around you that is 44 things the phone repaints constantly - and it costs the most exactly while you are dragging or pinching, because the whole map is moving under them at the same time.',
+     'The bobbing now stops for the length of the gesture and comes back when the map settles. It looks the same when you are not touching it, which is the only time you can see a 2px bob anyway.',
+     'If it is still slow, tap HOLLOW on the map screen - that skin has no bobbing at all. Tell me whether that fixes it, because it tells me whether I am looking in the right place.']},
  {v:'6.57',d:'Sep 18',t:'Your character is back on the road',
   i:['IF YOU WERE WEARING A ONESIE, you disappeared from the road scene - your pet stayed, your character did not.',
      'The hood needs an internal name to cut its shape out, and that name was being changed every single time you were drawn. The game keeps drawings by name, so it never recognised you twice, made a brand new picture sixty times a second, and none of them ever finished loading. The name is fixed now.',
