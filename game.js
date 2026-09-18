@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.58';
+const VERSION='6.59';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1741,7 +1741,16 @@ function act(kind){
     clog('You get a fresh grip on the '+(eqItem('melee')?eqItem('melee').n:'weapon')+'.','good');
   }
   else if(kind==='flee'){if(C.where==='raid'||C.where==='horde'){toast('Nowhere to run. This is your base.');return;}
-    if(Math.random()<0.7){C.fled=true;clog('You break away and run.','sys');const drop=Math.ceil(S.pack.length*0.25);for(let i=0;i<drop&&S.pack.length;i++)S.pack.splice(rint(0,S.pack.length-1),1);endCombat(false);return;}
+    if(Math.random()<0.7){C.fled=true;clog('You break away and run.','sys');
+      // "I actually want to know what I dropped." Name them, in the fight log and
+      // on the way-out screen, instead of just saying a quarter of the pack.
+      const drop=Math.ceil(S.pack.length*0.25);const lost=[];
+      for(let i=0;i<drop&&S.pack.length;i++)lost.push(S.pack.splice(rint(0,S.pack.length-1),1)[0]);
+      C.dropped=lost;
+      if(lost.length){const names=lost.map(x=>x.e+' '+x.n).join(', ');
+        clog('Shaken loose as you go: '+names+'.','hit');
+        log('Ran from a fight and lost '+names+'.');}
+      endCombat(false);return;}
     else clog('You stumble. They close in.','hit');
   }
   const a=alive();
@@ -1875,7 +1884,9 @@ function endCombat(won){
     else if(where==='horde'){resolveHorde(true,false);}
     else log('You fled the road.');
   }
-  const summary=C.killHtml?C.killHtml:won?`<h2>Clear</h2><div class="big">${where==='raid'?'🧱':'💥'}</div><p>${C.log.filter(l=>l.c==='good').slice(0,4).map(l=>esc(l.m)).join('<br>')||'They are down.'}</p>`:`<h2>You got away</h2><div class="big">💨</div><p>Dropped a quarter of the pack on the way out.</p>`;
+  const summary=C.killHtml?C.killHtml:won?`<h2>Clear</h2><div class="big">${where==='raid'?'🧱':'💥'}</div><p>${C.log.filter(l=>l.c==='good').slice(0,4).map(l=>esc(l.m)).join('<br>')||'They are down.'}</p>`:`<h2>You got away</h2><div class="big">💨</div>`+((C.dropped&&C.dropped.length)
+      ? `<p>Shaken loose on the way out:</p><div class="loot" style="justify-content:center">${C.dropped.map(g=>`<div class="item r-${g.r||'common'}"><span class="e">${g.e}</span>${esc(g.n)}</div>`).join('')}</div>`
+      : `<p>Nothing in your pack to lose.</p>`);
   const carry=S.walk.banked||0;S.walk.banked=0;
   C.summaryShown=true;C=null;save();render();
   openSheet(summary+`<button class="btn r wide" onclick="closeSheet()">Continue</button>`);
@@ -3016,6 +3027,13 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.59',d:'Sep 18',t:'Pick your gear from a list instead of a wall of buttons',
+  i:['THE BARE HANDS PROMPT now has one dropdown per slot - weapon, gun, armour, head, bag - instead of a stack of buttons.',
+     'AND IT WAS HIDING YOUR GEAR. It only ever offered the first four weapons and the first three pieces of armour, so if you owned more than that the rest could not be equipped from there at all. Every piece you own is in the list now, best first.',
+     'A wrecked piece is still listed but greyed out, and slots you own nothing for are left out entirely.']},
+ {v:'6.59b',d:'Sep 18',t:'You can see what you dropped running away',
+  i:['RUNNING FROM A FIGHT used to say "dropped a quarter of the pack on the way out" and leave you to work out what was gone.',
+     'It names them now - on the way-out screen, in the fight log, and in your journal. If your pack was empty it says so instead of implying you lost something.']},
  {v:'6.58',d:'Sep 18',t:'Dragging and pinching the map should be smoother',
   i:['ON THE BLOOM MAP every pin gently bobs, and each one carries three layers of shadow. With 44 places around you that is 44 things the phone repaints constantly - and it costs the most exactly while you are dragging or pinching, because the whole map is moving under them at the same time.',
      'The bobbing now stops for the length of the gesture and comes back when the map settles. It looks the same when you are not touching it, which is the only time you can see a 2px bob anyway.',
@@ -3780,6 +3798,47 @@ function bossChance(){return Math.min(1,0.06+(0.03+(bg('gamer')?0.01:0)+sk('lore
 function bossPhaseHp(){return 110+S.walk.district*35+(S.bossKills||0)*15;}
 let PENDING_FIGHT=null;
 function runPending(){const f=PENDING_FIGHT;PENDING_FIGHT=null;if(f)f();}
+// Her words: "it only shows like four weapons and three armor... we should be
+// able to choose like a drop down." She was right twice over - it was not just
+// long, it was CAPPED at slice(0,4) and slice(0,3), so anything past the fourth
+// weapon could not be equipped from here at all. One line per slot now, and
+// every piece you own is in it.
+const GEAR_SLOTS=[
+  {k:'melee', n:'Weapon',    v:'Bare hands'},
+  {k:'ranged',n:'Gun or bow',v:'Nothing ranged'},
+  {k:'armor', n:'Armour',    v:'No armour'},
+  {k:'head',  n:'Head',      v:'Nothing on your head'},
+  {k:'bag',   n:'Bag',       v:'No bag'},
+];
+function gearLabel(g){
+  const t=temperOf(g);
+  const what=g.dmg?`${g.dmg[0]}-${g.dmg[1]} dmg`:(g.dr!==undefined?`-${g.dr} damage`:(g.cap?`+${g.cap} room`:''));
+  const dur=(g.dur!==undefined&&repairMax(g))?` · ${g.dur} left`:'';
+  return `${g.e} ${g.n}${t?' ('+t.n+')':''}${what?' - '+what:''}${dur}${g.broken?' - WRECKED':''}`;
+}
+function gearPicker(){
+  return GEAR_SLOTS.map(sl=>{
+    const mine=(S.gear||[]).filter(x=>x.slot===sl.k);
+    if(!mine.length)return '';
+    // best first, so the top of the list is the one she probably wants
+    mine.sort((x,y)=>(y.broken?-1:1)-(x.broken?-1:1)||gearPower(y)-gearPower(x));
+    const cur=S.eq[sl.k]||'';
+    return `<label class="gpick"><span>${sl.n}</span>
+      <select onchange="pickGear('${sl.k}',this.value)">
+        <option value=""${cur?'':' selected'}>${esc(sl.v)}</option>
+        ${mine.map(g=>`<option value="${g.uid}"${cur===g.uid?' selected':''}${g.broken?' disabled':''}>${esc(gearLabel(g))}</option>`).join('')}
+      </select></label>`;
+  }).join('');
+}
+// equip() toggles, which is wrong for a dropdown - choosing the thing that is
+// already on would take it off.
+function pickGear(slot,uidv){
+  if(!uidv){S.eq[slot]=null;SFX.play('ui');save();render();}
+  else if(S.eq[slot]!==uidv)equip(uidv);
+  const msg=$('#sheet')&&$('#sheet').querySelector('#gcMsg');
+  if(msg){const g=(S.gear||[]).find(x=>x.uid===uidv);
+    msg.textContent=g?g.n+' equipped.':'Taken off.';}
+}
 function gearCheck(then){const w=eqItem('melee');const armor=eqItem('armor')||eqItem('head');const owned=S.gear.filter(x=>x.slot==='melee'&&S.eq.melee!==x.uid);const ownedArmor=S.gear.filter(x=>(x.slot==='armor'||x.slot==='head')&&S.eq[x.slot]!==x.uid);
   if(w&&(armor||!ownedArmor.length)){then();return;}
   // She has already said "fight anyway" for this exact gear situation today.
@@ -3787,9 +3846,17 @@ function gearCheck(then){const w=eqItem('melee');const armor=eqItem('armor')||eq
   if(S.gcOk===sig){then();return;}
   S.gcSig=sig;
   PENDING_FIGHT=then;
-  const wl=owned.slice(0,4).map(x=>`<button class="btn wide" style="margin-top:6px" onclick="equip('${x.uid}');$('#sheet').querySelector('#gcMsg').textContent='${esc(x.n)} equipped.';">${x.e} Equip ${esc(x.n)} <span class="help">${x.dmg?x.dmg[0]+'-'+x.dmg[1]+' dmg':''}</span></button>`).join('');
-  const al=ownedArmor.slice(0,3).map(x=>`<button class="btn wide ghost" style="margin-top:6px" onclick="equip('${x.uid}');$('#sheet').querySelector('#gcMsg').textContent='${esc(x.n)} equipped.';">${x.e} Wear ${esc(x.n)} <span class="help">-${x.dr} damage</span></button>`).join('');
-  openSheet(`<h2>${w?'No armor on':'Bare hands'}</h2><p>${w?'You have a weapon but nothing protecting you.':'You have no weapon equipped.'}${!w&&!owned.length?' You do not own one yet. Garages, hardware stores and the police station carry them.':''}</p>${wl}${al}<p class="help" id="gcMsg" style="margin-top:8px"></p><div class="grid2" style="margin-top:8px"><button class="btn ghost" onclick="PENDING_FIGHT=null;closeSheet()">Not now</button><button class="btn r" onclick="S.gcOk=S.gcSig;save();closeSheet();runPending()">${w?'Fight as is':'Fight anyway'}</button></div>`,true);}
+  const nothing=!w&&!owned.length;
+  openSheet(`<h2>${w?'No armor on':'Bare hands'}</h2>`
+    +`<p>${w?'You have a weapon but nothing protecting you.':'You have no weapon equipped.'}`
+    +`${nothing?' You do not own one yet. Garages, hardware stores and the police station carry them.':''}</p>`
+    +gearPicker()
+    +`<p class="help" id="gcMsg" style="margin-top:8px"></p>`
+    +`<div class="grid2" style="margin-top:10px">`
+    +`<button class="btn" onclick="S.gcOk=S.gcSig;save();closeSheet();runPending()">Fight anyway</button>`
+    +`<button class="btn r" onclick="closeSheet();runPending()">Go</button></div>`
+    +`<button class="btn wide ghost" style="margin-top:8px" onclick="PENDING_FIGHT=null;closeSheet()">Not yet</button>`,true);
+}
 function fightBoss(){const b=bossState();if(S.loc||S.combat){toast('Finish what you are doing first');return;}if(b.killed){toast(bossName()+' is already down this week');return;}
   if(S.bossFightsToday>=BOSS_FIGHTS_PER_DAY){toast('No boss fights left today. Two a day.');return;}
   if(S.hp<30&&!confirm('You are at '+S.hp+' HP. The boss hits hard. Go anyway?'))return;
