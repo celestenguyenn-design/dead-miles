@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.53';
+const VERSION='6.54';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -781,6 +781,26 @@ function rollRoom(r,loc){
   return out;
 }
 function rollCosmetic(){const pool=cosmeticPool().map(c=>({...c,w:(COS_W[c.r]||1)*rarW(c)}));const c=wpick(pool,'w');return {id:c.id,n:c.n,e:c.slot==='hat'?'🎩':c.slot==='top'?'👕':'🕶️',pts:c.r==='legendary'?60:c.r==='epic'?30:18,cat:'cosmetic',r:c.r,slot:c.slot,key:c.key};}
+// Ordinary enemies used to grow 0.075 per level while the player gains a flat
+// +1 damage per level ON TOP of a better weapon, so the gap widened forever: by
+// level 14 one swing killed a walker and a road fight cost literally 0 HP.
+// These two keep the world in step with her. They are deliberately NOT applied
+// to raids - raids already carry tier multipliers, and stacking both made tier 5
+// unwinnable (measured: 3% win at level 12).
+const WORLD_PER_LEVEL=0.13, WORLD_BASE=1.15, WORLD_CROWD_LVL=10;
+function worldEnemy(k){
+  const e=mk(k),lvl=S.lvl||1;
+  const f=((1+Math.max(0,lvl-5)*WORLD_PER_LEVEL)/(1+Math.max(0,lvl-5)*0.075))*WORLD_BASE;
+  e.hp=e.max=Math.round(e.max*f);
+  e.dmg=e.dmg.map(x=>Math.round(x*f));
+  return e;
+}
+function worldCrowd(en){
+  // Past level 10 the county sends one more body. A lone walker is never a
+  // threat to a grown character; three of them are.
+  if((S.lvl||1)>=WORLD_CROWD_LVL&&en.length)en.push(worldEnemy(Math.random()<0.6?'walker':'runner'));
+  return en;
+}
 function encounterFor(loc){
   const th=district().threat*loc.threat;const rng=Math.random();
   if(loc.stronghold){return strongholdStage(loc.stage+1);}
@@ -788,8 +808,8 @@ function encounterFor(loc){
   let quiet=0.27+ambushCut;if(wxKind()==='fog')quiet-=0.1;if(wxKind()==='rain')quiet-=0.08;
   if(rng<quiet)return [];
   let count=th<1.5?(Math.random()<0.3?2:1):th<2.5?rint(1,3):rint(2,3);if(isNight()||wxKind()==='storm')count++;count+=modCount();count=Math.max(1,count);count=Math.min(S.walk.district>=3?5:4,count);const out=[];
-  for(let i=0;i<count;i++){if(S.walk.district>=1&&Math.random()<0.15)out.push(mk(Math.random()<0.7?'raider':'gunner'));else{const k=wpick(Object.entries(ENEMIES).filter(([k,v])=>v.w>0).map(([k,v])=>({k,w:v.w*(isNight()&&k==='runner'?2:1)})),'w').k;out.push(mk(k));}}
-  return out;
+  for(let i=0;i<count;i++){if(S.walk.district>=1&&Math.random()<0.15)out.push(worldEnemy(Math.random()<0.7?'raider':'gunner'));else{const k=wpick(Object.entries(ENEMIES).filter(([k,v])=>v.w>0).map(([k,v])=>({k,w:v.w*(isNight()&&k==='runner'?2:1)})),'w').k;out.push(worldEnemy(k));}}
+  return worldCrowd(out);
 }
 function strongholdStage(st){if(st===1)return [mk('raider'),mk('raider')];if(st===2)return [mk('raider'),mk('gunner'),mk('raider')];const b=mk('boss');b.n=bossName();b.hp=Math.round(b.hp*1.5);b.max=b.hp;b.wanted=true;b.g=BOSS_GIMMICK[b.n]||'crit';if(b.g==='shield')b.shield=30;if(b.g==='dodgy'){b.dodge=0.45;b.hp=Math.round(b.hp*0.7);b.max=b.hp;}if(b.g==='slow'){b.dmg=b.dmg.map(x=>Math.round(x*1.4));}return [mk('gunner'),b];}
 function mk(k){const e=ENEMIES[k];const scale=(1+S.walk.district*0.12+S.league.tier*0.06+Math.max(0,S.lvl-5)*0.075)*diff().enemy;return {k,n:e.n,hp:Math.round(e.hp*scale),max:Math.round(e.hp*scale),dmg:e.dmg.map(x=>Math.round(x*scale)),hit:e.hit+(isNight()?0.04:0),xp:e.xp,dodge:e.dodge||0,fast:!!e.fast,burst:e.burst||0,scream:e.scream||0,human:!!e.human,boss:!!e.boss,dead:false,stun:0};}
@@ -1492,7 +1512,7 @@ function addSteps(n,src){
   let left=n;
   while(left>0){if(left>=S.walk.toNext){left-=S.walk.toNext;S.walk.progress=S.walk.dist;S.walk.toNext=0;arrive();break;}else{S.walk.toNext-=left;S.walk.progress=S.walk.dist-S.walk.toNext;left=0;}}
   if(left>0)S.walk.banked=(S.walk.banked||0)+left;
-  if(!S.loc&&!S.combat&&S.flags.roadCheck<1&&Math.random()<Math.min(0.5,n/300*0.07*dealMod('road'))){S.flags.roadCheck++;if(Math.random()<sk('shadow')*0.12){log('Something moved in the treeline. You went around it.');save();render();return;}save();render();setTimeout(()=>startCombat([mk(Math.random()<0.7?'walker':'runner')],'road'),400);return;}
+  if(!S.loc&&!S.combat&&S.flags.roadCheck<1&&Math.random()<Math.min(0.5,n/300*0.07*dealMod('road'))){S.flags.roadCheck++;if(Math.random()<sk('shadow')*0.12){log('Something moved in the treeline. You went around it.');save();render();return;}save();render();setTimeout(()=>startCombat(worldCrowd([worldEnemy(Math.random()<0.7?'walker':'runner')]),'road'),400);return;}
   save();render();
 }
 function arrive(){
@@ -2325,6 +2345,27 @@ function seasonAdd(n,why){
   if(ready.length){const b=$('#seasonCard');if(b)b.classList.add('ready');}
   return got;
 }
+// Tiff walks ~21,000 a day and finishes the ten rungs around day 22 - which
+// would leave her with nine empty days, the exact problem seasons were meant to
+// fix. Past the last rung the track keeps paying, forever, at a steeper price.
+const SEASON_OVERFLOW=240;
+function seasonSurplus(){const f=seasonState();const top=SEASON_TIERS[SEASON_TIERS.length-1].p;
+  return Math.max(0,f.pts-top);}
+function seasonOverflowDue(){
+  const f=seasonState();
+  if(f.claimed.length<SEASON_TIERS.length)return 0;      // finish the track first
+  return Math.floor(seasonSurplus()/SEASON_OVERFLOW)-(f.over||0);
+}
+function seasonClaimOverflow(){
+  const f=seasonState();const n=seasonOverflowDue();
+  if(n<=0){toast('Nothing over the top yet');return;}
+  f.over=(f.over||0)+n;
+  S.keys+=2*n;S.stock.scrap+=50*n;
+  const legend=Math.random()<0.2*n;
+  if(legend)dropLegendQuiet();
+  log('Over the top '+(f.over)+': +'+(2*n)+' keys, +'+(50*n)+' scrap'+(legend?', and a legendary':'')+'.');
+  toast('Over the top x'+f.over,'l');SFX.play('legend');save();render();
+}
 function seasonTierReady(){const f=seasonState();return SEASON_TIERS.map((t,i)=>i).filter(i=>f.pts>=SEASON_TIERS[i].p&&!f.claimed.includes(i));}
 function seasonClaim(i){
   const f=seasonState();const t=SEASON_TIERS[i];
@@ -2498,6 +2539,13 @@ function renderSeason(){
       <span class="chip${capLeft?'':' s'}">${capLeft?capLeft+' more today':'today is capped'}</span>
     </div>
     ${ready.length>1?`<button class="btn a wide" style="margin-top:8px" onclick="seasonClaimAll()">Claim ${ready.length} rewards</button>`:''}
+    ${(()=>{const over=seasonOverflowDue(),done=f.claimed.length>=SEASON_TIERS.length;
+      if(!done)return '';
+      const sur=seasonSurplus(),into=sur%SEASON_OVERFLOW;
+      return `<div class="overtop"><b>Over the top${f.over?' \u00d7'+f.over:''}</b>
+        <span>The track is finished. It keeps paying: 2 keys and 50 scrap every ${SEASON_OVERFLOW} points, with a chance at a legendary.</span>
+        ${over>0?`<button class="btn a" onclick="seasonClaimOverflow()">Claim ${over>1?over+' lots':'it'}</button>`
+                :`<i>${SEASON_OVERFLOW-into} points to the next one</i>`}</div>`;})()}
     <div class="strack" style="margin-top:10px">${rows}</div>
     <p class="help" style="margin-top:8px">Points come from walking AND from playing - places cleared, raids, chests, what you bring home. There is a daily cap, so the season lasts the month however far you walk.</p>`;
 }
@@ -2929,6 +2977,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.54',d:'Sep 18',t:'The county fights back',
+  i:['ORDINARY FIGHTS WERE FREE. Measured: a kitted player lost 0 HP on a road fight and 0 on a house, at every level - because your damage grew every level while the walkers barely did, so one swing killed anything.',
+     'The world now keeps pace with you. A walker at level 18 is 78 HP hitting 16-30, not 40 hitting 8-15, and past level 10 the county sends one more body. A normal fight now costs about 7% of your health at level 12, 23% at level 18 and 39% at level 25.',
+     'NEW PLAYERS ARE NOT TOUCHED - below level 10 it is exactly as it was. And RAIDS are not touched either: they already had their own difficulty, and stacking both made tier 5 unwinnable when I tried it.',
+     'OVER THE TOP: if you finish the whole season track, it keeps paying - 2 keys and 50 scrap every 240 points, with a shot at a legendary. Walking 20k a day finishes the track around day 22, and this is what the rest of the month is for.']},
  {v:'6.53',d:'Sep 18',t:'SEASONS - something to chase every month',
   i:['A SEASON runs for a calendar month and everyone is in the same one. This month is Overgrowth. There is a ten-rung track on the You screen: keys, scrap, a skill point, three season-only pieces of clothing, and a LEGENDARY at the top.',
      'Points come from walking AND from playing - places cleared, raids, chests, what you bring home. There is a daily cap, so the season lasts the month no matter how far you walk. Nobody clears it in a weekend.',
