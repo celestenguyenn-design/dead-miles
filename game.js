@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.59';
+const VERSION='6.60';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3027,6 +3027,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.60',d:'Sep 18',t:'It should stop telling you that you are in a car',
+  i:['WALKING WAS BEING READ AS DRIVING. Two reasons. A single GPS reading was enough to lock you out for over a minute - and phones glitch constantly. And when your phone does not report its own speed, the game worked it out from two positions without caring how accurate they were; walking past tall buildings a reading can jump 60 metres, which looks like 30 m/s.',
+     'It now needs three fast readings in a row before it believes you, it ignores movement smaller than the GPS error bars, and it measures over five seconds instead of one so a real car still stands out. The lockout is 45 seconds instead of 75.',
+     'Tested against a walk with 90-metre GPS jumps, a walk with no reported speed, and a walk with one freak reading - none of them lock you out now, and a real car still does.']},
  {v:'6.59',d:'Sep 18',t:'Pick your gear from a list instead of a wall of buttons',
   i:['THE BARE HANDS PROMPT now has one dropdown per slot - weapon, gun, armour, head, bag - instead of a stack of buttons.',
      'AND IT WAS HIDING YOUR GEAR. It only ever offered the first four weapons and the first three pieces of armour, so if you owned more than that the rest could not be equipped from there at all. Every piece you own is in the list now, best first.',

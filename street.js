@@ -19,22 +19,43 @@ function geoDist(a,b){const R=6371000,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon
    Being in a car is not a punishment, it is a pause: once you are back under
    walking speed, a short settle and you are playing again. That way a bus ride
    past a raid costs nothing, and driving to one buys you nothing. */
-const VEHICLE_MS=9, SETTLE_MS=75000;
+// Her friend was walking and the game told her she was in a car. Two reasons,
+// both fixed here.
+//
+// 1. ONE reading was enough to lock her out for 75 seconds. GPS glitches all the
+//    time; a single bad sample should never be believed.
+// 2. When the phone does not report its own speed, the fallback differenced two
+//    fixes and IGNORED how accurate they were. Walking between tall buildings a
+//    fix can jump 60 m with 80 m of uncertainty - that is not travel, it is the
+//    phone guessing, and it reads as 30 m/s.
+const VEHICLE_MS=9, SETTLE_MS=45000, FAST_HITS=3;
 function speedNow(){
   const h=STREET.spd||[];if(h.length<2)return 0;
-  const a=h[h.length-2],b=h[h.length-1];
-  const dt=(b.t-a.t)/1000;if(dt<=0.4)return STREET.lastSpd||0;
-  return geoDist(a,b)/dt;
+  const b=h[h.length-1];
+  // Measure against the OLDEST fix in the window rather than the previous one.
+  // Over one second a car covers ~15 m, which is less than the GPS error, so
+  // subtracting the error hid real driving. Over five seconds the distance grows
+  // while the uncertainty does not, and a car separates cleanly from a jumpy
+  // walk instead of both looking like noise.
+  const a=h[0];
+  const dt=(b.t-a.t)/1000;if(dt<1)return STREET.lastSpd||0;
+  const d=geoDist(a,b);
+  const slop=(a.acc||0)+(b.acc||0);
+  if(d<=slop)return 0;
+  return (d-slop)/dt;
 }
 function noteSpeed(pos,gps){
   if(!STREET.spd)STREET.spd=[];
-  STREET.spd.push({lat:pos.lat,lon:pos.lon,t:Date.now()});
+  STREET.spd.push({lat:pos.lat,lon:pos.lon,t:Date.now(),acc:pos.acc||20});
   if(STREET.spd.length>6)STREET.spd.shift();
   // Trust the GPS chip's own speed when it gives one - it is far steadier than
   // differencing two fixes, which a jumpy urban position makes look like 30 m/s.
   const measured=(typeof gps==='number'&&gps>=0)?gps:speedNow();
   STREET.lastSpd=measured;
-  if(measured>=VEHICLE_MS)STREET.lastFast=Date.now();
+  // Three fast readings in a row before we call it a car. A car stays fast for
+  // minutes; a glitch does not.
+  STREET.fastRun=(measured>=VEHICLE_MS)?(STREET.fastRun||0)+1:0;
+  if(STREET.fastRun>=FAST_HITS)STREET.lastFast=Date.now();
 }
 function drivingLock(){
   if(!STREET.lastFast)return 0;
