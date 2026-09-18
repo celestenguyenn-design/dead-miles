@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.54';
+const VERSION='6.55';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -822,10 +822,36 @@ const WATCH_JOBS={
   strays:{n:'Clear the strays',e:'🐕',d:'Runners have been circling the base at night. Two of them, quick ones.',enemies:()=>[mk('runner'),mk('runner')],reward:{items:2,scrap:4}}
 };
 function watchMax(){return 3+(S.base&&S.base.rooms.tower?S.base.rooms.tower:0)+(S.base&&S.base.rooms.bell?1:0)+sk('wellstocked')+dealMod('watch');}
-function watchState(){const t=todayStr();if(!S.watch||S.watch.date!==t){const keys=Object.keys(WATCH_JOBS);const jobs=[];while(jobs.length<3){const k=pick(keys);if(!jobs.includes(k))jobs.push(k);}S.watch={date:t,used:0,jobs};}return S.watch;}
+// The board used to post exactly 3 jobs while watchMax() allowed 3 + Watchtower
+// level + Alarm bell + Well Stocked. So the counter read "of 5", only 3 jobs
+// existed, and every upgrade that promises "+1 watch job per day" did nothing at
+// all. She noticed because she had been doing three against a label saying five.
+//
+// Two traps in the fix. There are only 4 job TYPES, so filling to watchMax()
+// with a unique-key loop spins forever the moment the cap passes 4 - the board
+// fills with unique types first, then allows a repeat. And the list can now hold
+// duplicates, so taking one must remove ONE entry, not every entry of that type.
+function watchFill(jobs,n){
+  const keys=Object.keys(WATCH_JOBS);
+  let guard=0;
+  while(jobs.length<n&&guard++<200){
+    const fresh=keys.filter(k=>!jobs.includes(k));
+    jobs.push(pick(fresh.length?fresh:keys));
+  }
+  return jobs;
+}
+function watchState(){
+  const t=todayStr();
+  if(!S.watch||S.watch.date!==t)S.watch={date:t,used:0,jobs:watchFill([],watchMax())};
+  // The cap can rise mid-day - she finishes the Watchtower at noon - so top the
+  // board up rather than making her wait until tomorrow for what she just built.
+  const want=watchMax()-S.watch.used;
+  if(S.watch.jobs.length<want)watchFill(S.watch.jobs,want);
+  return S.watch;
+}
 function takeWatch(k){const w=watchState();if(S.loc||S.combat){toast('Finish what you are doing first');return;}if(w.used>=watchMax()){toast('No watches left today');return;}
   const j=WATCH_JOBS[k];if(!j||!w.jobs.includes(k)){return;}if(S.hp<25&&!confirm('You are at '+S.hp+' HP. Take the job anyway?'))return;
-  gearCheck(()=>{const w2=watchState();if(!w2.jobs.includes(k)||w2.used>=watchMax())return;w2.used++;w2.jobs=w2.jobs.filter(x=>x!==k);save();log('Watch duty: '+j.n+'.');startCombat(j.enemies(),'watch',k);});}
+  gearCheck(()=>{const w2=watchState();const i=w2.jobs.indexOf(k);if(i<0||w2.used>=watchMax())return;w2.used++;w2.jobs.splice(i,1);save();log('Watch duty: '+j.n+'.');startCombat(j.enemies(),'watch',k);});}
 function watchReward(k){const j=WATCH_JOBS[k];if(!j)return;const r=j.reward;const got=[];const list=table(['food','water','meds','scrap','ammo'],0.15,0.25);
   for(let i=0;i<r.items;i++){const it=wpick(list,'w');const item=it.gear?{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}:{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:it.cat,qty:it.qty,uid:uid(),r:it.r};if(takeItem(item,null))got.push(it.e+' '+it.n);}
   S.stock.scrap+=r.scrap;if(r.key&&Math.random()<r.key){S.keys++;got.push('🗝️ Chest key');}
@@ -833,7 +859,7 @@ function watchReward(k){const j=WATCH_JOBS[k];if(!j)return;const r=j.reward;cons
   log('Watch paid: '+r.scrap+' scrap'+(got.length?', '+got.join(', ')+' in your pack':'')+'.');toast('Watch paid: +'+r.scrap+' scrap'+(got.length?' +'+got.length+' items':''),'a');}
 function renderWatch(){const el=$('#watch');if(!el)return;const w=watchState();const left=watchMax()-w.used;$('#watchSub').textContent=left+' of '+watchMax()+' left today';
   if(left<=0){el.innerHTML='<p class="help">Nothing left to guard today. Back tomorrow'+(S.base&&(S.base.rooms.tower||0)<2?' - a Watchtower at base adds a job per level':'')+'.</p>';return;}
-  el.innerHTML=w.jobs.map(k=>{const j=WATCH_JOBS[k];return `<div class="gear"><div class="e">${j.e}</div><div><div class="n">${j.n}</div><div class="d">${j.d} Pays ${j.reward.scrap}🔩 + ${j.reward.items} item${j.reward.items>1?'s':''}${j.reward.key?' · key chance':''}.</div></div><button class="btn sm r" onclick="takeWatch('${k}')">Go</button></div>`;}).join('')||'<p class="help">The jobs are done. More tomorrow.</p>';}
+  el.innerHTML=w.jobs.map((k,i)=>{const j=WATCH_JOBS[k];const dup=w.jobs.indexOf(k)!==i;return `<div class="gear"><div class="e">${j.e}</div><div><div class="n">${j.n}${dup?' <span class="chip s">another one</span>':''}</div><div class="d">${j.d} Pays ${j.reward.scrap}🔩 + ${j.reward.items} item${j.reward.items>1?'s':''}${j.reward.key?' · key chance':''}.</div></div><button class="btn sm r" onclick="takeWatch('${k}')">Go</button></div>`;}).join('')||'<p class="help">The jobs are done. More tomorrow.</p>';}
 const STREAK_REWARDS=[{d:3,n:'a chest key',give:()=>{S.keys++;}},{d:7,n:"the Runner's headband + a key",give:()=>{S.keys++;takeItem({id:'hat:streakband',n:"Runner's headband",e:'🎽',pts:0,cat:'cosmetic',r:'epic',slot:'hat',key:'streakband'},null);}},{d:14,n:'250 league points + 2 keys',give:()=>{S.league.score+=250;S.keys+=2;}},{d:30,n:'a LEGENDARY',give:()=>{dropLegendQuiet();}}];
 function dropLegendQuiet(){const id=pick(LEGEND_IDS);S.gear.push({uid:uid(),id,...GEAR[id]});toast('Legendary: '+GEAR[id].n,'l');SFX.play('legend');log('Found the legendary '+GEAR[id].n+'.');}
 // Past day 30 the track used to simply stop, so the people walking every single
@@ -923,6 +949,13 @@ function giftCost(g){return GIFT_COST[g&&g.r||'common']||1;}
 function giftLeft(){return Math.max(0,GIFT_BUDGET-giftDay().spent);}
 function giftBlocked(g){
   const c=giftCost(g);
+  // Her call: a legendary stays with whoever earned it. There are nine of them,
+  // they only come from chests, bosses and the season track, and handing one over
+  // skips all of that. Cosmetics were never giftable - the gift button only
+  // exists on gear, and the gumball machine pays into S.cosmetics - so the
+  // onesie and everything else unique was already safe.
+  if((g&&g.r)==='legendary')
+    return 'Legendaries stay with the person who earned them. Nine exist, and they only come from chests, bosses and the season track.';
   if(c>giftLeft())return 'That is '+c+' of your gift allowance and you have '+giftLeft()+' left today.';
   if((S.gear||[]).filter(x=>x.slot===g.slot&&!x.broken).length<=1&&g.slot==='melee')
     return 'That is your only weapon. Keep it.';
@@ -2977,6 +3010,15 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.55',d:'Sep 18',t:'Watch duty was short two jobs a day',
+  i:['THE COUNTER SAID 5, THE BOARD POSTED 3. Watch duty always put up exactly three jobs, while the number of watches you are allowed is 3 plus your Watchtower level, plus the Alarm bell, plus Well Stocked.',
+     'So every upgrade that promises "+1 watch job per day" raised the allowance and added nothing to the board. The Watchtower, the bell and the skill were all doing nothing for watch duty. That is fixed - the board now posts as many jobs as you are allowed.',
+     'If you finish a Watchtower partway through the day, the extra job appears today rather than tomorrow.',
+     'There are only four kinds of watch job, so past four the board will offer a second one of a kind, marked "another one".']},
+ {v:'6.55b',d:'Sep 18',t:'Legendaries cannot be gifted',
+  i:['A LEGENDARY NOW STAYS with whoever earned it. Nine exist and they only come from chests, bosses and the season track - handing one over skipped all of that.',
+     'Everything from the gumball machine, the onesie included, was already safe: the gift button only exists on gear, and clothes live somewhere else entirely with no gift path at all.',
+     'Ordinary gear is still giftable on the same daily allowance as before.']},
  {v:'6.54',d:'Sep 18',t:'The county fights back',
   i:['ORDINARY FIGHTS WERE FREE. Measured: a kitted player lost 0 HP on a road fight and 0 on a house, at every level - because your damage grew every level while the walkers barely did, so one swing killed anything.',
      'The world now keeps pace with you. A walker at level 18 is 78 HP hitting 16-30, not 40 hitting 8-15, and past level 10 the county sends one more body. A normal fight now costs about 7% of your health at level 12, 23% at level 18 and 39% at level 25.',

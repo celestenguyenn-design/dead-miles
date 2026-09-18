@@ -1,10 +1,21 @@
 /* Dead Miles notification sender. Runs on a schedule in GitHub Actions.
    Reads who is subscribed from Supabase, decides who needs a nudge right now, sends it,
    and marks it so the same nudge never goes twice in one local day. */
+// Missing keys used to throw a stack trace every 15 minutes, which left a red X
+// on the repo for days and said nothing useful. Check before anything else.
+const MISSING = ['VAPID_PRIVATE', 'PUSH_SECRET'].filter(k => !process.env[k]);
+if (MISSING.length) {
+  console.log('Notifications are not set up yet: ' + MISSING.join(' and ') + ' missing from the repo secrets.');
+  console.log('Add them under Settings > Secrets and variables > Actions, then this job starts sending.');
+  process.exit(0);
+}
 const webpush = require('web-push');
 
 const SB = 'https://edejxfcsjqwedbgulygi.supabase.co';
-const ANON = process.env.SB_ANON;
+// The Supabase anon key is public by design - it is in game.js, shipped to every
+// browser that opens the game - so it was never a secret worth keeping in the
+// repo settings. One fewer value for her to add by hand.
+const ANON = process.env.SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkZWp4ZmNzanF3ZWRiZ3VseWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0NTExMzEsImV4cCI6MjEwNTAyNzEzMX0.Z0T954DSwTVlRM37i_fJLVtu_x2IrdOoJMx6ImInVKI';
 const SECRET = process.env.PUSH_SECRET;
 const VAPID_PUBLIC = 'BDjXfxZW0UP34n25eFRp736S9ED4EInA8J-HP_0_VMz30hR06YzTEr2fyHLpmuabuU3ubSvUinRCIvM20Pmb4yw';
 
