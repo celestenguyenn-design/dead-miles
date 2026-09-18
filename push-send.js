@@ -1,16 +1,6 @@
 /* Dead Miles notification sender. Runs on a schedule in GitHub Actions.
    Reads who is subscribed from Supabase, decides who needs a nudge right now, sends it,
    and marks it so the same nudge never goes twice in one local day. */
-// Missing keys used to throw a stack trace every 15 minutes, which left a red X
-// on the repo for days and said nothing useful. Check before anything else.
-const MISSING = ['VAPID_PRIVATE', 'PUSH_SECRET'].filter(k => !process.env[k]);
-if (MISSING.length) {
-  console.log('Notifications are not set up yet: ' + MISSING.join(' and ') + ' missing from the repo secrets.');
-  console.log('Add them under Settings > Secrets and variables > Actions, then this job starts sending.');
-  process.exit(0);
-}
-const webpush = require('web-push');
-
 const SB = 'https://edejxfcsjqwedbgulygi.supabase.co';
 // The Supabase anon key is public by design - it is in game.js, shipped to every
 // browser that opens the game - so it was never a secret worth keeping in the
@@ -19,7 +9,27 @@ const ANON = process.env.SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3
 const SECRET = process.env.PUSH_SECRET;
 const VAPID_PUBLIC = 'BDjXfxZW0UP34n25eFRp736S9ED4EInA8J-HP_0_VMz30hR06YzTEr2fyHLpmuabuU3ubSvUinRCIvM20Pmb4yw';
 
-webpush.setVapidDetails('mailto:noreply@example.com', VAPID_PUBLIC, process.env.VAPID_PRIVATE);
+// Touch the database whether or not notifications are set up. Nothing was
+// hitting Supabase on a schedule - this job died before reaching it - so the
+// first request after a quiet night was a cold one, and her phone's Shortcut
+// gets only a few seconds in the background before iOS kills it and posts
+// "took too long to run". A cheap request every 15 minutes keeps it awake.
+async function keepWarm() {
+  const t = Date.now();
+  try {
+    const r = await fetch(`${SB}/rest/v1/`, { headers: { apikey: ANON } });
+    console.log(`Supabase answered ${r.status} in ${Date.now() - t}ms`);
+  } catch (e) {
+    console.log(`Supabase did not answer in ${Date.now() - t}ms: ${e.message}`);
+  }
+}
+
+// Missing keys used to throw a stack trace here every 15 minutes, which left a
+// red X on the repo for days and said nothing useful. The keep-warm ping above
+// still runs; only the sending is skipped. See the top of the async block.
+const MISSING = ['VAPID_PRIVATE', 'PUSH_SECRET'].filter(k => !process.env[k]);
+const webpush = require('web-push');
+if (!MISSING.length) webpush.setVapidDetails('mailto:noreply@example.com', VAPID_PUBLIC, process.env.VAPID_PRIVATE);
 
 async function rpc(fn, args) {
   const r = await fetch(`${SB}/rest/v1/rpc/${fn}`, {
@@ -119,6 +129,12 @@ function decide(row, everyone) {
 }
 
 (async () => {
+  await keepWarm();
+  if (MISSING.length) {
+    console.log('Notifications are not set up yet: ' + MISSING.join(' and ') + ' missing from the repo secrets.');
+    console.log('Add them under Settings > Secrets and variables > Actions, then this job starts sending too.');
+    return;
+  }
   if (!ANON || !SECRET || !process.env.VAPID_PRIVATE) {
     console.log('Missing SB_ANON, PUSH_SECRET or VAPID_PRIVATE. Nothing sent.');
     return;
