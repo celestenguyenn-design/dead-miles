@@ -3306,7 +3306,9 @@ function lookSheet(onDone){
     const sw=(arr,cur,set)=>arr.map((c,i)=>`<button class="swatch${cur===i?' on':''}" style="background:${c}" data-set="${set}" data-v="${i}" aria-label="${set} ${i+1}"></button>`).join('');
     const opt=(arr,cur,set,label)=>arr.map(v=>`<button class="${cur===v?'on':''}" data-set="${set}" data-v="${v}">${label?label(v):v}</button>`).join('');
     const hats=[['',{n:'None',r:'common'}]].concat(Object.entries(ART.HATS));const tops=Object.entries(ART.TOPS);const accs=[['',{n:'None',r:'common'}]].concat(Object.entries(ART.ACCS));
-    $('#sheet').innerHTML=`<h2>Your look</h2><div style="text-align:center">${ART.avatarSVG(av,120)}</div>
+    // Go through openSheet so the look editor gets the universal corner X like
+    // every other sheet - writing #sheet directly skipped it.
+    openSheet(`<h2>Your look</h2><div style="text-align:center">${ART.avatarSVG(av,120)}</div>
     <div class="section-label">Build</div><div class="opts" style="margin:6px 0 10px">${Object.entries(ART.BUILDS).map(([k,b])=>`<button class="${(av.build||'neutral')===k?'on':''}" data-set="build" data-v="${k}">${b.name}</button>`).join('')}</div>
     <div class="section-label">Skin</div><div class="opts" style="margin:6px 0 10px">${sw(ART.SKINS,av.skin,'skin')}</div>
     <div class="section-label">Hair <span class="help">more in the Boutique</span></div><div class="opts" style="margin:6px 0 10px">${opt(ART.HAIR_STYLES.concat(Object.keys(ART.HAIR_SHOP).filter(k=>own('hair',k))),av.hair,'hair',v=>(ART.HAIR_SHOP[v]||{}).n||v)}</div>
@@ -3318,7 +3320,7 @@ function lookSheet(onDone){
     <div class="section-label">Outfit <span class="help">found in the world or bought with steps</span></div><div class="opts" style="margin:6px 0 10px">${tops.map(([k,v])=>`<button class="${av.top===k?'on':''}${k!=='hoodie'&&!own('top',k)?' locked':''}" data-set="top" data-v="${k}"><span class="rc-${v.r}">${v.n}</span></button>`).join('')}</div>
     <div class="section-label">Hat</div><div class="opts" style="margin:6px 0 10px">${hats.map(([k,v])=>`<button class="${(av.hat||'')===k?'on':''}${k&&!own('hat',k)?' locked':''}" data-set="hat" data-v="${k}"><span class="rc-${v.r}">${v.n}</span></button>`).join('')}</div>
     <div class="section-label">Accessory</div><div class="opts" style="margin:6px 0 10px">${accs.map(([k,v])=>`<button class="${(av.acc||'')===k?'on':''}${k&&!own('acc',k)?' locked':''}" data-set="acc" data-v="${k}"><span class="rc-${v.r}">${v.n}</span></button>`).join('')}</div>
-    <div class="grid2"><button class="btn" id="lookRandom">Random</button><button class="btn r" id="lookDone">Done</button></div>`;
+    <div class="grid2"><button class="btn" id="lookRandom">Random</button><button class="btn r" id="lookDone">Done</button></div>`,true);
     $('#sheet').querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{const set=b.dataset.set;let v=b.dataset.v;
       if(b.classList.contains('locked')){toast('Find it in the world first');return;}
       // "Same as hair" is the ABSENCE of a beard colour, not colour zero - +'' is 0,
