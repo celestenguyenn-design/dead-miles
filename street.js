@@ -260,15 +260,15 @@ function tapPoi(id){
 }
 function setHomeHere(){
   if(!STREET.pos){toast('Waiting for GPS');return;}
-  if(S.base&&S.base.geo&&S.stock.scrap<20){toast('Moving home costs 20 scrap');return;}
+  if(S.base&&S.base.geo&&S.stock.scrap<20){toast('Moving your base pin costs 20 scrap');return;}
   if(S.base&&S.base.geo)S.stock.scrap-=20;
-  if(!S.base)S.base={t:'house',e:'🏠',n:'Home',district:district().n,rooms:{},claimed:Date.now()};
-  S.base.geo={lat:STREET.pos.lat,lon:STREET.pos.lon};S.base.n=S.base.n||'Home';
+  if(!S.base)S.base={t:'house',e:'🏠',n:'Base camp',district:district().n,rooms:{},claimed:Date.now()};
+  S.base.geo={lat:STREET.pos.lat,lon:STREET.pos.lon};S.base.n=S.base.n||'Base camp';
   // This is NOT the same button as "Move base here". This moves the map pin
   // only and keeps every room; that one changes the base TYPE and destroys them.
   // They read almost identically, so each now says which it is.
-  log('Home pin moved to where you are standing. Everything you built is still there - this only changes where you walk back to in order to stash.');
-  toast('Home pin moved. Nothing you built was lost.','a');SFX.play('win');save();drawBase();render();pushPlayer();
+  log('Your base pin moved to where you are standing. Same base, same rooms - this only changes where you walk back to in order to stash.');
+  toast('Base pin moved. Nothing you built was lost.','a');SFX.play('win');save();drawBase();render();pushPlayer();
 }
 function homeDistance(){if(!S.base||!S.base.geo||!STREET.pos)return null;return geoDist(S.base.geo,STREET.pos);}
 
@@ -331,7 +331,7 @@ function renderStreet(){
   const sp=STREET.lastSpd||0;
   el.innerHTML=`<span class="chip s">GPS ±${STREET.pos?Math.round(STREET.pos.acc):'?'} m${sp>1.2?' · '+(sp*3.6).toFixed(0)+' km/h':''}</span>`
     +`<span class="chip${(lock||!near)?' d':''}" id="mapNear">${nearTxt}</span>`
-    +`${hd!==null?`<span class="chip a">Home ${Math.round(hd)} m</span>`:'<span class="chip">No home set</span>'}`
+    +`${hd!==null?`<span class="chip a">Base ${Math.round(hd)} m</span>`:'<span class="chip">No base yet</span>'}`
     +`<span class="chip d">${STREET.zombies.length} on the street</span>`;
 }
 

@@ -2078,9 +2078,9 @@ function moveBaseSheet(){
       // means carrying a full pack around - and a pack is lost if you go down.
       if(!(typeof STREET!=='undefined'&&STREET.on&&loc.geo))return '';
       const d=(typeof homeDistance==='function')?homeDistance():null;
-      return '<div class="note" style="margin-top:8px"><b>You stash here.</b> With the live map on you have to be standing within 60 m of your base to stash a pack, so pick somewhere you walk past anyway - home, work, the school run.'
-        +(d!==null?' Your current base is '+Math.round(d)+' m from here.':'')
-        +'</div>';})()
+      return '<div class="note" style="margin-top:8px"><b>You stash within 60 m of your base pin.</b> '
+        +(d!==null?'Your current base is '+Math.round(d)+' m from here. ':'')
+        +'But the perk follows the <b>building</b> and the stash spot follows the <b>pin</b>, and they do not have to match: claim this place for what it gives you, then move the pin to wherever you actually walk with "Move my base pin here" on the map. 20 scrap, keeps everything.</div>';})()
     +'<div class="section-label" style="margin-top:10px">What this place gives you</div>'
     +(gain.names.length
       ? '<div class="kv">'+row('Free right away',esc(gain.names.join(', ')))
@@ -2102,13 +2102,22 @@ function moveBaseSheet(){
       +row('Raiders hitting harder by now','+'+age+' raid power')
       +row('After moving','back to 0, and one raid-free day')+'</div>'
       +'<p class="help" style="margin-top:6px">Raids get stronger the longer you stay in one place - about +0.5 power a day. Moving resets that.</p>')
-    +'<p class="help" style="margin-top:10px">Only moving the map PIN? That is a different button - "Move my home pin here" on the map. It costs the same 20 scrap and keeps everything you built.</p>'
+    +'<p class="help" style="margin-top:10px"><b>Your base and your home are the same thing</b> - one place, and its pin on the map. If this spot is right but you only want to move the PIN, use "Move my base pin here" on the map instead: same 20 scrap, and it keeps every room.</p>'
     +'<div class="grid2" style="margin-top:12px">'
     +'<button class="btn ghost" onclick="closeSheet()">Stay put</button>'
     +(!first&&S.stock.scrap<20
       ? '<button class="btn" disabled>Need 20 scrap</button>'
       : '<button class="btn r" onclick="closeSheet();claimBase(1)">'+(first?'Claim it':'Move here')+'</button>')
     +'</div>',true);
+}
+function basePinOffer(){
+  if(!S.base||!S.base.geo||S.loc||S.combat)return;
+  openSheet('<h2>One more thing about '+esc(S.base.n)+'</h2>'
+    +'<p>Its perk comes from the <b>building</b>: '+esc(BASE_PERK[S.base.t]||'what it came with')+'</p>'
+    +'<p>Where you <b>stash</b> comes from its <b>pin on the map</b>, and you have to be within 60 m of that pin to stash a pack.</p>'
+    +'<div class="note"><b>Those do not have to be the same spot.</b> Keep this building and everything it gives you, then move the pin to wherever you actually walk every day - your house, your work. Tap <b>Move my base pin here</b> on the map when you are standing there. It costs 20 scrap and changes nothing else.</div>'
+    +'<p class="help">So pick the building for its perk, and put the pin where your life already is.</p>'
+    +'<button class="btn r wide" style="margin-top:10px" onclick="closeSheet()">Got it</button>',true);
 }
 function claimBase(confirmed){
   const loc=S.loc;if(!loc||!loc.cleared)return;
@@ -2125,6 +2134,11 @@ function claimBase(confirmed){
   loc.rooms.forEach(r=>r.done=true);
   log('You claimed '+loc.n+' as your base. '+(BASE_PERK[loc.t]||''));toast('Base claimed','a');SFX.play('win');
   save();render();leaveLoc();pushPlayer();
+  // The building with the best perk is rarely the building you walk past every
+  // day, and you have to be within 60 m of your base to stash. Those pull in
+  // opposite directions - so say, at the one moment it matters, that they are
+  // separable: the perk follows the BUILDING, the stash spot follows the PIN.
+  if(S.base.geo&&typeof STREET!=='undefined'&&STREET.on)setTimeout(basePinOffer,500);
 }
 function defense(){if(!S.base)return 0;let d=0;for(const [k,l] of Object.entries(S.base.rooms)){if(!l)continue;d+=BUILD[k].def[l-1]||0;}d+=(S.base.rooms.walls||0)*(sk('framing')*3+sk('fortify')*2)+(S.base.rooms.traps||0)*sk('trapmaker')*2;return d;}
 function buildCost(k){const b=BUILD[k];const l=S.base.rooms[k]||0;if(l>=b.lv)return null;let c=b.cost[l];const el=roleLvl('engineer');if(el)c=Math.round(c*(1-(0.15+el*0.05)));if(S.base.t==='hardware')c=Math.round(c*0.9);if(bg('engineer'))c=Math.round(c*0.9);if(bg('carpenter')&&(k==='walls'||k==='traps'))c=Math.round(c*0.8);return c;}
@@ -2138,7 +2152,7 @@ const runMult=()=>1+S.run*0.1;
 function bank(){
   if(S.loc||S.combat){toast('Clear out first');return;}if(!S.pack.length){toast('Nothing to stash');return;}
   if(!S.base){toast('Claim a base first: clear a place, then Claim it');return;}
-  if(typeof STREET!=='undefined'&&STREET.on&&S.base.geo&&STREET.pos){const d=geoDist(S.base.geo,STREET.pos);if(d>60){toast('Walk home to stash: '+Math.round(d)+' m away','d');return;}}
+  if(typeof STREET!=='undefined'&&STREET.on&&S.base.geo&&STREET.pos){const d=geoDist(S.base.geo,STREET.pos);if(d>60){toast('Walk back to your base to stash: '+Math.round(d)+' m away','d');return;}}
   const raw=packPts();const qm=roleLvl('quartermaster');const pts=Math.round(raw*runMult()*TIERS[S.league.tier].mult*(1+(qm?0.08+qm*0.04:0)+sk('haggler')*0.05+sk('marathoner')*0.04)*dealMod('pts'));
   let meds=0;for(const it of S.pack){if(it.cat==='shelf')S.shelf.push({id:it.id,n:it.n,e:it.e});else if(it.cat==='candy')S.stock.candy=(S.stock.candy||0)+(it.qty||1);else if(it.cat==='ammo')S.stock.ammo+=(it.qty||0);else if(it.cat==='chest'){S.stock.chests=(S.stock.chests||0)+1;}else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;if(it.cat==='meds')meds++;}}
   rollWeek();S.league.score+=pts;ctEvent('stash',pts);if(meds)ctEvent('meds',meds);
@@ -3081,7 +3095,8 @@ function render(){
   const bh=$('#baseHead');
   if(!S.base){bh.className='card blood';bh.innerHTML='<h2>No base yet</h2><p>Clear any place, then tap <b>Claim as base</b> on it. Where you set up matters: a police station comes with an armory and walls, a pharmacy with a clinic, a gas station with a generator. You can move later for 20 scrap.</p>';}
   else{bh.className='card';bh.innerHTML=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2>${baseScene()}<p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div><div class="help" style="margin-top:4px;color:var(--amber)">${hordeCountdown()}</div>
-    <div class="help" style="margin-top:4px">Held ${baseDays()} day${baseDays()===1?'':'s'}${baseAgePower()?` · raiders hit ${baseAgePower()} harder for it. Moving resets that.`:''}</div></div></div>`;}
+    <div class="help" style="margin-top:4px">Held ${baseDays()} day${baseDays()===1?'':'s'}${baseAgePower()?` · raiders hit ${baseAgePower()} harder for it. Moving resets that.`:''}</div>
+    <div class="help" style="margin-top:4px">${S.base.geo?'This is also your <b>home</b> on the live map - same place, one pin. Stand within 60 m of it to stash.':'No map pin yet. Set one from the live map if you want to stash out walking.'}</div></div></div>`;}
   $('#baseAlert').hidden=!(S.raidPending&&S.base&&S.base.rooms.tower);
   $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',candy:'🍬'}[k]}</div><b>${S.stock[k]||0}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`
     +(S.stock.chests>0?`<button class="s chestbtn" onclick="openStashChest()"><div class="e">🧳</div><b>${S.stock.chests}</b><span>${S.keys>0?'Open one':sk('lockpick')?'Pick one':'Locked'}</span></button>`:'');
@@ -3195,7 +3210,10 @@ const NEWS=[
      'THE RAID CLOCK, which the game has never once mentioned: raiders hit HARDER the longer you stay in one place, about +0.5 power a day. Forty days in one base is +20. Moving resets it to zero and buys you a raid-free day. Your base card now shows how long you have held it and what that is costing you.',
      'What a base type really is: one free room, plus anything permanent. Only three are permanent - a GAS STATION is the only thing in the game that lowers how often you get raided (-30%, forever), HARDWARE takes 10% off every build forever, and a GROCERY, DINER or HOUSE pays you a little every morning. Every other base is a head start you could walk out and build yourself.',
      'WHERE your base sits matters too, and only for one reason: with the live map on you have to be within 60 m of it to STASH. Stashing is where a run turns into league points, heals you and feeds your crew - so put your base somewhere you walk past anyway. Nothing else cares where it is; you can build, work and fight from anywhere. The move screen now says this and shows how far the new spot is from your current base.',
-     '"Set my home here" on the map is a different button and now says so - it moves your home PIN only, costs 20 scrap and keeps everything you built. It is now called "Move my home pin here". If the spot is right but the pin is wrong, that is the button you want.']},
+     'YOUR BASE AND YOUR HOME ARE THE SAME PLACE. The game had been calling one thing by two names, which is nobody\'s fault but ours. It is a BASE everywhere now - the map chip says Base, the map button says "Move my base pin here", and the base card says outright that it is also your pin on the map.',
+     'Two buttons, one place: "Move base here" changes which BUILDING you live in and destroys the rooms you built. "Move my base pin here" moves only WHERE ON THE MAP it sits, for 20 scrap, and keeps every room.',
+     'WHICH SOLVES THE REAL PROBLEM: the building with the best perk is almost never the building you walk past every day, and you have to be within 60 m of your base to stash. You do not have to choose. The PERK follows the building, the STASH SPOT follows the pin. Claim the gas station across town for its generator, then stand in your own kitchen and tap "Move my base pin here" - you keep the gas station and everything in it, and you stash at home from then on.',
+     'The game now offers this the moment you claim a base on the live map, instead of leaving you to work it out.']},
  {v:'6.65',d:'Sep 18',t:'Your step count fixes itself now',
   i:['v6.64 stopped the double-counting, but it left anyone already inflated to tap a button. That was our bug, not yours to clean up.',
      'Open the game and it repairs itself: hand-typed steps that were sitting on top of the same steps your phone counted come back out, and today, this week and your lifetime total all land on your phone\'s own reading. It says in your log exactly how many it took back.',
