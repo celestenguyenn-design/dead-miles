@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.60';
+const VERSION='6.61';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2599,6 +2599,17 @@ function renderSeason(){
     <div class="strack" style="margin-top:10px">${rows}</div>
     <p class="help" style="margin-top:8px">Points come from walking AND from playing - places cleared, raids, chests, what you bring home. There is a daily cap, so the season lasts the month however far you walk.</p>`;
 }
+function goInfect(){
+  if(!infect()){const b=$('#infectBar');if(b)b.hidden=true;return;}
+  // The card is on the road screen, so switch there first if she is elsewhere.
+  const btn=document.querySelector('.nav button[data-v="street"]');
+  const onRoad=$('#v-street')&&$('#v-street').classList.contains('on');
+  if(!onRoad&&btn)btn.click();
+  setTimeout(()=>{const ic=$('#infectCard');if(!ic||ic.hidden)return;
+    ic.scrollIntoView({behavior:(typeof reduced!=='undefined'&&reduced)?'auto':'smooth',block:'center'});
+    ic.classList.remove('flashme');void ic.offsetWidth;ic.classList.add('flashme');
+    setTimeout(()=>ic.classList.remove('flashme'),1600);},onRoad?0:120);
+}
 function renderMapSkin(){
   const el=$('#skinRow');if(!el)return;
   el.innerHTML=Object.entries(MAPSKINS).map(([k,m])=>
@@ -2856,6 +2867,14 @@ function render(){
   $('#pright').innerHTML='Run <b>x'+runMult().toFixed(1)+'</b> · Pack <b>'+fmt(packPts())+'</b> pts';
   $('#syncHint').textContent=S.steps.lastSyncDate===S.steps.date&&S.steps.lastSync?'synced at '+fmt(S.steps.lastSync):'';
   renderLoc();renderRaidCard();renderContracts();
+  // Infection lives in a card down the road screen, which is easy to walk past.
+  // A red strip under the header is always on screen whatever tab she is on,
+  // and tapping it takes her to the card that can cure it.
+  try{const ib=$('#infectBar');if(ib){
+    const f=infect();
+    ib.hidden=!f;
+    if(f)ib.textContent='\u2623 '+infectLabel().toUpperCase()+' \u00b7 stage '+infectStage()+' of 3 \u00b7 tap to treat it';
+  }}catch(e){}
   try{const ic=$('#infectCard');if(ic){
     const f=infect();
     if(!f)ic.hidden=true;
@@ -3027,6 +3046,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.61',d:'Sep 18',t:'You cannot miss being infected now',
+  i:['A RED STRIP sits under the header the whole time you are infected, on every screen, saying which stage you are at. Tap it and it takes you straight down to the card that cures it and flashes it.',
+     'The card itself has not moved - it is still on the road screen where it was.']},
  {v:'6.60',d:'Sep 18',t:'It should stop telling you that you are in a car',
   i:['WALKING WAS BEING READ AS DRIVING. Two reasons. A single GPS reading was enough to lock you out for over a minute - and phones glitch constantly. And when your phone does not report its own speed, the game worked it out from two positions without caring how accurate they were; walking past tall buildings a reading can jump 60 metres, which looks like 30 m/s.',
      'It now needs three fast readings in a row before it believes you, it ignores movement smaller than the GPS error bars, and it measures over five seconds instead of one so a real car still stands out. The lockout is 45 seconds instead of 75.',

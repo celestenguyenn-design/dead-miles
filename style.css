@@ -454,3 +454,11 @@ a{color:var(--amber)}
 .gpick select{width:100%;padding:9px 10px;border-radius:8px;background:var(--panel2);
   color:var(--bone);border:1px solid var(--line);font-size:13.5px;font-family:inherit}
 .gpick select:focus{outline:none;border-color:var(--steel)}
+/* Always-visible infection strip under the header. Red, because it is the one
+   thing eating her maximum health while she walks. */
+.infectbar{display:block;width:100%;padding:9px 16px;background:var(--blood);color:#fff;
+  font-weight:800;font-size:13px;letter-spacing:.4px;text-align:center;border:0;cursor:pointer}
+.infectbar:active{filter:brightness(1.15)}
+@keyframes flashme{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 3px var(--blood),0 0 22px rgba(230,62,92,.6)}}
+.flashme{animation:flashme 1.5s ease-out}
+@media(prefers-reduced-motion:reduce){.flashme{animation:none;box-shadow:0 0 0 3px var(--blood)}}
