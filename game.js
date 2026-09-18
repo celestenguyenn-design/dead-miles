@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.62';
+const VERSION='6.63';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1602,7 +1602,7 @@ function dealTo(t,d,label,kind){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));
   if(t.plate&&!t.cracked){
     if(kind==='heavy'){t.cracked=true;clog('The heavy swing splits '+t.n+"'s plating wide open.",'good');}
     else{const soak=Math.round(d*0.55);d=Math.max(1,d-soak);clog('Most of that glanced off the plating.','');}
-  }if(t.shield>0){const s=Math.min(t.shield,d);t.shield-=s;d-=s;clog('The shield soaks '+s+'.'+(t.shield<=0?' It cracks apart.':''),'');if(d<=0){t.fx={d:0,t:Date.now()};C.lunge=Date.now();return;}}t.hp-=d;t.fx={d,t:Date.now(),k:kind||'slash'};C.lunge=Date.now();clog(label+' for '+d+'.','you');if(t.wanted)ctEvent('boss',d);}
+  }if(t.shield>0){const s=Math.min(t.shield,d);t.shield-=s;d-=s;clog('The shield soaks '+s+'.'+(t.shield<=0?' It cracks apart.':''),'');if(d<=0){t.fx={d:0,t:Date.now()};C.lunge=Date.now();return;}}t.hp-=d;t.fx={d,t:Date.now(),k:kind||'slash'};C.lunge=Date.now();if(t.warden)C.myDealt=(C.myDealt||0)+d;clog(label+' for '+d+'.','you');if(t.wanted)ctEvent('boss',d);}
 // Weapons she can actually put in her hand right now: melee, not wrecked, not
 // the one already equipped.
 function swapOptions(){return S.gear.filter(g=>g.slot==='melee'&&!g.broken&&(g.dur===undefined||g.dur>0)&&S.eq.melee!==g.uid);}
@@ -1804,6 +1804,11 @@ function raidMechs(tier){
 // than doubles across that span while a raid's did not move at all.
 function raidScale(){return 1+Math.max(0,(S.lvl||1)-3)*0.055;}
 function enemyPhase(){
+  // SQUAD RAIDS: when a friend is swinging at the same raid, the rounds go
+  // round the squad. On their round it turns on them and she takes nothing -
+  // the boss still heals, calls and enrages, it just is not looking at her.
+  C.duck=(C.where==='liveraid'&&typeof squadTarget==='function')?squadTarget():null;
+  if(C.duck)clog(C.duck+' pulls it off you this round.','sys');
   for(const e of alive()){
     if(e.stun>0){e.stun--;clog(e.n+' is still down.','');continue;}
     if(e.scream&&Math.random()<e.scream){const w=mk('walker');C.enemies.push(w);clog('The screamer shrieks. Another walker shoves in.','hit');continue;}
@@ -1827,6 +1832,7 @@ function enemyPhase(){
     if(frenzied&&!e.wasFrenzied){e.wasFrenzied=true;clog(e.n+' goes berserk.','hit');SFX.play('growl');}
     const swings=(e.fast&&C.turn%2===0?2:1)+(frenzied?1:0);
     for(let i=0;i<swings;i++){if(Math.random()<e.hit-sk('adrenaline')*0.06-(e.human?sk('intimidate')*0.08:0)){let d=rint(e.dmg[0],e.dmg[1]);if(e.g==='crit'&&Math.random()<0.2){d*=2;clog('A brutal swing.','hit');}
+      if(C.duck)continue;                      // it is swinging at her squadmate, not at her
       const guards=activeCrew();if(guards.length&&Math.random()<0.3){const gc=pick(guards);clog(e.n+' turns on '+gc.name+'.','hit');hurtCrew(gc,Math.max(1,d-2));continue;}
       if(!e.human&&Math.random()<infectChance())catchInfection(e.n);
       hurt(d,e.n);
@@ -1840,6 +1846,9 @@ function enemyPhase(){
 }
 function dropLegend(why){const id=pick(LEGEND_IDS);S.gear.push({uid:uid(),id,...GEAR[id]});clog((why||'')+' LEGENDARY: '+GEAR[id].n+'. '+GEAR[id].legend+'.','good');toast('Legendary: '+GEAR[id].n,'l');SFX.play('legend');log('Found the legendary '+GEAR[id].n+'.');}
 function death(){
+  // A friend is still on their feet in this raid. They pull her out: she is
+  // done with the fight, but a raid death with a squad costs nothing.
+  if(C&&C.where==='liveraid'&&typeof squadSize==='function'&&squadSize()>1){squadDown();return;}
   C.over=true;S.combat=false;buffClear();const lost=packPts();SFX.play('dead');
   const where=C.where;if(where==='raid'&&S.raidPending){const p=S.raidPending;resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;}
   if(where==='boss')bossAfter(false);if(where==='horde')resolveHorde(true,false);if(where==='rival')nemWon();
@@ -1865,7 +1874,7 @@ function death(){
   C=null;
 }
 function endCombat(won){
-  if(!C)return;C.over=true;S.combat=false;buffClear();
+  if(!C)return;if(typeof squadStop==='function')squadStop();C.over=true;S.combat=false;buffClear();
   const where=C.where;
   if(won){SFX.play('win');if(sk('secondwind'))S.hp=Math.min(maxHp(),S.hp+sk('secondwind')*6);
     log('Cleared '+C.enemies.length+' hostiles'+(where==='enter'&&S.loc?' inside '+S.loc.n:where==='road'?' on the road':'')+'.');
@@ -1901,6 +1910,7 @@ function renderCombat(){
   const SPARK={slash:'💢',heavy:'💥',shot:'✴️'};
   $('#sheet').innerHTML=`<h2>${C.where==='raid'?'Defend the base':C.where==='road'?'On the road':'Inside'} <span class="chip d" style="float:right">round ${C.turn}</span></h2>
   <div class="pbox${phurt?' hurt':''}"><div class="sp${plunge?' lunge':''}">${ART.avatarSVG(S.av,60,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',mood:S.hp<maxHp()*0.3?'angry':''})}${flash?'<span class="muzzle">✳️</span>':''}</div><div><div class="hplab"><span>You · DR ${dr()}</span><span>${S.hp} / ${maxHp()}</span></div><div class="hpbar"><i style="width:${S.hp/maxHp()*100}%"></i></div></div>${phurt?`<span class="dmg">-${C.pfx.d}</span>`:''}</div>
+  ${C.where==='liveraid'&&typeof squadStrip==='function'?squadStrip():''}
   ${S.buff&&S.buff.fights>0?`<div class="help" style="margin-top:6px;color:var(--amber)">${esc(BUFF_TEXT[S.buff.k]||'')}</div>`:''}
   <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}${hit?`<span class="spark">${SPARK[e.fx.k||'slash']}</span>`:''}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.plate&&!e.cracked?' · <b style="color:var(--steel)">plated</b>':''}${e.enraged?' · <b style="color:#ff8a92">enraged</b>':''}${e.caller?' · calls more':''}${e.frenzy?' · frenzies low':''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
   <div class="acts">
@@ -2474,7 +2484,7 @@ async function goOnline(handle,token){
   }catch(e){o.ok=false;o.err=e.message;save();render();}
 }
 function compactSave(){const c=JSON.parse(JSON.stringify(S));delete c.online;delete c.journal;delete c.wx;delete c.combat;if(c.party)delete c.party.data;return c;}
-function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code,flare:(S.flare&&S.flare.endsAt>Date.now())?S.flare:null},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:S.stock.ammo}};}
+function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code,raiding:(S.raidCur?{id:S.raidCur.id,n:S.raidCur.n,tier:S.raidCur.tier,at:Date.now()}:null),flare:(S.flare&&S.flare.endsAt>Date.now())?S.flare:null},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:S.stock.ammo}};}
 let pushTimer=0;let pushSoonTimer=0;function pushSoon(){clearTimeout(pushSoonTimer);pushSoonTimer=setTimeout(()=>pushPlayer(),8000);}
 function pushPlayer(){const o=O();if(!o.ok||!S.onboarded||STALE)return Promise.resolve();clearTimeout(pushTimer);return new Promise(res=>{pushTimer=setTimeout(async()=>{try{rollWeek();
   const ok=await rpc('save_player',{p_handle:o.handle,p_token:o.token,p_name:S.name,p_tier:S.league.tier,p_week:S.league.week,p_score:S.league.score,p_state:publicState()});
@@ -3046,6 +3056,13 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.63',d:'Sep 18',t:'Raid together: it has to split its attention now',
+  i:['SQUAD RAIDS. Walk into the same raid as a friend, or flare into theirs, and you fight it as a SQUAD - no lobby, no waiting, no invite to accept. The moment they land a hit you are in it together.',
+     'IT TAKES TURNS ON YOU. One round it comes for you, the next it turns on your squadmate. Two of you and it swings at you half as often. Three of you and it is a third. That is the whole point: a raid that was killing you alone is survivable together.',
+     'THE HEALTH BAR MOVES WHILE YOU FIGHT. Your friends\' hits now land on your screen as they happen, named, instead of the bar sitting still until the fight ends.',
+     'GOING DOWN BESIDE A FRIEND COSTS YOU NOTHING. They drag you out. You keep your pack, your gear and your scrap, and the damage you did stays on its health bar. Going down alone still costs you everything it always did.',
+     'The raid screen shows who is in there right now before you commit, so you can time it together.',
+     'Nothing to set up and no new party to join - if you are already in a party, your raid calls still go to them first.']},
  {v:'6.62',d:'Sep 18',t:'Raids: dying now counts, and levelling up no longer makes you weaker',
   i:['LOSING A RAID POSTED A FLAT NUMBER. Whatever you actually did, a loss put the same 400-per-tier on the shared health bar - so dying in round two and dying with the boss nearly down counted exactly the same, and against a big pool the bar barely moved. It now posts the damage you really did, and pays scrap and XP in proportion. Land no hits at all and it posts nothing.',
      'AND THE BOSS WAS SCALED BY YOUR LEVEL TWICE. Once in the normal enemy scaling, then again on top. At level 25 it hit five and a half times as hard as base while your health only doubled - so every level you gained made raids HARDER. It went from surviving about 4.6 hits at level 4 to 2.3 at level 25.',

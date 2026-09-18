@@ -412,6 +412,10 @@ function raidSheet(r){
     +(hp!==null?'<div class="progress" style="margin-top:8px"><div class="bar"><i style="width:'+Math.round(hp/max*100)+'%;background:linear-gradient(90deg,#8a2230,'+r.T.col+')"></i></div>'
         +'<div class="row"><span>'+fmt(hp)+' / '+fmt(max)+'</span><span>'+(dead?'down':'everyone hits the same one')+'</span></div></div>':'')
     +(RAID_STATE&&RAID_STATE.hits?'<p class="help" style="margin-top:6px">'+Object.keys(RAID_STATE.hits).length+' survivor'+(Object.keys(RAID_STATE.hits).length===1?'':'s')+' have hit it.</p>':'')
+    +(function(){const h=raidHere(r);return h.length
+        ?'<div class="squad"><div class="row"><span class="chip l">In there now</span>'+h.map(x=>'<span class="chip">'+esc(x)+'</span>').join('')+'</div>'
+          +'<div class="help" style="margin-top:4px">Go in while they are fighting and you are a squad: it splits its attention between you, and if you go down they pull you out instead of it costing you the pack.</div></div>'
+        :'<p class="help" style="margin-top:6px">Go in at the same time as a friend and you fight it as a squad - it takes turns on you, so it hits each of you half as often.</p>';})()
     +raidPayout(r.tier,near)
     +'<div class="grid2" style="margin-top:10px">'
     +'<button class="btn ghost" onclick="shareRaid(\''+esc(r.poi)+'\')">Invite a friend</button>'
@@ -557,6 +561,9 @@ async function enterRaid(r,remote){
     // list to look it up in afterwards.
     S.raidCur={id:r.id,tier:T.t,loot:T.loot,n:r.boss,poi:r.poi,r:{id:r.id,poi:r.poi,n:r.n,w:r.w,tier:r.tier,boss:r.boss,endsAt:r.endsAt},remote:!!remote};
     startCombat(en,'liveraid');
+    C.myDealt=0;
+    squadStart(r,st);
+    pushPlayer();
   });
 }
 // called from the combat resolver
@@ -571,7 +578,10 @@ function liveRaidAfter(won){
   let dealt=9999;
   if(!won){
     const boss=(typeof C!=='undefined'&&C&&C.enemies)?C.enemies.find(e=>e.warden):null;
-    dealt=boss?Math.max(0,(boss.startHp||boss.max)-Math.max(0,boss.hp)):0;
+    // C.myDealt counts only her own swings. startHp-hp would also count the
+    // damage a squadmate did to the same boss, and post it a second time under
+    // her handle - the bar would fall twice as fast as the fight earned.
+    dealt=(C&&C.myDealt!==undefined)?C.myDealt:(boss?Math.max(0,(boss.startHp||boss.max)-Math.max(0,boss.hp)):0);
   }
   if(r&&dealt>0)raidSync(r,dealt);
   if(!won){
@@ -586,7 +596,9 @@ function liveRaidAfter(won){
     log('The raid at '+cur.n+' beat you back, but you took '+fmt(dealt)+' off it: +'+scrap+' scrap, +'+xp+' XP. That damage stays on its health bar.');
     toast('Driven off - but you did '+fmt(dealt)+' damage','a');
     if(cur.remote)log('Your seat in this raid is paid for. Going back in costs no flare.');
-    save();render();return;
+    // Come off the board as "in this raid" on a loss too, or friends keep seeing
+    // her standing in a fight she has already been driven out of.
+    save();render();pushPlayer();return;
   }
   S.raidsDone[cur.id]=Date.now();
   // trim old entries so the save does not grow forever
@@ -615,4 +627,122 @@ function liveRaidAfter(won){
   log('Raid cleared: '+cur.n+' (tier '+cur.tier+'). +'+scrap+' scrap, +'+((cur.tier>=4?2:1)+(here&&cur.tier>=3?1:0))+' keys, +'+(40*cur.tier)+' XP'+(got.length?', '+got.join(', '):'')+'.'+(here?' Walked-in bonus applied.':''));
   toast('Tier '+cur.tier+' raid cleared','l');SFX.play('legend');
   save();render();pushPlayer();
+}
+
+/* ================= SQUAD RAIDS (v6.63) =================
+   Her ask: the people she actually walks with should be able to fight the same
+   raid together, taking turns, "that way it's not as hard."
+
+   No new SQL. boss_hit already returns `hits` - a map of handle -> total damage
+   on this raid - on every single sync. So a squadmate announces themselves by
+   the only thing that could possibly matter: landing a hit. A handle whose
+   number GOES UP while she is in the fight is someone swinging beside her right
+   now. An hour-old entry never counts, because only the CHANGE counts, which
+   means presence needs no table, no heartbeat and no timeout.
+
+   What being in a squad changes, on each client independently:
+     - The boss's swings rotate. Two of you and the rounds alternate: one is
+       hers to eat, the next it turns on her squadmate. Incoming damage divides
+       by the size of the squad. That is the whole ask.
+     - Her health bar drops live as her friends chip it, their hits named in the
+       log, instead of a bar that looks frozen until the fight ends.
+     - Going down while a squadmate is still up is NOT a death. They drag her
+       out. Pack, gear and scrap all stay.
+
+   Every client applies the split to itself, so nothing has to be arbitrated
+   between them: there is no turn that can time out, and putting the phone down
+   cannot stall anybody else's fight. That is the trade that makes this work
+   over a polling connection instead of real netcode. */
+const SQUAD_FRESH=210000;                  // a mate is "still in it" 3.5 min after their last hit
+const SQUAD={on:false,base:{},mates:{},seen:{},timer:0,r:null};
+function squadMe(){const o=(typeof O==='function')?O():null;return ((o&&o.handle)||'').toLowerCase();}
+function squadStart(r,st){
+  squadStop();
+  SQUAD.on=true;SQUAD.r=r;SQUAD.mates={};SQUAD.seen={};
+  SQUAD.base=(st&&st.hits)?Object.assign({},st.hits):{};
+  SQUAD.timer=setInterval(squadPoll,6000);
+}
+function squadStop(){if(SQUAD.timer)clearInterval(SQUAD.timer);SQUAD.timer=0;SQUAD.on=false;SQUAD.r=null;}
+async function squadPoll(){
+  if(!SQUAD.on||typeof C==='undefined'||!C||C.over||C.where!=='liveraid'){squadStop();return;}
+  const res=await raidSync(SQUAD.r,0);
+  if(res&&!res.error)squadApply(res);
+}
+function squadName(h){
+  const f=(typeof friends!=='undefined'?friends:[]||[]).find(x=>(x.handle||'').toLowerCase()===h);
+  return (f&&((f.pub&&f.pub.name)||f.name||f.handle))||h;
+}
+function squadApply(res){
+  if(!C||C.over)return;
+  const me=squadMe(),now=Date.now(),hits=res.hits||{};let news=false;
+  for(const h in hits){
+    if(h===me)continue;
+    const was=(SQUAD.seen[h]!==undefined)?SQUAD.seen[h]:(SQUAD.base[h]||0);
+    const d=Math.max(0,(hits[h]|0)-was);
+    SQUAD.seen[h]=hits[h]|0;
+    if(d<=0)continue;
+    const m=SQUAD.mates[h]||(SQUAD.mates[h]={dmg:0,last:0,name:h});
+    const first=!m.last;
+    m.dmg+=d;m.last=now;m.name=squadName(h);
+    clog(m.name+' hits '+((SQUAD.r&&SQUAD.r.boss)||'it')+' for '+d+'.','good');
+    if(first){clog(m.name+' is in the fight with you. It has to split its attention now.','sys');
+      if(typeof toast==='function')toast(m.name+' joined your raid','l');}
+    news=true;
+  }
+  // Pull the shared bar down to what the server says is left, minus the damage
+  // she has done in this fight but not yet posted. Never let it go back UP: a
+  // poll that crosses her own swing would otherwise heal the boss on screen.
+  const boss=C.enemies.find(e=>e.warden);
+  if(boss&&res.max>0){
+    const hp=Math.max(0,Math.round(boss.max*(Math.max(0,res.hp)/res.max))-(C.myDealt||0));
+    if(hp<boss.hp){boss.hp=hp;news=true;}
+    if(boss.hp<=0&&!boss.dead){boss.dead=true;boss.hp=0;clog('Between you, it goes down.','good');}
+  }
+  if(news&&typeof renderCombat==='function')renderCombat();
+}
+function squadLive(){if(!SQUAD.on)return [];const now=Date.now();
+  return Object.keys(SQUAD.mates).filter(h=>now-SQUAD.mates[h].last<SQUAD_FRESH).sort();}
+function squadSize(){return 1+squadLive().length;}
+// Whose round is this? Round one is hers, then it goes round the squad. Each
+// client runs its own rotation - they do not need to agree, they only need to
+// each be taking one round in N.
+function squadTarget(){
+  const live=squadLive();if(!live.length)return null;
+  const idx=(Math.max(1,C.turn)-1)%(live.length+1);
+  if(idx===0)return null;
+  const m=SQUAD.mates[live[idx-1]];
+  return (m&&m.name)||live[idx-1];
+}
+function squadStrip(){
+  if(!SQUAD.on)return '';
+  const live=squadLive();
+  if(!live.length)return '<div class="help" style="margin-top:6px">Fighting alone. If a friend joins this raid you will take turns and it will hit half as often.</div>';
+  const who=live.map(h=>esc(SQUAD.mates[h].name)+' <b>'+fmt(SQUAD.mates[h].dmg)+'</b>');
+  const t=squadTarget();
+  return '<div class="squad"><div class="row"><span class="chip l">Squad of '+(live.length+1)+'</span>'+who.map(w=>'<span class="chip">'+w+'</span>').join('')+'</div>'
+    +'<div class="help" style="margin-top:4px">'+(t?'This round it turns on <b>'+esc(t)+'</b>.':'This round it comes for <b>you</b>.')+'</div></div>';
+}
+// Who the board says is standing in this raid right now - so she can see the
+// squad forming BEFORE she commits to the fight.
+function raidHere(r){
+  const now=Date.now(),me=squadMe();
+  return (typeof friends!=='undefined'?friends:[]||[]).filter(f=>{
+    const q=f.pub&&f.pub.raiding;
+    return q&&q.id===r.id&&(now-q.at)<25*60000&&(f.handle||'').toLowerCase()!==me;
+  }).map(f=>(f.pub&&f.pub.name)||f.handle);
+}
+// Going down with a friend still swinging. They drag you out; it costs nothing.
+function squadDown(){
+  const names=squadLive().map(h=>SQUAD.mates[h].name);
+  const who=names.length>1?names.slice(0,-1).join(', ')+' and '+names[names.length-1]:(names[0]||'Your squad');
+  C.over=true;S.combat=false;buffClear();SFX.play('hurt');
+  liveRaidAfter(false);
+  squadStop();
+  S.hp=Math.max(1,Math.round(maxHp()*0.35));
+  log(who+' dragged you out of the raid before it finished you. You lost nothing.');
+  C=null;save();render();
+  openSheet('<h2>They pulled you out</h2><div class="big">'+ART.avatarSVG(S.av,70,{mood:'dead'})+'</div>'
+    +'<p><b>'+esc(who)+'</b> got you clear before it finished you. You are out of this raid, but the damage you did stays on its health bar, and you kept your pack, your gear and your scrap.</p>'
+    +'<p class="help">Going down alone costs you a lot. Going down with someone there costs you nothing - that is what a squad is for.</p>'
+    +'<button class="btn r wide" onclick="closeSheet()">Get up</button>');
 }

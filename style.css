@@ -462,3 +462,5 @@ a{color:var(--amber)}
 @keyframes flashme{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 3px var(--blood),0 0 22px rgba(230,62,92,.6)}}
 .flashme{animation:flashme 1.5s ease-out}
 @media(prefers-reduced-motion:reduce){.flashme{animation:none;box-shadow:0 0 0 3px var(--blood)}}
+.squad{margin-top:8px;padding:8px 10px;border-left:4px solid var(--rot);background:rgba(127,191,77,.10);border-radius:0 8px 8px 0}
+.squad .chip{margin:2px 4px 2px 0}
