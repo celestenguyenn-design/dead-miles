@@ -464,3 +464,4 @@ a{color:var(--amber)}
 @media(prefers-reduced-motion:reduce){.flashme{animation:none;box-shadow:0 0 0 3px var(--blood)}}
 .squad{margin-top:8px;padding:8px 10px;border-left:4px solid var(--rot);background:rgba(127,191,77,.10);border-radius:0 8px 8px 0}
 .squad .chip{margin:2px 4px 2px 0}
+.note{margin-top:8px;padding:8px 10px;border-left:4px solid var(--amber);background:rgba(230,165,48,.12);border-radius:0 8px 8px 0;font-size:14px;color:var(--bone2)}

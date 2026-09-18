@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.65';
+const VERSION='6.66';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -230,6 +230,17 @@ const RIVALS=[
   {id:'nadia',n:'Nadia\'s crew',av:{skin:4,hair:'curly',hairColor:0,eyes:'sparkle',top:'biker',topColor:3},pace:[4200,4500,4200,4400,5000,12500,11500],blurb:'Quiet all week, then two huge weekend hauls.'}
 ];
 const PTS_PER_STEP=0.085;
+const BASE_GRANT={pharmacy:{clinic:1},clinic:{clinic:1},gas:{generator:1},grocery:{garden:1},
+  police:{armory:1,walls:1},hardware:{walls:1},surplus:{armory:1,traps:1}};
+// The part that keeps paying after the free room is built. Everything not listed
+// here is a one-time head start you could walk out and build yourself.
+const BASE_FOREVER={
+  gas:'Raiders come 30% less often, for as long as you live here. Nothing else in the game lowers raid odds.',
+  hardware:'Every build here costs 10% less, forever.',
+  grocery:'+3 food every morning from the garden.',
+  diner:'+2 food every morning from the freezer.',
+  house:'+1 HP every morning.',
+  stronghold:'Raiders want it back: +40% raid odds - but the loot pile respawns every week.'};
 const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic comes pre-built',gas:'Generator pre-built - 5,000 steps of work, 6 defense, and raiders come 30% less often, forever',grocery:'Garden comes pre-built',police:'Armory and level 1 walls pre-built - 4,000 steps and 35 scrap of work, and 8 defense',clinic:'Clinic comes pre-built',hardware:'Level 1 walls pre-built, and every build here costs 10% less, forever',diner:'A full freezer: +2 food every morning',surplus:'Armory and level 1 traps pre-built - 3,500 steps and 32 scrap of work, and 6 defense',stronghold:'Raiders want it back: +40% raid odds, but the loot pile respawns weekly'};
 
 /* ================= state ================= */
@@ -2020,6 +2031,20 @@ function leaveLoc(){
 
 /* ================= base ================= */
 // What you already sank into the base you are about to walk away from.
+function roomsWorth(rooms){
+  let steps=0,scrap=0,def=0;const names=[];
+  for(const [k,l] of Object.entries(rooms||{})){
+    if(!l||!BUILD[k])continue;
+    for(let i=0;i<l;i++){steps+=BUILD[k].labor[i]||0;scrap+=BUILD[k].cost[i]||0;def+=BUILD[k].def[i]||0;}
+    names.push(BUILD[k].n+(BUILD[k].lv>1?' L'+l:''));
+  }
+  return {steps,scrap,def,names};
+}
+// Raids get stronger the longer you hold one place (daysSince*0.5 inside
+// checkRaids). Nobody would ever guess that from the screen, so it is printed
+// on the base card and on the move screen - moving resets it to zero.
+function baseDays(){return S.base?Math.floor((Date.now()-(S.base.claimed||Date.now()))/86400000):0;}
+function baseAgePower(){return Math.round(baseDays()*0.5);}
 function baseSunk(){
   if(!S.base)return {steps:0,scrap:0,def:0,rooms:[]};
   let steps=0,scrap=0;const rooms=[];
@@ -2030,19 +2055,56 @@ function baseSunk(){
   }
   return {steps,scrap,def:defense(),rooms};
 }
-function claimBase(){
+/* The move screen. It used to be a browser confirm() that named what you would
+   lose and nothing else - so the one question a player actually has, "is the
+   new place better than mine?", had no answer on screen. This prices the whole
+   swap: what you give up, what the new building hands you free, what keeps
+   paying afterwards, and the raid clock that resets. */
+function moveBaseSheet(){
+  const loc=S.loc;if(!loc||!loc.cleared)return;
+  const first=!S.base;
+  const gain=roomsWorth(BASE_GRANT[loc.t]||{});
+  const lose=first?{steps:0,scrap:0,def:0,names:[]}:roomsWorth(S.base.rooms||{});
+  const fwd=BASE_FOREVER[loc.t]||'';
+  const now=S.base?BASE_FOREVER[S.base.t]||'':'';
+  const age=baseAgePower();
+  const row=(a,b)=>'<span>'+a+'</span><b>'+b+'</b>';
+  openSheet('<h2>'+esc(loc.e+' '+loc.n)+'</h2>'
+    +'<p class="help">'+(first?'Your first base.':'Moving from '+esc(S.base.n)+'.')+' A base type is really just the one room it hands you for free, plus anything that keeps paying.</p>'
+    +'<div class="section-label" style="margin-top:10px">What this place gives you</div>'
+    +(gain.names.length
+      ? '<div class="kv">'+row('Free right away',esc(gain.names.join(', ')))
+        +row('Work that saves you',fmt(gain.steps)+' steps + '+gain.scrap+' scrap')
+        +(gain.def?row('Defense',gain.def):'')+'</div>'
+      : '<p class="help">No free rooms - you build everything here yourself.</p>')
+    +(fwd?'<p class="note" style="margin-top:8px">'+esc(fwd)+'</p>':'')
+    +(first?'':'<div class="section-label" style="margin-top:12px">What it costs you</div>'
+      +(lose.names.length
+        ? '<div class="kv">'+row('You lose','<span style="color:#ff8a92">'+esc(lose.names.join(', '))+'</span>')
+          +row('Work thrown away',fmt(lose.steps)+' steps + '+lose.scrap+' scrap')
+          +(lose.def?row('Defense lost','<span style="color:#ff8a92">-'+lose.def+'</span>'):'')
+          +row('Moving fee','20 scrap')+'</div>'
+          +'<p class="help" style="margin-top:6px">Nothing carries over. The new base starts with whatever that building came with, and you rebuild the rest from zero.</p>'
+        : '<div class="kv">'+row('You have built nothing yet','so there is nothing to lose')+row('Moving fee','20 scrap')+'</div>')
+      +(now?'<p class="help" style="margin-top:6px">You would also give up: '+esc(now)+'</p>':''))
+    +(first?'':'<div class="section-label" style="margin-top:12px">The raid clock</div>'
+      +'<div class="kv">'+row('Held '+esc(S.base.n),baseDays()+' day'+(baseDays()===1?'':'s'))
+      +row('Raiders hitting harder by now','+'+age+' raid power')
+      +row('After moving','back to 0, and one raid-free day')+'</div>'
+      +'<p class="help" style="margin-top:6px">Raids get stronger the longer you stay in one place - about +0.5 power a day. Moving resets that.</p>')
+    +'<div class="grid2" style="margin-top:12px">'
+    +'<button class="btn ghost" onclick="closeSheet()">Stay put</button>'
+    +(!first&&S.stock.scrap<20
+      ? '<button class="btn" disabled>Need 20 scrap</button>'
+      : '<button class="btn r" onclick="closeSheet();claimBase(1)">'+(first?'Claim it':'Move here')+'</button>')
+    +'</div>',true);
+}
+function claimBase(confirmed){
   const loc=S.loc;if(!loc||!loc.cleared)return;
   if(S.base&&S.stock.scrap<20){toast('Moving base costs 20 scrap');return;}
-  // Moving has always wiped every room you built - it just never said so.
-  // Twenty scrap is not the price of moving. The walls are.
-  if(S.base){
-    const k=baseSunk();
-    if(k.rooms.length&&!confirm(
-      'Move your base to '+loc.n+'?\n\n'
-      +'You LOSE everything built at '+S.base.n+': '+k.rooms.join(', ')+'.\n'
-      +'That is '+fmt(k.steps)+' steps and '+k.scrap+' scrap of work, and '+k.def+' defense.\n'
-      +'Nothing carries over - the new base starts with whatever that building came with.'))return;
-  }
+  // Moving wipes every room you built. Twenty scrap is not the price - the
+  // walls are - so the swap gets priced on screen before anything happens.
+  if(!confirmed){moveBaseSheet();return;}
   if(S.base)S.stock.scrap-=20;S.horde=null;S.work=null;
   const rooms={};
   if(loc.t==='pharmacy'||loc.t==='clinic')rooms.clinic=1;if(loc.t==='gas')rooms.generator=1;if(loc.t==='grocery')rooms.garden=1;
@@ -3007,7 +3069,8 @@ function render(){
   // base
   const bh=$('#baseHead');
   if(!S.base){bh.className='card blood';bh.innerHTML='<h2>No base yet</h2><p>Clear any place, then tap <b>Claim as base</b> on it. Where you set up matters: a police station comes with an armory and walls, a pharmacy with a clinic, a gas station with a generator. You can move later for 20 scrap.</p>';}
-  else{bh.className='card';bh.innerHTML=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2>${baseScene()}<p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div><div class="help" style="margin-top:4px;color:var(--amber)">${hordeCountdown()}</div></div></div>`;}
+  else{bh.className='card';bh.innerHTML=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2>${baseScene()}<p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div><div class="help" style="margin-top:4px;color:var(--amber)">${hordeCountdown()}</div>
+    <div class="help" style="margin-top:4px">Held ${baseDays()} day${baseDays()===1?'':'s'}${baseAgePower()?` · raiders hit ${baseAgePower()} harder for it. Moving resets that.`:''}</div></div></div>`;}
   $('#baseAlert').hidden=!(S.raidPending&&S.base&&S.base.rooms.tower);
   $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',candy:'🍬'}[k]}</div><b>${S.stock[k]||0}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`
     +(S.stock.chests>0?`<button class="s chestbtn" onclick="openStashChest()"><div class="e">🧳</div><b>${S.stock.chests}</b><span>${S.keys>0?'Open one':sk('lockpick')?'Pick one':'Locked'}</span></button>`:'');
@@ -3037,7 +3100,7 @@ function renderLoc(){
     el.innerHTML=`<h2>🏴 ${esc(loc.n)} <span class="sub">stage ${loc.stage}/3</span></h2><p><b style="color:var(--bone)">WANTED: ${esc(bossName())}</b>. Fires, tents, a trailer with a padlock. Fight through ${next?next:'nothing, it is yours'}${loc.stage<3?', or take what you have and go':''}. Every stage you clear opens its loot.</p>
     ${loc.stage>0?`<div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div><div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done||r.stage>loc.stage?'disabled':''}><span class="n">${esc(r.n)}</span><span class="m">${r.done?'searched':r.stage>loc.stage?'locked: stage '+r.stage:'noise +'+r.noise}</span></button>`).join('')}</div>`:''}
     ${loc.found.length?`<div class="section-label" style="margin-top:12px">Found here</div><div class="loot" style="margin-top:6px">${loc.found.map(it=>`<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span>${esc(it.n)}<span class="pt">+${it.pts}</span></div>`).join('')}</div>`:''}
-    ${bankedLine()}<div class="grid2" style="margin-top:12px">${next?`<button class="btn d" onclick="pushStage()">Push to ${next}</button>`:`<button class="btn" onclick="claimBase()">${S.base?(baseSunk().rooms.length?'Move base · lose what you built':'Move base here (20 scrap)'):'Claim as base'}</button>`}<button class="btn ${next?'':'r'}" onclick="leaveLoc()">${loc.stage?'Take the loot and go':'Keep walking'}</button></div>`;return;}
+    ${bankedLine()}<div class="grid2" style="margin-top:12px">${next?`<button class="btn d" onclick="pushStage()">Push to ${next}</button>`:`<button class="btn" onclick="claimBase()">${S.base?'Move base here · compare first':'Claim as base'}</button>`}<button class="btn ${next?'':'r'}" onclick="leaveLoc()">${loc.stage?'Take the loot and go':'Keep walking'}</button></div>`;return;}
   if(loc.rival){const r=RIVALS.find(x=>x.id===loc.rival);const first=r.n.split("'")[0];
     const body=loc.rival==='theo'?`<p><b style="color:var(--bone)">${esc(r.n)}</b> is jogging up the other side of the street toward the same door. Theo grins at you.</p><div class="grid2" style="margin-top:12px"><button class="btn r" onclick="rivalAct('race')">Race them in (${Math.round((0.5+(S.lvl-1)*0.03+roleLvl('scout')*0.05)*100)}%)</button><button class="btn" onclick="rivalAct('wait')">Let them go first</button></div><p class="help" style="margin-top:8px">Win the race: first pick, 30% more loot. Lose: scraps. Wait: they clear the walkers for you, costs 150 steps.</p>`
       :loc.rival==='maya'?`<p><b style="color:var(--bone)">${esc(r.n)}</b> has a fire going out front. Maya waves you over: "Three food for two antibiotics. Fair?"</p><div class="grid2" style="margin-top:12px"><button class="btn a" onclick="rivalAct('trade')">Trade (3 food → 2 antibiotics)</button><button class="btn" onclick="S.loc.rival='';save();render()">No thanks</button></div>`
@@ -3049,7 +3112,7 @@ function renderLoc(){
   <div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span><span class="help">${loc.noise>=70?'Something is stirring':loc.noise>=40?'Keep it down':'Quiet'}</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div>
   <div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done?'disabled':''}><span class="n">${esc(r.n)}</span><span class="m">${r.done?'searched':'noise +'+r.noise}</span>${r.peek&&!r.done?`<span class="peek">🔭 ${esc(r.peek)}</span>`:''}</button>`).join('')}</div>
   ${loc.found.length?`<div class="section-label" style="margin-top:12px">Found here</div><div class="loot" style="margin-top:6px">${loc.found.map(it=>`<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span>${esc(it.n)}<span class="pt">+${it.pts}</span></div>`).join('')}</div>`:''}
-  ${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn ${done?'r':''}" onclick="leaveLoc()">${done?'Move on':'Leave the rest'}</button><button class="btn" onclick="claimBase()">${S.base?(baseSunk().rooms.length?'Move base · lose what you built':'Move base here (20 scrap)'):'Claim as base'}</button></div>`;
+  ${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn ${done?'r':''}" onclick="leaveLoc()">${done?'Move on':'Leave the rest'}</button><button class="btn" onclick="claimBase()">${S.base?'Move base here · compare first':'Claim as base'}</button></div>`;
 }
 function bankedLine(){const b=S.walk.banked||0;if(!b)return '';const d=district();const avg=(d.dist[0]+d.dist[1])/2;const n=Math.floor(b/avg);return `<p class="help" style="margin-top:10px">🚶 <b style="color:var(--bone)">${fmt(b)} steps saved</b> while you stop here. They carry you onward the moment you leave${n>=1?' (about '+n+' more place'+(n>1?'s':'')+' already reached)':''}.</p>`;}
 function baseScene(st){st=st||S;if(!st.base)return '';
@@ -3115,6 +3178,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.66',d:'Sep 18',t:'Moving your base now tells you whether it is worth it',
+  i:['"Move base here" used to be a yes/no box that named what you would lose and nothing else - so the one question you actually have, IS THE NEW PLACE BETTER THAN MINE, had no answer on screen.',
+     'It is now a full comparison: the room the new building hands you free and what that would have cost you in steps and scrap, anything about it that keeps paying forever, everything you would demolish, and the defense you would drop.',
+     'THE RAID CLOCK, which the game has never once mentioned: raiders hit HARDER the longer you stay in one place, about +0.5 power a day. Forty days in one base is +20. Moving resets it to zero and buys you a raid-free day. Your base card now shows how long you have held it and what that is costing you.',
+     'What a base type really is: one free room, plus anything permanent. Only three are permanent - a GAS STATION is the only thing in the game that lowers how often you get raided (-30%, forever), HARDWARE takes 10% off every build forever, and a GROCERY, DINER or HOUSE pays you a little every morning. Every other base is a head start you could walk out and build yourself.',
+     '"Set my home here" on the map is a different button and now says so - it moves your home PIN only, costs 20 scrap and keeps everything you built. It is now called "Move my home pin here".']},
  {v:'6.65',d:'Sep 18',t:'Your step count fixes itself now',
   i:['v6.64 stopped the double-counting, but it left anyone already inflated to tap a button. That was our bug, not yours to clean up.',
      'Open the game and it repairs itself: hand-typed steps that were sitting on top of the same steps your phone counted come back out, and today, this week and your lifetime total all land on your phone\'s own reading. It says in your log exactly how many it took back.',

@@ -264,7 +264,11 @@ function setHomeHere(){
   if(S.base&&S.base.geo)S.stock.scrap-=20;
   if(!S.base)S.base={t:'house',e:'🏠',n:'Home',district:district().n,rooms:{},claimed:Date.now()};
   S.base.geo={lat:STREET.pos.lat,lon:STREET.pos.lon};S.base.n=S.base.n||'Home';
-  log('Home is set to where you are standing. Stash by walking back here.');toast('Home set. Walk back here to stash.','a');SFX.play('win');save();drawBase();render();pushPlayer();
+  // This is NOT the same button as "Move base here". This moves the map pin
+  // only and keeps every room; that one changes the base TYPE and destroys them.
+  // They read almost identically, so each now says which it is.
+  log('Home pin moved to where you are standing. Everything you built is still there - this only changes where you walk back to in order to stash.');
+  toast('Home pin moved. Nothing you built was lost.','a');SFX.play('win');save();drawBase();render();pushPlayer();
 }
 function homeDistance(){if(!S.base||!S.base.geo||!STREET.pos)return null;return geoDist(S.base.geo,STREET.pos);}
 
