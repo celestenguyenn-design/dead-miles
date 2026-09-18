@@ -266,14 +266,14 @@ a{color:var(--amber)}
    pull the saturation down so the road spaghetti stops shouting, lift the
    brightness so it reads as daylight, then warm the whole thing with a sepia
    pass and bring back a gentler saturation on top. */
-/* Each skin now loads tiles that already look the part, so the filters are a
-   light touch instead of the heavy correction the old inverted-OSM hack needed.
-   Atlas is the raw street map and gets no filter at all. */
+/* All three skins draw the SAME OpenStreetMap tiles; the difference is the
+   filter, plus maxNativeZoom on Bloom and Hollow, which is what actually drops
+   the street names and house numbers. Atlas is the raw map, unfiltered. */
 .dm-tiles{filter:none}
-.map-hollow .dm-tiles{filter:saturate(.8) contrast(1.04)}
+.map-hollow .dm-tiles{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.6)}
 .map-hollow #map{background:#0d0d12}
 .map-atlas #map{background:#1a1c1a}
-.map-bloom .dm-tiles{filter:saturate(1.12) brightness(1.03) sepia(.12) hue-rotate(-6deg)}
+.map-bloom .dm-tiles{filter:saturate(.45) brightness(1.1) contrast(.82) sepia(.28) saturate(1.25) hue-rotate(-6deg)}
 .map-bloom #map{background:#eef3e2}
 /* Markers: chunky, rounded, with a soft drop rather than a hard black shadow. */
 .map-bloom .poi{background:rgba(255,253,248,.96);border:3px solid #fff;color:#3b3b44;

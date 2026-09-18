@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.51';
+const VERSION='6.52';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -582,19 +582,30 @@ const DIFF={
    default now, and the original grim night map stays as an option rather than
    being thrown away. */
 // The base map is most of what the map screen LOOKS like, and the plain
-// OpenStreetMap style draws every street name and every house number - it reads
-// as a road atlas, not a game world. CARTO's styles are the same data drawn
-// without the address clutter, so each skin now brings its own tiles.
+// OpenStreetMap style draws every street name and every house number, which is
+// what made it read as a road atlas.
+//
+// The fix is NOT a different tile host. CARTO's styles were tried in v6.51 and
+// came back as "API key required" images - and because those arrive as a normal
+// 200 with a picture in them, the tile-error fallback never fired and she was
+// left looking at the error. Every good-looking free basemap is one policy
+// change away from doing exactly that.
+//
+// So: same OpenStreetMap tiles the game has always used, and no third party at
+// all. What removes the clutter is `nat` - maxNativeZoom. Street names and house
+// numbers are only DRAWN into the tile at high zoom, so asking for a lower-zoom
+// tile and letting Leaflet scale it up means those labels were never rendered in
+// the first place. The upscale also softens the whole thing, which is the look
+// she was asking for anyway.
+const OSM_TILES='https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const OSM_ATTR='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 const MAPSKINS={
-  bloom:{n:'Bloom',d:'Soft daylight. No house numbers, hardly any labels.',
-    tiles:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    sub:'abcd',max:20,bg:'#eef3e2',attr:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'},
-  hollow:{n:'Hollow',d:'A real night map, not an inverted day one.',
-    tiles:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    sub:'abcd',max:20,bg:'#0d0d12',attr:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'},
-  atlas:{n:'Atlas',d:'The plain street map, with every label and house number.',
-    tiles:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    max:19,bg:'#1a1c1a',attr:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}};
+  bloom:{n:'Bloom',d:'Soft daylight, no address clutter.',
+    tiles:OSM_TILES,max:19,nat:16,bg:'#eef3e2',attr:OSM_ATTR},
+  hollow:{n:'Hollow',d:'The same map at night.',
+    tiles:OSM_TILES,max:19,nat:16,bg:'#0d0d12',attr:OSM_ATTR},
+  atlas:{n:'Atlas',d:'Every street name and house number, for reading.',
+    tiles:OSM_TILES,max:19,bg:'#1a1c1a',attr:OSM_ATTR}};
 function mapSkin(){const k=(typeof S!=='undefined'&&S&&S.mapSkin)||'bloom';return MAPSKINS[k]?k:'bloom';}
 function applyMapSkin(){
   const m=$('#v-map');
@@ -2757,6 +2768,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.52',d:'Sep 18',t:'Map fixed - sorry about that',
+  i:['THE MAP WAS BROKEN and showing "API key required" tiles. That is on me: the last update switched to a prettier map service that turns out to need a paid key. Fixed.',
+     'It is back on the same OpenStreetMap the game has always used, with no other company involved, so this cannot happen again.',
+     'The address numbers and street names are still gone on Bloom and Hollow. They are removed a different way now - the map asks for a wider view of the tile and zooms in on it, and those labels are only ever drawn on the close-up version. It also looks softer, which suits the game.',
+     'ATLAS is still there if you want every label back.']},
  {v:'6.51',d:'Sep 18',t:'A better looking map, and the houses are back',
   i:['THE MAP ITSELF is what changes here. Bloom and Hollow now load a different base map instead of tinting the plain street map, so the address numbers and most of the labels are simply not drawn any more. Bloom is soft daylight; Hollow is a real night map rather than a day map turned inside out.',
      'THE HOUSE PINS ARE BACK exactly as they were. Shrinking them in the last update was a misread on my part - sorry.',

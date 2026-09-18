@@ -62,8 +62,8 @@ function applyTiles(){
   const spec=MAPSKINS[k]||MAPSKINS.atlas;
   if(STREET.tiles){try{STREET.map.removeLayer(STREET.tiles);}catch(e){}STREET.tiles=null;}
   STREET.tileSkin=k;
-  const layer=L.tileLayer(spec.tiles,{maxZoom:spec.max||19,subdomains:spec.sub||'abc',
-    attribution:spec.attr,className:'dm-tiles',detectRetina:true});
+  const layer=L.tileLayer(spec.tiles,{maxZoom:spec.max||19,maxNativeZoom:spec.nat||spec.max||19,
+    subdomains:spec.sub||'abc',attribution:spec.attr,className:'dm-tiles'});
   // If the tile host cannot be reached, drop back to the plain street map rather
   // than leaving her looking at an empty grid with no idea why.
   let bad=0;
