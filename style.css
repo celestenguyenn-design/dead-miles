@@ -418,3 +418,20 @@ a{color:var(--amber)}
 .gmachine h3{margin:6px 0 2px;font-family:'Bebas Neue';letter-spacing:.05em;font-size:19px;color:var(--bone)}
 .gpull{animation:gpull .5s ease-out}
 @keyframes gpull{0%{transform:scale(.6) rotate(-8deg);opacity:0}60%{transform:scale(1.12)}100%{transform:none;opacity:1}}
+
+/* ===== season track ===== */
+.card.season{border-color:var(--r-epic)}
+.card.season.ready{box-shadow:0 0 0 1px var(--r-epic),0 0 18px rgba(181,123,238,.35)}
+.sbar{height:9px;border-radius:5px;background:var(--ash2);overflow:hidden;margin-top:10px;border:1px solid var(--line)}
+.sbar i{display:block;height:100%;background:linear-gradient(90deg,var(--r-rare),var(--r-epic));transition:width .4s}
+.strack{display:flex;flex-direction:column;gap:4px}
+.strow{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;
+  padding:7px 10px;border-radius:7px;background:var(--panel2);border:1px solid var(--line);font-size:13px}
+.strow b{font-family:'Bebas Neue';font-size:16px;color:var(--muted);letter-spacing:.5px}
+.strow span{color:var(--bone2);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.strow .lock{font-style:normal;font-size:11px;color:var(--muted);white-space:nowrap}
+.strow .tick{font-style:normal;color:var(--rot)}
+.strow.can{border-color:var(--r-epic);background:color-mix(in srgb,var(--r-epic) 12%,var(--panel2))}
+.strow.can b{color:var(--r-epic)}
+.strow.done{opacity:.55}
+.strow.done b{color:var(--rot)}

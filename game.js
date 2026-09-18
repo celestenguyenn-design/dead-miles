@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.52';
+const VERSION='6.53';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -59,9 +59,16 @@ const GEAR={
   lastword:{n:'The Last Word',e:'⚾',slot:'melee',dmg:[16,24],dur:9,w:0,pts:80,r:'legendary',legend:'30% chance a hit knocks the enemy out of its next turn'},
   oldreliable:{n:'Old Reliable',e:'🔧',slot:'melee',dmg:[16,24],dur:20,w:0,pts:70,r:'legendary',legend:'20 swings between rebuilds - twice any other weapon - but the bill is the biggest in the county'},
   whisper:{n:'Whisper',e:'🔫',slot:'ranged',dmg:[24,32],dur:12,ammo:'ammo',w:0,pts:85,r:'legendary',legend:'Makes no noise'},
-  nightingale:{n:'Nightingale',e:'🦺',slot:'armor',dr:4,w:0,pts:85,r:'legendary',legend:'Heals 5 HP every combat round'}
+  nightingale:{n:'Nightingale',e:'🦺',slot:'armor',dr:4,w:0,pts:85,r:'legendary',legend:'Heals 5 HP every combat round'},
+  // Four more legendaries. Five was a small pile for people who walk every day,
+  // and every one of these is a different REASON to swap rather than a bigger
+  // number - the point is a choice, not a ladder.
+  harvest:{n:'The Harvest',e:'🌾',slot:'melee',dmg:[20,26],dur:7,w:0,pts:82,r:'legendary',legend:'Hits every enemy in the room for half damage'},
+  vigil:{n:'Vigil',e:'🕯️',slot:'armor',dr:5,w:0,pts:88,r:'legendary',legend:'The first hit of every fight cannot take more than 5 HP'},
+  saintjude:{n:'Saint Jude',e:'📿',slot:'melee',dmg:[14,30],dur:10,w:0,pts:84,r:'legendary',legend:'The worse your health, the harder it swings'},
+  longwinter:{n:'Long Winter',e:'❄️',slot:'ranged',dmg:[20,28],dur:14,ammo:'ammo',w:0,pts:86,r:'legendary',legend:'Every hit slows the target - it loses one turn in three'}
 };
-const LEGEND_IDS=['mercy','lastword','oldreliable','whisper','nightingale'];
+const LEGEND_IDS=['mercy','lastword','oldreliable','whisper','nightingale','harvest','vigil','saintjude','longwinter'];
 const CAT_LABEL={food:'Food',water:'Water',drink:'Drink',snack:'Snack',meds:'Meds',scrap:'Scrap',ammo:'Ammo',shelf:'Trophy',key:'Key',chest:'Chest',gear:'Gear',cosmetic:'Cosmetic',candy:'Candy'};
 const byCat=(c)=>Object.entries(ITEMS).filter(([k,v])=>v.cat===c&&v.w>0).map(([k,v])=>({id:k,...v}));
 function table(cats,shelfW,gearW){const out=[];for(const c of cats)out.push(...byCat(c));if(shelfW)out.push(...byCat('shelf').map(x=>({...x,w:x.w*shelfW})));if(gearW)out.push(...Object.entries(GEAR).filter(([k,v])=>v.w>0).map(([k,v])=>({id:k,gear:true,...v,w:v.w*gearW})));return out;}
@@ -809,8 +816,27 @@ function renderWatch(){const el=$('#watch');if(!el)return;const w=watchState();c
   el.innerHTML=w.jobs.map(k=>{const j=WATCH_JOBS[k];return `<div class="gear"><div class="e">${j.e}</div><div><div class="n">${j.n}</div><div class="d">${j.d} Pays ${j.reward.scrap}🔩 + ${j.reward.items} item${j.reward.items>1?'s':''}${j.reward.key?' · key chance':''}.</div></div><button class="btn sm r" onclick="takeWatch('${k}')">Go</button></div>`;}).join('')||'<p class="help">The jobs are done. More tomorrow.</p>';}
 const STREAK_REWARDS=[{d:3,n:'a chest key',give:()=>{S.keys++;}},{d:7,n:"the Runner's headband + a key",give:()=>{S.keys++;takeItem({id:'hat:streakband',n:"Runner's headband",e:'🎽',pts:0,cat:'cosmetic',r:'epic',slot:'hat',key:'streakband'},null);}},{d:14,n:'250 league points + 2 keys',give:()=>{S.league.score+=250;S.keys+=2;}},{d:30,n:'a LEGENDARY',give:()=>{dropLegendQuiet();}}];
 function dropLegendQuiet(){const id=pick(LEGEND_IDS);S.gear.push({uid:uid(),id,...GEAR[id]});toast('Legendary: '+GEAR[id].n,'l');SFX.play('legend');log('Found the legendary '+GEAR[id].n+'.');}
-function streakReward(){S.streakBest=Math.max(S.streakBest||0,S.streak.days);const r=STREAK_REWARDS.find(x=>x.d===S.streak.days);if(!r)return;r.give();log('Streak '+r.d+': '+r.n+'.');toast('Streak '+r.d+' days: '+r.n,'l');SFX.play('legend');}
-function nextStreakReward(){return STREAK_REWARDS.find(x=>x.d>S.streak.days);}
+// Past day 30 the track used to simply stop, so the people walking every single
+// day had nothing ahead of them. It repeats every 10 days now, and every 50 is
+// a legendary, so a streak is always worth keeping.
+const STREAK_LOOP=10;
+function streakLoopReward(d){
+  if(d<=30||d%STREAK_LOOP)return null;
+  return (d%50===0)
+    ? {d,n:'a LEGENDARY - '+d+' days straight',give:()=>{dropLegendQuiet();S.keys+=2;}}
+    : {d,n:'2 keys and 150 season points',give:()=>{S.keys+=2;seasonAdd(150);}};
+}
+function streakReward(){S.streakBest=Math.max(S.streakBest||0,S.streak.days);
+  const r=STREAK_REWARDS.find(x=>x.d===S.streak.days)||streakLoopReward(S.streak.days);
+  if(!r)return;r.give();log('Streak '+r.d+': '+r.n+'.');toast('Streak '+r.d+' days: '+r.n,'l');SFX.play('legend');}
+function nextStreakReward(){
+  const d=S.streak.days;
+  const fixed=STREAK_REWARDS.find(x=>x.d>d);
+  if(fixed)return fixed;
+  // The next multiple of 10 STRICTLY above both d and 30. Day 30 exactly used to
+  // land back on itself and report nothing ahead.
+  const n=Math.max(40,(Math.floor(d/STREAK_LOOP)+1)*STREAK_LOOP);
+  return streakLoopReward(n);}
 function rollDay(){
   const t=todayStr();if(S.steps.date===t)return;
   snapshot('start of the day');
@@ -1368,6 +1394,13 @@ const LADDER=[
   {s:10000,n:'a weapon',         weapon:true},
   {s:15000,n:'15 scrap, 40 XP',  give:s=>{s.stock.scrap+=15;addXp(40);}},
   {s:20000,n:'2 chest keys',     give:s=>{s.keys+=2;}},
+  // The ladder used to end here, so the friends walking 25-30k a day got nothing
+  // for the last third of their day. It keeps paying, but the rungs get further
+  // apart and the rewards stay modest - a long walk should be worth something,
+  // not worth more than playing.
+  {s:25000,n:'25 scrap, 60 XP',  give:s=>{s.stock.scrap+=25;addXp(60);}},
+  {s:30000,n:'a chest key + 60 season points', give:s=>{s.keys++;seasonAdd(60);}},
+  {s:40000,n:'2 keys + 100 scrap', give:s=>{s.keys+=2;s.stock.scrap+=100;}},
 ];
 // "Low tier" means what she said: the starter shelf, not a rare drop. Anything
 // better still has to come off the road.
@@ -1505,7 +1538,12 @@ function startCombat(enemies,where,job){
 function clog(m,c){if(!C||!C.log)return;C.log.unshift({m,c:c||''});C.log=C.log.slice(0,14);}
 function alive(){return C.enemies.filter(e=>!e.dead);}
 function targetEnemy(){let t=C.enemies[C.target];if(!t||t.dead){const a=alive();t=a[0];C.target=C.enemies.indexOf(t);}return t;}
-function hurt(n,src){let d=Math.max(1,n-dr());if(C.brace)d=Math.ceil(d*(1-(sk('steady')?0.6+sk('steady')*0.1:0.5)));if(S.pet==='dog'&&Math.random()<petBlock()){clog(S.petName+' lunges and takes the hit meant for you.','good');return;}if(sk('ironjaw')&&!C.jaw&&S.hp-d<=0){C.jaw=true;d=S.hp-1;clog('Iron Jaw. You stay on your feet at 1 HP.','good');}
+function hurt(n,src){let d=Math.max(1,n-dr());
+  // Vigil caps the OPENING hit of a fight. It does nothing for the rest of the
+  // fight, so it is protection against being ambushed, not a damage sponge.
+  {const a=eqItem('armor');
+   if(a&&a.id==='vigil'&&!C.vigilUsed){C.vigilUsed=true;if(d>5){d=5;clog('Vigil takes the first blow for you.','good');}}}
+  if(C.brace)d=Math.ceil(d*(1-(sk('steady')?0.6+sk('steady')*0.1:0.5)));if(S.pet==='dog'&&Math.random()<petBlock()){clog(S.petName+' lunges and takes the hit meant for you.','good');return;}if(sk('ironjaw')&&!C.jaw&&S.hp-d<=0){C.jaw=true;d=S.hp-1;clog('Iron Jaw. You stay on your feet at 1 HP.','good');}
   S.hp-=d;C.pfx={d,t:Date.now()};clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
 function dealTo(t,d,label,kind){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));
   if(t.plate&&!t.cracked){
@@ -1583,8 +1621,14 @@ function act(kind){
   if(kind==='attack'||kind==='fists'){const w=kind==='fists'?null:eqItem('melee');const dm=w?wDmg(w):baseDmg();
     if(Math.random()<t.dodge){clog(t.n+' sidesteps your swing.','');SFX.play('miss');}
     else if(Math.random()<(buffOn('numb')?0.72:0.9)){let d=Math.round((rint(dm[0],dm[1])+(S.lvl-1)+(w?dmgBonus():0))*hydroDmg()*(buffOn('wired')?1.15:1));
-      if(buffOn('sharp')&&!C.sharpUsed){C.sharpUsed=true;d=Math.round(d*1.5);clog('Cold brew. That one landed properly.','good');}dealTo(t,d,'You hit '+t.n+(w?' with the '+w.n:' bare-handed'),'slash');SFX.play('hit');
+      if(buffOn('sharp')&&!C.sharpUsed){C.sharpUsed=true;d=Math.round(d*1.5);clog('Cold brew. That one landed properly.','good');}
+      // Saint Jude pays you for being nearly dead: up to +60% at 1 HP, nothing
+      // at full. It is a comeback weapon, not a better weapon.
+      if(w&&w.id==='saintjude'){const hurt=1-(S.hp/maxHp());d=Math.round(d*(1+0.6*hurt));if(hurt>0.4)clog('Saint Jude finds its weight.','good');}
+      dealTo(t,d,'You hit '+t.n+(w?' with the '+w.n:' bare-handed'),'slash');SFX.play('hit');
       if(w&&w.id==='lastword'&&Math.random()<0.3){t.stun=1;clog(t.n+' is knocked flat. It loses its next turn.','good');}
+      // The Harvest trades single-target damage for hitting the whole room.
+      if(w&&w.id==='harvest'){for(const o of alive())if(o!==t)dealTo(o,Math.max(1,Math.round(d*0.5)),'The Harvest carries into '+o.n,'slash');}
       const tp=temperOf(w);
       if(tp&&tp.twice&&Math.random()<tp.twice&&!t.dead&&t.hp>0){
         const d2=Math.round(d*0.6);dealTo(t,d2,'The '+w.n+' comes back around','slash');clog('Vicious: a second cut.','good');}
@@ -1609,7 +1653,9 @@ function act(kind){
     SFX.play('shot');
     const shots=1+((Math.random()<sk('doubletap')*0.1)?1:0);if(shots>1)clog('Double tap.','good');
     for(let s=0;s<shots;s++){const tt=targetEnemy();if(!tt)break;
-      if(Math.random()<(buffOn('numb')?0.74:0.92)){let d=Math.round((rint(wDmg(g)[0],wDmg(g)[1])+(S.lvl-1)+sk('steadyaim')*3)*hydroDmg()*(buffOn('wired')?1.15:1));if(sk('coldbarrel')&&!C.fired){d=Math.round(d*1.5);clog('Cold barrel. The first shot bites.','good');}if(Math.random()<sk('headshot')*0.1){d*=2;clog('Headshot.','good');}C.fired=true;tt.shot=true;C.muzzle=Date.now();dealTo(tt,d,'You fire the '+g.n,'shot');}else{C.fired=true;clog('The shot goes wide.','');}}
+      if(Math.random()<(buffOn('numb')?0.74:0.92)){let d=Math.round((rint(wDmg(g)[0],wDmg(g)[1])+(S.lvl-1)+sk('steadyaim')*3)*hydroDmg()*(buffOn('wired')?1.15:1));if(sk('coldbarrel')&&!C.fired){d=Math.round(d*1.5);clog('Cold barrel. The first shot bites.','good');}if(Math.random()<sk('headshot')*0.1){d*=2;clog('Headshot.','good');}C.fired=true;tt.shot=true;C.muzzle=Date.now();dealTo(tt,d,'You fire the '+g.n,'shot');
+        // Long Winter does not hit harder, it takes their turns away.
+        if(g.id==='longwinter'&&!tt.dead&&Math.random()<0.34){tt.stun=1;clog(tt.n+' stiffens up. It loses its next turn.','good');}}else{C.fired=true;clog('The shot goes wide.','');}}
     if(S.loc&&g.id!=='whisper')S.loc.noise=Math.min(100,S.loc.noise+Math.round(Math.max(5,25-sk('silencer')*8)*(g.quiet?0.3:1)));
     // A bow gets most of its bolts back. That is the whole reason to carry one.
     if(g.recover&&!free){
@@ -2218,7 +2264,93 @@ function renderDeal(){const el=$('#dealBox');if(!el)return;const d=dealFor(weekI
   el.innerHTML=`<div class="dealbox"><b>${esc(d.who)}: ${esc(d.t)}</b><p style="margin:6px 0">${esc(d.txt)}</p>${c?`<p class="help">You ${c.choice==='take'?'took it':'refused'}. ${esc(c.choice==='take'?d.take:d.refuse)} New offer Monday.</p>`:`<div class="grid2"><button class="btn a" onclick="takeDeal('take')">Take it</button><button class="btn ghost" onclick="takeDeal('refuse')">Refuse</button></div><p class="help" style="margin-top:6px">Take: ${esc(d.take)}<br>Refuse: ${esc(d.refuse)}</p>`}</div>`;}
 function storyCheck(){if(!S.story)S.story=[];for(const s of STORY){if(!S.story.includes(s.id)&&s.need(S)){S.story.push(s.id);log('Radio: '+s.t+'.');toast('📻 New radio message: '+s.t,'a');if(S.story.length>1)SFX.play('rare');}}}
 function ctRoll(){const t=todayStr(),w=weekId();if(S.ct.date!==t){S.ct.date=t;S.ct.daily=makeDaily(t);}if(S.ct.week!==w){S.ct.week=w;S.ct.weekly=makeWeekly(w);}}
+/* ================= seasons ================= */
+// The people who walk most had run out of things to get: the streak track ended
+// at day 30, the daily step ladder ended at 20,000, and the cosmetics are a
+// finite pile. A season is the fix that keeps working - it rotates, so there is
+// always a next thing, without a new system being invented every month.
+//
+// A season is derived from the CALENDAR, exactly like raid windows, so every
+// friend is in the same season with no server involved.
+const SEASONS=[
+  {id:'ash',    n:'Ash Fall',      e:'🌫️', d:'The sky has not been clean for weeks.'},
+  {id:'thaw',   n:'The Thaw',      e:'💧', d:'The ice lets go, and so does everything under it.'},
+  {id:'green',  n:'Overgrowth',    e:'🌿', d:'The county is taking itself back.'},
+  {id:'dust',   n:'Dry Season',    e:'🌵', d:'Every street is a wind tunnel.'},
+  {id:'rust',   n:'Rust Month',    e:'🔩', d:'Everything metal is giving up at once.'},
+  {id:'dark',   n:'Long Nights',   e:'🌑', d:'It is dark before you get home.'},
+];
+function seasonKey(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function seasonNow(d){d=d||new Date();return SEASONS[(d.getFullYear()*12+d.getMonth())%SEASONS.length];}
+function seasonEnds(d){d=d||new Date();return new Date(d.getFullYear(),d.getMonth()+1,1);}
+function seasonDaysLeft(d){d=d||new Date();return Math.max(0,Math.ceil((seasonEnds(d)-d)/86400000));}
+
+// Ten rungs. The numbers are set so a steady walker who plays most days finishes
+// near the end of the month and a very heavy walker still cannot finish in a
+// week - see SEASON_DAILY_CAP.
+const SEASON_TIERS=[
+  {p:60,   n:'2 chest keys',        give:s=>{s.keys+=2;}},
+  {p:150,  n:'40 scrap',            give:s=>{s.stock.scrap+=40;}},
+  {p:280,  n:'the season hat',      give:s=>{seasonCosmetic('hat');}},
+  {p:450,  n:'3 chest keys',        give:s=>{s.keys+=3;}},
+  {p:660,  n:'300 league points',   give:s=>{s.league.score+=300;}},
+  {p:900,  n:'the season jacket',   give:s=>{seasonCosmetic('top');}},
+  {p:1200, n:'4 chest keys + 80 scrap', give:s=>{s.keys+=4;s.stock.scrap+=80;}},
+  {p:1550, n:'a skill point',       give:s=>{s.sp+=1;}},
+  {p:1950, n:'the season charm',    give:s=>{seasonCosmetic('acc');}},
+  {p:2400, n:'THE SEASON LEGENDARY',give:s=>{dropLegendQuiet();}},
+];
+// A day's play can only move you so far up the track. Without this a friend who
+// walks 30,000 a day clears the whole season in four days and is bored again.
+const SEASON_DAILY_CAP=110;
+function seasonState(){
+  const k=seasonKey();
+  if(!S.season||S.season.k!==k){
+    const past=(S.season&&S.season.k)?{k:S.season.k,pts:S.season.pts,tiers:(S.season.claimed||[]).length}:null;
+    S.seasonPast=(S.seasonPast||[]).concat(past?[past]:[]).slice(-12);
+    S.season={k,pts:0,claimed:[],day:'',dayPts:0};
+  }
+  const f=S.season;
+  if(f.day!==todayStr()){f.day=todayStr();f.dayPts=0;}
+  return f;
+}
+function seasonAdd(n,why){
+  if(!(n>0))return 0;
+  const f=seasonState();
+  const room=Math.max(0,SEASON_DAILY_CAP-(f.dayPts||0));
+  const got=Math.min(room,Math.round(n));
+  if(got<=0)return 0;
+  f.dayPts+=got;f.pts+=got;
+  const ready=SEASON_TIERS.filter((t,i)=>f.pts>=t.p&&!f.claimed.includes(i));
+  if(ready.length){const b=$('#seasonCard');if(b)b.classList.add('ready');}
+  return got;
+}
+function seasonTierReady(){const f=seasonState();return SEASON_TIERS.map((t,i)=>i).filter(i=>f.pts>=SEASON_TIERS[i].p&&!f.claimed.includes(i));}
+function seasonClaim(i){
+  const f=seasonState();const t=SEASON_TIERS[i];
+  if(!t||f.claimed.includes(i)||f.pts<t.p){toast('Not yet');return;}
+  f.claimed.push(i);t.give(S);
+  log('Season reward: '+t.n+'.');toast(t.n,'l');SFX.play('legend');save();render();
+}
+function seasonClaimAll(){const r=seasonTierReady();if(!r.length){toast('Nothing ready yet');return;}for(const i of r)seasonClaim(i);}
+// Season cosmetics are the same art, tagged with the season, so a friend can see
+// WHICH season you were walking in. They are only obtainable that month.
+function seasonCosmetic(slot){
+  const pool=cosmeticPool().filter(c=>c.slot===slot&&!S.cosmetics.includes(c.id));
+  const c=pool.length?pick(pool):null;
+  if(!c){S.stock.scrap+=60;log('Nothing new in that slot, so 60 scrap instead.');return;}
+  S.cosmetics.push(c.id);
+  S.seasonWorn=(S.seasonWorn||{});S.seasonWorn[c.id]=seasonNow().id;
+  log('Season reward: '+c.n+'.');
+}
+function seasonBadge(id){const k=(S.seasonWorn||{})[id];const sn=SEASONS.find(x=>x.id===k);return sn?sn.e:'';}
+
+// How much of the season track each thing is worth. Walking alone cannot finish
+// a season - you have to actually play - and playing without walking cannot
+// either, because places and raids come from being out there.
+const SEASON_WORTH={steps:0.004,places:6,kills:0.8,rooms:1.2,chests:10,stash:0.01,meds:2,stronghold:25,bounty:20,boss:0.05};
 function ctEvent(type,n){
+  if(SEASON_WORTH[type])try{seasonAdd(n*SEASON_WORTH[type]);}catch(e){}
   if(!S.ct)return;ctRoll();
   for(const c of S.ct.daily){if(c.t===type&&!c.done){c.n+=n;if(c.n>=c.goal){c.done=true;if(bg('gamer'))c.reward.scrap=Math.round(c.reward.scrap*1.25);S.stock.scrap+=c.reward.scrap;addXp(c.reward.xp);if(c.reward.key)S.keys+=c.reward.key;log('Contract done: '+CT_TYPES[c.t].n+' '+c.goal+'. +'+c.reward.scrap+' scrap, +'+c.reward.xp+' XP'+(c.reward.key?', +1 key':'')+'.');toast('Contract done: +'+c.reward.scrap+' scrap','a');SFX.play('chest');}}}
   if(type==='kills'||type==='places'){if(S.today.date!==todayStr())S.today={date:todayStr(),kills:0,places:0};S.today[type]+=n;}
@@ -2340,6 +2472,34 @@ async function pushOff(){
     if(sub){if(o.ok)await rpc('drop_push_sub',{p_handle:o.handle,p_token:o.token,p_endpoint:sub.endpoint});await sub.unsubscribe();}
   }catch(e){}
   S.push=false;save();toast('Notifications off');renderPush();
+}
+function renderSeason(){
+  const el=$('#seasonCard');if(!el)return;
+  const f=seasonState(),sn=seasonNow(),left=seasonDaysLeft();
+  // The NEXT rung is the first one she has not REACHED - not the first unclaimed
+  // one, which is usually sitting behind her waiting to be collected.
+  const next=SEASON_TIERS.findIndex(t=>f.pts<t.p);
+  const ready=seasonTierReady();
+  const top=SEASON_TIERS[SEASON_TIERS.length-1].p;
+  const pct=Math.min(100,Math.round(f.pts/top*100));
+  const capLeft=Math.max(0,SEASON_DAILY_CAP-(f.dayPts||0));
+  const rows=SEASON_TIERS.map((t,i)=>{
+    const done=f.claimed.includes(i),can=!done&&f.pts>=t.p;
+    return `<div class="strow${done?' done':can?' can':''}">
+      <b>${t.p}</b><span>${esc(t.n)}</span>${
+        done?'<i class="tick">\u2713</i>':can?`<button class="btn xs a" onclick="seasonClaim(${i})">Claim</button>`:`<i class="lock">${Math.max(0,t.p-f.pts)} to go</i>`}</div>`;}).join('');
+  el.classList.toggle('ready',ready.length>0);
+  el.innerHTML=`<h2>${sn.e} ${esc(sn.n)} <span class="sub">${left} day${left===1?'':'s'} left</span></h2>
+    <p class="help">${esc(sn.d)} Every season is a new track. What you have already earned is yours to keep.</p>
+    <div class="sbar"><i style="width:${pct}%"></i></div>
+    <div class="row" style="margin-top:6px">
+      <span class="chip a">${f.pts} season points</span>
+      ${next<0?'<span class="chip s">track finished</span>':`<span class="chip s">next at ${SEASON_TIERS[next].p}</span>`}
+      <span class="chip${capLeft?'':' s'}">${capLeft?capLeft+' more today':'today is capped'}</span>
+    </div>
+    ${ready.length>1?`<button class="btn a wide" style="margin-top:8px" onclick="seasonClaimAll()">Claim ${ready.length} rewards</button>`:''}
+    <div class="strack" style="margin-top:10px">${rows}</div>
+    <p class="help" style="margin-top:8px">Points come from walking AND from playing - places cleared, raids, chests, what you bring home. There is a daily cap, so the season lasts the month however far you walk.</p>`;
 }
 function renderMapSkin(){
   const el=$('#skinRow');if(!el)return;
@@ -2587,6 +2747,7 @@ function countTo(el,to){
 }
 function render(){
   ensureState();rollDay();rollWeek();ctRoll();checkRaids();storyCheck();
+  try{renderSeason();}catch(e){}   // after ensureState - it writes to S
   $('#hpNum').textContent=S.hp+' / '+maxHp();$('#hpBar').style.width=clamp(S.hp/maxHp()*100,0,100)+'%';
   countTo($('#topSteps'),S.steps.today);
   $('#sceneTag').textContent=district().n+' · '+S.walk.houses+' places';$('#arriveTag').hidden=!S.loc;
@@ -2768,6 +2929,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.53',d:'Sep 18',t:'SEASONS - something to chase every month',
+  i:['A SEASON runs for a calendar month and everyone is in the same one. This month is Overgrowth. There is a ten-rung track on the You screen: keys, scrap, a skill point, three season-only pieces of clothing, and a LEGENDARY at the top.',
+     'Points come from walking AND from playing - places cleared, raids, chests, what you bring home. There is a daily cap, so the season lasts the month no matter how far you walk. Nobody clears it in a weekend.',
+     'When the month turns over the track resets but everything you earned stays yours, and the clothes are tagged with the season you got them in.',
+     'FOUR NEW LEGENDARIES, nine in total, and each one is a different reason to swap rather than a bigger number: The Harvest hits everything in the room, Vigil caps the first hit of a fight, Saint Jude hits harder the worse your health is, and Long Winter takes the enemy turns away.',
+     'The streak no longer stops at 30 days - it keeps paying every 10, with a legendary every 50. The daily step ladder no longer stops at 20,000 either; there are rungs at 25k, 30k and 40k.']},
  {v:'6.52',d:'Sep 18',t:'Map fixed - sorry about that',
   i:['THE MAP WAS BROKEN and showing "API key required" tiles. That is on me: the last update switched to a prettier map service that turns out to need a paid key. Fixed.',
      'It is back on the same OpenStreetMap the game has always used, with no other company involved, so this cannot happen again.',
