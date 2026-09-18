@@ -258,7 +258,13 @@ function bodyParts(style,skin,tc,top,weapon){
   return {back:`<rect x="36" y="100" width="11" height="22" rx="5" fill="#2a2a30"/><rect x="53" y="100" width="11" height="22" rx="5" fill="#2a2a30"/><rect x="34" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/><rect x="51" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/>${topShape(top,tc)}<rect x="21" y="82" width="11" height="22" rx="5" fill="${skin}"/><rect x="68" y="82" width="11" height="22" rx="5" fill="${skin}"/>${wpn}`,
     head:`<path d="M12 50 q0 -40 38 -40 q38 0 38 40 v6 q0 26 -38 26 q-38 0 -38 -26z" fill="${skin}"/><circle cx="24" cy="66" r="6" fill="#ff8ab8" opacity=".45"/><circle cx="76" cy="66" r="6" fill="#ff8ab8" opacity=".45"/>`};
 }
-let AV_UID=0;
+// The hood's clip shape is the SAME ellipse for every character, so one shared
+// id is safe and, crucially, STABLE. It used to be a counter, which meant a
+// hooded avatar produced a different SVG string on every single call - and
+// spriteImg() caches on that string, so the road scene made a brand new Image
+// 60 times a second and none of them ever finished loading. The character in a
+// onesie simply never appeared. A hat hid the bug by turning the hood off.
+const AV_CLIP='dmhood';
 // The ears used to sit straight on the hair, so a onesie read as "hair with
 // ears stuck on" rather than a costume. A onesie needs a HOOD: a dome in the
 // costume's colour, over the hair, with a face hole cut out of it. Everything
@@ -332,7 +338,7 @@ function avatarSVG(av,size,opts){
   const mood=opts.mood||'';const weapon=opts.weapon||'';const bs=opts.style||AV_STYLE;
   const w=size||100,h=Math.round((size||100)*1.3);TOP_AV=av;const bp=bodyParts(bs,skin,tc,av.top||'hoodie',weapon);
   const o=bs==='sticker'?'stroke="#1e1418" stroke-width="2.2" stroke-linejoin="round"':bs==='bean'?'stroke="#2a1a14" stroke-width="1.4" stroke-linejoin="round"':'';
-  const ot=TOPS[av.top||'hoodie'];const hooded=!av.hat&&ot&&ot.kind==='onesie';const uid=++AV_UID;
+  const ot=TOPS[av.top||'hoodie'];const hooded=!av.hat&&ot&&ot.kind==='onesie';const uid=AV_CLIP;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -8 100 138" width="${w}" height="${h}" ${opts.attrs||''} aria-hidden="true">
   ${hooded?'':(o?`<g ${o}>${hairBack(style,hc)}</g>`:hairBack(style,hc))}
   ${bp.back}

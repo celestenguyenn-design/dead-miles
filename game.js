@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.56';
+const VERSION='6.57';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3016,6 +3016,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.57',d:'Sep 18',t:'Your character is back on the road',
+  i:['IF YOU WERE WEARING A ONESIE, you disappeared from the road scene - your pet stayed, your character did not.',
+     'The hood needs an internal name to cut its shape out, and that name was being changed every single time you were drawn. The game keeps drawings by name, so it never recognised you twice, made a brand new picture sixty times a second, and none of them ever finished loading. The name is fixed now.',
+     'Only hooded outfits were affected, and only in the road scene - which is why a hat made you reappear.']},
  {v:'6.56',d:'Sep 18',t:'The map should stop stuttering',
   i:['TWO THINGS WERE WASTING WORK, both measured. Every GPS reading threw away and rebuilt all 44 map pins, even though nothing about them had changed - and each rebuilt pin restarted its little bounce, which is what the stutter actually was. A pin is only redrawn now when something about it is genuinely different. 880 rebuilds per twenty readings became zero.',
      'And every batch of steps redrew EVERY screen, including the Boutique with all 71 pieces of clothing and their drawings, while you were looking at the map. Screens you are not looking at are left alone now, and refresh when you open them. That is about three quarters less work per step.',
