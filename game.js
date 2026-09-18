@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.63';
+const VERSION='6.64';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2679,8 +2679,9 @@ function pedoStop(silent){pedo.on=false;window.removeEventListener('devicemotion
 // could never win. Additive is what she meant both times she reported it.
 function syncReads(){
   const s=S.steps;
-  if(!s.reads||s.readsDate!==s.date){s.reads={counted:0,manual:0};s.readsDate=s.date;}
+  if(!s.reads||s.readsDate!==s.date){s.reads={counted:0,manual:0,floor:0};s.readsDate=s.date;}
   const r=s.reads;
+  if(r.floor===undefined)r.floor=0;
   if(r.counted===undefined){                 // migrate a v6.22 save without losing today
     r.counted=r.phone||0;
     r.manual=Math.max(0,(s.today||0)-(r.phone||0));
@@ -2748,15 +2749,21 @@ function stepsCounted(){return syncReads().counted||0;}
 function syncMath(){const el=$('#syncMath');if(!el)return;
   const inp=$('#syncInput');const v=inp?parseInt(inp.value,10):NaN;
   const c=stepsCounted(),m=stepsManual();
-  if(!(v>0)){el.innerHTML=fmt(c)+' counted by your phone'+(m?' + '+fmt(m)+' you added by hand':'')+' = <b>'+fmt(S.steps.today||0)+'</b> today.';return;}
-  el.innerHTML='<b>Add these</b> makes it '+fmt((S.steps.today||0)+v)+'. <b>That\'s my total</b> makes it '+fmt(Math.max(S.steps.today||0,v))+'.';}
+  const extra=m+Math.max(0,(syncReads().floor||0)-c);
+  if(!(v>0)){
+    el.innerHTML=fmt(c)+' counted by your phone'+(extra?' + '+fmt(extra)+' you typed in':'')+' = <b>'+fmt(S.steps.today||0)+'</b> today.'
+      +(extra?' <button class="btn xs ghost" onclick="clearManual()">Use my phone\'s count only</button>':'');
+    return;}
+  el.innerHTML='<b>Add these</b> makes it '+fmt((S.steps.today||0)+v)+' - use it for a walk your phone never counted at all.'
+    +'<br><b>That\'s my total</b> makes it '+fmt(Math.max(S.steps.today||0,v))+' and holds it there - use it when the sync is behind. '
+    +'Your phone catching up later will not add these on top again.';}
 function stepsManual(){return syncReads().manual||0;}
 // The one place today's number is allowed to move.
 function stepsApply(src){
   const r=syncReads();
-  let target=(r.counted||0)+(r.manual||0);
-  if(target<(S.steps.today||0)){             // steps never go down; re-anchor instead
-    r.manual=Math.max(0,(S.steps.today||0)-(r.counted||0));
+  let target=Math.max((r.counted||0)+(r.manual||0), r.floor||0);
+  if(target<(S.steps.today||0)){             // steps never go down; raise the floor
+    r.floor=S.steps.today||0;
     target=S.steps.today||0;
   }
   const delta=target-(S.steps.today||0);
@@ -2790,10 +2797,31 @@ function addManual(v){
 function setManual(v){
   rollDay();v=Math.max(0,Math.round(v||0));
   const before=S.steps.today||0;
-  const r=syncReads();r.manual=Math.max(0,v-(r.counted||0));
+  const r=syncReads();r.floor=Math.max(r.floor||0,v);
   const d=stepsApply('sync');
   if(d>0)toast('Today set to '+fmt(S.steps.today),'z');
   else toast('Today is already '+fmt(before)+', which is higher. Whatever you walk from here still counts on top.','a');
+  return true;
+}
+// For anyone whose day is already inflated by hand-typed steps: take them back
+// out. The phone's own count stays, so this can only ever lower today to the
+// true reading, never wipe a walk.
+function clearManual(){
+  rollDay();const r=syncReads();const had=(r.manual||0)+Math.max(0,(r.floor||0)-(r.counted||0));
+  if(!had){toast('Nothing was added by hand today');return false;}
+  r.manual=0;r.floor=0;
+  const t=r.counted||0;
+  const back=Math.max(0,(S.steps.today||0)-t);
+  // stepsApply only ever raises, so today is set down by hand here - and the
+  // week and lifetime counters come down with it, or her phone and the game
+  // would still disagree everywhere except the one number she just fixed.
+  S.steps.today=t;
+  S.steps.week=Math.max(0,(S.steps.week||0)-back);
+  S.steps.total=Math.max(0,(S.steps.total||0)-back);
+  if(S.steps.src)S.steps.src.typed=Math.max(0,(S.steps.src.typed||0)-back);
+  save();render();syncMath();
+  toast('Took back '+fmt(had)+' hand-typed steps. Today is '+fmt(t)+', straight from your phone.','a');
+  log('Cleared '+fmt(had)+' hand-typed steps. Today is your phone\'s count: '+fmt(t)+'.');
   return true;
 }
 // kept so old call sites and the Shortcut URL keep working
@@ -3056,6 +3084,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.64',d:'Sep 18',t:'"That\'s my total" was being added on top of your phone, not used instead of it',
+  i:['Tiff and Wing both had the game showing far more steps than their phone. It was real, and it was this: when the sync looked stuck and you typed your real total, the game recorded the difference as EXTRA steps your phone had not seen - and then added them again when your phone caught up.',
+     'Walk 15,000, see the sync stuck at 6,000, type 15,000, and once your phone caught up the game showed 24,000. Reproduced exactly.',
+     'THAT\'S MY TOTAL now means what it says: today is at least this number, and it keeps meaning that as your phone catches up. Nothing gets added twice. Anything you walk afterwards still counts on top, as it always did.',
+     'If your day is already inflated, the Steps card now shows how much of it you typed in, with a "Use my phone\'s count only" button that takes it back out - today, this week and your lifetime total all come back in line.',
+     'ADD THESE is unchanged and still adds: it is for a walk your phone never counted at all, like a treadmill with your phone on the table. The card now spells out the difference between the two buttons.']},
  {v:'6.63',d:'Sep 18',t:'Raid together: it has to split its attention now',
   i:['SQUAD RAIDS. Walk into the same raid as a friend, or flare into theirs, and you fight it as a SQUAD - no lobby, no waiting, no invite to accept. The moment they land a hit you are in it together.',
      'IT TAKES TURNS ON YOU. One round it comes for you, the next it turns on your squadmate. Two of you and it swings at you half as often. Three of you and it is a third. That is the whole point: a raid that was killing you alone is survivable together.',
