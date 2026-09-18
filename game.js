@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.49';
+const VERSION='6.51';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -233,7 +233,7 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
   gear:[],eq:{melee:null,ranged:null,armor:null,head:null,bag:null},
   crew:[],active:[],pet:null,
-  base:null,stock:{food:5,water:5,meds:1,scrap:0,ammo:0},shelf:[],
+  base:null,stock:{food:5,water:5,meds:1,scrap:0,ammo:0,chests:0},shelf:[],
   goal:6000,streak:{days:0,last:''},
   league:{week:weekId(),score:0,tier:0,history:[],seen:''},
   raids:[],raidPending:null,campCleared:'',bossKilled:'',milestones:[],
@@ -581,10 +581,26 @@ const DIFF={
 /* Map skin. She asked for "cuter, kind of like Pikmin Bloom" - so Bloom is the
    default now, and the original grim night map stays as an option rather than
    being thrown away. */
-const MAPSKINS={bloom:{n:'Bloom',d:'Warm daylight, soft chunky pins. Cute.'},
-                hollow:{n:'Hollow',d:'The original: a cold, inverted night map.'}};
-function mapSkin(){return (typeof S!=='undefined'&&S&&S.mapSkin)||'bloom';}
-function applyMapSkin(){const m=$('#v-map');if(m)m.classList.toggle('map-bloom',mapSkin()==='bloom');}
+// The base map is most of what the map screen LOOKS like, and the plain
+// OpenStreetMap style draws every street name and every house number - it reads
+// as a road atlas, not a game world. CARTO's styles are the same data drawn
+// without the address clutter, so each skin now brings its own tiles.
+const MAPSKINS={
+  bloom:{n:'Bloom',d:'Soft daylight. No house numbers, hardly any labels.',
+    tiles:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    sub:'abcd',max:20,bg:'#eef3e2',attr:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'},
+  hollow:{n:'Hollow',d:'A real night map, not an inverted day one.',
+    tiles:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    sub:'abcd',max:20,bg:'#0d0d12',attr:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'},
+  atlas:{n:'Atlas',d:'The plain street map, with every label and house number.',
+    tiles:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    max:19,bg:'#1a1c1a',attr:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}};
+function mapSkin(){const k=(typeof S!=='undefined'&&S&&S.mapSkin)||'bloom';return MAPSKINS[k]?k:'bloom';}
+function applyMapSkin(){
+  const m=$('#v-map');
+  if(m)for(const k of Object.keys(MAPSKINS))m.classList.toggle('map-'+k,mapSkin()===k);
+  if(typeof applyTiles==='function'){try{applyTiles();}catch(e){}}
+}
 function setMapSkin(k){if(!MAPSKINS[k])return;S.mapSkin=k;applyMapSkin();save();render();toast(MAPSKINS[k].n+' map','a');}
 function diff(){return DIFF[(typeof S!=='undefined'&&S&&S.diff)||'normal']||DIFF.normal;}
 function setDiff(k){if(!DIFF[k])return;S.diff=k;log('Difficulty set to '+DIFF[k].n+'.');toast(DIFF[k].n,'a');save();render();}
@@ -1800,10 +1816,28 @@ function searchRoom(i){pushSoon();
   crewXp(1);save();render();
   if(loc.noise>=100){loc.noise=55;loc.wave++;setTimeout(()=>startCombat([mk('walker'),mk(Math.random()<0.4?'runner':'walker')].concat(loc.wave>1?[mk('bloater')]:[]),'wave'),350);}
 }
+// Stashing used to turn a locked chest into 5 scrap, silently - and a chest is
+// one of only two places a legendary can come from. It goes in the stash now,
+// and opens from there, so there are two ways in and one set of rewards.
+function chestUnlock(){
+  if(S.keys>0){S.keys--;return true;}
+  if(Math.random()<sk('lockpick')*0.3){toast('Lock picked','z');return true;}
+  toast(sk('lockpick')?'The pick slipped. Try again or find a key.':'Needs a key','d');SFX.play('miss');
+  return false;
+}
+function openStashChest(){
+  if(!(S.stock.chests>0)){toast('No chests in the stash');return;}
+  if(!chestUnlock())return;
+  S.stock.chests--;chestLoot();
+}
 function openChest(uidv){
   const c=S.pack.find(p=>p.uid===uidv);if(!c)return;
-  if(S.keys>0){S.keys--;}else if(Math.random()<sk('lockpick')*0.3){toast('Lock picked','z');}else{toast(sk('lockpick')?'The pick slipped. Try again or find a key.':'Needs a key','d');SFX.play('miss');return;}
-  S.pack=S.pack.filter(p=>p!==c);SFX.play('chest');
+  if(!chestUnlock())return;
+  S.pack=S.pack.filter(p=>p!==c);
+  chestLoot();
+}
+function chestLoot(){
+  SFX.play('chest');
   const list=table(['food','water','meds','scrap','ammo'],1.5,1.5).filter(x=>x.r!=='common').map(x=>({...x,w:x.w*rarW(x)}));const got=[];
   for(let i=0;i<3;i++){const it=wpick(list,'w');const item=it.gear?{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}:{id:it.id,n:it.n,e:it.e,pts:Math.round(it.pts*lootMult()),cat:it.cat,qty:it.qty,r:it.r};if(takeItem(item,null))got.push(item);}
   if(Math.random()<0.25){const cs=rollCosmetic();if(takeItem(cs,null))got.push(cs);}
@@ -1871,7 +1905,7 @@ function bank(){
   if(!S.base){toast('Claim a base first: clear a place, then Claim it');return;}
   if(typeof STREET!=='undefined'&&STREET.on&&S.base.geo&&STREET.pos){const d=geoDist(S.base.geo,STREET.pos);if(d>60){toast('Walk home to stash: '+Math.round(d)+' m away','d');return;}}
   const raw=packPts();const qm=roleLvl('quartermaster');const pts=Math.round(raw*runMult()*TIERS[S.league.tier].mult*(1+(qm?0.08+qm*0.04:0)+sk('haggler')*0.05+sk('marathoner')*0.04)*dealMod('pts'));
-  let meds=0;for(const it of S.pack){if(it.cat==='shelf')S.shelf.push({id:it.id,n:it.n,e:it.e});else if(it.cat==='candy')S.stock.candy=(S.stock.candy||0)+(it.qty||1);else if(it.cat==='ammo')S.stock.ammo+=(it.qty||0);else if(it.cat==='chest'){S.stock.scrap+=5;}else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;if(it.cat==='meds')meds++;}}
+  let meds=0;for(const it of S.pack){if(it.cat==='shelf')S.shelf.push({id:it.id,n:it.n,e:it.e});else if(it.cat==='candy')S.stock.candy=(S.stock.candy||0)+(it.qty||1);else if(it.cat==='ammo')S.stock.ammo+=(it.qty||0);else if(it.cat==='chest'){S.stock.chests=(S.stock.chests||0)+1;}else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;if(it.cat==='meds')meds++;}}
   rollWeek();S.league.score+=pts;ctEvent('stash',pts);if(meds)ctEvent('meds',meds);
   let eat=activeCrew().length;if(sk('rationing'))eat=Math.ceil(eat/2);S.stock.food=Math.max(0,S.stock.food-eat);if(sk('harvest'))S.stock.food+=sk('harvest');
   S.hp=Math.min(maxHp(),S.hp+15);if(roleLvl('medic'))S.hp=Math.min(maxHp(),S.hp+20);
@@ -2617,7 +2651,8 @@ function render(){
   if(!S.base){bh.className='card blood';bh.innerHTML='<h2>No base yet</h2><p>Clear any place, then tap <b>Claim as base</b> on it. Where you set up matters: a police station comes with an armory and walls, a pharmacy with a clinic, a gas station with a generator. You can move later for 20 scrap.</p>';}
   else{bh.className='card';bh.innerHTML=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2>${baseScene()}<p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div><div class="help" style="margin-top:4px;color:var(--amber)">${hordeCountdown()}</div></div></div>`;}
   $('#baseAlert').hidden=!(S.raidPending&&S.base&&S.base.rooms.tower);
-  $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',candy:'🍬'}[k]}</div><b>${S.stock[k]||0}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`;
+  $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',candy:'🍬'}[k]}</div><b>${S.stock[k]||0}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`
+    +(S.stock.chests>0?`<button class="s chestbtn" onclick="openStashChest()"><div class="e">🧳</div><b>${S.stock.chests}</b><span>${S.keys>0?'Open one':sk('lockpick')?'Pick one':'Locked'}</span></button>`:'');
   $('#dropRow').hidden=!(S.base&&S.base.rooms.radio);const used=S.flags.dropDate===S.steps.date;$('#dropBtn').textContent=used?'📻 Drop used today':'📻 Call in today\'s supply drop';$('#dropBtn').classList.toggle('ghost',used);$('#dropHelp').textContent=used?'Next one after midnight.':'Three free items into your pack.';
   const wk=S.work;$('#workCard').hidden=!(S.base&&wk);if(S.base&&wk){$('#workCard').innerHTML=`<h2>Under construction <span class="sub">${BUILD[wk.k].e} ${BUILD[wk.k].n} L${wk.lvl}</span></h2><div class="progress" style="margin-top:8px"><div class="bar"><i style="width:${Math.min(100,wk.done/wk.need*100)}%;background:linear-gradient(90deg,var(--amber),#ffd166)"></i></div><div class="row"><span><b>${fmt(Math.min(wk.done,wk.need))}</b> / ${fmt(wk.need)} steps of work</span><span>${fmt(Math.max(0,wk.need-wk.done))} to go</span></div></div><p class="help" style="margin-top:6px">Every step you walk is labor on it. Bigger builds take more walking. One job at a time.</p><div class="row" style="margin-top:6px"><button class="btn sm ghost" onclick="cancelWork()">Cancel (refund ${wk.scrap} scrap)</button></div>`;}
   $('#build').innerHTML=S.base?Object.entries(BUILD).map(([k,b])=>{const l=S.base.rooms[k]||0;const c=buildCost(k);const lb=buildLabor(k);const busy=!!S.work;return `<div class="room2${l?' own':''}"><div class="e">${b.e}</div><div class="t"><b>${b.n}${l?' L'+l:''}${b.def[l-1]?' · +'+b.def[l-1]+' def':''}</b><span>${b.d}${c!==null?' · next: '+c+' scrap + '+fmt(lb)+' steps':' · maxed'}</span></div>${c!==null?(busy&&S.work.k===k?'<span class="chip a">building</span>':`<button class="btn sm a" onclick="build('${k}')"${busy?' disabled':''}>Build</button>`):'<span class="chip z">max</span>'}</div>`;}).join(''):'<p class="help">Claim a base to build.</p>';
@@ -2722,6 +2757,15 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.51',d:'Sep 18',t:'A better looking map, and the houses are back',
+  i:['THE MAP ITSELF is what changes here. Bloom and Hollow now load a different base map instead of tinting the plain street map, so the address numbers and most of the labels are simply not drawn any more. Bloom is soft daylight; Hollow is a real night map rather than a day map turned inside out.',
+     'THE HOUSE PINS ARE BACK exactly as they were. Shrinking them in the last update was a misread on my part - sorry.',
+     'There is a third choice, ATLAS, which is the plain street map with every label and house number, in case you ever want to read it like a map.',
+     'If a map style cannot load for any reason, it drops back to Atlas and tells you, instead of leaving you with an empty grid.']},
+ {v:'6.50',d:'Sep 18',t:'Stashing a locked chest no longer destroys it',
+  i:['THIS WAS A BUG, AND A BAD ONE. Stashing a locked chest quietly broke it down for 5 scrap. A chest is one of only two places a legendary can come from, so that was the worst thing in your pack to lose, and the game never said a word about it.',
+     'A chest you stash now goes into the stash and stays there. There is a chest tile on your base screen - tap it to open one with a key, same rewards as opening it in the pack.',
+     'A chest in the stash also survives dying. A chest in your pack still does not.']},
  {v:'6.49',d:'Sep 18',t:'You can see the map again',
   i:['THE HOUSES WERE BURYING THE MAP. In a dense neighbourhood every building is a place you can loot, so you had forty identical white house pins packed edge to edge - you could not see the streets, your own character, or which pin was a shop and which was just a lot.',
      'A house you cannot reach yet is now a small quiet dot. Walk into range and it opens into a full pin you can tap. Shops, raids, strongholds and your base always draw in full, so the things worth walking to are the things that stand out.',

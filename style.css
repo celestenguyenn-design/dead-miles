@@ -155,6 +155,10 @@ a{color:var(--amber)}
 .stock{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
 .stock .s{text-align:center;padding:8px 2px;border-radius:6px;background:var(--ash2);border:1px solid var(--line)}
 .stock .s .e{font-size:18px}.stock .s b{display:block;font-family:'Bebas Neue';font-size:20px}.stock .s span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+/* The chest tile is the one stash tile you can press. */
+.stock .chestbtn{border-color:var(--r-epic);background:color-mix(in srgb,var(--r-epic) 14%,var(--ash2));cursor:pointer}
+.stock .chestbtn span{color:var(--r-epic)}
+.stock .chestbtn:active{transform:scale(.97)}
 .def{display:flex;align-items:center;gap:12px}
 .def .big{font-family:'Bebas Neue';font-size:44px;line-height:1;color:var(--steel)}
 /* league */
@@ -245,18 +249,9 @@ a{color:var(--amber)}
 .mapbox{width:100%;height:52vh;min-height:300px;border-radius:10px;border:1px solid var(--line);background:#111;overflow:hidden;position:relative;z-index:0;isolation:isolate}
 .leaflet-container{background:#111;font-family:inherit}
 .poi-wrap,.me-icon,.z-icon{background:none;border:0}
-.poi-wrap{display:grid;place-items:center}
 .poi{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:18px;background:rgba(35,35,40,.92);border:2px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,.6)}
 .poi.near{border-color:var(--amber);box-shadow:0 0 0 4px rgba(230,165,48,.35),0 0 18px rgba(230,165,48,.6);animation:pulse 1.4s infinite}
 .poi.looted{opacity:.35;filter:grayscale(1)}
-/* A house you cannot reach yet is a dot, not a card. 40 full-size pins with the
-   same house emoji buried the streets and gave a grocery no more weight than a
-   random lot. */
-.poi.dot{width:13px;height:13px;border-width:2px;font-size:0;
-  background:rgba(35,35,40,.7);border-color:rgba(255,255,255,.34);box-shadow:0 1px 4px rgba(0,0,0,.5)}
-.poi.dot.multi{width:19px;height:19px}
-.poi.dot i{font-style:normal;font-size:10px;font-weight:700;line-height:1;color:var(--muted)}
-.poi.dot.looted{opacity:.3}
 .poi.sh{border-color:var(--blood)}
 .poi.base{width:40px;height:40px;font-size:22px;border-color:var(--rot)}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
@@ -271,8 +266,14 @@ a{color:var(--amber)}
    pull the saturation down so the road spaghetti stops shouting, lift the
    brightness so it reads as daylight, then warm the whole thing with a sepia
    pass and bring back a gentler saturation on top. */
-.dm-tiles{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.6)}
-.map-bloom .dm-tiles{filter:saturate(.45) brightness(1.1) contrast(.82) sepia(.28) saturate(1.25) hue-rotate(-6deg)}
+/* Each skin now loads tiles that already look the part, so the filters are a
+   light touch instead of the heavy correction the old inverted-OSM hack needed.
+   Atlas is the raw street map and gets no filter at all. */
+.dm-tiles{filter:none}
+.map-hollow .dm-tiles{filter:saturate(.8) contrast(1.04)}
+.map-hollow #map{background:#0d0d12}
+.map-atlas #map{background:#1a1c1a}
+.map-bloom .dm-tiles{filter:saturate(1.12) brightness(1.03) sepia(.12) hue-rotate(-6deg)}
 .map-bloom #map{background:#eef3e2}
 /* Markers: chunky, rounded, with a soft drop rather than a hard black shadow. */
 .map-bloom .poi{background:rgba(255,253,248,.96);border:3px solid #fff;color:#3b3b44;
@@ -284,13 +285,6 @@ a{color:var(--amber)}
 .map-bloom .poi.raid{border-color:#fff;box-shadow:0 3px 0 color-mix(in srgb,var(--rc) 45%,transparent),0 0 0 5px color-mix(in srgb,var(--rc) 30%,transparent),0 8px 18px rgba(0,0,0,.18)}
 .map-bloom .poi.raid b{border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.2)}
 .map-bloom .poi.looted{opacity:.4}
-/* Bloom sets .poi to 38px LATER in this file at the same specificity, so the dot
-   has to restate its own size here or it renders as a full-size empty card. */
-.map-bloom .poi.dot{width:12px;height:12px;border-width:2px;border-radius:50%;
-  background:rgba(255,252,246,.7);border-color:rgba(255,255,255,.8);
-  box-shadow:0 1px 3px rgba(120,100,80,.22)}
-.map-bloom .poi.dot.multi{width:19px;height:19px;background:rgba(255,252,246,.78)}
-.map-bloom .poi.dot i{color:#8a8492}
 /* You, with a little shadow puddle so you sit ON the world instead of over it. */
 .map-bloom .me-icon{filter:drop-shadow(0 4px 3px rgba(90,80,70,.35))}
 .map-bloom .me-icon::after{content:'';position:absolute;left:50%;bottom:2px;width:26px;height:8px;
@@ -300,7 +294,6 @@ a{color:var(--amber)}
 .map-bloom .leaflet-control-attribution a{color:#4a7fb5!important}
 /* a slow, soft bob so the map never feels dead */
 .map-bloom .poi{animation:bloombob 3.4s ease-in-out infinite}
-.map-bloom .poi.dot{animation:none}
 .map-bloom .poi.near{animation:pulse 1.4s infinite}
 @keyframes bloombob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
 @media(prefers-reduced-motion:reduce){.map-bloom .poi{animation:none}}
