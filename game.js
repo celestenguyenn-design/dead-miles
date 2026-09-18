@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.61';
+const VERSION='6.62';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3046,6 +3046,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.62',d:'Sep 18',t:'Raids: dying now counts, and levelling up no longer makes you weaker',
+  i:['LOSING A RAID POSTED A FLAT NUMBER. Whatever you actually did, a loss put the same 400-per-tier on the shared health bar - so dying in round two and dying with the boss nearly down counted exactly the same, and against a big pool the bar barely moved. It now posts the damage you really did, and pays scrap and XP in proportion. Land no hits at all and it posts nothing.',
+     'AND THE BOSS WAS SCALED BY YOUR LEVEL TWICE. Once in the normal enemy scaling, then again on top. At level 25 it hit five and a half times as hard as base while your health only doubled - so every level you gained made raids HARDER. It went from surviving about 4.6 hits at level 4 to 2.3 at level 25.',
+     'Now it is a flat five hits at every level. Tier 5 is still a real fight you can lose - it is meant to be - but it is not a death sentence for being high level any more.']},
  {v:'6.61',d:'Sep 18',t:'You cannot miss being infected now',
   i:['A RED STRIP sits under the header the whole time you are infected, on every screen, saying which stage you are at. Tap it and it takes you straight down to the card that cures it and flashes it.',
      'The card itself has not moved - it is still on the road screen where it was.']},

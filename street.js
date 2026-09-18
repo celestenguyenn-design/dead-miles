@@ -527,13 +527,21 @@ async function enterRaid(r,remote){
     // health just made fights longer - and a longer fight against several
     // enemies is one she loses to attrition, not to skill.
     boss.max=Math.round(boss.max*(1+T.hp*0.55));
-    boss.dmg=boss.dmg.map(x=>Math.round(x*T.dmg*raidScale()));
+    // mk() ALREADY scales damage with her level. Multiplying by raidScale() on
+    // top scaled it twice, so the boss hit 5.5x as hard at level 25 while her
+    // health only grew 2.6x - levelling up made her weaker, and hits-to-kill
+    // fell from 4.6 to 2.3. That is the "we go in and just die" she reported.
+    // One level scale, plus the tier, and nothing else.
+    boss.dmg=boss.dmg.map(x=>Math.round(x*T.dmg));
     // THE SHARED BAR IS NOW REAL. You face what is LEFT of it, not a fresh boss.
     // Solo at tier 5 you cannot take it in one go - but every attempt sticks, and
     // friends who join chip the same pool. This is what makes a raid co-op
     // instead of a private fight with a cosmetic group total.
     const shared=(st&&st.max>0&&st.hp>=0)?Math.max(0.08,st.hp/st.max):1;
     boss.hp=Math.max(1,Math.round(boss.max*shared));
+    // Remember what it had when she walked in, so a loss can report the damage
+    // she ACTUALLY did rather than a flat guess.
+    boss.startHp=boss.hp;
 
     for(const m of raidMechs(T.t)){
       if(m==='plated')boss.plate=true;
@@ -557,15 +565,26 @@ function liveRaidAfter(won){
   if(!S.raidsDone)S.raidsDone={};
   const p=STREET.pois.find(x=>x.id===cur.poi);
   const r=(p&&raidAt(p))||(cur.r?Object.assign({},cur.r,{T:RAID_TIERS[cur.r.tier-1]}):null);
-  const dealt=won?9999:Math.round(400*cur.tier);
-  if(r)raidSync(r,dealt);
+  // A loss used to post a flat 400 x tier no matter what happened, so dying in
+  // round two and dying with the boss on its last legs counted the same - and
+  // against a big shared pool it barely moved the bar. Post what she really did.
+  let dealt=9999;
+  if(!won){
+    const boss=(typeof C!=='undefined'&&C&&C.enemies)?C.enemies.find(e=>e.warden):null;
+    dealt=boss?Math.max(0,(boss.startHp||boss.max)-Math.max(0,boss.hp)):0;
+  }
+  if(r&&dealt>0)raidSync(r,dealt);
   if(!won){
     // You still put damage on the shared bar. Pay for that, or a lost raid is a
     // flare spent on nothing.
-    const scrap=4+cur.tier*3, xp=15*cur.tier;
+    // Pay for the damage done, not just for turning up - so a fight you nearly
+    // won is worth more than one you lost immediately.
+    const bossMax=(typeof C!=='undefined'&&C&&C.enemies&&(C.enemies.find(e=>e.warden)||{}).max)||1;
+    const share=Math.max(0, Math.min(1, dealt/bossMax));
+    const scrap=4+cur.tier*3+Math.round(cur.tier*12*share), xp=15*cur.tier+Math.round(cur.tier*20*share);
     S.stock.scrap+=scrap;addXp(xp);
-    log('The raid at '+cur.n+' beat you back, but you hurt it: +'+scrap+' scrap, +'+xp+' XP. Your damage stays on its health bar.');
-    toast('Driven off. +'+scrap+' scrap for the damage you did','a');
+    log('The raid at '+cur.n+' beat you back, but you took '+fmt(dealt)+' off it: +'+scrap+' scrap, +'+xp+' XP. That damage stays on its health bar.');
+    toast('Driven off - but you did '+fmt(dealt)+' damage','a');
     if(cur.remote)log('Your seat in this raid is paid for. Going back in costs no flare.');
     save();render();return;
   }
