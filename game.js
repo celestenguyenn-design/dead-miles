@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.48';
+const VERSION='6.49';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2722,6 +2722,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.49',d:'Sep 18',t:'You can see the map again',
+  i:['THE HOUSES WERE BURYING THE MAP. In a dense neighbourhood every building is a place you can loot, so you had forty identical white house pins packed edge to edge - you could not see the streets, your own character, or which pin was a shop and which was just a lot.',
+     'A house you cannot reach yet is now a small quiet dot. Walk into range and it opens into a full pin you can tap. Shops, raids, strongholds and your base always draw in full, so the things worth walking to are the things that stand out.',
+     'Dots that would overlap collapse into one with a number on it, and they re-collapse as you zoom, so the map never turns back into a pile.',
+     'Nothing was removed - every place is still there and still lootable.']},
  {v:'6.48',d:'Sep 17',t:'Facial hair',
   i:['SEVEN FACIAL HAIR STYLES - stubble, moustache, goatee, mutton chops, boxed beard, full beard, or clean shaven. Your look, under Hair colour.',
      'Facial hair follows your hair colour by default, and there is a colour row if you want it to differ.',

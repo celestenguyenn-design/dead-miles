@@ -61,6 +61,9 @@ function streetStart(){
   if(!STREET.map){
     STREET.map=L.map('map',{zoomControl:false,attributionControl:true}).setView([40.71,-74.0],17);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',className:'dm-tiles'}).addTo(STREET.map);
+    // Which house dots collapse together depends on where they land ON SCREEN,
+    // so it has to be recomputed whenever the screen changes.
+    STREET.map.on('zoomend moveend',()=>{try{updateMarkers();}catch(e){}});
   }
   setTimeout(()=>{STREET.map.invalidateSize();if(STREET.pos)STREET.map.setView([STREET.pos.lat,STREET.pos.lon],17);},50);
   try{applyMapSkin();renderMapSkin();}catch(e){}
@@ -174,15 +177,43 @@ async function fetchPois(pos,force){
 }
 function poiState(p){const st=streetState();const t=st.looted[p.id];if(t&&Date.now()-t<24*3600000)return 'looted';if(!STREET.pos)return 'far';return geoDist(p,STREET.pos)<=reachRadius()?'near':'far';}
 let RAID_WIN_SEEN=-1;
+// A house is scenery until you can actually reach it. Bay Ridge returns a
+// building on every lot, so drawing 40 full-size pins buried the streets, the
+// shops and her own character under a wall of identical white boxes. Houses
+// draw as small dots, and overlapping dots collapse into one with a count.
+const DECLUTTER_PX=38;
+function housePins(){
+  const out=[],kept=[];
+  const houses=[],rest=[];
+  // A raid can land on ANY poi, houses included - collapsing one would take a
+  // live raid off the map. Anything with a raid on it always draws in full.
+  for(const p of STREET.pois)((p.house||p.t==='house')&&!raidAt(p))?houses.push(p):rest.push(p);
+  // nearest first, so the one that survives a collapse is the one she can use
+  if(STREET.pos)houses.sort((a,b)=>geoDist(a,STREET.pos)-geoDist(b,STREET.pos));
+  for(const p of rest)out.push({p,n:1,dot:false});
+  for(const p of houses){
+    const st=poiState(p);
+    if(st==='near'){out.push({p,n:1,dot:false});continue;}   // in reach: show it properly
+    let pt=null;
+    try{pt=STREET.map.latLngToLayerPoint([p.lat,p.lon]);}catch(e){}
+    if(!pt){out.push({p,n:1,dot:true});continue;}
+    const hit=kept.find(k=>Math.abs(k.pt.x-pt.x)<DECLUTTER_PX&&Math.abs(k.pt.y-pt.y)<DECLUTTER_PX);
+    if(hit){hit.e.n++;continue;}
+    const e={p,n:1,dot:true};kept.push({pt,e});out.push(e);
+  }
+  return out;
+}
 function updateMarkers(){
   if(!STREET.map)return;const seen=new Set();
   // a new two-hour window means every marker is potentially a different thing
   const w=raidWindow();
   if(w!==RAID_WIN_SEEN){RAID_WIN_SEEN=w;for(const k in STREET.markers){STREET.map.removeLayer(STREET.markers[k]);delete STREET.markers[k];}}
-  for(const p of STREET.pois){seen.add(p.id);const st=poiState(p);const rd=raidAt(p);
+  for(const ent of housePins()){const p=ent.p;seen.add(p.id);const st=poiState(p);const rd=raidAt(p);
     const rdone=rd&&(S.raidsDone||{})[rd.id];
     const html=rd
       ? `<div class="poi ${st} raid t${rd.tier}${rdone?' rdone':''}" style="--rc:${rdone?'#6b6b74':rd.T.col}"><span>${rd.T.e}</span><b>${rdone?'✓':rd.tier}</b></div>`
+      : ent.dot
+      ? `<div class="poi dot ${st}${ent.n>1?' multi':''}">${ent.n>1?`<i>${ent.n}</i>`:''}</div>`
       : `<div class="poi ${st}${p.t==='stronghold'?' sh':''}"><span>${p.e}</span></div>`;
     if(!STREET.markers[p.id]){const m=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]})}).addTo(STREET.map);m.on('click',()=>{const rr=raidAt(p);if(rr)openRaid(p.id);else tapPoi(p.id);});STREET.markers[p.id]=m;}
     else STREET.markers[p.id].setIcon(L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]}));}
