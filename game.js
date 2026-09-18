@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.64';
+const VERSION='6.65';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -269,7 +269,38 @@ function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossK
   // so anything above what the phone has actually counted is stale - drop it.
   if(S.steps&&S.steps.lastSyncDate===S.steps.date&&S.steps.lastSync>stepsCounted())
     {S.steps.lastSync=stepsCounted();}
-  if(S.flare&&S.flare.endsAt<=Date.now())S.flare=null;}
+  if(S.flare&&S.flare.endsAt<=Date.now())S.flare=null;
+  repairTypedSteps();}
+/* v6.63 and earlier, "That's my total" recorded the gap between what she typed
+   and what the phone had counted as steps the phone would NEVER see. It was
+   only behind, so when it caught up those steps landed a second time: 15,000
+   walked showed as 24,000. Her call was that this is ours to fix, not something
+   her friends should have to tap a button for.
+
+   Once per day, at the first load, if hand-typed steps are still sitting on top
+   of the phone's own count, take them back out. The phone's reading is what
+   survives, so this can only ever REMOVE duplication - it can never invent a
+   step or wipe a walk the phone counted. Anything typed in after this has run
+   is left alone, because the flag is already set for the day. */
+function repairTypedSteps(){
+  const s=S&&S.steps;if(!s)return;
+  if(s.typedFixDate===s.date)return;
+  s.typedFixDate=s.date;
+  const r=(s.reads&&s.readsDate===s.date)?s.reads:null;
+  if(!r||!(r.manual>0)||!((r.counted||0)>0))return;
+  const truth=Math.max(r.counted||0,r.floor||0);
+  const back=Math.max(0,(s.today||0)-truth);
+  r.manual=0;
+  if(back<=0)return;
+  s.today=truth;
+  s.week=Math.max(0,(s.week||0)-back);
+  s.total=Math.max(0,(s.total||0)-back);
+  if(s.src)s.src.typed=Math.max(0,(s.src.typed||0)-back);
+  // ensureState runs before the screen exists, so say it once the game is up.
+  setTimeout(()=>{if(!S||!S.onboarded)return;
+    log('Fixed a counting bug: '+fmt(back)+' steps you typed in had been added on top of the same steps your phone counted. Today is '+fmt(truth)+', straight from your phone. If any of that really was a walk your phone missed, add it again with "Add these".');
+    toast('Step count corrected to '+fmt(truth),'a');},900);
+}
 function migrate(o){
   if(!o)return null;if(o.v===3)return o;
   if(o.v===2){const f=fresh();const m=Object.assign(f,o);m.v=3;m.av=ART.randomAv();m.cosmetics=[];m.cls='';m.sp=Math.max(0,(o.lvl||1)-1);m.skills={};m.sfx=true;m.keys=0;m.milestones=[];m.ct=f.ct;m.party=f.party;m.wx=null;m.bossKilled='';
@@ -3084,11 +3115,16 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.65',d:'Sep 18',t:'Your step count fixes itself now',
+  i:['v6.64 stopped the double-counting, but it left anyone already inflated to tap a button. That was our bug, not yours to clean up.',
+     'Open the game and it repairs itself: hand-typed steps that were sitting on top of the same steps your phone counted come back out, and today, this week and your lifetime total all land on your phone\'s own reading. It says in your log exactly how many it took back.',
+     'It can only ever remove double-counting - it cannot invent a step or lose a walk your phone counted. It runs once, so anything you type in afterwards stays.',
+     'If your sync happens to be running behind at that moment, you will drop to your phone\'s current number and climb back as it catches up.']},
  {v:'6.64',d:'Sep 18',t:'"That\'s my total" was being added on top of your phone, not used instead of it',
   i:['Tiff and Wing both had the game showing far more steps than their phone. It was real, and it was this: when the sync looked stuck and you typed your real total, the game recorded the difference as EXTRA steps your phone had not seen - and then added them again when your phone caught up.',
      'Walk 15,000, see the sync stuck at 6,000, type 15,000, and once your phone caught up the game showed 24,000. Reproduced exactly.',
      'THAT\'S MY TOTAL now means what it says: today is at least this number, and it keeps meaning that as your phone catches up. Nothing gets added twice. Anything you walk afterwards still counts on top, as it always did.',
-     'If your day is already inflated, the Steps card now shows how much of it you typed in, with a "Use my phone\'s count only" button that takes it back out - today, this week and your lifetime total all come back in line.',
+     'If your day was already inflated, v6.65 fixes it for you when you open the game - nothing to tap.',
      'ADD THESE is unchanged and still adds: it is for a walk your phone never counted at all, like a treadmill with your phone on the table. The card now spells out the difference between the two buttons.']},
  {v:'6.63',d:'Sep 18',t:'Raid together: it has to split its attention now',
   i:['SQUAD RAIDS. Walk into the same raid as a friend, or flare into theirs, and you fight it as a SQUAD - no lobby, no waiting, no invite to accept. The moment they land a hit you are in it together.',
