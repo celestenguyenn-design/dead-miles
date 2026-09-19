@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.90';
+const VERSION='6.91';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3568,6 +3568,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.91',d:'Sep 19',t:'The test button was posting a row that looked like your phone',
+  i:['MY OWN TEST WAS MUDDYING THE ONE LIST THAT ANSWERS THIS. Test my key posts a real 1-step row, and the log printed it under "What your phone has sent today" right next to your genuine readings - so a 15:32 / 1 sat under a 10:00 / 14 and read as your shortcut sending 1 step.',
+     'That row is now named <b>my test button, not your phone</b>, it no longer counts toward the "every post is the same number" warning, and if it is the ONLY row today the card says so out loud: the server and your key are fine, the fault is inside the shortcut.']},
  {v:'6.90',d:'Sep 19',t:'It is labelled Sum, not Statistic',
   i:['YOU SAID THERE IS NO STATISTIC BUBBLE, ONLY A SUM BUBBLE, AND YOU ARE RIGHT. iOS names that bubble after whichever operation you picked in Calculate Statistics - you picked Sum, so it says <b>Sum</b>. Three places in the setup told you to tap a "Statistic" bubble that does not exist on your screen, while the rest of the game said Sum. All three now say Sum.']},
  {v:'6.89',d:'Sep 19',t:'The address was four folds deep - the exact thing I said I had stopped doing',
@@ -4209,11 +4212,15 @@ function stepPostLog(){
   if(!o.ok||!o.posts||o.postsDate!==todayStr())return '';
   const ps=o.posts;
   if(!ps.length)return '<div class="note" style="margin-top:8px"><b style="color:#ffb35c">Your phone has sent nothing today.</b> Not a wrong number - nothing at all. That is iOS: the shortcut did not run, or it could not read Health.</div>';
-  const same=ps.length>2&&ps.every(x=>x.n===ps[0].n);
+  const isTest=x=>x.n===1&&o.testAt&&Math.abs(x.t-o.testAt)<180000;
+  const real=ps.filter(x=>!isTest(x));
+  const same=real.length>2&&real.every(x=>x.n===real[0].n);
   const rows=ps.slice(0,8).map(x=>{const d=new Date(x.t);
-    return '<span>'+esc(isNaN(d)?'?':timeStr(d.getTime()))+'</span><b>'+fmt(x.n)+'</b>';}).join('');
+    return '<span>'+esc(isNaN(d)?'?':timeStr(d.getTime()))+'</span><b>'+fmt(x.n)
+      +(isTest(x)?' <span class="help" style="font-weight:400">&larr; my test button, not your phone</span>':'')+'</b>';}).join('');
   return '<div style="margin-top:8px"><div class="section-label">What your phone has sent today</div>'
     +'<div class="kv" style="margin-top:4px">'+rows+'</div>'
+    +(!real.length?'<div class="note" style="margin-top:8px"><b style="color:#ffb35c">Nothing from your phone today.</b> The only row above is the test this card sent - your shortcut itself has delivered nothing. The server and your key are fine; the fault is inside the shortcut.</div>':'')
     +(ps.length>8?'<span class="help">'+(ps.length-8)+' more earlier.</span>':'')
     +(same?'<div class="note" style="margin-top:8px"><b style="color:#ffb35c">Every post is the same number.</b> Your shortcut is sending a fixed value, not your step count - the bubble at the end of it is the wrong one. It should be the <b>Sum</b> from Calculate Statistics.</div>':'')
     +'</div>';
@@ -4249,6 +4256,12 @@ async function testStepKey(){
   const key=(O().stepKey||O().token||'');
   if(!key){stepTestSay('<b style="color:var(--blood)">No key.</b> The game has no shortcut key yet, so nothing your phone sends can be matched to you. Go offline and back online in Settings, then test again.');return;}
   let ok=false,err='';const t0=Date.now();
+  /* v6.91 - the instrument was polluting the data it exists to read. This posts
+     a real row of 1 step, and the log rendered it under "What your phone has
+     sent today" next to her genuine readings. On 2026-09-19 that put a 15:32/1
+     directly under a 10:00/14 on her screen, which reads as her shortcut having
+     sent 1 step. Remember when the test fired so the row can be named. */
+  try{o.testAt=Date.now();save();}catch(e){}
   try{ok=await rpc('post_steps_link',{p:o.handle+'|'+key+'|1'});}catch(e){ok=false;err=e.message||String(e);}
   const ms=Date.now()-t0;
   if(err){stepTestSay('<b style="color:var(--blood)">The server would not answer.</b>'
