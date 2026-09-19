@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.88';
+const VERSION='6.89';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3568,6 +3568,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.89',d:'Sep 19',t:'The address was four folds deep - the exact thing I said I had stopped doing',
+  i:['YOU ASKED WHERE TO GO TO COPY THE ADDRESS AND THE HONEST ANSWER WAS FOUR TAPS INTO A NESTED FOLD. I wrote the lesson about that two versions ago and then did it again.',
+     'Building or fixing this shortcut needs two things, so both now sit together at the top of the <b>Get Contents of URL</b> box, numbered: <b>1. The address</b>, <b>2. Your code</b>. Open Settings, open Steps, and they are right there - no extra folds.']},
  {v:'6.88',d:'Sep 19',t:'Get Contents of URL is the one to use, and the setup guide now builds it',
   i:['YOU ASKED WHICH IS BETTER AND THE ANSWER IS GET CONTENTS OF URL. It posts your steps and finishes. The Open URLs kind <b>opens the game every single time it runs</b> - on a daily automation that is your phone launching a game by itself, and it only ever existed to dodge a timeout whose real cause was Fill Missing, which is already off.',
      'The setup guide was still walking you through building the Open URLs one. It now builds the direct one, with Fill Missing called out in the step it lives in. The Open URLs recipe is still there in a fold if you want fewer taps.',
@@ -4278,29 +4281,34 @@ function renderStepSync(){
 
     +'<details open style="margin-top:10px"><summary style="cursor:pointer"><b>Last action says "Get Contents of URL"</b></summary>'
     +'<div class="note" style="margin-top:6px">'
-    +'<div class="help">This is the kind that worked before, and it is the one to keep. It posts straight to the server and never opens a browser, so your steps cannot land in a blank copy of the game. <b>There is no address to replace in this one.</b></div>'
-    +'<div class="help" style="margin-top:6px">Two things to check. First, in <b>Find Health Samples</b>, <b>Fill Missing</b> must be OFF - that is what was timing it out. Second, tap the <b>Get Contents of URL</b> action and open the Request Body field named <b>p</b>. It must hold exactly this code, then the blue <b>Sum</b> bubble, and nothing else:</div>'
-    +'<input id="syncCodeCard" readonly value="'+esc(pre)+'" style="width:100%;margin:8px 0 6px;font-size:11px">'
+    +'<div class="help">This is the kind that worked before, and it is the one to keep. It posts straight to the server and never opens a browser, so your steps cannot land in a blank copy of the game. <b>There is nothing in it to replace unless it stopped working.</b></div>'
+    /* v6.89 - BOTH VALUES LIVE HERE NOW. The address was four folds deep, inside
+       the "how do I switch it" fold, which is exactly the v6.85 failure repeated
+       one version after that lesson was written. Building or repairing this
+       shortcut needs the address AND the code, so they sit together, on the
+       branch that needs them, at the shallowest depth the Steps card has. */
+    +'<div class="section-label" style="margin-top:10px">1. The address</div>'
+    +'<input id="syncPostUrl" readonly value="'+esc(SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key)+'" style="width:100%;margin:6px 0;font-size:11px">'
+    +'<button class="btn sm r" onclick="copyText($(\'#syncPostUrl\').value,\'syncPostUrl\')">Copy the address</button>'
+    +'<div class="section-label" style="margin-top:10px">2. Your code</div>'
+    +'<input id="syncCodeCard" readonly value="'+esc(pre)+'" style="width:100%;margin:6px 0;font-size:11px">'
     +'<div class="row"><button class="btn sm r" onclick="copyText($(\'#syncCodeCard\').value,\'syncCodeCard\')">Copy the code</button>'
     +'<button class="btn sm" onclick="testStepKey()">Test my key</button></div>'
     +'<div id="stepTestOut" style="margin-top:8px">'+STEP_TEST+'</div>'
-    +'<div class="help" style="margin-top:6px">Delete everything in <b>p</b> except the blue Sum bubble, put the cursor in front of the bubble and paste. The code already ends in a <b>|</b> - do not add another.</div>'
+    +'<div class="help" style="margin-top:8px">Inside the shortcut: the address goes in the <b>Get Contents of URL</b> field. Then <b>Show More</b> &rarr; Method <b>POST</b> &rarr; Request Body <b>JSON</b> &rarr; a <b>Text</b> field with Key <b>p</b>, holding your code and then the blue <b>Sum</b> bubble. The code already ends in a <b>|</b> - do not add another, and leave no space before the bubble.</div>'
+    +'<div class="help" style="margin-top:6px">Also check <b style="color:var(--blood)">Fill Missing is OFF</b> in <b>Find Health Samples</b>. That one setting is the only thing that has ever made this kind time out.</div>'
     +'<details style="margin-top:8px"><summary class="help" style="cursor:pointer">Mine says Open URLs - how do I switch it to this one?</summary><div style="margin-top:6px">'
-    +'<div class="help">Worth doing: this kind posts and finishes, so it never opens the game. The Open URLs kind opens the game every single time it runs, which on a daily automation means your phone launching a game by itself.</div>'
-    +'<div class="help" style="margin-top:6px">Keep the first two actions exactly as they are. Only the last one changes:</div>'
+    +'<div class="help">Worth doing: this kind posts and finishes, so it never opens the game. The Open URLs kind opens the game every single time it runs.</div>'
+    +'<div class="help" style="margin-top:6px">Keep the first two actions exactly as they are. Only the last one changes, and it uses the two boxes above:</div>'
     +'<ol style="padding-left:20px;margin:6px 0;line-height:1.7">'
     +'<li>Press and hold the <b>Open URLs</b> action, <b>Delete</b>.</li>'
-    +'<li>Search <b>Get Contents of URL</b> and add it. Paste this address into it:</li>'
-    +'</ol>'
-    +'<input id="syncUrl3" readonly value="'+esc(SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key)+'" style="width:100%;margin:4px 0 6px;font-size:11px">'
-    +'<button class="btn sm ghost" onclick="copyText($(\'#syncUrl3\').value,\'syncUrl3\')">Copy the address</button>'
-    +'<ol start="3" style="padding-left:20px;margin:6px 0;line-height:1.7">'
+    +'<li>Search <b>Get Contents of URL</b> and add it.</li>'
+    +'<li>Paste <b>the address</b> from box 1 above into it.</li>'
     +'<li>Tap <b>Show More</b>. Method <b>POST</b>, Request Body <b>JSON</b>.</li>'
-    +'<li><b>Add new field</b> &rarr; <b>Text</b>, Key <b>p</b>. Paste the code from above into its value, then tap the <b>Statistic</b> bubble over the keyboard so it sits right after the last <b>|</b>.</li>'
+    +'<li><b>Add new field</b> &rarr; <b>Text</b>, Key <b>p</b>. Paste <b>your code</b> from box 2 into its value, then tap the <b>Statistic</b> bubble over the keyboard so it sits right after the last <b>|</b>.</li>'
     +'<li>Done. Tap play - nothing should open, and your number appears here.</li>'
     +'</ol></div></details>'
     +'</div></details>'
-
     +'<details style="margin-top:8px"><summary style="cursor:pointer"><b>Last action says "Open URLs"</b></summary>'
     +'<div class="note" style="margin-top:6px">'
     +'<div class="help">This one hands the link to Safari, so it needs the address with your key in it. Select the old address inside the action and paste this over it, leaving the blue <b>Sum</b> bubble at the end where it is.</div>'
