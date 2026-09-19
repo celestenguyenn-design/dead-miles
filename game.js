@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.71';
+const VERSION='6.72';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -66,9 +66,21 @@ const GEAR={
   harvest:{n:'The Harvest',e:'🌾',slot:'melee',dmg:[20,26],dur:7,w:0,pts:82,r:'legendary',legend:'Hits every enemy in the room for half damage'},
   vigil:{n:'Vigil',e:'🕯️',slot:'armor',dr:5,w:0,pts:88,r:'legendary',legend:'The first hit of every fight cannot take more than 5 HP'},
   saintjude:{n:'Saint Jude',e:'📿',slot:'melee',dmg:[14,30],dur:10,w:0,pts:84,r:'legendary',legend:'The worse your health, the harder it swings'},
-  longwinter:{n:'Long Winter',e:'❄️',slot:'ranged',dmg:[20,28],dur:14,ammo:'ammo',w:0,pts:86,r:'legendary',legend:'Every hit slows the target - it loses one turn in three'}
+  longwinter:{n:'Long Winter',e:'❄️',slot:'ranged',dmg:[20,28],dur:14,ammo:'ammo',w:0,pts:86,r:'legendary',legend:'Every hit slows the target - it loses one turn in three'},
+  // HANDS and FEET (v6.72). Her ask: "we only have like 3 types of armor ...
+  // we should add boots, head, chest, gloves, that way we have more things we
+  // can upgrade." Four armour slots now, each with a common/uncommon/rare rung
+  // and one legendary, so there is a ladder in every one of them.
+  workgloves:{n:'Work gloves',    e:'🧤',slot:'hands',dr:1,w:7,  pts:7, r:'common'},
+  tacgloves: {n:'Tactical gloves',e:'🧤',slot:'hands',dr:2,w:3.5,pts:15,r:'uncommon'},
+  gauntlets: {n:'Welding gauntlets',e:'🧤',slot:'hands',dr:4,w:1.2,pts:26,r:'rare'},
+  surefoot:  {n:'Sure Hands',     e:'🤲',slot:'hands',dr:3,w:0,  pts:80,r:'legendary',legend:'Your weapon wears out half as fast'},
+  sneakers:  {n:'Old sneakers',   e:'👟',slot:'feet', dr:1,w:7,  pts:7, r:'common'},
+  workboots: {n:'Work boots',     e:'🥾',slot:'feet', dr:2,w:3.5,pts:15,r:'uncommon'},
+  steeltoes: {n:'Steel toecaps',  e:'🥾',slot:'feet', dr:4,w:1.2,pts:26,r:'rare'},
+  longhaul:  {n:'Long Haul',      e:'🥾',slot:'feet', dr:3,w:0,  pts:80,r:'legendary',legend:'You always get away clean, and drop nothing running'}
 };
-const LEGEND_IDS=['mercy','lastword','oldreliable','whisper','nightingale','harvest','vigil','saintjude','longwinter'];
+const LEGEND_IDS=['mercy','lastword','oldreliable','whisper','nightingale','harvest','vigil','saintjude','longwinter','surefoot','longhaul'];
 const CAT_LABEL={food:'Food',water:'Water',drink:'Drink',snack:'Snack',meds:'Meds',scrap:'Scrap',ammo:'Ammo',shelf:'Trophy',key:'Key',chest:'Chest',gear:'Gear',cosmetic:'Cosmetic',candy:'Candy'};
 const byCat=(c)=>Object.entries(ITEMS).filter(([k,v])=>v.cat===c&&v.w>0).map(([k,v])=>({id:k,...v}));
 function table(cats,shelfW,gearW){const out=[];for(const c of cats)out.push(...byCat(c));if(shelfW)out.push(...byCat('shelf').map(x=>({...x,w:x.w*shelfW})));if(gearW)out.push(...Object.entries(GEAR).filter(([k,v])=>v.w>0).map(([k,v])=>({id:k,gear:true,...v,w:v.w*gearW})));return out;}
@@ -249,7 +261,7 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   steps:{total:0,today:0,date:todayStr(),lastSync:0,lastSyncDate:''},
   walk:{toNext:0,dist:500,district:0,houses:0,progress:0,banked:0},
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
-  gear:[],eq:{melee:null,ranged:null,armor:null,head:null,bag:null},
+  gear:[],eq:{melee:null,ranged:null,armor:null,head:null,hands:null,feet:null,bag:null},
   crew:[],active:[],pet:null,
   base:null,stock:{food:5,water:5,meds:1,scrap:0,ammo:0,chests:0},shelf:[],
   goal:6000,streak:{days:0,last:''},
@@ -259,7 +271,7 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
 function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
-  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};
+  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};if(S.eq&&S.eq.hands===undefined)S.eq.hands=null;if(S.eq&&S.eq.feet===undefined)S.eq.feet=null;
   // free any slot a downed crew member is still sitting in (they never gave it
   // back before v6.70), so an existing save is not stuck a fighter short
   if(Array.isArray(S.active)&&Array.isArray(S.crew)){
@@ -591,7 +603,13 @@ function bestMed(){
 function medsAll(){return MED_ORDER.map(id=>({id,pack:packMeds(id),stock:medsHeld(id)})).filter(x=>x.pack||x.stock);}
 const maxHp=()=>Math.max(30,Math.round(hydroHpMult()*(1-infectPenalty())*(100+(S.lvl-1)*10+sk('tough')*10+sk('thickskin')*8+sk('survivalist')*5+(bg('firefighter')?10:0)-(bg('gamer')?10:0))));
 const eqItem=(slot)=>S.eq[slot]?S.gear.find(g=>g.uid===S.eq[slot]):null;
-const dr=()=>(eqItem('armor')?eqItem('armor').dr:0)+(eqItem('head')?eqItem('head').dr:0);
+const ARMOR_SLOTS=['armor','head','hands','feet'];
+const dr=()=>ARMOR_SLOTS.reduce((a,k)=>a+((eqItem(k)&&eqItem(k).dr)||0),0);
+// A classic soak curve: every point of armour is worth less than the last, so
+// it can never reach zero damage and there is always a reason for one more
+// piece. Bare: 0%. One jacket (2): 8%. A full common set (5): 18%.
+// A full rare set (17): 43%. Everything legendary (19): 46%.
+const drSoak=()=>{const d=dr();return d/(d+22);};
 const capacity=()=>10+(eqItem('bag')?eqItem('bag').cap:0)+(roleLvl('quartermaster')?3+roleLvl('quartermaster'):0)+sk('deeppockets')*2+sk('packrat')*2;
 const baseDmg=()=>[3+S.lvl,6+S.lvl];
 function addXp(n){if(setPerk('xp'))n=Math.round(n*(1+setPerk('xp')));if(S.pet==='cat')n=Math.round(n*petXpMult());if(bg('gamer'))n=Math.round(n*(1.25+sk('metaknowledge')*0.05));S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
@@ -1676,7 +1694,7 @@ function startCombat(enemies,where,job){
 function clog(m,c){if(!C||!C.log)return;C.log.unshift({m,c:c||''});C.log=C.log.slice(0,14);}
 function alive(){return C.enemies.filter(e=>!e.dead);}
 function targetEnemy(){let t=C.enemies[C.target];if(!t||t.dead){const a=alive();t=a[0];C.target=C.enemies.indexOf(t);}return t;}
-function hurt(n,src){let d=Math.max(1,n-dr());
+function hurt(n,src){let d=Math.max(1,Math.round((n-dr())*(1-drSoak())));
   // Vigil caps the OPENING hit of a fight. It does nothing for the rest of the
   // fight, so it is protection against being ambushed, not a damage sponge.
   {const a=eqItem('armor');
@@ -1772,7 +1790,7 @@ function act(kind){
       if(tp&&tp.twice&&Math.random()<tp.twice&&!t.dead&&t.hp>0){
         const d2=Math.round(d*0.6);dealTo(t,d2,'The '+w.n+' comes back around','slash');clog('Vicious: a second cut.','good');}
       if(sk('cleave')&&Math.random()<sk('cleave')*0.2){const o=alive().find(e=>e!==t);if(o){dealTo(o,Math.round(d/2),'The swing carries into '+o.n);}}
-      if(w&&!(Math.random()<sk('irongrip')*0.25)){w.dur--;if(w.dur<=0&&Math.random()<sk('juryrig')*0.2){w.dur=1;clog('You jury-rig the '+w.n+' back together.','good');}
+      if(w&&!(Math.random()<sk('irongrip')*0.25)&&!(eqItem('hands')&&eqItem('hands').id==='surefoot'&&Math.random()<0.5)){w.dur--;if(w.dur<=0&&Math.random()<sk('juryrig')*0.2){w.dur=1;clog('You jury-rig the '+w.n+' back together.','good');}
         if(w.dur>0&&w.dur<=3)clog(w.n+': '+w.dur+' swing'+(w.dur===1?'':'s')+' left before it gives out.','hit');
         breakWeapon(w);}}
     else{clog('You miss.','');SFX.play('miss');}
@@ -1840,6 +1858,9 @@ function act(kind){
     clog('You get a fresh grip on the '+(eqItem('melee')?eqItem('melee').n:'weapon')+'.','good');
   }
   else if(kind==='flee'){if(C.where==='raid'||C.where==='horde'){toast('Nowhere to run. This is your base.');return;}
+    const lh=eqItem('feet')&&eqItem('feet').id==='longhaul';
+    if(lh){C.fled=true;C.dropped=[];clog('Long Haul. You are gone before they finish turning around, and nothing shakes loose.','good');
+      endCombat(false);return;}
     if(Math.random()<0.7){C.fled=true;clog('You break away and run.','sys');
       // "I actually want to know what I dropped." Name them, in the fight log and
       // on the way-out screen, instead of just saying a quarter of the pack.
@@ -2011,7 +2032,7 @@ function renderCombat(){
   <div class="pbox${phurt?' hurt':''}"><div class="sp${plunge?' lunge':''}">${ART.avatarSVG(S.av,60,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',mood:S.hp<maxHp()*0.3?'angry':''})}${flash?'<span class="muzzle">✳️</span>':''}</div><div><div class="hplab"><span>You · DR ${dr()}</span><span>${S.hp} / ${maxHp()}</span></div><div class="hpbar"><i style="width:${S.hp/maxHp()*100}%"></i></div></div>${phurt?`<span class="dmg">-${C.pfx.d}</span>`:''}</div>
   ${C.where==='liveraid'&&typeof squadStrip==='function'?squadStrip():''}
   ${S.buff&&S.buff.fights>0?`<div class="help" style="margin-top:6px;color:var(--amber)">${esc(BUFF_TEXT[S.buff.k]||'')}</div>`:''}
-  <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}${hit?`<span class="spark">${SPARK[e.fx.k||'slash']}</span>`:''}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.plate&&!e.cracked?' · <b style="color:var(--steel)">plated</b>':''}${e.enraged?' · <b style="color:#ff8a92">enraged</b>':''}${e.caller?' · calls more':''}${e.frenzy?' · frenzies low':''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
+  <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}${hit?`<span class="spark">${SPARK[e.fx.k||'slash']}</span>`:''}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.plate&&!e.cracked?' · <b style="color:var(--steel)">plated - a heavy swing cracks it</b>':''}${e.enraged?' · <b style="color:#ff8a92">enraged</b>':''}${e.caller?' · calls more':''}${e.frenzy?' · frenzies low':''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
   <div class="acts">
     <button class="btn r" onclick="attackGuard()">${w?w.e+' '+esc(w.n)+(temperOf(w)?' <span class="chip s">'+esc(temperOf(w).n)+'</span>':''):'👊 Fists'}<small>${w?(wDmg(w)[0]+dmgBonus())+'-'+(wDmg(w)[1]+dmgBonus())+' · '+w.dur+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
     <button class="btn" onclick="heavyGuard()" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · ${60+sk('bruiser')*12}% hit · costs 2 durability</small></button>
@@ -3311,6 +3332,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.72',d:'Sep 19',t:'Four armour slots, and armour that actually stops a tier 5',
+  i:['GLOVES AND BOOTS. Armour is four pieces now - Head, Chest, Hands, Feet - each with a common, uncommon and rare rung plus a legendary, so there is a ladder in every slot instead of two things to find.',
+     'ARMOUR NEVER KEPT UP. It subtracted a flat 2 to 9 while enemy damage grows with your level AND the raid tier, so a tier 5 hitting for 138 lost 9 to a full set. Six per cent. Armour now also buys a percentage, and every point is worth slightly less than the last so it can never reach zero.',
+     'At level 20 against that same 138: bare 138 · jacket and helmet 113 · full common set 104 · full uncommon 88 · FULL RARE SET 68. Measured over 300 tier-5 fights, a full rare set takes you from 8 rounds alive to 16.',
+     'A TIER 5 IS PLATED, which eats 55% of an ordinary swing - that is your "we hit it for 6". A HEAVY SWING cracks the plating open and it stays cracked. Ordinary 18, heavy 40, against the same target. The fight screen now says so on the enemy instead of just printing the word "plated" at you.',
+     'Two new legendaries: SURE HANDS (your weapon wears out half as fast) and LONG HAUL (you always get away clean, and drop nothing running).']},
  {v:'6.71',d:'Sep 19',t:'Being broke is no longer a dead end - food and sleep keep up with you too',
   i:['v6.67 scaled MEDS to your health bar and left everything else flat, which is how you end up at 10% HP with no meds and no scrap and nothing you can actually do. At level 20 a meal was 6% of your bar, stashing 6%, and a WHOLE NIGHT 10%. Ten nights to sleep off one bad fight.',
      'A meal, a stash run and a night\'s sleep are now shares of your bar too, floored at the old numbers so nothing is ever worse than before. A night is 30%: THREE NIGHTS from near-death to full at every level, instead of ten.',
@@ -4159,6 +4186,8 @@ const GEAR_SLOTS=[
   {k:'ranged',n:'Gun or bow',v:'Nothing ranged'},
   {k:'armor', n:'Armour',    v:'No armour'},
   {k:'head',  n:'Head',      v:'Nothing on your head'},
+  {k:'hands', n:'Hands',     v:'Bare hands'},
+  {k:'feet',  n:'Feet',      v:'Nothing on your feet'},
   {k:'bag',   n:'Bag',       v:'No bag'},
 ];
 function gearLabel(g){
