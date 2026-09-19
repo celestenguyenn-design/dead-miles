@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.93';
+const VERSION='6.94';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3308,6 +3308,15 @@ async function stepsBeacon(){
     ? '<div><div style="font-size:34px;font-weight:800;color:#5fd08a">'+fmt(v)+' \u2713</div><div style="margin-top:6px">Sent. Your game will have it within a minute.</div><button id="bcOk" style="margin-top:16px;padding:10px 20px;border-radius:9px;border:0;background:#c2612f;color:#fff;font:600 15px system-ui">Open Dead Miles</button></div>'
     : '<div><div style="font-size:30px;font-weight:800;color:#ff5a78">Could not send</div><div style="margin-top:6px">'+fmt(v)+' steps were read off your phone, but the server would not take them. Your key may be out of date - open the game and tap <b>Fix my shortcut</b>.</div><button id="bcOk" style="margin-top:16px;padding:10px 20px;border-radius:9px;border:0;background:#c2612f;color:#fff;font:600 15px system-ui">Open Dead Miles</button></div>';
   const b=document.getElementById('bcOk');if(b)b.onclick=()=>{box.remove();try{if(O().ok)pullSteps();}catch(e){}};
+  /* v6.94 - THE RELIABLE PATH HAD TO STOP BEING THE ANNOYING ONE. An Open URLs
+     shortcut is the only shape with no POST method, no JSON body, no p field
+     and no variable buried inside a body - four parts that cannot be seen from
+     here and broke every time. Its whole cost is that it opens the game. So on
+     success the confirmation gets out of the way by itself: if this copy IS her
+     game the steps are already applied and she is back in it in a second and a
+     half, with no tap. A failure stays on screen, because that is the one she
+     needs to read. */
+  if(ok)setTimeout(()=>{try{box.remove();if(O().ok)pullSteps();}catch(e){}},1500);
   return true;
 }
 function autoSyncFromUrl(){try{
@@ -3586,6 +3595,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.94',d:'Sep 19',t:'Open URLs is the recommendation again, and it gets out of your way now',
+  i:['I SENT YOU DOWN THE HARDER PATH AND IT COST YOU AN EVENING. An Open URLs shortcut has two parts: one address and the Sum bubble. The other kind has six, four of them buried in a POST body I cannot see from here - and every failure tonight was in one of those four.',
+     'Its only real cost was that it opens the game every time. So now the confirmation clears itself after a second and a half and drops you straight back in, with no tap. A failure stays on screen, because that is the one worth reading.']},
  {v:'6.93',d:'Sep 19',t:'Your shortcut is right except for one line - the address',
   i:['YOUR RECORDING FOUND IT IN FIFTEEN SECONDS. Fill Missing off, Limit off, Sum of Health Samples, POST, JSON, field p with your code and the Sum bubble - all correct. The only wrong thing is the address inside <b>Get Contents of URL</b>.',
      'It holds <b>celestenguyenn-design.github.io/dead-miles/index.html?k=...&steps=</b> - the game\'s own web page. That address is real, but it belongs to an <b>Open URLs</b> shortcut. In a POST it aims everything at GitHub Pages, which just serves files and throws the body away, so nothing ever reached the server.',
