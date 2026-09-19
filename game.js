@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.78';
+const VERSION='6.79';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3514,6 +3514,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.79',d:'Sep 19',t:'The Shortcut button tells you when nothing came back',
+  i:['Tapping the button asked iOS to run your Shortcut, said "Opening Shortcuts...", quietly checked four times, and then said NOTHING if nothing arrived. A deep link to a Shortcut that has been renamed or deleted does not fail - iOS just ignores it. So the button looked like it stopped working, with no way to tell which end was broken.',
+     'If no steps arrive within 16 seconds it now says so, names the three things it can be - your Shortcut has a different name, it lost its Health permission after an iOS update, or it is sending the wrong key - and puts "Check my sync" and "Rename my shortcut" one tap away.',
+     'When it works, it stays quiet.',
+     'The game side was checked end to end and is fine: given steps on the server it takes them correctly. "Why aren\'t my steps syncing?" on the Steps card already tells you exactly which link in the chain is broken - it is worth running first.']},
  {v:'6.78',d:'Sep 19',t:'Your new gloves and boots were invisible',
   i:['Gear has never gone in your pack - it goes straight to GEAR, under You. But when v6.72 added the Hands and Feet slots, the Armor tab kept its own old list of what counts as armour, so gauntlets and boots were filed correctly and then filtered out of the only screen you would look for them on. The tab count was wrong too.',
      'They are all there and they have been the whole time. The Armor tab now reads from the one list of armour slots, so this cannot drift again.',
@@ -4016,8 +4021,31 @@ async function fetchStepKey(){
 function stepCode(){const o=O();return o.handle+'|'+(o.stepKey||o.token)+'|';}
 function runShortcut(){
   toast('Opening Shortcuts...');
-  // it takes a moment to run and post, so check a few times on the way back
+  // A deep link to a Shortcut that has been renamed, deleted, or simply does
+  // not run does NOT throw - iOS just does nothing. So the button said
+  // "Opening Shortcuts...", polled four times in silence, and left her looking
+  // at the same number with no idea which end was broken. Her words: "the
+  // button was working before, now it isn't."
+  // Remember what the game had before, and if nothing has arrived by the last
+  // poll, say so and put the check one tap away.
+  const was=stepsCounted();
   [2000,5000,9000,15000].forEach(t=>setTimeout(()=>{if(O().ok)pullSteps();},t));
+  setTimeout(()=>{
+    if(!O().ok||S.loc||S.combat)return;
+    if(stepsCounted()>was)return;                 // it worked, say nothing
+    openSheet('<h2>Nothing came back</h2>'
+      +'<p>The game asked iOS to run <b>'+esc(S.scName||SC_NAME)+'</b> and no steps arrived in the 16 seconds after. That is one of three things, and the check below says which:</p>'
+      +'<div class="stack" style="margin-top:8px">'
+      +'<div class="note">Your Shortcut is not called <b>'+esc(S.scName||SC_NAME)+'</b> any more. iOS silently ignores the link when the name does not match exactly.</div>'
+      +'<div class="note">It ran but could not read Health - the permission gets dropped after an iOS update.</div>'
+      +'<div class="note">It ran and sent the wrong key, so the server could not match it to you.</div>'
+      +'</div>'
+      +'<div class="grid2" style="margin-top:12px">'
+      +'<button class="btn r" onclick="closeSheet();syncDoctor()">Check my sync</button>'
+      +'<button class="btn" onclick="closeSheet();renameShortcut()">Rename my shortcut</button>'
+      +'</div>'
+      +'<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet()">Not now</button>',true);
+  },16000);
   try{location.href='shortcuts://run-shortcut?name='+encodeURIComponent(S.scName||SC_NAME);}
   catch(e){toast('Could not open Shortcuts','d');}
 }
