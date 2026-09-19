@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.94';
+const VERSION='6.95';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3595,6 +3595,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.95',d:'Sep 19',t:'Open URLs can never run on a schedule - that was the whole mistake',
+  i:['YOU WERE RIGHT THAT GET CONTENTS OF URL WAS THE ONE THAT WORKED, AND NOW I KNOW WHY. iOS will not open a URL while your phone is locked or the screen is off. So an <b>Open URLs</b> shortcut fired by an automation just sits there until iOS kills it - which is the <b>"Dead Miles Steps took too long to run"</b> notification, and why nothing ever popped up in Safari.',
+     'v6.81 moved you onto Open URLs <i>to fix</i> that exact timeout. It is the one shape that cannot run in an automation at all. That is the root error under this whole mess, and it was mine.',
+     'The card now says so on both branches. <b>Get Contents of URL</b> posts in the background with your phone in your pocket, which is the only thing that works on a schedule.']},
  {v:'6.94',d:'Sep 19',t:'Open URLs is the recommendation again, and it gets out of your way now',
   i:['I SENT YOU DOWN THE HARDER PATH AND IT COST YOU AN EVENING. An Open URLs shortcut has two parts: one address and the Sum bubble. The other kind has six, four of them buried in a POST body I cannot see from here - and every failure tonight was in one of those four.',
      'Its only real cost was that it opens the game every time. So now the confirmation clears itself after a second and a half and drops you straight back in, with no tap. A failure stays on screen, because that is the one worth reading.']},
@@ -4334,7 +4338,7 @@ function renderStepSync(){
 
     +'<details open style="margin-top:10px"><summary style="cursor:pointer"><b>Last action says "Get Contents of URL"</b></summary>'
     +'<div class="note" style="margin-top:6px">'
-    +'<div class="help">This is the kind that worked before, and it is the one to keep. It posts straight to the server and never opens a browser, so your steps cannot land in a blank copy of the game. <b>There is nothing in it to replace unless it stopped working.</b></div>'
+    +'<div class="help">This is the kind that worked before, and it is the one to keep. It posts in the background and never opens a browser - which is why it is <b>the only shape that works on a schedule</b>, with your phone locked and in your pocket. <b>There is nothing in it to replace unless it stopped working.</b></div>'
     /* v6.89 - BOTH VALUES LIVE HERE NOW. The address was four folds deep, inside
        the "how do I switch it" fold, which is exactly the v6.85 failure repeated
        one version after that lesson was written. Building or repairing this
@@ -4374,6 +4378,16 @@ function renderStepSync(){
     +'</div></details>'
     +'<details style="margin-top:8px"><summary style="cursor:pointer"><b>Last action says "Open URLs"</b></summary>'
     +'<div class="note" style="margin-top:6px">'
+    /* v6.95 - THE DEEPEST ERROR IN THIS WHOLE SAGA, NAMED AT LAST. v6.81 moved
+       her onto Open URLs to fix "Dead Miles Steps took too long to run" on a
+       scheduled automation. Open URLs is the ONE shape that cannot run in a
+       scheduled automation: iOS will not open a URL while the phone is locked
+       or the screen is off, so the shortcut blocks until iOS kills it - which
+       reproduces the exact timeout it was chosen to cure, and explains every
+       "nothing popped up in Safari". Get Contents of URL posts in the
+       background and needs nothing on screen. Her words, and she was right:
+       "the one that worked previously was get contents of URL". */
+    +'<div class="note" style="margin-bottom:8px;border-left-color:var(--blood)"><b style="color:var(--blood)">This one cannot run on a schedule.</b><span class="help"> iOS will not open a URL while your phone is locked, so an automation using this shape hangs until iOS kills it - that is the <b>"Dead Miles Steps took too long to run"</b> notification. Use it only if you tap the shortcut by hand. For automatic syncing, use <b>Get Contents of URL</b> above.</span></div>'
     +'<div class="help">This one hands the link to Safari, so it needs the address with your key in it. Select the old address inside the action and paste this over it, leaving the blue <b>Sum</b> bubble at the end where it is.</div>'
     +'<input id="syncUrlCard" readonly value="'+esc(nu)+'" style="width:100%;margin:8px 0 6px;font-size:11px">'
     +'<div class="row"><button class="btn sm r" onclick="copyText($(\'#syncUrlCard\').value,\'syncUrlCard\')">Copy the address</button>'
