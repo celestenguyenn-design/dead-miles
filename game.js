@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.86';
+const VERSION='6.87';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3568,6 +3568,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.87',d:'Sep 19',t:'The card asks which shortcut you have before telling you to change it',
+  i:['YOU SAID IT WORKED UNTIL WE STARTED CHANGING IT, AND THAT IS THE ANSWER. The <b>Get Contents of URL</b> shortcut posts straight to the server and never opens a browser, so it cannot misdeliver your steps. It is the shape that worked. The only reason it was replaced was a timeout, and the real cause of that turned out to be <b>Fill Missing</b> being on - which is already off now.',
+     'So the Steps card now asks which last action you have FIRST, and shows only the instructions for that one. If yours says Get Contents of URL there is no address to replace and there never was - that card was about the other kind of shortcut the whole time.',
+     'Each branch carries the test that can say something about it: <b>Test my key</b> makes the exact call your Get Contents of URL shortcut makes and prints the answer on the card, and <b>Test this address</b> opens the link the way an Open URLs shortcut would.']},
  {v:'6.86',d:'Sep 19',t:'A button that tests the address without the shortcut',
   i:['NOTHING POPPED UP IN SAFARI, and I could not tell you whether that was the address, the key, the shortcut or my own code. So now you can find out in one tap.',
      '<b>Test this address</b> on the Steps card opens the link exactly the way your shortcut would, with 7 steps standing in for your real count. A black screen with a green tick means the address and your key are both fine and whatever is still wrong lives inside the shortcut. Nothing at all means it is mine.',
@@ -4208,60 +4212,110 @@ function stepPostLog(){
 /* One tap that does exactly what the Shortcut's last action does, minus the
    Shortcut. It splits the problem in half: black screen with a tick = the
    address and the key are good and the fault is inside iOS; nothing = ours. */
-function testStepAddress(){
+function testStepLink(){
   const o=O();if(!o.ok){toast('Go online first','d');return;}
   const u=stepOpenUrl()+'7';
   toast('Opening the address - look for a black screen with a green tick');
   try{const w=window.open(u,'_blank');if(!w)location.href=u;}
   catch(e){location.href=u;}
 }
+/* v6.87 - the OTHER half of the test. testStepLink() above opens the address
+   the way an Open URLs shortcut would, and proves the Safari hand-off and the
+   beacon. It cannot say anything about a Get Contents of URL shortcut, which
+   never opens a browser at all - that one POSTs p = handle|stepKey|steps
+   straight to post_steps_link. So that branch gets the test that matches it:
+   the same call, with her real key, and a verdict that discriminates.
+
+   The verdict is STATE, not innerHTML. Written straight into the div it looked
+   right and then vanished, because this function ends by calling pullSteps(),
+   which re-renders the whole Steps card and wipes the div it had just written
+   to. Only clicking the button on a real page showed that. */
+let STEP_TEST='';
+function stepTestSay(h){STEP_TEST=h;const el=$('#stepTestOut');if(el)el.innerHTML=h;}
+async function testStepKey(){
+  const o=O();
+  if(!o.ok){stepTestSay('<b style="color:var(--blood)">Sign in first.</b> The game has to be online to test the key.');return;}
+  stepTestSay('<span class="help">Sending a test to the server...</span>');
+  try{await fetchStepKey();}catch(e){}
+  const key=(O().stepKey||O().token||'');
+  if(!key){stepTestSay('<b style="color:var(--blood)">No key.</b> The game has no shortcut key yet, so nothing your phone sends can be matched to you. Go offline and back online in Settings, then test again.');return;}
+  let ok=false,err='';const t0=Date.now();
+  try{ok=await rpc('post_steps_link',{p:o.handle+'|'+key+'|1'});}catch(e){ok=false;err=e.message||String(e);}
+  const ms=Date.now()-t0;
+  if(err){stepTestSay('<b style="color:var(--blood)">The server would not answer.</b>'
+      +'<div class="help" style="margin-top:4px">'+esc(err.slice(0,140))+'</div>'
+      +'<div class="help" style="margin-top:6px">This is not your shortcut - the game itself cannot reach the step endpoint right now. Check your signal and test again.</div>');return;}
+  if(!ok){stepTestSay('<b style="color:var(--blood)">The server refused the key.</b>'
+      +'<div class="help" style="margin-top:4px">It answered in '+ms+' ms, so the connection is fine - it does not recognise <b>'+esc(o.handle)+'</b> with this key. That happens after you recover your account. Sign out and back in, then copy the code out of this card again.</div>');return;}
+  stepTestSay('<b style="color:#5fd08a">Your key works.</b>'
+    +'<div class="help" style="margin-top:4px">The server took a test step with it and answered in '+ms+' ms, so the code in the box below is correct.</div>'
+    +'<div class="help" style="margin-top:6px">If your real steps still are not arriving, the fault is inside the shortcut: it is not running, or the <b>p</b> field does not match the box below. Copy it out again and paste it in - and check <b>Fill Missing</b> is OFF.</div>');
+  try{await pullSteps();}catch(e){}
+  stepTestSay(STEP_TEST);
+}
+/* v6.87 - THE CARD STILL LED WITH A SHORTCUT SHE MAY NOT HAVE.
+   v6.86 added the "if it says Get Contents of URL" sentence, but it sits at the
+   end of a paragraph under a card whose headline is "Your shortcut needs this
+   new address" - and if hers is that other kind, there IS no address to
+   replace and the whole card is about someone else's problem. Her words: "the
+   shortcuts and syncing worked really well up until this point of having to
+   change it". That is a bisection result: the Get Contents of URL shortcut is
+   the shape that worked, it POSTs straight to the server, and no browser
+   hand-off can misdeliver it. So the card asks which one she has FIRST, and
+   each branch carries the test that can actually say anything about it. */
 function renderStepSync(){
   const el=$('#stepSyncBody');if(!el)return;const o=O();
   if(!o.ok){el.innerHTML='<p class="help">Sign in above first. Your shortcut code lives on the server, so the game has to be online to show it to you.</p>';return;}
   const posted=o.lastPost?('Your phone last sent steps at <b>'+esc(timeStr(o.lastPost))+'</b>.')
     :'<span style="color:#ffb35c">Your phone has not sent any steps today.</span>';
-  /* v6.85: this notice shipped inside a COLLAPSED <details> inside another
-     collapsed fold, so the one person who needed it never saw it. The address
-     she has to replace now sits on the first card of the Steps section, with
-     its own copy button, above everything else. */
-  const nu=stepOpenUrl();
-  el.innerHTML='<div class="note" style="border-left-color:var(--blood)"><b style="color:var(--blood)">Your shortcut needs this new address.</b>'
-    +'<div class="help" style="margin-top:4px">The old one had no key in it, so your steps went into a blank copy of the game in Safari instead of into your save. Replace it once and this stops.</div>'
+  const nu=stepOpenUrl();const pre=stepCode();
+  el.innerHTML='<div class="note" style="border-left-color:var(--blood)"><b style="color:var(--blood)">First: which shortcut do you have?</b>'
+    +'<div class="help" style="margin-top:4px">Open <b>'+esc(S.scName||SC_NAME)+'</b> in the Shortcuts app and scroll to the <b>last action</b>. Use the box below that matches it and ignore the other one - they need opposite things.</div></div>'
+
+    +'<details open style="margin-top:10px"><summary style="cursor:pointer"><b>Last action says "Get Contents of URL"</b></summary>'
+    +'<div class="note" style="margin-top:6px">'
+    +'<div class="help">This is the kind that worked before, and it is the one to keep. It posts straight to the server and never opens a browser, so your steps cannot land in a blank copy of the game. <b>There is no address to replace in this one.</b></div>'
+    +'<div class="help" style="margin-top:6px">Two things to check. First, in <b>Find Health Samples</b>, <b>Fill Missing</b> must be OFF - that is what was timing it out. Second, tap the <b>Get Contents of URL</b> action and open the Request Body field named <b>p</b>. It must hold exactly this code, then the blue <b>Sum</b> bubble, and nothing else:</div>'
+    +'<input id="syncCodeCard" readonly value="'+esc(pre)+'" style="width:100%;margin:8px 0 6px;font-size:11px">'
+    +'<div class="row"><button class="btn sm r" onclick="copyText($(\'#syncCodeCard\').value,\'syncCodeCard\')">Copy the code</button>'
+    +'<button class="btn sm" onclick="testStepKey()">Test my key</button></div>'
+    +'<div id="stepTestOut" style="margin-top:8px">'+STEP_TEST+'</div>'
+    +'<div class="help" style="margin-top:6px">Delete everything in <b>p</b> except the blue Sum bubble, put the cursor in front of the bubble and paste. The code already ends in a <b>|</b> - do not add another.</div>'
+    +'</div></details>'
+
+    +'<details style="margin-top:8px"><summary style="cursor:pointer"><b>Last action says "Open URLs"</b></summary>'
+    +'<div class="note" style="margin-top:6px">'
+    +'<div class="help">This one hands the link to Safari, so it needs the address with your key in it. Select the old address inside the action and paste this over it, leaving the blue <b>Sum</b> bubble at the end where it is.</div>'
     +'<input id="syncUrlCard" readonly value="'+esc(nu)+'" style="width:100%;margin:8px 0 6px;font-size:11px">'
-    +'<div class="row"><button class="btn sm r" onclick="copyText($(\'#syncUrlCard\').value,\'syncUrlCard\')">Copy the new address</button>'
-    +'<button class="btn sm" onclick="testStepAddress()">Test this address</button></div>'
-    +'<div class="help" style="margin-top:8px"><b>Test it first.</b> That button opens the address exactly the way your shortcut would, with 7 steps instead of your real count. A black screen with a green tick means the address works and anything still broken is inside the shortcut. Nothing at all means it is mine to fix - tell me.</div>'
-    +'<div class="help" style="margin-top:8px">Then: Shortcuts app &rarr; <b>'+esc(S.scName||SC_NAME)+'</b> &rarr; scroll to the <b>last action</b>. If it says <b>Open URLs</b>, select the old address inside it and paste this over it, leaving the blue <b>Sum</b> bubble at the end where it is. If it says <b>Get Contents of URL</b> instead, that is the other kind of shortcut - it posts straight to the server and needs no address change at all. Say which one you have.</div></div>'
-    +'<p class="help" style="margin-top:8px">The game cannot read Apple Health - your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number here. '+posted+'</p>'
+    +'<div class="row"><button class="btn sm r" onclick="copyText($(\'#syncUrlCard\').value,\'syncUrlCard\')">Copy the address</button>'
+    +'<button class="btn sm" onclick="testStepLink()">Test this address</button></div>'
+    +'<div class="help" style="margin-top:6px"><b>Test it first.</b> That button opens the address exactly the way this shortcut would, with 7 steps instead of your real count. A black screen with a green tick means the address works and anything still broken is inside the shortcut. Nothing at all means it is mine to fix - tell me.</div>'
+    +'</div></details>'
+
+    +'<p class="help" style="margin-top:10px">The game cannot read Apple Health - your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number here. '+posted+'</p>'
     +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run it now</button>'
-    +'<button class="btn sm" onclick="fixShortcut()">Fix my shortcut</button>'
+    +'<button class="btn sm" onclick="syncDoctor()">Check my sync</button>'
     +'<button class="btn sm ghost" onclick="renameShortcut()">Rename</button></div>'
-    +stepPostLog()
-    +'<p class="help" style="margin-top:8px">If the shortcut runs but nothing arrives, the code inside it is out of date - that happens after you recover your account. <b>Fix my shortcut</b> gives you the new one.</p>';
+    +stepPostLog();
 }
 function fixShortcut(){
   const o=O();if(!o.ok){toast('Go online first','d');return;}
   fetchStepKey().then(()=>{
-    const nu=stepOpenUrl();
     openSheet('<h2>Fix my shortcut</h2>'
-      +'<p>One thing to replace: <b>the address</b>. Yours was made before the key went into it, which is why your steps ended up in a blank copy of the game in Safari instead of in your save.</p>'
+      +'<p>What to replace depends on how your shortcut ends. Open <b>'+esc(S.scName||SC_NAME)+'</b> and read the <b>last action</b>.</p>'
       +'<div style="padding:10px 12px;border-radius:8px;background:rgba(230,62,92,.12);border-left:4px solid var(--blood)">'
-      +'<b style="color:var(--bone)">The new address</b>'
-      +'<input id="fixUrl" readonly value="'+esc(nu)+'" style="width:100%;margin:8px 0 6px;font-size:11px">'
-      +'<button class="btn sm r" onclick="copyText($(\'#fixUrl\').value,\'fixUrl\')">Copy the new address</button>'
+      +'<b style="color:var(--bone)">If it says "Get Contents of URL"</b>'
+      +'<div class="help" style="margin-top:4px">Keep this one - it is the kind that worked. No address to change. Tap it, open the Request Body field named <b>p</b>, delete everything in it <b>except the blue Sum bubble</b>, put the cursor before the bubble and paste this. It already ends in a <b>|</b>. Also make sure <b>Fill Missing</b> is OFF in Find Health Samples.</div>'
+      +'<input id="fixCode" readonly value="'+esc(stepCode())+'" style="width:100%;margin:8px 0 6px;font-size:11px">'
+      +'<button class="btn sm r" onclick="copyText($(\'#fixCode\').value,\'fixCode\')">Copy the code</button>'
       +'</div>'
-      +'<ol style="padding-left:20px;margin:12px 0;line-height:1.8">'
-      +'<li>Shortcuts app, open <b>'+esc(S.scName||SC_NAME)+'</b>.</li>'
-      +'<li>Tap the <b>Open URLs</b> action at the bottom.</li>'
-      +'<li>Select the old address and paste this one over it. <b>Do not touch the blue Sum bubble</b> at the end - it stays where it is.</li>'
-      +'<li>Done, then tap play.</li>'
-      +'</ol>'
-      +'<p class="help">You should get a black screen with your real step count and a green tick. That means the server has it and this game will have it within a minute.</p>'
-      +'<details style="margin-top:10px"><summary class="help" style="cursor:pointer">My shortcut posts to the server instead (the older kind)</summary><div style="margin-top:6px">'
-      +'<div class="help">That one uses <b>Get Contents of URL</b>. Its Request Body has a field named <b>p</b>: delete everything in it <b>except the blue Sum bubble</b>, then put the cursor before the bubble and paste this code, and type one <b>|</b> after it.</div>'
-      +'<input id="fixCode" readonly value="'+esc(stepCode().replace(/\|$/,''))+'" style="width:100%;margin:6px 0;font-size:11px">'
-      +'<button class="btn sm ghost" onclick="copyText($(\'#fixCode\').value,\'fixCode\')">Copy the code</button>'
-      +'</div></details>'
+      +'<div style="margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(94,173,255,.10);border-left:4px solid #5eadff">'
+      +'<b style="color:var(--bone)">If it says "Open URLs"</b>'
+      +'<div class="help" style="margin-top:4px">Select the old address and paste this over it. Leave the blue <b>Sum</b> bubble at the end where it is.</div>'
+      +'<input id="fixUrl" readonly value="'+esc(stepOpenUrl())+'" style="width:100%;margin:8px 0 6px;font-size:11px">'
+      +'<button class="btn sm" onclick="copyText($(\'#fixUrl\').value,\'fixUrl\')">Copy the address</button>'
+      +'</div>'
+      +'<p class="help" style="margin-top:12px">Then close this and use the test button on that same branch of the Steps card - it says on screen whether the server takes it.</p>'
       +'<button class="btn wide ghost" style="margin-top:12px" onclick="closeSheet()">Close</button>',true);
   });
 }
