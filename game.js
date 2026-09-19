@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.87';
+const VERSION='6.88';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3568,6 +3568,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.88',d:'Sep 19',t:'Get Contents of URL is the one to use, and the setup guide now builds it',
+  i:['YOU ASKED WHICH IS BETTER AND THE ANSWER IS GET CONTENTS OF URL. It posts your steps and finishes. The Open URLs kind <b>opens the game every single time it runs</b> - on a daily automation that is your phone launching a game by itself, and it only ever existed to dodge a timeout whose real cause was Fill Missing, which is already off.',
+     'The setup guide was still walking you through building the Open URLs one. It now builds the direct one, with Fill Missing called out in the step it lives in. The Open URLs recipe is still there in a fold if you want fewer taps.',
+     'And if yours currently says Open URLs, the Steps card now has the steps to switch it over - only the last action changes, the first two stay exactly as they are.']},
  {v:'6.87',d:'Sep 19',t:'The card asks which shortcut you have before telling you to change it',
   i:['YOU SAID IT WORKED UNTIL WE STARTED CHANGING IT, AND THAT IS THE ANSWER. The <b>Get Contents of URL</b> shortcut posts straight to the server and never opens a browser, so it cannot misdeliver your steps. It is the shape that worked. The only reason it was replaced was a timeout, and the real cause of that turned out to be <b>Fill Missing</b> being on - which is already off now.',
      'So the Steps card now asks which last action you have FIRST, and shows only the instructions for that one. If yours says Get Contents of URL there is no address to replace and there never was - that card was about the other kind of shortcut the whole time.',
@@ -4281,6 +4285,20 @@ function renderStepSync(){
     +'<button class="btn sm" onclick="testStepKey()">Test my key</button></div>'
     +'<div id="stepTestOut" style="margin-top:8px">'+STEP_TEST+'</div>'
     +'<div class="help" style="margin-top:6px">Delete everything in <b>p</b> except the blue Sum bubble, put the cursor in front of the bubble and paste. The code already ends in a <b>|</b> - do not add another.</div>'
+    +'<details style="margin-top:8px"><summary class="help" style="cursor:pointer">Mine says Open URLs - how do I switch it to this one?</summary><div style="margin-top:6px">'
+    +'<div class="help">Worth doing: this kind posts and finishes, so it never opens the game. The Open URLs kind opens the game every single time it runs, which on a daily automation means your phone launching a game by itself.</div>'
+    +'<div class="help" style="margin-top:6px">Keep the first two actions exactly as they are. Only the last one changes:</div>'
+    +'<ol style="padding-left:20px;margin:6px 0;line-height:1.7">'
+    +'<li>Press and hold the <b>Open URLs</b> action, <b>Delete</b>.</li>'
+    +'<li>Search <b>Get Contents of URL</b> and add it. Paste this address into it:</li>'
+    +'</ol>'
+    +'<input id="syncUrl3" readonly value="'+esc(SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key)+'" style="width:100%;margin:4px 0 6px;font-size:11px">'
+    +'<button class="btn sm ghost" onclick="copyText($(\'#syncUrl3\').value,\'syncUrl3\')">Copy the address</button>'
+    +'<ol start="3" style="padding-left:20px;margin:6px 0;line-height:1.7">'
+    +'<li>Tap <b>Show More</b>. Method <b>POST</b>, Request Body <b>JSON</b>.</li>'
+    +'<li><b>Add new field</b> &rarr; <b>Text</b>, Key <b>p</b>. Paste the code from above into its value, then tap the <b>Statistic</b> bubble over the keyboard so it sits right after the last <b>|</b>.</li>'
+    +'<li>Done. Tap play - nothing should open, and your number appears here.</li>'
+    +'</ol></div></details>'
     +'</div></details>'
 
     +'<details style="margin-top:8px"><summary style="cursor:pointer"><b>Last action says "Open URLs"</b></summary>'
@@ -4455,25 +4473,36 @@ function renderOnline(){if(offscreen('#onlineStatus'))return;
           +'<span class="help">It checks on its own every minute and the moment you open the game. You never need to delete the icon. <a href="#" onclick="fixShortcut();return false;" style="color:var(--steel);text-decoration:underline">Fix my shortcut</a></span>';
       }}
   }
-  const sh=$('#shortcutHelp');if(sh){const openUrl=stepOpenUrl();const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=stepCode();if(o.ok&&!o.stepKey)fetchStepKey();sh.innerHTML=o.ok?`<div class="note" style="border-left-color:var(--blood);margin-bottom:8px"><b style="color:var(--blood)">Built this yesterday? The address changed.</b> It now has your key in it. The old one sent your steps into a blank copy of the game in Safari instead of into your save. Copy the new address below and replace the old one inside your shortcut - nothing else about it changes.</div>
-  <b>iPhone, one time.</b> Three actions, no server to wait for - which is why this one cannot time out.
-  <div class="section-label" style="margin-top:8px">The address</div><input id="syncUrl" readonly value="${esc(openUrl)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncUrl').value,'syncUrl')">Copy address</button>
+  /* v6.88 - THE SETUP GUIDE STILL BUILT THE WRONG ONE.
+     v6.87 fixed the Steps card but this guide, one layer down, was still
+     walking a new player through building the Open URLs shortcut. Two reasons
+     that is the wrong default, and the second is the decisive one:
+       1. it depends on iOS handing the link to the copy of the game she
+          actually plays, which is the v6.84 bug;
+       2. IT OPENS THE GAME EVERY TIME IT RUNS. On a daily or hourly
+          automation that is a phone that launches a game by itself all day.
+          A background sync that yanks you into an app is not a background
+          sync.
+     Get Contents of URL posts and finishes. Nothing opens. It is the default
+     again, and the only thing that ever made it time out - Fill Missing - is
+     called out in the step where it lives. */
+  const sh=$('#shortcutHelp');if(sh){const openUrl=stepOpenUrl();const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=stepCode();if(o.ok&&!o.stepKey)fetchStepKey();sh.innerHTML=o.ok?`
+  <b>iPhone, one time.</b> Three actions. This one posts your steps and finishes - it never opens the game, so it can run on a schedule without interrupting you.
+  <div class="section-label" style="margin-top:8px">The address</div><input id="syncUrl" readonly value="${esc(url)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncUrl').value,'syncUrl')">Copy address</button>
+  <div class="section-label" style="margin-top:8px">Your code</div><input id="syncPrefix" readonly value="${esc(prefix)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncPrefix').value,'syncPrefix')">Copy code</button>
   <ol style="padding-left:20px;margin:10px 0">
-  <li><b>Shortcuts</b> app &rarr; <b>+</b>. Add three actions with the search box: <b>Find Health Samples</b>, <b>Calculate Statistics</b>, <b>Open URLs</b>.</li>
-  <li><b>Find Health Samples</b>: Type is <b>Steps</b>, and one filter - <b>Start Date is today</b>. Then scroll down in that action and make sure <b style="color:var(--blood)">Fill Missing is OFF</b> and <b>Limit is off</b>. Fill Missing makes Health invent an entry for every gap it can find, which is enough on its own to hang the whole shortcut.</li>
+  <li><b>Shortcuts</b> app &rarr; <b>+</b>. Add three actions with the search box: <b>Find Health Samples</b>, <b>Calculate Statistics</b>, <b>Get Contents of URL</b>.</li>
+  <li><b>Find Health Samples</b>: Type is <b>Steps</b>, and one filter - <b>Start Date is today</b>. Then scroll down inside that action and make sure <b style="color:var(--blood)">Fill Missing is OFF</b> and <b>Limit is off</b>. Fill Missing makes Health invent an entry for every gap it can find, and that one setting is enough on its own to hang the whole shortcut. It is the only thing that has ever made this kind time out.</li>
   <li><b>Calculate Statistics</b>: <b>Sum</b> of <b>Health Samples</b>.</li>
-  <li><b>Open URLs</b>: paste the address above, then with the cursor at the very end (right after the <b>=</b>) tap the <b>Statistic</b> bubble above the keyboard. The line should read <b>...?steps=</b> followed by a blue bubble.</li>
-  <li>Name it <b>Dead Miles Steps</b>, Done, then tap play. The game opens and your steps are in.</li>
+  <li><b>Get Contents of URL</b>: paste the address above. Tap <b>Show More</b>. Set <b>Method</b> to <b>POST</b>, <b>Request Body</b> to <b>JSON</b>, then <b>Add new field</b> &rarr; <b>Text</b>, Key <b>p</b>. In its value paste your code above, and with the cursor right after the last <b>|</b> tap the <b>Statistic</b> bubble over the keyboard.</li>
+  <li>Name it <b>Dead Miles Steps</b>, Done, then tap play. Nothing will open - come back here and the number is in.</li>
+  <li><b>Automation</b> tab &rarr; <b>+</b> &rarr; <b>Time of Day</b> &rarr; a time, Daily, <b>Run Immediately</b> &rarr; <b>Next</b> &rarr; tap <b>Dead Miles Steps</b>. Make a few (noon, 4 pm, 8 pm, 11 pm). Do not stack one every hour - it just fails every hour if anything is wrong.</li>
   </ol>
-  <div class="note"><b>If yours already exists and keeps timing out, check two things before rebuilding it.</b> In <b>Find Health Samples</b>, turn <b>Fill Missing OFF</b> - that one setting can make Health grind through every day it has ever recorded. And check the triggers at the very top: an hourly stack (At 22:00 or At 21:00 or At 20:00...) means it runs all day and fails all day, one notification each time.</div>
-  <p class="help"><b>Why this one is different.</b> The old version posted to the server and then sat there waiting for an answer - if anything between your phone and the server was slow, iOS killed it and you got "took too long to run". This one just opens the game with the number in the address. There is nothing to wait for, so there is nothing to time out. The game sends it on from there, over the same connection your leaderboard already uses.</p>
-  <details style="margin-top:8px"><summary class="help">The old direct-to-server version, if you want it</summary><div style="margin-top:6px">
-  <input id="syncUrl2" readonly value="${esc(url)}" style="margin:6px 0;font-size:11px"><button class="btn sm ghost" onclick="copyText($('#syncUrl2').value,'syncUrl2')">Copy address</button>
-  <input id="syncPrefix" readonly value="${esc(prefix)}" style="margin:6px 0;font-size:11px"><button class="btn sm ghost" onclick="copyText($('#syncPrefix').value,'syncPrefix')">Copy code</button>
-  <p class="help">Use <b>Get Contents of URL</b> instead of Open URLs: Method <b>POST</b>, Request Body <b>JSON</b>, one Text field with Key <b>p</b> and your code, then the Sum bubble after the last <b>|</b>. This is the one that can time out.</p>
+  <div class="note"><b>If yours already exists and keeps timing out, check this before rebuilding it.</b> In <b>Find Health Samples</b>, turn <b>Fill Missing OFF</b>. Then check the triggers at the very top: an hourly stack (At 22:00 or At 21:00 or At 20:00...) means it runs all day and fails all day, one notification each time.</div>
+  <details style="margin-top:8px"><summary class="help">The Open URLs version, if you would rather not edit a POST body</summary><div style="margin-top:6px">
+  <input id="syncUrl2" readonly value="${esc(openUrl)}" style="margin:6px 0;font-size:11px"><button class="btn sm ghost" onclick="copyText($('#syncUrl2').value,'syncUrl2')">Copy address</button>
+  <p class="help">Use <b>Open URLs</b> as the last action instead: paste this address, then with the cursor right after the <b>=</b> tap the <b>Statistic</b> bubble. It is fewer taps to build and it cannot time out, because it waits for nothing. The cost is that <b>it opens the game every single time it runs</b>, and it depends on iOS handing the link to the copy of the game you actually play.</p>
   </div></details>
-  <li><b>Automation</b> tab → <b>+</b> → <b>Time of Day</b> → a time, Daily, Run Immediately → <b>Next</b> → tap <b>Dead Miles Steps</b>. Make a few (noon, 4 pm, 8 pm, 11 pm).</li>
-  </ol>
   <b>Android:</b> install the tiny companion app <a href="./DeadMilesSteps.apk">DeadMilesSteps.apk</a> (Android asks once to allow installs from your browser), paste the handle <b>${esc(o.handle)}</b> and token <b style="word-break:break-all">${esc(o.token)}</b> into it, tap Allow reading steps, then Save. It posts your Health Connect steps every hour on its own.`:'Go online first, then your personal sync address and code appear here.';}
 }
 function visitFriend(i){const f=friends[i];if(!f)return;const pub=f.pub||{};const sv=pub.save||{};const st={base:sv.base||(pub.base?{...pub.base}:null),shelf:sv.shelf||[],av:sv.av||pub.av||S.av,pet:sv.pet||null,petCoat:sv.petCoat||null,active:sv.active||[],crew:sv.crew||[]};
