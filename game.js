@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.68';
+const VERSION='6.69';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3300,6 +3300,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.69',d:'Sep 19',t:'The map was throwing away the buildings closest to you',
+  i:['"Houses all around but not where I am." That was real, and it was the worst possible bug: the map asked the building server for the first 120 it could find, and a city block has 300+. Which 120 you got was decided by the order somebody happened to draw them in years ago - nothing to do with where you are standing.',
+     'Measured on a real-shaped block: SIX buildings within walking reach of her, THREE of them on her screen. The gap right under your feet was the cut half.',
+     'The cap is gone. The whole block comes back now and YOUR PHONE picks the nearest ones, because it is the only thing that knows where you are. Same test: six in reach, six on screen. The search radius went from 200 m to 220 m and the map keeps 55 buildings instead of 40.',
+     'PINS NOW SHRINK WHEN YOU ZOOM OUT. Row houses sit about 7 m apart, which at the default zoom is a few pixels, so a whole street used to mash into one blob of overlapping icons. On a real block that is 8 overlapping pairs down to none, and nothing is hidden to get there - every house stays.',
+     'The map status line now tells you how far the nearest place is, so an empty patch around you can never look like a healthy map again.']},
  {v:'6.68',d:'Sep 19',t:'Meds you are CARRYING now show up, and you can use them',
   i:['A trauma kit picked up as loot sits in your PACK until you stash it, and the meds list only ever read your STASH. So you could be carrying a trauma kit while the game told you you had one bandage. That is the "trauma kit does not even show up in my inventory" - it was real.',
      'Your meds now list both, labelled: <b>on you</b> for what is in your pack, <b>stashed</b> for what is at base.',

@@ -113,6 +113,7 @@ function streetStart(){
     const moving=(on)=>{const m=$('#v-map');if(m)m.classList.toggle('moving',on);};
     STREET.map.on('movestart zoomstart dragstart',()=>moving(true));
     STREET.map.on('moveend zoomend',()=>moving(false));
+    STREET.map.on('zoomend',poiScale);poiScale();
   }
   setTimeout(()=>{STREET.map.invalidateSize();if(STREET.pos)STREET.map.setView([STREET.pos.lat,STREET.pos.lon],17);},50);
   try{applyMapSkin();renderMapSkin();}catch(e){}
@@ -163,12 +164,12 @@ async function fetchPois(pos,force){
      to name eight values, and anything a city tagged differently - commercial,
      retail, mixed-use, the row houses of Brooklyn - simply did not exist. Any
      building is somewhere to loot; only the ones you cannot walk into are cut. */
-  const around=(r,body)=>`[out:json][timeout:60];(${body});out center 120;`;
+  const around=(r,body)=>`[out:json][timeout:60];(${body});out center 300;`;
   const bizQ=around(0,
     `nwr(around:350,${pos.lat},${pos.lon})[amenity~"^(pharmacy|police|fuel|hospital|clinic|doctors|dentist|veterinary|fast_food|restaurant|cafe|bar|pub|ice_cream|school|college)$"];`
    +`nwr(around:350,${pos.lat},${pos.lon})[shop];`
    +`nwr(around:400,${pos.lat},${pos.lon})[leisure=park]`);
-  const bldQ=`[out:json][timeout:60];(way(around:200,${pos.lat},${pos.lon})[building];);out center 120;`;
+  const bldQ=`[out:json][timeout:60];(way(around:220,${pos.lat},${pos.lon})[building];);out center 900;`;
 
   const MIRRORS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
   const ask=async(q)=>{
@@ -207,12 +208,14 @@ async function fetchPois(pos,force){
   for(const el of bld.els){if(!seen.has(el.type+'/'+el.id))add(el,true);}
 
   const shops=pois.filter(p=>!p.house);
-  const houses=pois.filter(p=>p.house).sort((a,b)=>geoDist(a,pos)-geoDist(b,pos)).slice(0,40);
+  const houses=pois.filter(p=>p.house).sort((a,b)=>geoDist(a,pos)-geoDist(b,pos)).slice(0,55);
   STREET.pois=shops.concat(houses);
 
   if(STREET.pois.length){
     try{localStorage.setItem('dm.pois.'+cell,JSON.stringify({t:Date.now(),pois:STREET.pois}));}catch(e){}
-    $('#mapStatus').textContent=STREET.pois.length+' places nearby ('+shops.length+' shops, '+houses.length+' buildings)';
+    const near=STREET.pos?Math.round(Math.min(...STREET.pois.map(x=>geoDist(x,STREET.pos)))):null;
+    $('#mapStatus').textContent=STREET.pois.length+' places nearby ('+shops.length+' shops, '+houses.length+' buildings)'
+      +(near!==null?' · nearest '+near+' m':'');
   }else{
     STREET.lastFetch=null;                     // retry on the next GPS ping
     // Say what actually went wrong. "Found nothing" was the same message whether
@@ -223,6 +226,14 @@ async function fetchPois(pos,force){
       : 'The map servers would not answer ('+why+'). Tap Refresh places in a minute.';
   }
   updateMarkers();renderStreet();
+}
+// Pin size follows the zoom so a dense street reads as houses instead of a pile.
+// Nothing is ever hidden - she asked for every house to stay on the map.
+function poiScale(){
+  if(!STREET.map)return;
+  const z=STREET.map.getZoom();
+  const px=z>=19?34:z>=18?30:z>=17?24:z>=16?19:15;
+  document.documentElement.style.setProperty('--poiSize',px+'px');
 }
 function poiState(p){const st=streetState();const t=st.looted[p.id];if(t&&Date.now()-t<24*3600000)return 'looted';if(!STREET.pos)return 'far';return geoDist(p,STREET.pos)<=reachRadius()?'near':'far';}
 let RAID_WIN_SEEN=-1;

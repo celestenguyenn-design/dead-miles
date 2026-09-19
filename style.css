@@ -249,7 +249,12 @@ a{color:var(--amber)}
 .mapbox{width:100%;height:52vh;min-height:300px;border-radius:10px;border:1px solid var(--line);background:#111;overflow:hidden;position:relative;z-index:0;isolation:isolate}
 .leaflet-container{background:#111;font-family:inherit}
 .poi-wrap,.me-icon,.z-icon{background:none;border:0}
-.poi{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:18px;background:rgba(35,35,40,.92);border:2px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,.6)}
+/* The marker box stays 34px so Leaflet anchors it on the real building; the pin
+   inside it shrinks when zoomed out. Row houses sit 8-12 m apart, which at zoom
+   17 is a handful of pixels - a fixed 34px pin turns a whole street into one
+   blob. Shrinking beats hiding: she asked for every house to stay. */
+.poi-wrap{display:grid;place-items:center}
+.poi{width:var(--poiSize,34px);height:var(--poiSize,34px);border-radius:50%;display:grid;place-items:center;font-size:calc(var(--poiSize,34px)*0.53);transition:width .12s,height .12s;background:rgba(35,35,40,.92);border:2px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,.6)}
 .poi.near{border-color:var(--amber);box-shadow:0 0 0 4px rgba(230,165,48,.35),0 0 18px rgba(230,165,48,.6);animation:pulse 1.4s infinite}
 .poi.looted{opacity:.35;filter:grayscale(1)}
 .poi.sh{border-color:var(--blood)}
