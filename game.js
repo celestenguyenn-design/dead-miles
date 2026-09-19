@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.92';
+const VERSION='6.93';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3586,6 +3586,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.93',d:'Sep 19',t:'Your shortcut is right except for one line - the address',
+  i:['YOUR RECORDING FOUND IT IN FIFTEEN SECONDS. Fill Missing off, Limit off, Sum of Health Samples, POST, JSON, field p with your code and the Sum bubble - all correct. The only wrong thing is the address inside <b>Get Contents of URL</b>.',
+     'It holds <b>celestenguyenn-design.github.io/dead-miles/index.html?k=...&steps=</b> - the game\'s own web page. That address is real, but it belongs to an <b>Open URLs</b> shortcut. In a POST it aims everything at GitHub Pages, which just serves files and throws the body away, so nothing ever reached the server.',
+     'Replace that one address with the one in box 1 on the Steps card and change nothing else. The card now also warns you if an address has github.io in it, because two lookalike addresses were never going to stay straight.']},
  {v:'6.92',d:'Sep 19',t:'The Run my Health shortcut button was never drawn on the tab you read it on',
   i:['YOU WERE RIGHT THAT IT DISAPPEARED, AND IT WAS A REAL BUG, NOT YOUR MEMORY. The panel under <b>Why aren\'t my steps syncing?</b> lives on the Road tab, but it was being drawn by a function that quits early unless the BASE tab is the open one. So on Road you saw the placeholder text the page ships with and no buttons at all.',
      'It now draws itself, on its own tab. <b>Run my Health shortcut</b> is back, and it is the red primary button in both cases - it used to turn into a grey ghost in second place the moment anything arrived, and a junk 14 counts as "anything".',
@@ -4324,7 +4328,17 @@ function renderStepSync(){
        one version after that lesson was written. Building or repairing this
        shortcut needs the address AND the code, so they sit together, on the
        branch that needs them, at the shallowest depth the Steps card has. */
+    /* v6.93 - HER RECORDING SHOWED THE ONE MISTAKE THIS CARD MAKES EASY.
+       Her Get Contents of URL held the GAME PAGE address
+       (...github.io/dead-miles/index.html?k=...&steps=) instead of the server
+       endpoint. That address is real and correct - for an Open URLs shortcut.
+       Pasted into a POST it aims the whole thing at GitHub Pages, a static host
+       that ignores the body and can never record a step. Two addresses exist,
+       they look alike, and until v6.89 the only one this card showed
+       prominently was the Open URLs one. So the card names the difference now
+       rather than trusting her to keep two lookalike URLs straight. */
     +'<div class="section-label" style="margin-top:10px">1. The address</div>'
+    +'<div class="note" style="margin:4px 0;border-left-color:#ffa500"><span class="help">It must start with <b>'+esc(SB.url.replace('https://',''))+'</b>. If the address in your shortcut contains <b>github.io</b>, that is the game\'s own web page - it cannot receive steps, and a POST to it is thrown away silently. That is the single most common way this breaks.</span></div>'
     +'<input id="syncPostUrl" readonly value="'+esc(SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key)+'" style="width:100%;margin:6px 0;font-size:11px">'
     +'<button class="btn sm r" onclick="copyText($(\'#syncPostUrl\').value,\'syncPostUrl\')">Copy the address</button>'
     +'<div class="section-label" style="margin-top:10px">2. Your code</div>'
