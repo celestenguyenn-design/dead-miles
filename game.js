@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.76';
+const VERSION='6.77';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -110,7 +110,12 @@ const ENEMIES={
   screamer:{n:'Screamer',hp:26,dmg:[5,9],hit:.7,xp:16,w:2,scream:.4},
   raider:{n:'Raider',hp:44,dmg:[11,17],hit:.8,xp:20,w:0,dodge:.2,human:true},
   gunner:{n:'Raider gunner',hp:38,dmg:[15,22],hit:.7,xp:26,w:0,dodge:.1,human:true},
-  boss:{n:'Raider boss',hp:80,dmg:[17,25],hit:.8,xp:50,w:0,dodge:.25,human:true,boss:true}
+  boss:{n:'Raider boss',hp:80,dmg:[17,25],hit:.8,xp:50,w:0,dodge:.25,human:true,boss:true},
+  // SEALED-ROOM BOSSES (v6.77). Something was locked in there for a reason.
+  butcher:{n:'The Butcher',  hp:150,dmg:[20,30],hit:.78,xp:110,w:0,boss:true,warden:true},
+  matron: {n:'The Matron',   hp:130,dmg:[16,24],hit:.85,xp:110,w:0,boss:true,warden:true,scream:.35},
+  hollow: {n:'The Hollow One',hp:120,dmg:[22,34],hit:.7,xp:120,w:0,boss:true,warden:true,dodge:.2},
+  cellar: {n:'Cellar Thing', hp:175,dmg:[18,26],hit:.75,xp:120,w:0,boss:true,warden:true,burst:18}
 };
 const BOSS_GIMMICK={'Mad Dog Reyes':'reinforce','Sister Ash':'shield','The Butcher of Elm St':'bleed','Two-Tooth Tully':'steal','Queen Wasp':'dodgy','Preacher Cole':'heal','Ghost Delacroix':'flee','Big Sal':'slow','The Widow Marsh':'poison','Cutter Vance':'crit','The Gourd King':'reinforce'};
 const GIMMICK_TEXT={reinforce:'whistles for backup at half health',shield:'starts behind a riot shield: 30 damage soaks in before you touch him',bleed:'her cleaver makes you bleed for 3 rounds',steal:'picks your pack on every hit',dodgy:'fast and slippery: dodges 45% of swings',heal:'prays back 10 HP every round',flee:'bolts at a quarter health with the bounty',slow:'moves every other round, but hits like a truck',poison:'her hits sap your strength for 3 rounds',crit:'one swing in five lands double'};
@@ -638,7 +643,15 @@ const dr=()=>ARMOR_SLOTS.reduce((a,k)=>a+((eqItem(k)&&eqItem(k).dr)||0),0);
 // A full rare set (17): 43%. Everything legendary (19): 46%.
 const drSoak=()=>{const d=dr();return d/(d+22);};
 const capacity=()=>10+(eqItem('bag')?eqItem('bag').cap:0)+(roleLvl('quartermaster')?3+roleLvl('quartermaster'):0)+sk('deeppockets')*2+sk('packrat')*2;
-const baseDmg=()=>[3+S.lvl,6+S.lvl];
+/* FISTS (fixed v6.77). baseDmg added her FULL level, and then act() added
+   (lvl-1) again on top - so bare hands got her level twice while every weapon
+   in the game got it once. At level 20 that is fists 42-45 against a baseball
+   bat's 28-34, and fists never break, never wear out and cost nothing. Her
+   words: "our fists are also OP, I can just use my fists forever."
+   Fists now creep up slowly and land around the worst weapon in the game,
+   which is what they are for: a fallback that saves your good weapon on a
+   walker, never a reason to stop carrying one. */
+const baseDmg=()=>{const g=Math.floor((S.lvl||1)/4);return [3+g,6+g];};
 function addXp(n){if(setPerk('xp'))n=Math.round(n*(1+setPerk('xp')));if(S.pet==='cat')n=Math.round(n*petXpMult());if(bg('gamer'))n=Math.round(n*(1.25+sk('metaknowledge')*0.05));S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
 const activeCrew=()=>S.active.map(id=>S.crew.find(c=>c.id===id)).filter(c=>c&&(c.hp===undefined||c.hp>0));
 const woundedCrew=()=>S.crew.filter(c=>c.hp!==undefined&&c.hp<=0);
@@ -897,9 +910,27 @@ function makeLoc(force,nameOverride){
   const rooms=type.rooms.map(r=>({n:r.n,noise:r.noise,cats:r.cats,shelf:r.shelf,gear:r.gear||0,keyish:!!r.keyish,stage:r.stage||0,done:false,items:null,peek:null}));
   const loc={t:type.t,e:type.e,n:nameOverride||pick(type.n),rooms,noise:0,found:[],cleared:false,wave:0,threat:type.threat,stronghold:!!type.stronghold,stage:0};
   for(const r of rooms)r.items=rollRoom(r,loc);
+  // A SEALED ROOM (v6.77). Rare on purpose - about 1 place in 40 - and never in
+  // a stronghold, which already has its own boss at the end. It is not searched,
+  // it is BROKEN INTO, and something is still in there.
+  // Added AFTER the loot roll on purpose: it carries no categories, and
+  // rollRoom on an empty category list picks from an empty table and throws.
+  // Its loot comes from sealAfter(), not from the ordinary room tables.
+  if(!loc.stronghold&&Math.random()<SEAL_ODDS){
+    const k=pick(SEALS);
+    loc.rooms.push({n:k.n,noise:0,cats:[],shelf:0,gear:0,keyish:false,stage:0,done:false,items:[],peek:null,sealed:k.id});
+  }
   if(roleLvl('scout')&&wxKind()!=='fog'){const r=rooms[rint(0,rooms.length-1)];const best=r.items.slice().sort((a,b)=>b.pts-a.pts)[0];r.peek=best?best.e+' '+best.n:'looks empty';}
   return loc;
 }
+const SEAL_ODDS=0.025;
+const SEALS=[
+  {id:'butcher',n:'Padlocked meat locker', d:'A walk-in freezer, chained from the OUTSIDE. Something heavy shifts against the door when you touch it.'},
+  {id:'matron', n:'Nailed-shut nursery',   d:'Every window boarded from the inside, and a chair wedged under the handle. Someone sealed themselves in here, and then stopped being someone.'},
+  {id:'hollow', n:'Bricked-up stairwell',  d:'A basement door bricked over in a hurry, mortar still smeared. The brick is cold, and it is not cold outside.'},
+  {id:'cellar', n:'Bolted storm cellar',   d:'Steel doors, four bolts, all of them on your side. Whoever locked this was keeping something IN.'},
+];
+function sealOf(id){return SEALS.find(x=>x.id===id)||SEALS[0];}
 function rarW(it){const r=RAR[it.r||'common'].w;return r>=3?1+sk('eagleeye')*0.15+sk('rng')*0.1+setPerk('rare'):1;}
 function rollRoom(r,loc){
   const lm=lootMult()*(loc.stronghold?1.4:1);const list=table(r.cats,r.shelf,r.gear).map(x=>({...x,w:x.w*rarW(x)}));const n=rint(1,3);const out=[];
@@ -1711,7 +1742,7 @@ let C=null;
 function startCombat(enemies,where,job){
   C={enemies,where,job,turn:1,log:[],target:0,brace:false,over:false,fled:false};
   S.combat=true;SFX.play('growl');
-  const desc=where==='rival'?'Nadia\'s scouts step out of the dark.':where==='road'?'Something is in the road.':where==='boss'?bossName()+' steps out. Phase '+(S.bossFightsToday)+' of the week\'s hunt.':where==='watch'?'Watch duty. '+(WATCH_JOBS[C.job]?WATCH_JOBS[C.job].n+'.':''):where==='wave'?'The noise brought more.':where==='raid'?'Raiders are at your walls.':where==='liveraid'?((S.raidCur?S.raidCur.n:'Something')+' is here, and it is not alone.'):where==='horde'?'Horde night. They are over the fence.':S.loc&&S.loc.stronghold?['','At the gate.','Into the yard.','The boss trailer. '+bossName()+' is home.'][S.loc.stage+1]:'They were waiting inside '+(S.loc?S.loc.n:'the dark')+'.';
+  const desc=where==='rival'?'Nadia\'s scouts step out of the dark.':where==='road'?'Something is in the road.':where==='boss'?bossName()+' steps out. Phase '+(S.bossFightsToday)+' of the week\'s hunt.':where==='watch'?'Watch duty. '+(WATCH_JOBS[C.job]?WATCH_JOBS[C.job].n+'.':''):where==='seal'?(S.sealCur?'The door comes off its hinges. '+S.sealCur.n.replace(/^[A-Z]/,c=>c.toLowerCase())+' - and it is awake.':'Something was sealed in here.'):where==='wave'?'The noise brought more.':where==='raid'?'Raiders are at your walls.':where==='liveraid'?((S.raidCur?S.raidCur.n:'Something')+' is here, and it is not alone.'):where==='horde'?'Horde night. They are over the fence.':S.loc&&S.loc.stronghold?['','At the gate.','Into the yard.','The boss trailer. '+bossName()+' is home.'][S.loc.stage+1]:'They were waiting inside '+(S.loc?S.loc.n:'the dark')+'.';
   clog(desc+' '+enemies.length+' hostile'+(enemies.length>1?'s':'')+'.','sys');
   if(bg('gamer')){const bz=enemies.find(e=>e.boss&&e.g);if(bz)clog('Gamer instinct: '+bz.n+' - '+(GIMMICK_TEXT[bz.g]||bz.g)+'.','good');}
   let amb=0.15;if(wxKind()==='fog')amb+=0.1;if(roleLvl('scout')||sk('quickdraw')||sk('brave'))amb=0;
@@ -2000,6 +2031,7 @@ function death(){
   const where=C.where;if(where==='raid'&&S.raidPending){const p=S.raidPending;resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;}
   if(where==='boss')bossAfter(false);if(where==='horde')resolveHorde(true,false);if(where==='rival')nemWon();
   if(where==='liveraid'&&typeof liveRaidAfter==='function')liveRaidAfter(false);
+  if(where==='seal')sealAfter(false);
   const keepFrac=sk('fieldsurgeon')*0.25;const kept=keepFrac?S.pack.slice(0,Math.floor(S.pack.length*keepFrac)):[];S.pack=kept;S.run=0;S.loc=null;newDistance();S.hp=Math.round(maxHp()*(0.4+sk('fieldsurgeon')*0.15));
   const lostCrew=woundedCrew();if(lostCrew.length){const ids=lostCrew.map(c=>c.id);S.crew=S.crew.filter(c=>!ids.includes(c.id));S.active=S.active.filter(id=>!ids.includes(id));log('You went down and could not carry them out. '+lostCrew.map(c=>c.name).join(' and ')+' did not make it.');}
   // Only ordinary gear can be taken off you. An epic or legendary survives a
@@ -2031,6 +2063,7 @@ function endCombat(won){
     if(where==='horde'){resolveHorde(true,true);}
     if(where==='boss'){bossAfter(true);}
     if(where==='liveraid'&&typeof liveRaidAfter==='function'){liveRaidAfter(true);}
+    if(where==='seal'){sealAfter(true);}
     if(where==='rival'){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:6});for(let i=0;i<3&&S.pack.length<capacity();i++)S.pack.push({id:'scrap',...ITEMS.scrap,uid:uid()});log('They ran. You took their ammo and scrap.');nemBeaten();}
     crewXp(2);
   }else{
@@ -2038,6 +2071,7 @@ function endCombat(won){
     else if(where==='wave'){S.loc.rooms.forEach(r=>r.done=true);S.loc=null;newDistance();log('You fled the wave and lost part of the pack.');}
     else if(where==='boss'){bossAfter(false);log('You fell back from '+bossName()+'. The damage you dealt still counts.');}
     else if(where==='horde'){resolveHorde(true,false);}
+    else if(where==='seal'){sealAfter(false);log('You got back out of the sealed room.');}
     else log('You fled the road.');
   }
   const summary=C.killHtml?C.killHtml:won?`<h2>Clear</h2><div class="big">${where==='raid'?'🧱':'💥'}</div><p>${C.log.filter(l=>l.c==='good').slice(0,4).map(l=>esc(l.m)).join('<br>')||'They are down.'}</p>`:`<h2>You got away</h2><div class="big">💨</div>`+((C.dropped&&C.dropped.length)
@@ -2118,7 +2152,8 @@ function takeItem(it,loc){
   S.pack.push(item);if(loc)loc.found.push({...item,ft:Date.now()});rarToast(it);return true;
 }
 function searchRoom(i){pushSoon();
-  const loc=S.loc;if(!loc||!loc.cleared)return;const r=loc.rooms[i];if(r.done)return;if(loc.stronghold&&r.stage>loc.stage){toast('Push deeper first');return;}r.done=true;S.roomsSearched=(S.roomsSearched||0)+1;
+  const loc=S.loc;if(!loc||!loc.cleared)return;const r=loc.rooms[i];if(r.done)return;
+  if(r.sealed){breakSeal(i);return;}if(loc.stronghold&&r.stage>loc.stage){toast('Push deeper first');return;}r.done=true;S.roomsSearched=(S.roomsSearched||0)+1;
   for(const it of r.items)takeItem(it,loc);
   ctEvent('rooms',1);
   if(!loc.stronghold&&S.crew.length<8&&Math.random()<0.07){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was hiding in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was hiding in the ${esc(r.n.toLowerCase())}. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(1)}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
@@ -2127,6 +2162,70 @@ function searchRoom(i){pushSoon();
   let noise=Math.max(4,Math.round((r.noise+rint(-6,8)-sk('lightstep')*4-(wxKind()==='rain'?10:0))*(dayMod().noise||1)));loc.noise=Math.min(100,loc.noise+noise);
   crewXp(1);save();render();
   if(loc.noise>=100){loc.noise=55;loc.wave++;setTimeout(()=>startCombat([mk('walker'),mk(Math.random()<0.4?'runner':'walker')].concat(loc.wave>1?[mk('bloater')]:[]),'wave'),350);}
+}
+/* ================= THE SEALED ROOM (v6.77) =================
+   Her ask: "make some houses have a rare loot room ... we have to kill some
+   type of zombie boss and gives good rewards. Don't make it easy but make it
+   hard enough that we have to spend meds."
+
+   So the boss is tuned against HER health bar rather than against a number
+   picked out of the air: it is meant to take a real bite, which with the v6.72
+   armour curve and the v6.67 heals means one or two meds, not a whole stash.
+   It scales with her level through mk() like everything else, and the reward
+   floor is "nothing common" so the trip is never wasted. */
+function breakSeal(i){
+  const loc=S.loc;if(!loc)return;const r=loc.rooms[i];if(!r||!r.sealed||r.done)return;
+  const k=sealOf(r.sealed);
+  const meds=medsTotal()+packMedsTotal();
+  openSheet('<h2>'+esc(k.n)+'</h2>'
+    +'<p>'+esc(k.d)+'</p>'
+    +'<div class="note"><b>Whatever is in there is still in there.</b> Opening it starts a fight you cannot walk away from clean, and it hits far harder than anything on the street. What is behind it is worth it.</div>'
+    +'<div class="kv" style="margin-top:8px"><span>You are on</span><b>'+S.hp+' / '+maxHp()+'</b>'
+      +'<span>Meds you can reach</span><b'+(meds?'':' style="color:#ff8a92"')+'>'+meds+'</b></div>'
+    +(meds<1?'<p class="help" style="color:#ff8a92;margin-top:6px">No meds anywhere. You can still try it.</p>':'')
+    +'<div class="grid2" style="margin-top:12px">'
+    +'<button class="btn ghost" onclick="closeSheet()">Leave it sealed</button>'
+    +'<button class="btn r" onclick="closeSheet();sealGo('+i+')">Break it open</button>'
+    +'</div>',true);
+}
+function sealGo(i){
+  const loc=S.loc;if(!loc)return;const r=loc.rooms[i];if(!r||!r.sealed||r.done)return;
+  gearCheck(()=>{
+    const k=sealOf(r.sealed);
+    const boss=mk(r.sealed);
+    // It is not alone in there. Two of whatever else was shut in with it.
+    const en=[mk(Math.random()<0.5?'walker':'runner'),boss];
+    if(S.lvl>=8)en.unshift(mk('walker'));
+    S.sealCur={room:i,id:r.sealed,n:k.n};
+    startCombat(en,'seal');
+  });
+}
+function sealAfter(won){
+  const cur=S.sealCur;if(!cur)return;S.sealCur=null;
+  const loc=S.loc;const r=loc&&loc.rooms[cur.room];
+  if(!won){
+    if(r)r.sealed=r.sealed;            // still sealed - it is there if she comes back
+    log('You backed out of the '+cur.n.toLowerCase()+'. The door is still open, and so is whatever is behind it.');
+    return;
+  }
+  if(r){r.done=true;r.sealed=null;}
+  // Nothing common comes out of a room somebody bricked over.
+  const got=[];const nItems=4+rint(0,2);
+  const pool=table(['meds','ammo','scrap','food','water'],3,9).map(x=>({...x,w:x.w*rarW(x)*((RAR[x.r||'common'].w>=3)?3.2:1)}));
+  for(let j=0;j<nItems;j++){
+    let it=wpick(pool,'w');
+    for(let g=0;g<14&&RAR[it.r||'common'].w<3;g++)it=wpick(pool,'w');
+    const packed=it.gear?{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}
+                        :{id:it.id,n:it.n,e:it.e,pts:Math.round(it.pts*lootMult()*1.5),cat:it.cat,qty:it.qty,r:it.r};
+    if(takeItem(packed,loc))got.push(packed.n);
+  }
+  const scrap=35+rint(0,25);S.stock.scrap+=scrap;S.keys+=2;addXp(90+S.lvl*6);
+  medsGive('kit',1);
+  if(Math.random()<0.35)dropLegendQuiet(),got.push('a LEGENDARY');
+  S.sealsOpened=(S.sealsOpened||0)+1;
+  log('You cleared the '+cur.n.toLowerCase()+'. +'+scrap+' scrap, 2 keys, a trauma kit'+(got.length?', '+got.join(', '):'')+'.');
+  toast('Sealed room cleared','l');SFX.play('legend');
+  save();render();
 }
 // Stashing used to turn a locked chest into 5 scrap, silently - and a chest is
 // one of only two places a legendary can come from. It goes in the stash now,
@@ -2813,7 +2912,23 @@ async function pullSteps(){
   save();if(typeof C==='undefined'||!C)render();else renderOnline();
 }
 let friends=[];
-async function loadFriends(){const o=O();if(!o.ok)return;try{rollWeek();const fr=await rpc('get_board',{p_week:S.league.week});friends=Array.isArray(fr)?fr:[];o.err='';}catch(e){o.err=e.message;}renderFriends();}
+async function loadFriends(){const o=O();if(!o.ok)return;try{rollWeek();const fr=await rpc('get_board',{p_week:S.league.week});friends=Array.isArray(fr)?fr:[];o.err='';
+    await addQuietPartyMembers();}catch(e){o.err=e.message;}renderFriends();}
+/* Party members the weekly board cannot see. They are not missing, they just
+   have not walked since Monday - which is a completely different thing from
+   "not in the game", and the board was showing both as nothing at all. */
+async function addQuietPartyMembers(){
+  const mem=(S.party&&S.party.data&&S.party.data.members)||[];
+  if(!mem.length)return;
+  const have=new Set(friends.map(f=>(f.handle||'').toLowerCase()));
+  const miss=mem.map(x=>String(x).toLowerCase()).filter(h=>h&&!have.has(h)).slice(0,8);
+  for(const h of miss){
+    try{const b=await rpc('get_base',{p_handle:h});
+      if(b&&b.handle)friends.push({handle:b.handle,name:b.name||b.handle,score:b.score||0,
+        tier:b.tier||0,pub:b.public||{},updated_at:b.updated_at,quiet:true});
+    }catch(e){}
+  }
+}
 async function testOnline(){const o=O();$('#onlineStatus').textContent='testing...';try{const t0=Date.now();await rpc('get_board',{p_week:S.league.week});o.err='';toast('Server answered in '+(Date.now()-t0)+' ms','z');}catch(e){o.err=e.message;toast('No answer: '+e.message,'d');}save();renderOnline();}
 /* party: shared weekly contract + shared Wanted boss */
 const PARTY_GOALS=[{t:'steps',goal:60000},{t:'places',goal:20},{t:'kills',goal:50},{t:'boss',goal:600}];
@@ -3331,7 +3446,7 @@ function renderLoc(){
   const done=loc.rooms.every(r=>r.done);
   el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.rooms.filter(r=>r.done).length}/${loc.rooms.length} searched</span></h2>
   <div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span><span class="help">${loc.noise>=70?'Something is stirring':loc.noise>=40?'Keep it down':'Quiet'}</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div>
-  <div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done?'disabled':''}><span class="n">${esc(r.n)}</span><span class="m">${r.done?'searched':'noise +'+r.noise}</span>${r.peek&&!r.done?`<span class="peek">🔭 ${esc(r.peek)}</span>`:''}</button>`).join('')}</div>
+  <div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done?'disabled':''}><span class="n">${r.sealed?'🔒 ':''}${esc(r.n)}</span><span class="m">${r.done?'searched':r.sealed?'<b style="color:var(--blood)">SEALED - something is in there</b>':'noise +'+r.noise}</span>${r.peek&&!r.done?`<span class="peek">🔭 ${esc(r.peek)}</span>`:''}</button>`).join('')}</div>
   ${loc.found.length?`<div class="section-label" style="margin-top:12px">Found here</div><div class="loot" style="margin-top:6px">${loc.found.map(it=>`<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span>${esc(it.n)}<span class="pt">+${it.pts}</span></div>`).join('')}</div>`:''}
   ${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn ${done?'r':''}" onclick="leaveLoc()">${done?'Move on':'Leave the rest'}</button><button class="btn" onclick="claimBase()">${S.base?'Move base here · compare first':'Claim as base'}</button></div>`;
 }
@@ -3399,6 +3514,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.77',d:'Sep 19',t:'Sealed rooms, fists that are no longer better than a katana, and the friend the board was hiding',
+  i:['SEALED ROOMS. About 1 place in 40 now has a door somebody locked from the OUTSIDE - a chained meat locker, a nailed-shut nursery, a bricked-up stairwell, a bolted storm cellar. It is not searched, it is broken into, and one of four named things is still awake in there. Clearing one pays around 50 scrap, 2 keys, half a dozen rare-or-better items, a trauma kit and a 35% legendary roll. You can always leave it sealed.',
+     'YOUR FISTS WERE BETTER THAN A KATANA. baseDmg added your full level, and then the swing added your level AGAIN - so bare hands got it twice while every weapon got it once. At level 22 that was fists 48 against a katana\'s 46, and fists never break and cost nothing. Fists now land around the worst weapon in the game, which is what they are for: saving your good weapon on a walker.',
+     'FRIENDS WHO HAVE NOT WALKED THIS WEEK WERE VANISHING. The leaderboard only ever asked for this week\'s rows, so anyone in your party who had not been out since Monday showed up as nothing at all - no name, no steps. Party members are now filled in from their own record and marked "not out this week", listed after everyone who is actually walking.']},
  {v:'6.76',d:'Sep 19',t:'Horde night stopped restarting every time you claimed a base',
   i:['Claiming or moving a base wiped your horde clock - a missing pair of braces meant it ran on EVERY claim, not just a move. The seven days started over, and the count of hordes you had survived went to zero with it, which is the thing that makes them get harder each time.',
      'That is why the countdown looked frozen: it was not stuck, it was being reset.',
@@ -4103,13 +4222,14 @@ function rivalRow(){const el=$('#rivalCard');if(!el)return;const o=O();
 function renderFriends(){
   const o=O();const el=$('#friends');if(!el)return;const sub=$('#friendsSub');const help=$('#friendsHelp');
   if(!o.ok){sub.textContent='offline';help.textContent='Go online in Settings to see who else is walking Hollow County.';el.innerHTML='';return;}
-  const shown=friends.filter(f=>!S.hidden.includes(f.handle)).slice().sort((a,b)=>lbVal(b)-lbVal(a));
+  const shown=friends.filter(f=>!S.hidden.includes(f.handle)).slice()
+    .sort((a,b)=>(a.quiet?1:0)-(b.quiet?1:0)||lbVal(b)-lbVal(a));   // quiet ones last, never mixed in
   const hid=friends.filter(f=>S.hidden.includes(f.handle));
   sub.textContent=shown.length+' on the board';help.textContent='Tap a name to make them your rival. Hide anyone you do not want on your board.';
   $('#lbTabs').innerHTML=LB_TABS.map(([k,n])=>`<button class="${LB_TAB===k?'on':''}" onclick="lbTab('${k}')">${n}</button>`).join('');
   el.innerHTML=shown.map((f)=>{const me=f.handle===o.handle;const pub=f.pub||{};const idx=friends.indexOf(f);const ts=typedShare(pub);
     return `<div class="lbrow${me?' me':''}${S.rival===f.handle?' rival':''}"><div class="rk">${shown.indexOf(f)+1}</div><div class="av">${pub.av?ART.avatarSVG(pub.av,40):'🧍'}</div>
-    <div class="nm"><button class="linkish" onclick="${me?'':`setRival('${f.handle}')`}">${esc(f.name)}${me?' (you)':''}${pub.crowns?' 👑'+pub.crowns:''}${S.rival===f.handle?' · rival':''}</button><small>@${esc(f.handle)} · lvl ${pub.lvl||1} · ${fmt(pub.steps_today||0)} today · ${fmt(pub.steps_week||0)} this week${pub.streak?' · streak '+pub.streak:''}${ts&&ts.typed?` · <span style="color:var(--amber)">${fmt(ts.typed)} typed in (${ts.pct}%)</span>`:ts?' · phone-synced':''}</small></div>
+    <div class="nm"><button class="linkish" onclick="${me?'':`setRival('${f.handle}')`}">${esc(f.name)}${me?' (you)':''}${pub.crowns?' 👑'+pub.crowns:''}${S.rival===f.handle?' · rival':''}${f.quiet?' <span class="chip s">not out this week</span>':''}</button><small>@${esc(f.handle)} · lvl ${pub.lvl||1} · ${fmt(pub.steps_today||0)} today · ${fmt(pub.steps_week||0)} this week${pub.streak?' · streak '+pub.streak:''}${ts&&ts.typed?` · <span style="color:var(--amber)">${fmt(ts.typed)} typed in (${ts.pct}%)</span>`:ts?' · phone-synced':''}</small></div>
     <div class="sc">${fmt(lbVal(f))}${me?'':`<br><button class="btn xs" onclick="visitFriend(${idx})">Visit</button><br><button class="btn xs ghost" onclick="hideFriend('${f.handle}')">Hide</button>`}</div></div>`;}).join('')||'<p class="help">Nobody yet.</p>';
   if(hid.length)el.innerHTML+=`<div class="section-label" style="margin-top:12px">Hidden</div>`+hid.map(f=>`<div class="lbrow" style="opacity:.6"><div class="rk">·</div><div class="av">🚫</div><div class="nm">${esc(f.name)}<small>@${esc(f.handle)}</small></div><div class="sc"><button class="btn xs" onclick="unhideFriend('${f.handle}')">Unhide</button></div></div>`).join('');
 }
