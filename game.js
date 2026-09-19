@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.83';
+const VERSION='6.84';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3262,6 +3262,36 @@ function parseStepsParam(s){
     return seen?sum:NaN;}
   return num(parts[0]);
 }
+function urlParam(n){try{
+  const q=new URLSearchParams(location.search);const h=new URLSearchParams(location.hash.replace(/^#/,''));
+  return q.get(n)!==null?q.get(n):h.get(n);}catch(e){return null;}}
+/* A keyed address landed on us. This copy of the game may be a blank Safari tab
+   that has never been signed in - it does not matter. The key in the address is
+   all the server needs, so post it and say so on screen. Her real game is a
+   different copy and will pull it within the minute. */
+let BEACON_DONE=false;
+async function stepsBeacon(){
+  if(BEACON_DONE)return false;
+  const k=urlParam('k');const v=parseStepsParam(urlParam('steps'));
+  if(!k||!(v>=0)||v>=1000000)return false;
+  BEACON_DONE=true;
+  try{history.replaceState(null,'',location.pathname);}catch(e){}
+  const handle=String(k).split('|')[0].toLowerCase();
+  const mine=(O().handle||'').toLowerCase()===handle;
+  if(mine)try{syncTotal(v,'shortcut');}catch(e){}   // this IS her game: take it now too
+  const box=document.createElement('div');
+  box.id='beacon';
+  box.setAttribute('style','position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(8,8,12,.94);font:16px/1.6 system-ui,sans-serif;color:#eceaf2;text-align:center');
+  box.innerHTML='<div><div style="font-size:34px;font-weight:800;color:#e6a530">'+fmt(v)+'</div><div style="margin-top:6px">steps - sending to Dead Miles...</div></div>';
+  document.body.appendChild(box);
+  let ok=false;
+  try{ok=await rpc('post_steps_link',{p:k+'|'+v});}catch(e){ok=false;}
+  box.innerHTML=ok
+    ? '<div><div style="font-size:34px;font-weight:800;color:#5fd08a">'+fmt(v)+' \u2713</div><div style="margin-top:6px">Sent. Your game will have it within a minute.</div><button id="bcOk" style="margin-top:16px;padding:10px 20px;border-radius:9px;border:0;background:#c2612f;color:#fff;font:600 15px system-ui">Open Dead Miles</button></div>'
+    : '<div><div style="font-size:30px;font-weight:800;color:#ff5a78">Could not send</div><div style="margin-top:6px">'+fmt(v)+' steps were read off your phone, but the server would not take them. Your key may be out of date - open the game and tap <b>Fix my shortcut</b>.</div><button id="bcOk" style="margin-top:16px;padding:10px 20px;border-radius:9px;border:0;background:#c2612f;color:#fff;font:600 15px system-ui">Open Dead Miles</button></div>';
+  const b=document.getElementById('bcOk');if(b)b.onclick=()=>{box.remove();try{if(O().ok)pullSteps();}catch(e){}};
+  return true;
+}
 function autoSyncFromUrl(){try{
   const q=new URLSearchParams(location.search);const h=new URLSearchParams(location.hash.replace(/^#/,''));
   const raw=q.get('steps')!==null?q.get('steps'):h.get('steps');
@@ -3538,6 +3568,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.84',d:'Sep 19',t:'"Nothing came back" was wrong, and it was my fault',
+  i:['THE DIALOG WAS LYING TO YOU. Yesterday\'s shortcut ends in Open URLs, and on an iPhone that hands the link to SAFARI - never to the app on your home screen. Those are two separate copies of the game with two separate saves. So the number was read off your phone correctly, opened Safari correctly, and landed in a blank copy of Dead Miles that has never been signed in. Your real game never saw it, and then told you nothing came back.',
+     'It gets worse: the game sat there polling the server for 16 seconds while iOS had switched you to Safari. It could not have seen anything no matter what happened. It was describing its own blindness as your failure, which is the exact opposite of useful.',
+     'FIXED. The address now carries your key. Whichever copy of the game opens it - Safari, the home screen, a browser you have never used - it posts the number to the SERVER, shows you a green tick, and your real game picks it up within the minute. It no longer matters where iOS decides to open the link.',
+     'YOU HAVE TO REPLACE THE ADDRESS INSIDE YOUR SHORTCUT ONCE. Settings has the new one with a Copy button. Nothing else about the shortcut changes - same three actions, same Sum bubble at the end.',
+     'And the dialog now keeps quiet when the shortcut took you out of the app, instead of accusing it of doing nothing.']},
  {v:'6.83',d:'Sep 19',t:'The game now shows you what your phone actually sent',
   i:['YOUR HEALTH SAYS 3,338 AND THE GAME SAYS 14. Those steps are on your phone, so the break is somewhere between Health and here - and until now the game only ever reported the HIGHEST number it had received, which cannot tell "it never ran" apart from "it ran and sent the wrong number". Those two have opposite fixes.',
      'The Steps card and the sync check now list every post your phone has made today, with the time each one arrived. Nothing listed means iOS never delivered anything - that is a Shortcut or a Health permission problem, not a game one. Posts listed but all carrying the SAME number means your Shortcut is running fine and sending a fixed value instead of your step count, and the game now says that in those words.',
@@ -4090,7 +4126,15 @@ function stepCode(){const o=O();return o.handle+'|'+(o.stepKey||o.token)+'|';}
 // GAME with the number in the address waits for nothing: the game takes it the
 // moment it opens and posts it itself, over the same connection that already
 // works for her leaderboard.
-function stepOpenUrl(){return location.origin+location.pathname+'?steps=';}
+/* THE ADDRESS HAS TO CARRY THE KEY (v6.84). On iOS a Shortcut's "Open URLs"
+   hands the link to SAFARI, never to the home-screen app - and a home-screen
+   PWA has its own storage. v6.81 put the bare number in the address, so it
+   landed in whatever empty copy of the game Safari opened, and her real game,
+   with her real save, never saw a thing. With the key in the address, any copy
+   that opens the link posts the number to the SERVER, and every copy of her
+   game picks it up on its next pull. */
+function stepOpenUrl(){const o=O();const k=o.handle+'|'+(o.stepKey||o.token);
+  return location.origin+location.pathname+'?k='+encodeURIComponent(k)+'&steps=';}
 function runShortcut(){
   toast('Opening Shortcuts...');
   // A deep link to a Shortcut that has been renamed, deleted, or simply does
@@ -4101,13 +4145,26 @@ function runShortcut(){
   // Remember what the game had before, and if nothing has arrived by the last
   // poll, say so and put the check one tap away.
   const was=stepsCounted();
-  [2000,5000,9000,15000].forEach(t=>setTimeout(()=>{if(O().ok)pullSteps();},t));
+  /* THE DIALOG WAS FIRING ON A WORKING SHORTCUT (fixed v6.84). The Open URLs
+     shortcut leaves this app entirely - iOS switches to Safari, the number goes
+     to the server from there, and this timer runs the whole time she is looking
+     at another screen. Polling here and then announcing "nothing came back" was
+     describing our own blindness as her failure. If the app was backgrounded at
+     any point, the Shortcut plainly did something: stay quiet and let the pull
+     on resume do its job. */
+  let leftApp=false;
+  const watch=()=>{if(document.visibilityState==='hidden')leftApp=true;};
+  document.addEventListener('visibilitychange',watch);
+  [2000,5000,9000,15000,22000].forEach(t=>setTimeout(()=>{if(O().ok)pullSteps();},t));
   setTimeout(()=>{
+    document.removeEventListener('visibilitychange',watch);
     if(!O().ok||S.loc||S.combat)return;
+    if(leftApp)return;                            // it ran and took us elsewhere
     if(stepsCounted()>was)return;                 // it worked, say nothing
     openSheet('<h2>Nothing came back</h2>'
-      +'<p>The game asked iOS to run <b>'+esc(S.scName||SC_NAME)+'</b> and no steps arrived in the 16 seconds after. <b>Check my sync</b> below tests every link and tells you which one it is - it is usually the first of these:</p>'
+      +'<p>The game asked iOS to run <b>'+esc(S.scName||SC_NAME)+'</b> and no steps arrived in the 24 seconds after. <b>Check my sync</b> below tests every link and tells you which one it is - it is usually the first of these:</p>'
       +'<div class="stack" style="margin-top:8px">'
+      +'<div class="note"><b style="color:var(--blood)">Most likely: your shortcut has the old address.</b> Until v6.84 it had no key in it, so the steps went into a blank copy of the game in Safari instead of into your save. Settings has the new address - copy it and replace the old one inside the shortcut.</div>'
       +'<div class="note">It ran but took too long and iOS killed it. In <b>Find Health Samples</b>, <b>Fill Missing</b> must be OFF - it makes Health invent an entry for every gap it can find.</div>'
       +'<div class="note">It ran but could not read Health - the permission gets dropped after an iOS update.</div>'
       +'<div class="note">It ran and sent the wrong key, so the server could not match it to you.</div>'
@@ -4118,7 +4175,7 @@ function runShortcut(){
       +'<button class="btn" onclick="closeSheet();renameShortcut()">Rename my shortcut</button>'
       +'</div>'
       +'<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet()">Not now</button>',true);
-  },16000);
+  },24000);
   try{location.href='shortcuts://run-shortcut?name='+encodeURIComponent(S.scName||SC_NAME);}
   catch(e){toast('Could not open Shortcuts','d');}
 }
@@ -4194,7 +4251,7 @@ function syncNow(){
 let LAST_ACTIVE=Date.now();
 function onResume(){
   const away=Date.now()-LAST_ACTIVE;LAST_ACTIVE=Date.now();
-  try{autoSyncFromUrl();}catch(e){}       // a Shortcut may have just opened us with ?steps=
+  try{stepsBeacon();autoSyncFromUrl();}catch(e){}   // a Shortcut may have just opened us with ?steps=
   if(away>6*3600000){location.reload();return;}
   if(O().ok){pullSteps();loadFriends();partySync();bossSync();takeGifts();}
   if(typeof C==='undefined'||!C)render();
@@ -4314,7 +4371,8 @@ function renderOnline(){if(offscreen('#onlineStatus'))return;
           +'<span class="help">It checks on its own every minute and the moment you open the game. You never need to delete the icon. <a href="#" onclick="fixShortcut();return false;" style="color:var(--steel);text-decoration:underline">Fix my shortcut</a></span>';
       }}
   }
-  const sh=$('#shortcutHelp');if(sh){const openUrl=stepOpenUrl();const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=stepCode();if(o.ok&&!o.stepKey)fetchStepKey();sh.innerHTML=o.ok?`<b>iPhone, one time.</b> Three actions, no server to wait for - which is why this one cannot time out.
+  const sh=$('#shortcutHelp');if(sh){const openUrl=stepOpenUrl();const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=stepCode();if(o.ok&&!o.stepKey)fetchStepKey();sh.innerHTML=o.ok?`<div class="note" style="border-left-color:var(--blood);margin-bottom:8px"><b style="color:var(--blood)">Built this yesterday? The address changed.</b> It now has your key in it. The old one sent your steps into a blank copy of the game in Safari instead of into your save. Copy the new address below and replace the old one inside your shortcut - nothing else about it changes.</div>
+  <b>iPhone, one time.</b> Three actions, no server to wait for - which is why this one cannot time out.
   <div class="section-label" style="margin-top:8px">The address</div><input id="syncUrl" readonly value="${esc(openUrl)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncUrl').value,'syncUrl')">Copy address</button>
   <ol style="padding-left:20px;margin:10px 0">
   <li><b>Shortcuts</b> app &rarr; <b>+</b>. Add three actions with the search box: <b>Find Health Samples</b>, <b>Calculate Statistics</b>, <b>Open URLs</b>.</li>
@@ -4642,6 +4700,9 @@ function start(){
   S=load()||fresh();recoverStuckRaid();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
   wire();render();fetchWeather();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
+  // A keyed address is handled before anything else: this copy may be a blank
+  // Safari tab that would otherwise try to onboard her instead of delivering.
+  stepsBeacon();
   if(!S.onboarded){identBoot().then(found=>{if(!found)onboard();});}else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else{whileYouWereOut();newsCheck();recapCheck();}autoSyncFromUrl();}
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){LAST_ACTIVE=Date.now();S.lastOpen=Date.now();const bb=board();S.lastRank=bb.findIndex(r=>r.me)+1;save();}else{onResume();}});
   window.addEventListener('pageshow',e=>{if(e.persisted)onResume();});
