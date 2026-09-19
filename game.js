@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.75';
+const VERSION='6.76';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2239,7 +2239,8 @@ function moveBaseSheet(){
     +(first?'':'<div class="section-label" style="margin-top:12px">The raid clock</div>'
       +'<div class="kv">'+row('Held '+esc(S.base.n),baseDays()+' day'+(baseDays()===1?'':'s'))
       +row('Raiders hitting harder by now','+'+age+' raid power')
-      +row('After moving','back to 0, and one raid-free day')+'</div>'
+      +row('After moving','back to 0, and one raid-free day')
+      +row('Horde night','unchanged - it follows you, not the building')+'</div>'
       +'<p class="help" style="margin-top:6px">Raids get stronger the longer you stay in one place - about +0.5 power a day. Moving resets that.</p>')
     +'<p class="help" style="margin-top:10px"><b>Your base and your home are the same thing</b> - one place, and its pin on the map. If this spot is right but you only want to move the PIN, use "Move my base pin here" on the map instead: same 20 scrap, and it keeps every room.</p>'
     +'<div class="grid2" style="margin-top:12px">'
@@ -2264,7 +2265,12 @@ function claimBase(confirmed){
   // Moving wipes every room you built. Twenty scrap is not the price - the
   // walls are - so the swap gets priced on screen before anything happens.
   if(!confirmed){moveBaseSheet();return;}
-  if(S.base)S.stock.scrap-=20;S.horde=null;S.work=null;
+  // The missing braces here meant S.horde=null ran on EVERY claim, not just a
+  // move - so changing address restarted the seven-day horde clock AND threw
+  // away how many hordes you had survived, which is what makes them get harder.
+  // The horde comes for YOU. It does not care that you changed address.
+  if(S.base)S.stock.scrap-=20;
+  S.work=null;
   const rooms={};
   if(loc.t==='pharmacy'||loc.t==='clinic')rooms.clinic=1;if(loc.t==='gas')rooms.generator=1;if(loc.t==='grocery')rooms.garden=1;
   if(loc.t==='police'){rooms.armory=1;rooms.walls=1;}if(loc.t==='hardware')rooms.walls=1;if(loc.t==='surplus'){rooms.armory=1;rooms.traps=1;}
@@ -3393,6 +3399,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.76',d:'Sep 19',t:'Horde night stopped restarting every time you claimed a base',
+  i:['Claiming or moving a base wiped your horde clock - a missing pair of braces meant it ran on EVERY claim, not just a move. The seven days started over, and the count of hordes you had survived went to zero with it, which is the thing that makes them get harder each time.',
+     'That is why the countdown looked frozen: it was not stuck, it was being reset.',
+     'The horde comes for YOU, not for the building. Your clock and your record now follow you when you move, and the move screen says so.',
+     'The countdown itself was fine - checked across a full week, it ticks down to "Horde night is here" exactly as it should.']},
  {v:'6.75',d:'Sep 19',t:'The map fix from yesterday never actually reached your phone',
   i:['v6.69 fixed the map throwing away the buildings closest to you. It did not work for anyone, and the reason is embarrassing: places are cached on your phone per area for SEVEN DAYS, and the cache had no version on it. So every one of you kept being handed yesterday\'s broken list. A fix that cannot reach a cached phone is not a fix.',
      'The cache is stamped now. Anything built by a query we have since changed is thrown out the moment you open the map, and this can never happen again - every future map change carries a new stamp with it.',
