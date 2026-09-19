@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.66';
+const VERSION='6.67';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -21,7 +21,7 @@ const RAR={common:{n:'Common',c:'var(--r-common)',w:1},uncommon:{n:'Uncommon',c:
 const ITEMS={
   beans:{n:'Canned beans',e:'🥫',pts:6,cat:'food',w:10,r:'common'},ramen:{n:'Instant ramen',e:'🍜',pts:5,cat:'food',w:9,r:'common'},jerky:{n:'Beef jerky',e:'🥩',pts:8,cat:'food',w:5,r:'uncommon'},mre:{n:'MRE ration',e:'🍱',pts:12,cat:'food',w:2,r:'rare'},
   water:{n:'Water bottle',e:'💧',pts:5,cat:'water',w:10,r:'common'},tablets:{n:'Purification tablets',e:'🧂',pts:9,cat:'water',w:3,r:'uncommon'},coffee:{n:'Ground coffee',e:'☕',pts:7,cat:'water',w:4,r:'uncommon'},
-  bandage:{n:'Bandages',e:'🩹',pts:8,cat:'meds',w:8,r:'common'},pain:{n:'Painkillers',e:'💊',pts:10,cat:'meds',w:6,r:'uncommon'},abx:{n:'Antibiotics',e:'💉',pts:16,cat:'meds',w:3,r:'rare'},kit:{n:'Trauma kit',e:'🧰',pts:24,cat:'meds',w:1.5,r:'epic'},
+  bandage:{n:'Bandages',e:'🩹',pts:8,cat:'meds',w:8,r:'common'},pain:{n:'Painkillers',e:'💊',pts:10,cat:'meds',w:6,r:'uncommon'},abx:{n:'Antibiotics',e:'💉',pts:16,cat:'meds',w:3,r:'rare'},kit:{n:'Trauma kit',e:'🧰',pts:24,cat:'meds',w:1.5,r:'epic'},adrena:{n:'Adrenaline shot',e:'⚡',pts:28,cat:'meds',w:1,r:'epic'},bloodbag:{n:'Blood bag',e:'🩸',pts:40,cat:'meds',w:0.5,r:'legendary'},
   scrap:{n:'Scrap metal',e:'🔩',pts:4,cat:'scrap',w:10,r:'common'},tape:{n:'Duct tape',e:'🧻',pts:5,cat:'scrap',w:7,r:'common'},nails:{n:'Box of nails',e:'🔨',pts:5,cat:'scrap',w:6,r:'common'},wire:{n:'Copper wire',e:'🧵',pts:4,cat:'scrap',w:6,r:'common'},battery:{n:'Car battery',e:'🔋',pts:10,cat:'scrap',w:2.5,r:'uncommon'},fuel:{n:'Fuel can',e:'⛽',pts:12,cat:'scrap',w:2,r:'rare'},
   ammo:{n:'Box of rounds (x6)',e:'📦',pts:14,cat:'ammo',w:2.5,qty:6,r:'uncommon'},shells:{n:'Shotgun shells (x4)',e:'🟥',pts:16,cat:'ammo',w:1.2,qty:4,r:'rare'},
   bolts:{n:'Bundle of bolts (x8)',e:'🎯',pts:12,cat:'ammo',w:7,qty:8,r:'common'},
@@ -259,7 +259,7 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
 function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
-  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(S.buff===undefined)S.buff=null;
+  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};if(S.buff===undefined)S.buff=null;
   // A temper can lower a weapon's ceiling, so never let a stored durability
   // sit above it - that renders as "9 / 7" and repairs would read as free.
   for(const g of (S.gear||[])){
@@ -551,6 +551,27 @@ const SFX={ctx:null,
 
 /* ================= player ================= */
 function sk(id){return S.skills[id]||0;}
+const MEDS={
+  bandage: {n:'Bandages',       e:'🩹', pct:0.20, min:35, c:10,  d:'Patch it and keep going.'},
+  pain:    {n:'Painkillers',    e:'💊', pct:0.24, min:40, c:14,  d:'Takes the edge off.'},
+  abx:     {n:'Antibiotics',    e:'💉', pct:0.32, min:50, c:25,  d:'Also clears an infection on its own.'},
+  kit:     {n:'Trauma kit',     e:'🧰', pct:0.55, min:70, c:45,  d:'Proper field surgery.'},
+  adrena:  {n:'Adrenaline shot',e:'⚡', pct:0.35, min:55, c:60,  d:'In a fight it also keeps you on your feet for that round, whatever lands.'},
+  bloodbag:{n:'Blood bag',      e:'🩸', pct:1.00, min:999,c:90,  d:'Back to full, from anywhere. The whole bag.'},
+};
+const MED_ORDER=['bandage','pain','abx','kit','adrena','bloodbag'];
+function medHeal(id){
+  const m=MEDS[id]||MEDS.bandage;
+  const base=Math.max(m.min,Math.round(maxHp()*m.pct));
+  return Math.min(maxHp(), base+setPerk('med')+sk('fielddressing')*10);
+}
+// The stash used to flatten every med into one number, so a trauma kit put away
+// for later came back out worth the same as a bandage. Tiers are kept now.
+function medStock(){const s=S.stock;if(!s.medkit)s.medkit={};return s.medkit;}
+function medsHeld(id){return id==='bandage'?(S.stock.meds||0):(medStock()[id]||0);}
+function medsTake(id){if(id==='bandage'){S.stock.meds=Math.max(0,(S.stock.meds||0)-1);}else{const m=medStock();m[id]=Math.max(0,(m[id]||0)-1);}}
+function medsGive(id,n){n=n||1;if(id==='bandage'){S.stock.meds=(S.stock.meds||0)+n;}else{const m=medStock();m[id]=(m[id]||0)+n;}}
+function medsTotal(){return MED_ORDER.reduce((a,id)=>a+medsHeld(id),0);}
 const maxHp=()=>Math.max(30,Math.round(hydroHpMult()*(1-infectPenalty())*(100+(S.lvl-1)*10+sk('tough')*10+sk('thickskin')*8+sk('survivalist')*5+(bg('firefighter')?10:0)-(bg('gamer')?10:0))));
 const eqItem=(slot)=>S.eq[slot]?S.gear.find(g=>g.uid===S.eq[slot]):null;
 const dr=()=>(eqItem('armor')?eqItem('armor').dr:0)+(eqItem('head')?eqItem('head').dr:0);
@@ -692,8 +713,9 @@ function catchInfection(from){
 function cureInfection(){
   if(!infect()){toast('You are not infected');return;}
   const inPack=S.pack.find(x=>x.id==='abx');
-  if(!inPack&&S.stock.meds<4){toast('Antibiotics, or four meds from the stash, will clear it','d');return;}
-  if(inPack)S.pack=S.pack.filter(x=>x!==inPack); else S.stock.meds-=4;
+  const stockAbx=medsHeld('abx')>0;
+  if(!inPack&&!stockAbx&&S.stock.meds<4){toast('Antibiotics, or four bandages from the stash, will clear it','d');return;}
+  if(inPack)S.pack=S.pack.filter(x=>x!==inPack); else if(stockAbx)medsTake('abx'); else S.stock.meds-=4;
   S.infect=null;S.infectStep=0;S.hp=Math.min(maxHp(),S.hp);
   log('The fever breaks. '+(inPack?'The antibiotics did it.':'Four doses and a bad night, but it did it.'));
   toast('Infection cleared','z');SFX.play('legend');save();render();
@@ -713,7 +735,7 @@ function newCrew(role){const used=S.crew.map(c=>c.name);const names=CREW_NAMES.f
 function hurtCrew(c,n){c.hp=Math.max(0,(c.hp===undefined?crewMax(c):c.hp)-n);
   if(c.hp<=0){clog(c.name+' goes down and drags themselves out of the fight.','hit');log(c.name+' was hurt badly and is out until they heal.');SFX.play('hurt');}
   else clog(c.name+' takes '+n+'.','hit');}
-function healCrew(id){const c=S.crew.find(x=>x.id===id);if(!c)return;if(c.hp>=crewMax(c)){toast(c.name+' is fine');return;}if(S.stock.meds<1){toast('No meds in the stash');return;}S.stock.meds--;c.hp=crewMax(c);log('Patched up '+c.name+'.');toast(c.name+' is back on their feet','a');SFX.play('win');save();render();}
+function healCrew(id){const c=S.crew.find(x=>x.id===id);if(!c)return;if(c.hp>=crewMax(c)){toast(c.name+' is fine');return;}if(medsTotal()<1){toast('No meds in the stash');return;}medsTake(MED_ORDER.find(id=>medsHeld(id)>0));c.hp=crewMax(c);log('Patched up '+c.name+'.');toast(c.name+' is back on their feet','a');SFX.play('win');save();render();}
 function skillList(){return (SKILLS[S.cls]||[]).concat(SKILLS[S.bg]||[]).concat(SKILLS.general);}
 const bg=(id)=>S&&S.bg===id;
 function dmgBonus(){let d=sk('heavyhands')*2+sk('axeman')*2+sk('sharpknife')-(bg('gamer')?1:0);
@@ -1638,7 +1660,8 @@ function hurt(n,src){let d=Math.max(1,n-dr());
   // fight, so it is protection against being ambushed, not a damage sponge.
   {const a=eqItem('armor');
    if(a&&a.id==='vigil'&&!C.vigilUsed){C.vigilUsed=true;if(d>5){d=5;clog('Vigil takes the first blow for you.','good');}}}
-  if(C.brace)d=Math.ceil(d*(1-(sk('steady')?0.6+sk('steady')*0.1:0.5)));if(S.pet==='dog'&&Math.random()<petBlock()){clog(S.petName+' lunges and takes the hit meant for you.','good');return;}if(sk('ironjaw')&&!C.jaw&&S.hp-d<=0){C.jaw=true;d=S.hp-1;clog('Iron Jaw. You stay on your feet at 1 HP.','good');}
+  if(C.brace)d=Math.ceil(d*(1-(sk('steady')?0.6+sk('steady')*0.1:0.5)));if(S.pet==='dog'&&Math.random()<petBlock()){clog(S.petName+' lunges and takes the hit meant for you.','good');return;}if(C.adrena===C.turn&&S.hp-d<=0){d=S.hp-1;clog('The adrenaline holds you up at 1 HP.','good');}
+  else if(sk('ironjaw')&&!C.jaw&&S.hp-d<=0){C.jaw=true;d=S.hp-1;clog('Iron Jaw. You stay on your feet at 1 HP.','good');}
   S.hp-=d;C.pfx={d,t:Date.now()};clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
 function dealTo(t,d,label,kind){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));
   if(t.plate&&!t.cracked){
@@ -1775,7 +1798,20 @@ function act(kind){
     // "do I have meds" into "when do I spend one".
     const cap=diff().meds+(sk('fielddressing')?1:0);
     if((C.meds||0)>=cap){toast('You can only patch up '+cap+' times in one fight','d');return;}
-    C.meds=(C.meds||0)+1;const m=S.pack.find(p=>p.cat==='meds')||(S.stock.meds>0?{stock:true}:null);if(!m){toast('No meds');return;}const heal=(m.id==='kit'?70:m.id==='abx'?45:35)+setPerk('med')+sk('fielddressing')*10;if(m.stock)S.stock.meds--;else S.pack=S.pack.filter(p=>p!==m);S.hp=Math.min(maxHp(),S.hp+heal);clog('You patch up: +'+heal+' HP.','good');SFX.play('loot');}
+    C.meds=(C.meds||0)+1;
+    // Reach for the strongest thing on her, pack first, then the stash - the
+    // old code took whatever came first and healed a flat 35 for it.
+    let m=null,mid='bandage';
+    for(let i=MED_ORDER.length-1;i>=0&&!m;i--){const p=S.pack.find(x=>x.cat==='meds'&&x.id===MED_ORDER[i]);if(p){m=p;mid=MED_ORDER[i];}}
+    if(!m){const p=S.pack.find(x=>x.cat==='meds');if(p){m=p;mid=MEDS[p.id]?p.id:'bandage';}}
+    if(!m){for(let i=MED_ORDER.length-1;i>=0&&!m;i--)if(medsHeld(MED_ORDER[i])>0){m={stock:true};mid=MED_ORDER[i];}}
+    if(!m){toast('No meds');return;}
+    const heal=medHeal(mid);
+    if(m.stock)medsTake(mid);else S.pack=S.pack.filter(p=>p!==m);
+    S.hp=Math.min(maxHp(),S.hp+heal);
+    if(mid==='adrena'){C.jaw=false;C.adrena=C.turn;clog('Adrenaline. Nothing puts you down this round.','good');}
+    if(mid==='abx'&&S.infect){S.infect=null;S.infectStep=0;clog('The antibiotics take hold. The infection is gone.','good');}
+    clog('You use the '+MEDS[mid].n.toLowerCase()+': +'+heal+' HP.','good');SFX.play('loot');}
   else if(kind==='swap'){
     // Free when you are holding nothing - that is the case she hit, standing
     // there bare-handed because her weapon just broke. Otherwise it costs the
@@ -1947,7 +1983,7 @@ function openCombat(){$('#modal').classList.add('on');$('#modal').dataset.lock='
 function renderCombat(){
   if(!C)return;const w=eqItem('melee'),g=eqItem('ranged');const t=targetEnemy();
   const ammoN=(g?(S.pack.filter(p=>p.cat==='ammo'&&p.id===g.ammo).reduce((a,b)=>a+(b.qty||0),0)+(g.ammo==='ammo'?S.stock.ammo:0)):0);
-  const meds=S.pack.filter(p=>p.cat==='meds').length+S.stock.meds;
+  const meds=S.pack.filter(p=>p.cat==='meds').length+medsTotal();
   const now=Date.now();const phurt=C.pfx&&now-C.pfx.t<600;const plunge=C.lunge&&now-C.lunge<400;const flash=C.muzzle&&now-C.muzzle<350;
   const SPARK={slash:'💢',heavy:'💥',shot:'✴️'};
   $('#sheet').innerHTML=`<h2>${C.where==='raid'?'Defend the base':C.where==='road'?'On the road':'Inside'} <span class="chip d" style="float:right">round ${C.turn}</span></h2>
@@ -2154,21 +2190,49 @@ function bank(){
   if(!S.base){toast('Claim a base first: clear a place, then Claim it');return;}
   if(typeof STREET!=='undefined'&&STREET.on&&S.base.geo&&STREET.pos){const d=geoDist(S.base.geo,STREET.pos);if(d>60){toast('Walk back to your base to stash: '+Math.round(d)+' m away','d');return;}}
   const raw=packPts();const qm=roleLvl('quartermaster');const pts=Math.round(raw*runMult()*TIERS[S.league.tier].mult*(1+(qm?0.08+qm*0.04:0)+sk('haggler')*0.05+sk('marathoner')*0.04)*dealMod('pts'));
-  let meds=0;for(const it of S.pack){if(it.cat==='shelf')S.shelf.push({id:it.id,n:it.n,e:it.e});else if(it.cat==='candy')S.stock.candy=(S.stock.candy||0)+(it.qty||1);else if(it.cat==='ammo')S.stock.ammo+=(it.qty||0);else if(it.cat==='chest'){S.stock.chests=(S.stock.chests||0)+1;}else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;if(it.cat==='meds')meds++;}}
+  let meds=0;for(const it of S.pack){if(it.cat==='shelf')S.shelf.push({id:it.id,n:it.n,e:it.e});else if(it.cat==='candy')S.stock.candy=(S.stock.candy||0)+(it.qty||1);else if(it.cat==='ammo')S.stock.ammo+=(it.qty||0);else if(it.cat==='chest'){S.stock.chests=(S.stock.chests||0)+1;}else if(it.cat==='meds'){const id=MEDS[it.id]?it.id:'bandage';medsGive(id==='pain'?'pain':id,1);meds++;}
+    else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;}}
   rollWeek();S.league.score+=pts;ctEvent('stash',pts);if(meds)ctEvent('meds',meds);
   let eat=activeCrew().length;if(sk('rationing'))eat=Math.ceil(eat/2);S.stock.food=Math.max(0,S.stock.food-eat);if(sk('harvest'))S.stock.food+=sk('harvest');
   S.hp=Math.min(maxHp(),S.hp+15);if(roleLvl('medic'))S.hp=Math.min(maxHp(),S.hp+20);
-  if(S.base.rooms.clinic&&S.stock.meds>0&&S.hp<maxHp()){S.stock.meds--;S.hp=maxHp();}
+  if(S.base.rooms.clinic&&medsTotal()>0&&S.hp<maxHp()){medsTake(MED_ORDER.find(id=>medsHeld(id)>0));S.hp=maxHp();}
   log('Stashed '+fmt(raw)+' x'+runMult().toFixed(1)+' = '+fmt(pts)+' league points.'+(eat?' Crew ate '+eat+' food.':''));toast('+'+fmt(pts)+' league points','a');SFX.play('win');
   S.pack=[];S.run=0;save();render();pushPlayer();
 }
 function supplyDrop(){if(!S.base){toast('Claim a base first');return;}if(!S.base.rooms.radio){toast(S.work&&S.work.k==='radio'?'The radio is still being built. Keep walking.':'Build a Ham radio first (30 scrap + 3,000 steps).');return;}if(S.flags.dropDate===S.steps.date){toast('Already called in today. The next drop is after midnight.');return;}S.flags.dropDate=S.steps.date;const list=table(['food','water','meds','ammo'],0.3,0.4);const got=[];for(let i=0;i<3;i++){const it=wpick(list,'w');const item=it.gear?{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}:{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:it.cat,qty:it.qty,uid:uid(),r:it.r};if(takeItem(item,null))got.push(it.e+' '+it.n);}log('Supply drop: '+got.join(', ')+'. In your pack.');SFX.play('chest');save();render();openSheet(`<h2>Supply drop</h2><div class="big">📦</div><p>It came down two streets over. In your pack now:<br><b style="color:var(--bone)">${esc(got.join(', ')||'nothing usable')}</b></p><button class="btn a wide" onclick="closeSheet()">Grab it</button>`);}
 function buyCandy(id,c){S.stock.candy=S.stock.candy||0;if(S.cosmetics.includes(id)){toast('Already yours');return;}if(S.stock.candy<c){toast('Need '+c+' candy');return;}S.stock.candy-=c;S.cosmetics.push(id);SFX.play('legend');toast('Yours. Put it on under You.','l');save();render();}
-const TRADE=[{id:'bandage',n:'Bandages',e:'🩹',c:10,give:s=>s.meds++},{id:'beans',n:'Canned food',e:'🥫',c:5,give:s=>s.food++},{id:'water',n:'Water bottle',e:'💧',c:5,give:s=>s.water++},{id:'ammo',n:'Box of rounds (x6)',e:'📦',c:12,give:s=>s.ammo+=6},{id:'key',n:'Chest key',e:'🗝️',c:25,give:()=>S.keys++}];
+const TRADE=[{id:'bandage',n:'Bandages',e:'🩹',c:10,give:s=>s.meds++},
+  {id:'abx',n:'Antibiotics',e:'💉',c:25,give:()=>medsGive('abx',1)},
+  {id:'kit',n:'Trauma kit',e:'🧰',c:45,give:()=>medsGive('kit',1)},
+  {id:'adrena',n:'Adrenaline shot',e:'⚡',c:60,give:()=>medsGive('adrena',1)},
+  {id:'bloodbag',n:'Blood bag',e:'🩸',c:90,give:()=>medsGive('bloodbag',1)},{id:'beans',n:'Canned food',e:'🥫',c:5,give:s=>s.food++},{id:'water',n:'Water bottle',e:'💧',c:5,give:s=>s.water++},{id:'ammo',n:'Box of rounds (x6)',e:'📦',c:12,give:s=>s.ammo+=6},{id:'key',n:'Chest key',e:'🗝️',c:25,give:()=>S.keys++}];
 function trade(id){const t=TRADE.find(x=>x.id===id);if(!t)return;if(!S.base){toast('The trader only comes to a base');return;}let c=t.c;c=Math.max(1,Math.round(c*(1-sk('haggler')*0.1-sk('trader')*0.15)));if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}S.stock.scrap-=c;t.give(S.stock);log('Bought '+t.n+' from the trader for '+c+' scrap.');toast(t.e+' '+t.n,'a');SFX.play('chest');save();render();}
 function renderTrader(){const el=$('#trader');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first. The trader only stops where there are walls.</p>';return;}
   el.innerHTML=TRADE.map(t=>{let c=Math.max(1,Math.round(t.c*(1-sk('haggler')*0.1-sk('trader')*0.15)));return `<button class="tr${S.stock.scrap<c?' off':''}" onclick="trade('${t.id}')"><span class="e">${t.e}</span><b>${t.n}</b><span class="chip a">${c}🔩</span></button>`;}).join('');}
-function heal(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.meds<1){toast('No meds in stash');return;}S.stock.meds--;S.hp=Math.min(maxHp(),S.hp+40+sk('fielddressing')*10+setPerk('med'));save();render();}
+function heal(){
+  if(S.hp>=maxHp()){toast('HP is full');return;}
+  if(!medsTotal()){toast('No meds in stash');return;}
+  const have=MED_ORDER.filter(id=>medsHeld(id)>0);
+  if(have.length===1){healWith(have[0]);return;}       // nothing to choose between
+  const missing=Math.max(0,maxHp()-S.hp);
+  openSheet('<h2>Patch up</h2>'
+    +'<div class="kv"><span>You are on</span><b>'+S.hp+' / '+maxHp()+'</b><span>Missing</span><b>'+missing+' HP</b></div>'
+    +'<div class="stack" style="margin-top:10px">'
+    +have.map(id=>{const h=Math.min(medHeal(id),missing);const waste=medHeal(id)-h;
+      return '<button class="room2" onclick="closeSheet();healWith(\''+id+'\')"><div class="e">'+MEDS[id].e+'</div>'
+        +'<div class="t"><b>'+esc(MEDS[id].n)+'</b> <span class="chip s">'+medsHeld(id)+' left</span>'
+        +'<span>+'+h+' HP'+(waste>0?' · '+waste+' of it wasted right now':'')+' · '+esc(MEDS[id].d)+'</span></div></button>';}).join('')
+    +'</div><button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet()">Not now</button>',true);
+}
+function healWith(id){
+  if(medsHeld(id)<1){toast('None left');return;}
+  if(S.hp>=maxHp()){toast('HP is full');return;}
+  medsTake(id);const h=medHeal(id);const was=S.hp;
+  S.hp=Math.min(maxHp(),S.hp+h);
+  if(id==='abx'&&S.infect){S.infect=null;S.infectStep=0;log('The antibiotics cleared the infection.');}
+  toast('+'+(S.hp-was)+' HP ('+MEDS[id].n.toLowerCase()+')','a');SFX.play('loot');
+  save();render();
+}
 function eat(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.food<1){toast('No food in stash');return;}S.stock.food--;S.hp=Math.min(maxHp(),S.hp+15+sk('comfortfood')*5+(bg('chef')?10:0)+(bg('farmer')?5:0));save();render();}
 function equip(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;
   if(g.broken&&S.eq[g.slot]!==uidv){toast(g.n+' is wrecked. Repairing it costs '+repairCost(g)+' scrap.','d');return;}
@@ -2379,7 +2443,7 @@ function renderShop(){if(offscreen('#shop'))return;const el=$('#shop');if(!el)re
 function wear(slot,key){if(!owns(slot,key))return;S.av[slot]=key;save();render();}
 
 /* ================= raids (real clock) ================= */
-function stockValue(){return S.stock.food*5+S.stock.water*5+S.stock.meds*10+S.stock.scrap*4+S.stock.ammo*3;}
+function stockValue(){return S.stock.food*5+S.stock.water*5+medsTotal()*10+S.stock.scrap*4+S.stock.ammo*3;}
 function checkRaids(){
   if(!S.base)return;const t=todayStr();if(S.flags.lastRaidCheck===t)return;
   const rng=mulberry(hash(t+'raid'+S.created));
@@ -3040,7 +3104,7 @@ function render(){
         +'<p>A bite broke the skin'+(f.from?' ('+esc(f.from)+')':'')+'. Your maximum health is down <b>'+Math.round(infectPenalty()*100)+'%</b>, and you lose health as you walk.</p>'
         +'<p class="help">It does not get worse just because time passes - only if you take another bite while it is running. Time away from the game costs you nothing.</p>'
         +'<button class="btn r wide" style="margin-top:8px" onclick="cureInfection()">'
-          +(abx?'Take the antibiotics':S.stock.meds>=4?'Burn 4 meds on it':'Need antibiotics, or 4 meds')+'</button>'
+          +(abx||medsHeld('abx')>0?'Take the antibiotics':S.stock.meds>=4?'Burn 4 bandages on it':'Need antibiotics, or 4 bandages')+'</button>'
         +'<p class="help" style="margin-top:6px">Antibiotics turn up in pharmacies and clinics.</p>';}
   }}catch(e){}
   const hs=hydroState();const hb=$('#hydroBar');if(hb){hb.style.width=Math.round(S.hydro||0)+'%';hb.style.background=hs==='ok'?'linear-gradient(90deg,#3a7ad6,#5fb3c9)':hs==='thirsty'?'linear-gradient(90deg,#c9a04a,#f5c842)':'linear-gradient(90deg,#8a2a2a,#e63e5c)';
@@ -3098,7 +3162,15 @@ function render(){
     <div class="help" style="margin-top:4px">Held ${baseDays()} day${baseDays()===1?'':'s'}${baseAgePower()?` · raiders hit ${baseAgePower()} harder for it. Moving resets that.`:''}</div>
     <div class="help" style="margin-top:4px">${S.base.geo?'This is also your <b>home</b> on the live map - same place, one pin. Stand within 60 m of it to stash.':'No map pin yet. Set one from the live map if you want to stash out walking.'}</div></div></div>`;}
   $('#baseAlert').hidden=!(S.raidPending&&S.base&&S.base.rooms.tower);
-  $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',candy:'🍬'}[k]}</div><b>${S.stock[k]||0}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`
+  $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',candy:'🍬'}[k]}</div><b>${k==='meds'?medsTotal():(S.stock[k]||0)}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`
+  // Break the med pile out by tier and say what each is worth against HER bar
+  // right now, so a trauma kit is visibly not a bandage.
+  {const el=$('#medRow');if(el){const have=MED_ORDER.filter(id=>medsHeld(id)>0);
+    el.innerHTML=have.length
+      ? '<div class="section-label">Your meds</div><div class="row" style="margin-top:4px">'
+        +have.map(id=>`<span class="chip${id==='bloodbag'||id==='adrena'?' l':id==='kit'?' a':''}">${MEDS[id].e} ${esc(MEDS[id].n)} <b>x${medsHeld(id)}</b> · +${Math.min(medHeal(id),maxHp())}</span>`).join('')
+        +'</div>'
+      : '<p class="help">No meds. The trader sells everything from bandages to a blood bag.</p>';}}
     +(S.stock.chests>0?`<button class="s chestbtn" onclick="openStashChest()"><div class="e">🧳</div><b>${S.stock.chests}</b><span>${S.keys>0?'Open one':sk('lockpick')?'Pick one':'Locked'}</span></button>`:'');
   $('#dropRow').hidden=!(S.base&&S.base.rooms.radio);const used=S.flags.dropDate===S.steps.date;$('#dropBtn').textContent=used?'📻 Drop used today':'📻 Call in today\'s supply drop';$('#dropBtn').classList.toggle('ghost',used);$('#dropHelp').textContent=used?'Next one after midnight.':'Three free items into your pack.';
   const wk=S.work;$('#workCard').hidden=!(S.base&&wk);if(S.base&&wk){$('#workCard').innerHTML=`<h2>Under construction <span class="sub">${BUILD[wk.k].e} ${BUILD[wk.k].n} L${wk.lvl}</span></h2><div class="progress" style="margin-top:8px"><div class="bar"><i style="width:${Math.min(100,wk.done/wk.need*100)}%;background:linear-gradient(90deg,var(--amber),#ffd166)"></i></div><div class="row"><span><b>${fmt(Math.min(wk.done,wk.need))}</b> / ${fmt(wk.need)} steps of work</span><span>${fmt(Math.max(0,wk.need-wk.done))} to go</span></div></div><p class="help" style="margin-top:6px">Every step you walk is labor on it. Bigger builds take more walking. One job at a time.</p><div class="row" style="margin-top:6px"><button class="btn sm ghost" onclick="cancelWork()">Cancel (refund ${wk.scrap} scrap)</button></div>`;}
@@ -3204,6 +3276,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.67',d:'Sep 19',t:'Healing keeps up with you now, and there is a proper ladder of it',
+  i:['A heal was a FLAT number while your health grows 10 a level, so it quietly got worse the whole game: 40 HP is 40% of your bar at level 1 and 10% of it at level 30. Every heal is a SHARE of your bar now - bandages 20%, antibiotics 32%, trauma kit 55% - and never less than it used to be, so low levels are untouched and high levels stop feeling useless.',
+     'YOUR STASH WAS EATING YOUR GOOD MEDS. Everything you put away became one generic pile, so a trauma kit you saved for an emergency came back out healing the same as a bandage. Meds keep their kind now. At level 20 that is a 160 HP kit next to a 58 HP bandage - you have been throwing those away without being told.',
+     'TWO NEW ONES. ADRENALINE SHOT heals hard and nothing can put you down for that round - use it as you are about to go under, not after. BLOOD BAG puts you back to FULL from any health, from anywhere.',
+     'THE TRADER NOW SELLS ALL OF IT: bandages 10, antibiotics 25, trauma kit 45, adrenaline 60, blood bag 90 scrap. Scrap turns into healing, so running dry is now something you can buy your way out of.',
+     'Patch up asks WHICH med you want instead of spending one blind, and tells you what each is worth against your bar right now and how much of it would be wasted. Antibiotics from the stash clear an infection on their own. In a fight you automatically reach for the strongest thing you are carrying.']},
  {v:'6.66',d:'Sep 18',t:'Moving your base now tells you whether it is worth it',
   i:['"Move base here" used to be a yes/no box that named what you would lose and nothing else - so the one question you actually have, IS THE NEW PLACE BETTER THAN MINE, had no answer on screen.',
      'It is now a full comparison: the room the new building hands you free and what that would have cost you in steps and scrap, anything about it that keeps paying forever, everything you would demolish, and the defense you would drop.',
