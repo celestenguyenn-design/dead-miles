@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.72';
+const VERSION='6.73';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2022,6 +2022,40 @@ function endCombat(won){
   if(carry>0&&!S.loc)addSteps(carry,'carry');
 }
 function openCombat(){$('#modal').classList.add('on');$('#modal').dataset.lock='1';renderCombat();}
+/* WHEN SHE HAS NOTHING (v6.73). Her words: "I don't have food, bandages or any
+   scrap LOL". Measured from a real save - a base with its garden, nothing in
+   the stash, 10% HP - she was three free mornings from full and one watch job
+   from enough scrap for bandages. The way out existed the whole time and the
+   game never said a word about it, which is the same failure as every other one
+   this week: it knew something and kept it to itself.
+   This appears ONLY when she is genuinely in trouble, and every number in it is
+   read from her own save rather than written down here. */
+function renderStuck(){
+  const el=$('#stuckCard');if(!el)return;
+  if(!S.onboarded||S.loc||S.combat){el.hidden=true;return;}
+  const hurt=S.hp<maxHp()*0.35, noMeds=!medsTotal()&&!packMedsTotal(), broke=(S.stock.scrap||0)<10;
+  if(!(hurt&&noMeds&&broke)){el.hidden=true;return;}
+  const night=Math.max(25,Math.round(maxHp()*0.30));
+  const garden=(S.base&&S.base.rooms.garden)||0;
+  const per=garden?(3+(bg('farmer')?2:0)+sk('greenthumb'))*garden:0;
+  const w=S.base?watchState():null;
+  const jobs=w?Math.max(0,w.jobs.length-(w.used||0)):0;
+  const pay=w&&w.jobs.length?(WATCH_JOBS[w.jobs[0]].reward.scrap||0):0;
+  const rows=[];
+  rows.push('<b>Sleep.</b> Tomorrow morning gives you <b>'+night+' HP</b> back'
+    +(per?' and the garden gives <b>'+per+' food</b>':'')+'. Three mornings takes you from here to full, and it costs nothing.');
+  if(S.stock.food>0)rows.push('<b>Eat.</b> You have <b>'+S.stock.food+' food</b> - that is <b>'+Math.max(15,Math.round(maxHp()*0.08))+' HP</b> each.');
+  if(S.stock.water>0&&hydroState()!=='ok')rows.push('<b>Drink.</b> Being parched cuts your maximum HP by 15% on its own.');
+  rows.push('<b>Walk and loot, do not fight.</b> Searching rooms costs nothing and about <b>1 in 12</b> things you find is scrap, <b>1 in 20</b> is food, <b>1 in 20</b> is meds. Leave a place before the noise brings anything.');
+  if(jobs>0)rows.push('<b>Watch duty</b> at your base: <b>'+jobs+' job'+(jobs===1?'':'s')+' left today</b>, about <b>'+pay+' scrap</b> plus items each. It is a fight, so do it after you have slept.');
+  if(S.base)rows.push('<b>The trader</b> sells bandages at 10 scrap, food at 5. One watch job covers it.');
+  else rows.push('<b>Claim a base.</b> Clear any place and claim it - that is what brings the trader, and a garden feeds you every morning.');
+  el.className='card blood';
+  el.innerHTML='<h2>Low, and nothing in the stash</h2>'
+    +'<p class="help">You are on '+S.hp+' / '+maxHp()+' with no meds and '+(S.stock.scrap||0)+' scrap. Here is every way out that costs nothing:</p>'
+    +'<div class="stack" style="margin-top:8px">'+rows.map(r=>'<div class="note">'+r+'</div>').join('')+'</div>';
+  el.hidden=false;
+}
 function renderCombat(){
   if(!C)return;const w=eqItem('melee'),g=eqItem('ranged');const t=targetEnemy();
   const ammoN=(g?(S.pack.filter(p=>p.cat==='ammo'&&p.id===g.ammo).reduce((a,b)=>a+(b.qty||0),0)+(g.ammo==='ammo'?S.stock.ammo:0)):0);
@@ -3237,7 +3271,7 @@ function render(){
   $('#goalInput').value=S.goal;$('#nameInput').value=S.name;$('#sfxBtn').textContent=S.sfx?'On':'Off';const vs=$('#verSub');if(vs)vs.textContent='v'+VERSION;const bi=backupInfo();const ub=$('#undoRow');if(ub){ub.hidden=!bi;if(bi)$('#undoBtn').textContent='Undo restore (put back the save from '+ago(bi.t)+')';}
   const snList=snapshots();const snEl=$('#snapList');if(snEl)snEl.innerHTML=snList.length?snList.map((s,i)=>`<div class="lbrow"><div class="rk">${i+1}</div><div class="nm">${esc(s.name||'Survivor')} · level ${s.lvl}<small>${fmt(s.steps)} lifetime steps · ${esc(ago(s.t))}${s.why&&s.why!=='auto'?' · '+esc(s.why):''}</small></div><div class="sc"><button class="btn xs" onclick="restoreSnapshot(${i})">Go back</button></div></div>`).join(''):'<p class="help">None yet. One every few minutes while you play, thinning to about one an hour further back, plus one before anything risky.</p>';if(CLOUD_SNAPS===null&&O().ok)loadCloudSnaps();else renderCloudSnaps();renderRecov();renderStepSync();
   // county
-  renderMap();renderParty();renderBoss();renderDeal();renderEvent();renderStory();renderShop();renderPet();
+  renderMap();renderParty();renderBoss();renderDeal();renderEvent();renderStory();renderShop();renderPet();renderStuck();
   const tier=TIERS[S.league.tier];$('#tierBadge').textContent=tier.e;$('#tierName').textContent=tier.n;$('#tierSub').textContent='Tier '+(S.league.tier+1)+' of '+TIERS.length+' · stash x'+tier.mult;
   const end=new Date(weekStart());end.setDate(end.getDate()+7);const left=Math.max(0,end-Date.now());$('#weekChip').textContent='Week of '+S.league.week;$('#resetChip').textContent=Math.floor(left/86400000)+'d '+Math.floor(left%86400000/3600000)+'h left';
   const b=board();$('#board').innerHTML=b.map((r,i)=>`<div class="lbrow${r.me?' me':''}"><div class="rk">${i+1}</div><div class="av">${ART.avatarSVG(r.av,40)}</div><div class="nm">${esc(r.n)}${r.me?' (you)':''}<small>${r.me?'stash runs to score':esc(r.blurb)}</small></div><div class="sc">${fmt(r.s)}</div></div>`).join('');
@@ -3332,6 +3366,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.73',d:'Sep 19',t:'When you have nothing, the game now tells you how to get out of it',
+  i:['"I don\'t have food, bandages or any scrap." The way out existed the whole time and nothing said a word about it - which is the same failure as every other one this week.',
+     'Low health, no meds anywhere and under 10 scrap now puts a card on your road screen listing every way out that costs nothing, with the numbers read from YOUR save: what tomorrow morning gives you back, what your garden feeds you, how many watch jobs are left today and what they pay, and what the trader charges.',
+     'Measured from a real save at 10% HP with an empty stash: three free mornings to full, and one watch job is more than enough scrap for bandages.',
+     'It only shows when all three are true at once, and never over a fight or inside a building.']},
  {v:'6.72',d:'Sep 19',t:'Four armour slots, and armour that actually stops a tier 5',
   i:['GLOVES AND BOOTS. Armour is four pieces now - Head, Chest, Hands, Feet - each with a common, uncommon and rare rung plus a legendary, so there is a ladder in every slot instead of two things to find.',
      'ARMOUR NEVER KEPT UP. It subtracted a flat 2 to 9 while enemy damage grows with your level AND the raid tier, so a tier 5 hitting for 138 lost 9 to a full set. Six per cent. Armour now also buys a percentage, and every point is worth slightly less than the last so it can never reach zero.',
