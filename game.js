@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.85';
+const VERSION='6.86';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3568,6 +3568,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.86',d:'Sep 19',t:'A button that tests the address without the shortcut',
+  i:['NOTHING POPPED UP IN SAFARI, and I could not tell you whether that was the address, the key, the shortcut or my own code. So now you can find out in one tap.',
+     '<b>Test this address</b> on the Steps card opens the link exactly the way your shortcut would, with 7 steps standing in for your real count. A black screen with a green tick means the address and your key are both fine and whatever is still wrong lives inside the shortcut. Nothing at all means it is mine.',
+     'ALSO WORTH CHECKING: scroll to the LAST action in your shortcut. If it says <b>Get Contents of URL</b> rather than <b>Open URLs</b>, you have the other kind - it posts straight to the server and never opens Safari at all, so there is no address to replace and nothing was ever going to pop up. That one just needs Fill Missing off.']},
  {v:'6.85',d:'Sep 19',t:'The notice was hidden inside two closed folds',
   i:['I PUT YESTERDAY\'S FIX WHERE YOU COULD NOT SEE IT. The "your address changed" box went into a collapsed section inside another collapsed section, so the one person who needed it never found it. That is not a small thing - the fix was useless until you could reach it.',
      'The new address is now the first thing on the Steps card, with its own Copy button, and <b>Fix my shortcut</b> - the button that was already sitting there - now hands you the same address and the three steps to paste it in.']},
@@ -4201,6 +4205,16 @@ function stepPostLog(){
     +(same?'<div class="note" style="margin-top:8px"><b style="color:#ffb35c">Every post is the same number.</b> Your shortcut is sending a fixed value, not your step count - the bubble at the end of it is the wrong one. It should be the <b>Sum</b> from Calculate Statistics.</div>':'')
     +'</div>';
 }
+/* One tap that does exactly what the Shortcut's last action does, minus the
+   Shortcut. It splits the problem in half: black screen with a tick = the
+   address and the key are good and the fault is inside iOS; nothing = ours. */
+function testStepAddress(){
+  const o=O();if(!o.ok){toast('Go online first','d');return;}
+  const u=stepOpenUrl()+'7';
+  toast('Opening the address - look for a black screen with a green tick');
+  try{const w=window.open(u,'_blank');if(!w)location.href=u;}
+  catch(e){location.href=u;}
+}
 function renderStepSync(){
   const el=$('#stepSyncBody');if(!el)return;const o=O();
   if(!o.ok){el.innerHTML='<p class="help">Sign in above first. Your shortcut code lives on the server, so the game has to be online to show it to you.</p>';return;}
@@ -4214,8 +4228,10 @@ function renderStepSync(){
   el.innerHTML='<div class="note" style="border-left-color:var(--blood)"><b style="color:var(--blood)">Your shortcut needs this new address.</b>'
     +'<div class="help" style="margin-top:4px">The old one had no key in it, so your steps went into a blank copy of the game in Safari instead of into your save. Replace it once and this stops.</div>'
     +'<input id="syncUrlCard" readonly value="'+esc(nu)+'" style="width:100%;margin:8px 0 6px;font-size:11px">'
-    +'<button class="btn sm r" onclick="copyText($(\'#syncUrlCard\').value,\'syncUrlCard\')">Copy the new address</button>'
-    +'<div class="help" style="margin-top:8px">Shortcuts app &rarr; <b>'+esc(S.scName||SC_NAME)+'</b> &rarr; tap the <b>Open URLs</b> action &rarr; select the old address and paste this over it. Leave the blue <b>Sum</b> bubble at the end exactly where it is.</div></div>'
+    +'<div class="row"><button class="btn sm r" onclick="copyText($(\'#syncUrlCard\').value,\'syncUrlCard\')">Copy the new address</button>'
+    +'<button class="btn sm" onclick="testStepAddress()">Test this address</button></div>'
+    +'<div class="help" style="margin-top:8px"><b>Test it first.</b> That button opens the address exactly the way your shortcut would, with 7 steps instead of your real count. A black screen with a green tick means the address works and anything still broken is inside the shortcut. Nothing at all means it is mine to fix - tell me.</div>'
+    +'<div class="help" style="margin-top:8px">Then: Shortcuts app &rarr; <b>'+esc(S.scName||SC_NAME)+'</b> &rarr; scroll to the <b>last action</b>. If it says <b>Open URLs</b>, select the old address inside it and paste this over it, leaving the blue <b>Sum</b> bubble at the end where it is. If it says <b>Get Contents of URL</b> instead, that is the other kind of shortcut - it posts straight to the server and needs no address change at all. Say which one you have.</div></div>'
     +'<p class="help" style="margin-top:8px">The game cannot read Apple Health - your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number here. '+posted+'</p>'
     +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run it now</button>'
     +'<button class="btn sm" onclick="fixShortcut()">Fix my shortcut</button>'
