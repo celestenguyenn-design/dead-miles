@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.95';
+const VERSION='6.96';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -81,7 +81,7 @@ const GEAR={
   longhaul:  {n:'Long Haul',      e:'🥾',slot:'feet', dr:3,w:0,  pts:80,r:'legendary',legend:'You always get away clean, and drop nothing running'}
 };
 const LEGEND_IDS=['mercy','lastword','oldreliable','whisper','nightingale','harvest','vigil','saintjude','longwinter','surefoot','longhaul'];
-const CAT_LABEL={food:'Food',water:'Water',drink:'Drink',snack:'Snack',meds:'Meds',scrap:'Scrap',ammo:'Ammo',shelf:'Trophy',key:'Key',chest:'Chest',gear:'Gear',cosmetic:'Cosmetic',candy:'Candy'};
+const CAT_LABEL={food:'Food',water:'Water',drink:'Drink',snack:'Snack',meds:'Meds',scrap:'Scrap',ammo:'Rounds',shells:'Shells',bolts:'Bolts',shelf:'Trophy',key:'Key',chest:'Chest',gear:'Gear',cosmetic:'Cosmetic',candy:'Candy'};
 const byCat=(c)=>Object.entries(ITEMS).filter(([k,v])=>v.cat===c&&v.w>0).map(([k,v])=>({id:k,...v}));
 function table(cats,shelfW,gearW){const out=[];for(const c of cats)out.push(...byCat(c));if(shelfW)out.push(...byCat('shelf').map(x=>({...x,w:x.w*shelfW})));if(gearW)out.push(...Object.entries(GEAR).filter(([k,v])=>v.w>0).map(([k,v])=>({id:k,gear:true,...v,w:v.w*gearW})));return out;}
 function cosmeticPool(){const out=[];for(const [k,v] of Object.entries(ART.HATS))if(!v.lock)out.push({id:'hat:'+k,slot:'hat',key:k,n:v.n,r:v.r});for(const [k,v] of Object.entries(ART.TOPS))if(v.r!=='common')out.push({id:'top:'+k,slot:'top',key:k,n:v.n,r:v.r});for(const [k,v] of Object.entries(ART.ACCS))out.push({id:'acc:'+k,slot:'acc',key:k,n:v.n,r:v.r});return out;}
@@ -168,7 +168,7 @@ function petFetch(){if(!S.pet)return;const lvl=petLevel();const kennel=S.base&&S
     if(S.pet==='cat'&&Math.random()<0.35){const sh=byCat('shelf');const it=wpick(sh,'w');S.shelf.push({id:it.id,n:it.n,e:it.e});got.push(it.e+' '+it.n);continue;}
     const list=table(['food','water','meds','scrap','ammo'],0,0.04+0.03*lvl);const it=wpick(list,'w');
     if(it.gear){S.gear.push({uid:uid(),id:it.id,...GEAR[it.id]});got.push(it.e+' '+it.n);}
-    else if(it.cat==='ammo'){S.stock.ammo+=it.qty||6;got.push(it.e+' '+it.n);}
+    else if(it.cat==='ammo'){addAmmoStock(it.id,it.qty||6);got.push(it.e+' '+it.n);}
     else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;got.push(it.e+' '+it.n);}}
   S.petGifts=got;S.petLast=todayStr();if(got.length){log(S.petName+' brought back '+got.join(', ')+'.');}}
 function renderPet(){const el=$('#petCard');if(!el)return;if(!S.pet){el.innerHTML='<h2>Companion <span class="sub">none yet</span></h2><p class="help">Strays hide in the houses you search. Keep looting: one always turns up by your 40th room ('+Math.min(40,S.roomsSearched||0)+' searched). Nine kinds of cat and eight kinds of dog are out there, and the rare ones are rare.</p>';return;}
@@ -268,7 +268,7 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
   gear:[],eq:{melee:null,ranged:null,armor:null,head:null,hands:null,feet:null,bag:null},
   crew:[],active:[],pet:null,
-  base:null,stock:{food:5,water:5,meds:1,scrap:0,ammo:0,chests:0},shelf:[],
+  base:null,stock:{food:5,water:5,meds:1,scrap:0,ammo:0,shells:0,bolts:0,chests:0},shelf:[],
   goal:6000,streak:{days:0,last:''},
   league:{week:weekId(),score:0,tier:0,history:[],seen:''},
   raids:[],raidPending:null,campCleared:'',bossKilled:'',milestones:[],
@@ -1860,11 +1860,11 @@ function act(kind){
     w.dur=Math.max(0,w.dur-2);breakWeapon(w);
     if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+(w.quiet?3:8));
   }
-  else if(kind==='shoot'){const g=eqItem('ranged');if(!g){toast('No gun');return;}const ammoItem=S.pack.find(p=>p.cat==='ammo'&&p.id===g.ammo);const stockAmmo=g.ammo==='ammo'?S.stock.ammo:0;
+  else if(kind==='shoot'){const g=eqItem('ranged');if(!g){toast('No gun');return;}const ammoItem=S.pack.find(p=>p.cat==='ammo'&&p.id===g.ammo);const stockAmmo=ammoStock(g.ammo);
     const free=g.id==='mercy'&&Math.random()<0.35;
-    if(!free&&!ammoItem&&stockAmmo<1){toast('No '+(g.ammo==='shells'?'shells':'rounds'));return;}
+    if(!free&&!ammoItem&&stockAmmo<1){toast('No '+ammoWord(g.ammo));return;}
     const noAmmo=Math.random()<sk('ammosense')*0.12;if(noAmmo)clog('Ammo Sense: the chamber had one you forgot about.','good');
-    if(!free&&!noAmmo){if(ammoItem){ammoItem.qty--;if(ammoItem.qty<=0)S.pack=S.pack.filter(p=>p!==ammoItem);}else S.stock.ammo--;}else clog('Mercy fires on an empty chamber. Somehow.','good');
+    if(!free&&!noAmmo){if(ammoItem){ammoItem.qty--;if(ammoItem.qty<=0)S.pack=S.pack.filter(p=>p!==ammoItem);}else takeAmmoStock(g.ammo);}else clog('Mercy fires on an empty chamber. Somehow.','good');
     SFX.play('shot');
     const shots=1+((Math.random()<sk('doubletap')*0.1)?1:0);if(shots>1)clog('Double tap.','good');
     for(let s=0;s<shots;s++){const tt=targetEnemy();if(!tt)break;
@@ -1933,7 +1933,7 @@ function act(kind){
   }
   const a=alive();
   if(a.length){const bl=roleLvl('brawler');if(bl){const tt=targetEnemy();dealTo(tt,rint(9+bl*2,15+bl*3),activeCrew().find(c=>c.role==='brawler').name+' punches '+tt.n);}
-    const hl=roleLvl('hunter');if(hl&&(S.pack.some(p=>p.cat==='ammo')||S.stock.ammo>0)){const tt=targetEnemy();dealTo(tt,10+hl*3,activeCrew().find(c=>c.role==='hunter').name+' fires');}}
+    const hl=roleLvl('hunter');if(hl&&(S.pack.some(p=>p.cat==='ammo')||ammoTotal()>0)){const tt=targetEnemy();dealTo(tt,10+hl*3,activeCrew().find(c=>c.role==='hunter').name+' fires');}}
   const ml=roleLvl('medic');if(ml&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+6+ml*3);clog(activeCrew().find(c=>c.role==='medic').name+' patches you: +'+(6+ml*3)+'.','good');}
   if(sk('triage')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('triage')*4);}
   if(eqItem('armor')&&eqItem('armor').id==='nightingale'&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+5);}
@@ -2119,7 +2119,7 @@ function renderStuck(){
 }
 function renderCombat(){
   if(!C)return;const w=eqItem('melee'),g=eqItem('ranged');const t=targetEnemy();
-  const ammoN=(g?(S.pack.filter(p=>p.cat==='ammo'&&p.id===g.ammo).reduce((a,b)=>a+(b.qty||0),0)+(g.ammo==='ammo'?S.stock.ammo:0)):0);
+  const ammoN=(g?(S.pack.filter(p=>p.cat==='ammo'&&p.id===g.ammo).reduce((a,b)=>a+(b.qty||0),0)+ammoStock(g.ammo)):0);
   const meds=S.pack.filter(p=>p.cat==='meds').length+medsTotal();
   const now=Date.now();const phurt=C.pfx&&now-C.pfx.t<600;const plunge=C.lunge&&now-C.lunge<400;const flash=C.muzzle&&now-C.muzzle<350;
   const SPARK={slash:'💢',heavy:'💥',shot:'✴️'};
@@ -2398,7 +2398,7 @@ function bank(){
   if(!S.base){toast('Claim a base first: clear a place, then Claim it');return;}
   if(typeof STREET!=='undefined'&&STREET.on&&S.base.geo&&STREET.pos){const d=geoDist(S.base.geo,STREET.pos);if(d>60){toast('Walk back to your base to stash: '+Math.round(d)+' m away','d');return;}}
   const raw=packPts();const qm=roleLvl('quartermaster');const pts=Math.round(raw*runMult()*TIERS[S.league.tier].mult*(1+(qm?0.08+qm*0.04:0)+sk('haggler')*0.05+sk('marathoner')*0.04)*dealMod('pts'));
-  let meds=0;for(const it of S.pack){if(it.cat==='shelf')S.shelf.push({id:it.id,n:it.n,e:it.e});else if(it.cat==='candy')S.stock.candy=(S.stock.candy||0)+(it.qty||1);else if(it.cat==='ammo')S.stock.ammo+=(it.qty||0);else if(it.cat==='chest'){S.stock.chests=(S.stock.chests||0)+1;}else if(it.cat==='meds'){const id=MEDS[it.id]?it.id:'bandage';medsGive(id==='pain'?'pain':id,1);meds++;}
+  let meds=0;for(const it of S.pack){if(it.cat==='shelf')S.shelf.push({id:it.id,n:it.n,e:it.e});else if(it.cat==='candy')S.stock.candy=(S.stock.candy||0)+(it.qty||1);else if(it.cat==='ammo')addAmmoStock(it.id,it.qty||0);else if(it.cat==='chest'){S.stock.chests=(S.stock.chests||0)+1;}else if(it.cat==='meds'){const id=MEDS[it.id]?it.id:'bandage';medsGive(id==='pain'?'pain':id,1);meds++;}
     else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;}}
   rollWeek();S.league.score+=pts;ctEvent('stash',pts);if(meds)ctEvent('meds',meds);
   let eat=activeCrew().length;if(sk('rationing'))eat=Math.ceil(eat/2);S.stock.food=Math.max(0,S.stock.food-eat);if(sk('harvest'))S.stock.food+=sk('harvest');
@@ -2662,7 +2662,24 @@ function renderShop(){if(offscreen('#shop'))return;const el=$('#shop');if(!el)re
 function wear(slot,key){if(!owns(slot,key))return;S.av[slot]=key;save();render();}
 
 /* ================= raids (real clock) ================= */
-function stockValue(){return S.stock.food*5+S.stock.water*5+medsTotal()*10+S.stock.scrap*4+S.stock.ammo*3;}
+/* v6.96 - THE STASH WAS MELTING SHELLS INTO ROUNDS. Every cat:'ammo' item was
+   poured into the single S.stock.ammo counter on pickup and on stash, so a box
+   of shotgun shells and a bundle of bolts both became generic rounds and their
+   identity was gone. Firing then read
+       const stockAmmo = g.ammo==='ammo' ? S.stock.ammo : 0;
+   so a shotgun or a bow could NEVER draw from the stash at all - only from a
+   pack item. Stash your shells and the shotgun reports "No shells" while the
+   stash shows a pile of ammo. Reported by her friend, in exactly those words:
+   "it becomes rounds and not shells anymore." The bow had it too, unreported.
+   Ammo now keeps its kind everywhere: S.stock.ammo stays rounds, so old saves
+   are untouched, and shells/bolts get their own counters. */
+const AMMO_KINDS=['ammo','shells','bolts'];
+function ammoStock(kind){return (S.stock[AMMO_KINDS.includes(kind)?kind:'ammo'])||0;}
+function addAmmoStock(kind,n){const k=AMMO_KINDS.includes(kind)?kind:'ammo';S.stock[k]=(S.stock[k]||0)+(n||0);}
+function takeAmmoStock(kind){const k=AMMO_KINDS.includes(kind)?kind:'ammo';if((S.stock[k]||0)>0){S.stock[k]--;return true;}return false;}
+function ammoTotal(){return AMMO_KINDS.reduce((a,k)=>a+(S.stock[k]||0),0);}
+function ammoWord(kind){return kind==='shells'?'shells':kind==='bolts'?'bolts':'rounds';}
+function stockValue(){return S.stock.food*5+S.stock.water*5+medsTotal()*10+S.stock.scrap*4+ammoTotal()*3;}
 function checkRaids(){
   if(!S.base)return;const t=todayStr();if(S.flags.lastRaidCheck===t)return;
   const rng=mulberry(hash(t+'raid'+S.created));
@@ -2885,7 +2902,7 @@ async function goOnline(handle,token){
   }catch(e){o.ok=false;o.err=e.message;save();render();}
 }
 function compactSave(){const c=JSON.parse(JSON.stringify(S));delete c.online;delete c.journal;delete c.wx;delete c.combat;if(c.party)delete c.party.data;return c;}
-function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code,raiding:(S.raidCur?{id:S.raidCur.id,n:S.raidCur.n,tier:S.raidCur.tier,at:Date.now()}:null),flare:(S.flare&&S.flare.endsAt>Date.now())?S.flare:null},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:S.stock.ammo}};}
+function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code,raiding:(S.raidCur?{id:S.raidCur.id,n:S.raidCur.n,tier:S.raidCur.tier,at:Date.now()}:null),flare:(S.flare&&S.flare.endsAt>Date.now())?S.flare:null},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:ammoTotal()}};}
 let pushTimer=0;let pushSoonTimer=0;function pushSoon(){clearTimeout(pushSoonTimer);pushSoonTimer=setTimeout(()=>pushPlayer(),8000);}
 function pushPlayer(){const o=O();if(!o.ok||!S.onboarded||STALE)return Promise.resolve();clearTimeout(pushTimer);return new Promise(res=>{pushTimer=setTimeout(async()=>{try{rollWeek();
   const ok=await rpc('save_player',{p_handle:o.handle,p_token:o.token,p_name:S.name,p_tier:S.league.tier,p_week:S.league.week,p_score:S.league.score,p_state:publicState()});
@@ -3479,7 +3496,7 @@ function render(){
     <div class="help" style="margin-top:4px">Held ${baseDays()} day${baseDays()===1?'':'s'}${baseAgePower()?` · raiders hit ${baseAgePower()} harder for it. Moving resets that.`:''}</div>
     <div class="help" style="margin-top:4px">${S.base.geo?'This is also your <b>home</b> on the live map - same place, one pin. Stand within 60 m of it to stash.':'No map pin yet. Set one from the live map if you want to stash out walking.'}</div></div></div>`;}
   $('#baseAlert').hidden=!(S.raidPending&&S.base&&S.base.rooms.tower);
-  $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',candy:'🍬'}[k]}</div><b>${k==='meds'?medsTotal():(S.stock[k]||0)}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`
+  $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(AMMO_KINDS.filter(k=>k!=='ammo'&&(S.stock[k]||0)>0)).concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',shells:'🟥',bolts:'🎯',candy:'🍬'}[k]}</div><b>${k==='meds'?medsTotal():(S.stock[k]||0)}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`
   // Break the med pile out by tier and say what each is worth against HER bar
   // right now, so a trauma kit is visibly not a bandage.
   {const el=$('#medRow');if(el){const have=medsAll();
@@ -3595,6 +3612,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.96',d:'Sep 19',t:'The stash was melting shotgun shells into rounds',
+  i:['YOUR FRIEND IS RIGHT AND IT WAS A REAL BUG. Every kind of ammo was poured into one counter the moment it went into the stash, so a box of shells became generic rounds and the pump shotgun could never draw on them - it would say "No shells" while your stash showed a pile of ammo.',
+     'Worse, a shotgun could ONLY fire from ammo carried in your pack. Stashing shells did not just rename them, it destroyed them. The crossbow had exactly the same bug and nobody had noticed.',
+     'Ammo keeps its kind now, everywhere: <b>Rounds</b>, <b>Shells</b> and <b>Bolts</b> are counted separately, and Shells and Bolts get their own stash tiles once you have some. Rounds you already had stay rounds, so nothing in your stash changed.']},
  {v:'6.95',d:'Sep 19',t:'Open URLs can never run on a schedule - that was the whole mistake',
   i:['YOU WERE RIGHT THAT GET CONTENTS OF URL WAS THE ONE THAT WORKED, AND NOW I KNOW WHY. iOS will not open a URL while your phone is locked or the screen is off. So an <b>Open URLs</b> shortcut fired by an automation just sits there until iOS kills it - which is the <b>"Dead Miles Steps took too long to run"</b> notification, and why nothing ever popped up in Safari.',
      'v6.81 moved you onto Open URLs <i>to fix</i> that exact timeout. It is the one shape that cannot run in an automation at all. That is the root error under this whole mess, and it was mine.',
