@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.96';
+const VERSION='6.97';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3612,6 +3612,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.97',d:'Sep 19',t:'Rebuilding beat inspecting, so the rebuild prompt is a button now',
+  i:['WHAT FINALLY FIXED YOUR SYNC WAS NOT ANOTHER EDIT. It was handing the Shortcuts AI a spec and letting it build the whole thing from scratch. Your hand-built one looked identical in every screenshot - same address, same POST, same JSON, same p field, same Sum bubble - and delivered nothing. Whatever was different was something no screenshot can show.',
+     'So that prompt is now a button on the Steps card, with your address and key already in it: <b>It all looks right and still nothing arrives</b> &rarr; <b>Copy the rebuild prompt</b>.',
+     'One catch worth knowing: the AI may rename the shortcut. If it does, your automations can end up still pointing at the old one - so it works when you tap it and never runs on its own.']},
  {v:'6.96',d:'Sep 19',t:'The stash was melting shotgun shells into rounds',
   i:['YOUR FRIEND IS RIGHT AND IT WAS A REAL BUG. Every kind of ammo was poured into one counter the moment it went into the stash, so a box of shells became generic rounds and the pump shotgun could never draw on them - it would say "No shells" while your stash showed a pile of ammo.',
      'Worse, a shotgun could ONLY fire from ammo carried in your pack. Stashing shells did not just rename them, it destroyed them. The crossbow had exactly the same bug and nobody had noticed.',
@@ -4205,6 +4209,28 @@ async function fetchStepKey(){
     if(k&&k!==o.stepKey){o.stepKey=k;save(true);renderOnline();}
     return k;}catch(e){return null;}
 }
+/* v6.97 - THE THING THAT ACTUALLY WORKED, KEPT. After an entire evening of
+   editing her shortcut field by field, what fixed it was handing the Shortcuts
+   AI a spec and letting it rebuild the whole thing from scratch. Her hand-built
+   version LOOKED identical in every screenshot - same URL, same POST, same JSON,
+   same p field, same Sum bubble - and still delivered nothing. Whatever differed
+   was something no screenshot can show: a stray space, a variable that displays
+   the same label but points at the wrong action, some state left over from an
+   iOS 27 upgrade. Inspection could never have found it. Rebuilding did.
+   So the prompt is a button now, generated with her real address and key. */
+function rebuildPrompt(){
+  const o=O();
+  return 'Rebuild this shortcut to have exactly these three actions, in this order:\n\n'
+    +'1. Find Health Samples\n   Type: Steps\n   Filter: Start Date is today\n   Unit: count\n'
+    +'   Group by: Day\n   Fill Missing: OFF\n   Limit: OFF\n\n'
+    +'2. Calculate Statistics\n   Operation: Sum\n   Input: the Health Samples from step 1\n\n'
+    +'3. Get Contents of URL\n   URL: '+SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key+'\n'
+    +'   Method: POST\n   Request Body: JSON\n   One text field:\n     Key: p\n'
+    +'     Value: '+stepCode()+' immediately followed by the Sum from step 2,\n'
+    +'            with no space between the | and the number\n\n'
+    +'Do not add any other actions. Do not add a notification.\n'
+    +'Name the shortcut exactly: '+(S.scName||SC_NAME);
+}
 function stepCode(){const o=O();return o.handle+'|'+(o.stepKey||o.token)+'|';}
 // THE SHORTCUT THAT CANNOT TIME OUT (v6.81). "Get Contents of URL" sits and
 // waits for the server to answer, so anything slow anywhere between her phone
@@ -4385,6 +4411,13 @@ function renderStepSync(){
     +'<div id="stepTestOut" style="margin-top:8px">'+STEP_TEST+'</div>'
     +'<div class="help" style="margin-top:8px">Inside the shortcut: the address goes in the <b>Get Contents of URL</b> field. Then <b>Show More</b> &rarr; Method <b>POST</b> &rarr; Request Body <b>JSON</b> &rarr; a <b>Text</b> field with Key <b>p</b>, holding your code and then the blue <b>Sum</b> bubble. The code already ends in a <b>|</b> - do not add another, and leave no space before the bubble.</div>'
     +'<div class="help" style="margin-top:6px">Also check <b style="color:var(--blood)">Fill Missing is OFF</b> in <b>Find Health Samples</b>. That one setting is the only thing that has ever made this kind time out.</div>'
+    +'<details style="margin-top:8px"><summary class="help" style="cursor:pointer"><b style="color:#5fd08a">It all looks right and still nothing arrives</b></summary><div style="margin-top:6px">'
+    +'<div class="help">Then stop reading it. A shortcut can look correct in every field and still be broken by something no screenshot shows - a stray space, a variable pointing at the wrong action, leftover state from an iOS upgrade. <b>Rebuilding beats inspecting.</b></div>'
+    +'<div class="help" style="margin-top:6px">Open the shortcut, ask the <b>Shortcuts AI</b> to edit it, and paste this in. It has your address and your key already in it.</div>'
+    +'<textarea id="rebuildTxt" readonly rows="6" style="width:100%;margin:8px 0 6px;font-size:10px;font-family:monospace">'+esc(rebuildPrompt())+'</textarea>'
+    +'<button class="btn sm r" onclick="copyText($(\'#rebuildTxt\').value,\'rebuildTxt\')">Copy the rebuild prompt</button>'
+    +'<div class="help" style="margin-top:6px">Afterwards check two things: the <b>p</b> field must end with <b>|</b> then the blue <b>Sum</b> bubble, and the shortcut must still be named <b>'+esc(S.scName||SC_NAME)+'</b> - if the AI renamed it, your automations may still be pointing at the old one. This is what finally fixed it on 19 Sep.</div>'
+    +'</div></details>'
     +'<details style="margin-top:8px"><summary class="help" style="cursor:pointer">Mine says Open URLs - how do I switch it to this one?</summary><div style="margin-top:6px">'
     +'<div class="help">Worth doing: this kind posts and finishes, so it never opens the game. The Open URLs kind opens the game every single time it runs.</div>'
     +'<div class="help" style="margin-top:6px">Keep the first two actions exactly as they are. Only the last one changes, and it uses the two boxes above:</div>'
