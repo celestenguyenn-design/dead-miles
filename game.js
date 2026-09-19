@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.89';
+const VERSION='6.90';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3568,6 +3568,8 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.90',d:'Sep 19',t:'It is labelled Sum, not Statistic',
+  i:['YOU SAID THERE IS NO STATISTIC BUBBLE, ONLY A SUM BUBBLE, AND YOU ARE RIGHT. iOS names that bubble after whichever operation you picked in Calculate Statistics - you picked Sum, so it says <b>Sum</b>. Three places in the setup told you to tap a "Statistic" bubble that does not exist on your screen, while the rest of the game said Sum. All three now say Sum.']},
  {v:'6.89',d:'Sep 19',t:'The address was four folds deep - the exact thing I said I had stopped doing',
   i:['YOU ASKED WHERE TO GO TO COPY THE ADDRESS AND THE HONEST ANSWER WAS FOUR TAPS INTO A NESTED FOLD. I wrote the lesson about that two versions ago and then did it again.',
      'Building or fixing this shortcut needs two things, so both now sit together at the top of the <b>Get Contents of URL</b> box, numbered: <b>1. The address</b>, <b>2. Your code</b>. Open Settings, open Steps, and they are right there - no extra folds.']},
@@ -4305,7 +4307,7 @@ function renderStepSync(){
     +'<li>Search <b>Get Contents of URL</b> and add it.</li>'
     +'<li>Paste <b>the address</b> from box 1 above into it.</li>'
     +'<li>Tap <b>Show More</b>. Method <b>POST</b>, Request Body <b>JSON</b>.</li>'
-    +'<li><b>Add new field</b> &rarr; <b>Text</b>, Key <b>p</b>. Paste <b>your code</b> from box 2 into its value, then tap the <b>Statistic</b> bubble over the keyboard so it sits right after the last <b>|</b>.</li>'
+    +'<li><b>Add new field</b> &rarr; <b>Text</b>, Key <b>p</b>. Paste <b>your code</b> from box 2 into its value, then tap the blue <b>Sum</b> bubble on the bar above the keyboard so it sits right after the last <b>|</b>. (It is labelled <b>Sum</b>, not "Statistic" - iOS names that bubble after whichever operation you picked in <b>Calculate Statistics</b>.)</li>'
     +'<li>Done. Tap play - nothing should open, and your number appears here.</li>'
     +'</ol></div></details>'
     +'</div></details>'
@@ -4502,14 +4504,14 @@ function renderOnline(){if(offscreen('#onlineStatus'))return;
   <li><b>Shortcuts</b> app &rarr; <b>+</b>. Add three actions with the search box: <b>Find Health Samples</b>, <b>Calculate Statistics</b>, <b>Get Contents of URL</b>.</li>
   <li><b>Find Health Samples</b>: Type is <b>Steps</b>, and one filter - <b>Start Date is today</b>. Then scroll down inside that action and make sure <b style="color:var(--blood)">Fill Missing is OFF</b> and <b>Limit is off</b>. Fill Missing makes Health invent an entry for every gap it can find, and that one setting is enough on its own to hang the whole shortcut. It is the only thing that has ever made this kind time out.</li>
   <li><b>Calculate Statistics</b>: <b>Sum</b> of <b>Health Samples</b>.</li>
-  <li><b>Get Contents of URL</b>: paste the address above. Tap <b>Show More</b>. Set <b>Method</b> to <b>POST</b>, <b>Request Body</b> to <b>JSON</b>, then <b>Add new field</b> &rarr; <b>Text</b>, Key <b>p</b>. In its value paste your code above, and with the cursor right after the last <b>|</b> tap the <b>Statistic</b> bubble over the keyboard.</li>
+  <li><b>Get Contents of URL</b>: paste the address above. Tap <b>Show More</b>. Set <b>Method</b> to <b>POST</b>, <b>Request Body</b> to <b>JSON</b>, then <b>Add new field</b> &rarr; <b>Text</b>, Key <b>p</b>. In its value paste your code above, and with the cursor right after the last <b>|</b> tap the blue <b>Sum</b> bubble on the bar above the keyboard.</li>
   <li>Name it <b>Dead Miles Steps</b>, Done, then tap play. Nothing will open - come back here and the number is in.</li>
   <li><b>Automation</b> tab &rarr; <b>+</b> &rarr; <b>Time of Day</b> &rarr; a time, Daily, <b>Run Immediately</b> &rarr; <b>Next</b> &rarr; tap <b>Dead Miles Steps</b>. Make a few (noon, 4 pm, 8 pm, 11 pm). Do not stack one every hour - it just fails every hour if anything is wrong.</li>
   </ol>
   <div class="note"><b>If yours already exists and keeps timing out, check this before rebuilding it.</b> In <b>Find Health Samples</b>, turn <b>Fill Missing OFF</b>. Then check the triggers at the very top: an hourly stack (At 22:00 or At 21:00 or At 20:00...) means it runs all day and fails all day, one notification each time.</div>
   <details style="margin-top:8px"><summary class="help">The Open URLs version, if you would rather not edit a POST body</summary><div style="margin-top:6px">
   <input id="syncUrl2" readonly value="${esc(openUrl)}" style="margin:6px 0;font-size:11px"><button class="btn sm ghost" onclick="copyText($('#syncUrl2').value,'syncUrl2')">Copy address</button>
-  <p class="help">Use <b>Open URLs</b> as the last action instead: paste this address, then with the cursor right after the <b>=</b> tap the <b>Statistic</b> bubble. It is fewer taps to build and it cannot time out, because it waits for nothing. The cost is that <b>it opens the game every single time it runs</b>, and it depends on iOS handing the link to the copy of the game you actually play.</p>
+  <p class="help">Use <b>Open URLs</b> as the last action instead: paste this address, then with the cursor right after the <b>=</b> tap the blue <b>Sum</b> bubble. It is fewer taps to build and it cannot time out, because it waits for nothing. The cost is that <b>it opens the game every single time it runs</b>, and it depends on iOS handing the link to the copy of the game you actually play.</p>
   </div></details>
   <b>Android:</b> install the tiny companion app <a href="./DeadMilesSteps.apk">DeadMilesSteps.apk</a> (Android asks once to allow installs from your browser), paste the handle <b>${esc(o.handle)}</b> and token <b style="word-break:break-all">${esc(o.token)}</b> into it, tap Allow reading steps, then Save. It posts your Health Connect steps every hour on its own.`:'Go online first, then your personal sync address and code appear here.';}
 }
