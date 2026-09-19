@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.98';
+const VERSION='6.99';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2521,7 +2521,10 @@ const TEMPERS={
 const TEMPER_ORDER=['perfect','vicious','heavy','keen','sturdy','balanced','crude'];
 function temperOdds(){const t=Object.values(TEMPERS).reduce((a,b)=>a+b.w,0);
   return TEMPER_ORDER.map(k=>[k,Math.round(TEMPERS[k].w/t*1000)/10]);}
-function temperOf(g){return (g&&g.temper&&TEMPERS[g.temper])||null;}
+// One gate for every reader: a temper on a non-weapon is not shown and not
+// applied, so a legacy "Vicious" helmet from an older save stops claiming a
+// double strike it was never going to deliver.
+function temperOf(g){return (g&&temperable(g)&&g.temper&&TEMPERS[g.temper])||null;}
 // Effective numbers. The temper is never baked into g.dmg, because a reroll has
 // to be able to take it back off cleanly.
 function wDmg(g){
@@ -2542,6 +2545,17 @@ function rerollParts(g){let c={common:2,uncommon:3,rare:5,epic:8,legendary:12}[g
 function rollTemper(){const tot=Object.values(TEMPERS).reduce((a,b)=>a+b.w,0);let r=Math.random()*tot;
   for(const k of Object.keys(TEMPERS)){r-=TEMPERS[k].w;if(r<=0)return k;}return 'balanced';}
 function benchable(g){return !!(g&&(g.dmg||g.dr!==undefined||g.cap));}
+/* v6.99 - TEMPERS WERE SOLD ON ARMOUR AND DID ABSOLUTELY NOTHING. Reported by
+   her friend: "the armor upgrades don't make sense, because it adds x2 strike
+   and stuff." Every stat a TEMPER carries is a weapon stat:
+       dmg   - armour has no g.dmg, so wDmg() returns null and it is ignored
+       dur   - armour has no durability at all
+       twice - read only from the equipped MELEE weapon, at the swing
+   So rolling Vicious onto a riot helmet charged real scrap and parts, printed
+   "12% chance to strike twice" on the card, and changed nothing whatsoever.
+   The bench still upgrades armour and bags (+1 armour, +2 carry, which do work);
+   it just stops offering a gamble that cannot pay out. */
+function temperable(g){return !!(g&&g.dmg);}
 
 /* What a repair costs is now derived from how hard the thing hits, not from the
    word printed on it. Her rule: "the better the legendary weapon, the more scrap
@@ -2624,6 +2638,7 @@ function upgrade(uidv){
 // real downgrade, so a good temper is something you decide whether to risk.
 function reroll(uidv){
   const g=S.gear.find(x=>x.uid===uidv);if(!g||!benchable(g))return;
+  if(!temperable(g)){toast('Tempers only change how a weapon hits. Use Work it up on this.','d');return;}
   const sc=rerollScrap(g), pc=rerollParts(g);
   if(S.stock.scrap<sc){toast('Need '+sc+' scrap');return;}
   if(partsHave()<pc){toast('Need '+pc+' parts. Salvage gear to get them - you have '+partsHave()+'.','d');return;}
@@ -2655,13 +2670,14 @@ function benchSheet(uidv){
     +'<div class="kv" style="margin-top:6px"><span>'+esc(g.e+' '+g.n)+'</span><b class="rc-'+esc(g.r||'common')+'">'+esc(RAR[g.r||'common'].n)+(up?' +'+up:'')+'</b>'
       +'<span>Now</span><b>'+stat+'</b>'
       +(repairMax(g)?'<span>Durability</span><b>'+Math.max(0,g.dur||0)+' / '+repairMax(g)+'</b>':'')
-      +'<span>Temper</span><b>'+(t?esc(t.n)+' <span class="help">'+esc(t.d)+'</span>':'<span class="help">none yet</span>')+'</b>'
+      +(temperable(g)?'<span>Temper</span><b>'+(t?esc(t.n)+' <span class="help">'+esc(t.d)+'</span>':'<span class="help">none yet</span>')+'</b>':'')
       +'<span>Your parts</span><b>'+partsHave()+'</b><span>Your scrap</span><b>'+fmt(S.stock.scrap)+'</b></div>'
     +'<div class="section-label" style="margin-top:12px">Work it up</div>'
     +'<p class="help">'+(up>=3?'This is as far as it goes.':'+2 damage (or +1 armor, +2 carry) a level, three levels. Parts only come from breaking down gear.')+'</p>'
     +(up>=3?'':'<button class="btn r wide" style="margin-top:6px" onclick="upgrade(\''+g.uid+'\')"'
         +((S.stock.scrap<uc||partsHave()<upc)?' disabled':'')+'>To +'+(up+1)+' · '+uc+'🔩 · '+upc+' parts</button>')
-    +'<div class="section-label" style="margin-top:14px">Rework the temper</div>'
+    +(!temperable(g)?'<p class="help" style="margin-top:14px">Tempers are a weapon thing - every one of them changes damage, durability or an extra swing, and '+esc(g.dr!==undefined?'armour':'a bag')+' has none of those. <b>Work it up</b> is the whole bench for this.</p>':''
+    )+(!temperable(g)?'':'<div class="section-label" style="margin-top:14px">Rework the temper</div>'
     +'<p class="help">A gamble, not a ladder. Whatever it has now is gone, and these are the real odds:</p>'
     +'<div style="display:flex;flex-direction:column;gap:2px;margin:6px 0">'
     +temperOdds().map(([k,pct])=>{const x=TEMPERS[k];const cur=g.temper===k;
@@ -2672,7 +2688,7 @@ function benchSheet(uidv){
     +'</div>'
     +'<button class="btn wide" onclick="reroll(\''+g.uid+'\')"'+((S.stock.scrap<rs||partsHave()<rp)?' disabled':'')+'>'
       +(g.temper?'Rework':'Temper it')+' · '+rs+'🔩 · '+rp+' parts</button>'
-    +'<p class="help" style="margin-top:8px">'+(forge?'Your forge is cutting the parts cost by 40%.':'A Forge at your base cuts the parts cost by 40%.')+'</p>'
+    )+'<p class="help" style="margin-top:8px">'+(forge?'Your forge is cutting the parts cost by 40%.':'A Forge at your base cuts the parts cost by 40%.')+'</p>'
     +'<button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet()">Done</button>',true);
 }
 function dropGear(uidv){S.gear=S.gear.filter(x=>x.uid!==uidv);for(const k in S.eq)if(S.eq[k]===uidv)S.eq[k]=null;save();render();}
@@ -3643,6 +3659,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.99',d:'Sep 19',t:'Tempers were being sold on armour and did nothing at all',
+  i:['YOUR FRIEND IS RIGHT AGAIN. Every stat a temper carries is a weapon stat - damage, durability, or an extra swing. Armour has none of the three. So rolling <b>Vicious</b> onto a riot helmet took your scrap and parts, printed "12% chance to strike twice" on the card, and changed absolutely nothing.',
+     'The workbench no longer offers a gamble that cannot pay out. Armour and bags keep <b>Work it up</b>, which really does add +1 armour and +2 carry, and the card now says plainly why there is no temper section.',
+     'If an old helmet of yours already has a temper on it, it stops claiming a double strike it was never going to deliver.']},
  {v:'6.98',d:'Sep 19',t:'The pack tells you how full it is, where you are actually looting',
   i:['YOU WERE LOSING LOOT TO A FULL PACK WITH NO WARNING. The count existed - as small grey text next to the word Pack, on the Pack tab, which is not the tab you are on while you are searching a house.',
      'There is a meter on the Road now, right above the place you are clearing. It shows <b>8 / 10</b>, goes amber with two spaces left and red when it is full, and says plainly that new finds are left behind rather than held.',
