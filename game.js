@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.84';
+const VERSION='6.85';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3568,6 +3568,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.85',d:'Sep 19',t:'The notice was hidden inside two closed folds',
+  i:['I PUT YESTERDAY\'S FIX WHERE YOU COULD NOT SEE IT. The "your address changed" box went into a collapsed section inside another collapsed section, so the one person who needed it never found it. That is not a small thing - the fix was useless until you could reach it.',
+     'The new address is now the first thing on the Steps card, with its own Copy button, and <b>Fix my shortcut</b> - the button that was already sitting there - now hands you the same address and the three steps to paste it in.']},
  {v:'6.84',d:'Sep 19',t:'"Nothing came back" was wrong, and it was my fault',
   i:['THE DIALOG WAS LYING TO YOU. Yesterday\'s shortcut ends in Open URLs, and on an iPhone that hands the link to SAFARI - never to the app on your home screen. Those are two separate copies of the game with two separate saves. So the number was read off your phone correctly, opened Safari correctly, and landed in a blank copy of Dead Miles that has never been signed in. Your real game never saw it, and then told you nothing came back.',
      'It gets worse: the game sat there polling the server for 16 seconds while iOS had switched you to Safari. It could not have seen anything no matter what happened. It was describing its own blindness as your failure, which is the exact opposite of useful.',
@@ -4203,7 +4206,17 @@ function renderStepSync(){
   if(!o.ok){el.innerHTML='<p class="help">Sign in above first. Your shortcut code lives on the server, so the game has to be online to show it to you.</p>';return;}
   const posted=o.lastPost?('Your phone last sent steps at <b>'+esc(timeStr(o.lastPost))+'</b>.')
     :'<span style="color:#ffb35c">Your phone has not sent any steps today.</span>';
-  el.innerHTML='<p class="help">The game cannot read Apple Health - your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number here. '+posted+'</p>'
+  /* v6.85: this notice shipped inside a COLLAPSED <details> inside another
+     collapsed fold, so the one person who needed it never saw it. The address
+     she has to replace now sits on the first card of the Steps section, with
+     its own copy button, above everything else. */
+  const nu=stepOpenUrl();
+  el.innerHTML='<div class="note" style="border-left-color:var(--blood)"><b style="color:var(--blood)">Your shortcut needs this new address.</b>'
+    +'<div class="help" style="margin-top:4px">The old one had no key in it, so your steps went into a blank copy of the game in Safari instead of into your save. Replace it once and this stops.</div>'
+    +'<input id="syncUrlCard" readonly value="'+esc(nu)+'" style="width:100%;margin:8px 0 6px;font-size:11px">'
+    +'<button class="btn sm r" onclick="copyText($(\'#syncUrlCard\').value,\'syncUrlCard\')">Copy the new address</button>'
+    +'<div class="help" style="margin-top:8px">Shortcuts app &rarr; <b>'+esc(S.scName||SC_NAME)+'</b> &rarr; tap the <b>Open URLs</b> action &rarr; select the old address and paste this over it. Leave the blue <b>Sum</b> bubble at the end exactly where it is.</div></div>'
+    +'<p class="help" style="margin-top:8px">The game cannot read Apple Health - your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number here. '+posted+'</p>'
     +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run it now</button>'
     +'<button class="btn sm" onclick="fixShortcut()">Fix my shortcut</button>'
     +'<button class="btn sm ghost" onclick="renameShortcut()">Rename</button></div>'
@@ -4213,26 +4226,27 @@ function renderStepSync(){
 function fixShortcut(){
   const o=O();if(!o.ok){toast('Go online first','d');return;}
   fetchStepKey().then(()=>{
-    const code=stepCode().replace(/\|$/,'');
+    const nu=stepOpenUrl();
     openSheet('<h2>Fix my shortcut</h2>'
-      +'<p>Your shortcut proves the steps are yours with a code. This is a <b>permanent</b> one, so this is the last time.</p>'
-      +'<div style="padding:10px 12px;border-radius:8px;background:rgba(94,173,255,.12);border-left:4px solid var(--steel)">'
-      +'<b style="color:var(--bone)">The easy way - two boxes, each replaced whole</b>'
-      +'<div class="help" style="margin-top:4px">No editing around the blue bubble. In <b>Request Body</b> you want two fields:</div>'
-      +'<div class="help" style="margin-top:6px">field named <b>c</b> &rarr; this code:</div>'
-      +'<input id="fixCode" readonly value="'+esc(code)+'" style="width:100%;margin:6px 0;font-size:11px">'
-      +'<button class="btn sm r" onclick="copyText($(\'#fixCode\').value,\'fixCode\')">Copy the code</button>'
-      +'<div class="help" style="margin-top:8px">field named <b>n</b> &rarr; <b>nothing but the blue Sum bubble</b>.</div>'
-      +'<div class="help" style="margin-top:6px">Delete the old <b>p</b> field with its red minus. Needs round eleven of the setup page.</div>'
+      +'<p>One thing to replace: <b>the address</b>. Yours was made before the key went into it, which is why your steps ended up in a blank copy of the game in Safari instead of in your save.</p>'
+      +'<div style="padding:10px 12px;border-radius:8px;background:rgba(230,62,92,.12);border-left:4px solid var(--blood)">'
+      +'<b style="color:var(--bone)">The new address</b>'
+      +'<input id="fixUrl" readonly value="'+esc(nu)+'" style="width:100%;margin:8px 0 6px;font-size:11px">'
+      +'<button class="btn sm r" onclick="copyText($(\'#fixUrl\').value,\'fixUrl\')">Copy the new address</button>'
       +'</div>'
-      +'<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700">Or keep the old single p field</summary>'
-      +'<ol style="padding-left:20px;margin:10px 0;line-height:1.7">'
-      +'<li>Tap the value next to <b>p</b>.</li>'
-      +'<li>Delete everything <b>except the blue Sum bubble</b> at the end.</li>'
-      +'<li>Cursor <b>before</b> the bubble, paste the code, then type one <b>|</b> after it.</li>'
-      +'</ol></details>'
-      +'<p class="help" style="margin-top:10px">Then tap <b>Done</b> and the play button. It should say <b>ok - N steps</b>. Anything else is a sentence telling you which setting to change.</p>'
-      +'<button class="btn wide ghost" onclick="closeSheet()">Close</button>',true);
+      +'<ol style="padding-left:20px;margin:12px 0;line-height:1.8">'
+      +'<li>Shortcuts app, open <b>'+esc(S.scName||SC_NAME)+'</b>.</li>'
+      +'<li>Tap the <b>Open URLs</b> action at the bottom.</li>'
+      +'<li>Select the old address and paste this one over it. <b>Do not touch the blue Sum bubble</b> at the end - it stays where it is.</li>'
+      +'<li>Done, then tap play.</li>'
+      +'</ol>'
+      +'<p class="help">You should get a black screen with your real step count and a green tick. That means the server has it and this game will have it within a minute.</p>'
+      +'<details style="margin-top:10px"><summary class="help" style="cursor:pointer">My shortcut posts to the server instead (the older kind)</summary><div style="margin-top:6px">'
+      +'<div class="help">That one uses <b>Get Contents of URL</b>. Its Request Body has a field named <b>p</b>: delete everything in it <b>except the blue Sum bubble</b>, then put the cursor before the bubble and paste this code, and type one <b>|</b> after it.</div>'
+      +'<input id="fixCode" readonly value="'+esc(stepCode().replace(/\|$/,''))+'" style="width:100%;margin:6px 0;font-size:11px">'
+      +'<button class="btn sm ghost" onclick="copyText($(\'#fixCode\').value,\'fixCode\')">Copy the code</button>'
+      +'</div></details>'
+      +'<button class="btn wide ghost" style="margin-top:12px" onclick="closeSheet()">Close</button>',true);
   });
 }
 function renameShortcut(){
