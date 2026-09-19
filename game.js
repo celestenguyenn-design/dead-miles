@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.69';
+const VERSION='6.70';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -259,7 +259,13 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
 function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
-  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};if(S.buff===undefined)S.buff=null;
+  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};
+  // free any slot a downed crew member is still sitting in (they never gave it
+  // back before v6.70), so an existing save is not stuck a fighter short
+  if(Array.isArray(S.active)&&Array.isArray(S.crew)){
+    const down=S.crew.filter(c=>c.hp!==undefined&&c.hp<=0).map(c=>c.id);
+    if(down.length)S.active=S.active.filter(id=>!down.includes(id));
+  }if(S.buff===undefined)S.buff=null;
   // A temper can lower a weapon's ceiling, so never let a stored durability
   // sit above it - that renders as "9 / 7" and repairs would read as free.
   for(const g of (S.gear||[])){
@@ -744,7 +750,11 @@ const was=hydroState();S.hydro=Math.max(0,(S.hydro===undefined?100:S.hydro)-n);
 function crewMax(c){return 40+12*(c.lvl||1);}
 function newCrew(role){const used=S.crew.map(c=>c.name);const names=CREW_NAMES.filter(n=>!used.includes(n));const c={id:uid(),name:names.length?pick(names):pick(CREW_NAMES),av:ART.randomAv(),role:role||pick(Object.keys(ROLES)),lvl:1,xp:0};c.hp=crewMax(c);return c;}
 function hurtCrew(c,n){c.hp=Math.max(0,(c.hp===undefined?crewMax(c):c.hp)-n);
-  if(c.hp<=0){clog(c.name+' goes down and drags themselves out of the fight.','hit');log(c.name+' was hurt badly and is out until they heal.');SFX.play('hurt');}
+  if(c.hp<=0){clog(c.name+' goes down and drags themselves out of the fight.','hit');
+    const i=S.active.indexOf(c.id);
+    if(i>=0){S.active.splice(i,1);log(c.name+' was hurt badly and is out until they heal. Their slot is free - bring someone else along.');}
+    else log(c.name+' was hurt badly and is out until they heal.');
+    SFX.play('hurt');}
   else clog(c.name+' takes '+n+'.','hit');}
 function healCrew(id){const c=S.crew.find(x=>x.id===id);if(!c)return;if(c.hp>=crewMax(c)){toast(c.name+' is fine');return;}if(medsTotal()<1){toast('No meds in the stash');return;}medsTake(MED_ORDER.find(id=>medsHeld(id)>0));c.hp=crewMax(c);log('Patched up '+c.name+'.');toast(c.name+' is back on their feet','a');SFX.play('win');save();render();}
 function skillList(){return (SKILLS[S.cls]||[]).concat(SKILLS[S.bg]||[]).concat(SKILLS.general);}
@@ -2448,7 +2458,7 @@ function benchSheet(uidv){
     +'<button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet()">Done</button>',true);
 }
 function dropGear(uidv){S.gear=S.gear.filter(x=>x.uid!==uidv);for(const k in S.eq)if(S.eq[k]===uidv)S.eq[k]=null;save();render();}
-function toggleCrew(id){const i=S.active.indexOf(id);if(i>=0)S.active.splice(i,1);else{if(S.active.length>=crewSlots()){toast('No free slot. Build a bunkhouse.');return;}S.active.push(id);}save();render();}
+function toggleCrew(id){const i=S.active.indexOf(id);if(i>=0)S.active.splice(i,1);else{const c=S.crew.find(x=>x.id===id);if(c&&c.hp!==undefined&&c.hp<=0){toast('They are down. Patch them up first.','d');return;}if(S.active.length>=crewSlots()){toast('No free slot. Build a bunkhouse.');return;}S.active.push(id);}save();render();}
 function shopItems(){const out=[];for(const [k,v] of Object.entries(ART.HAIR_SHOP))out.push({id:'hair:'+k,slot:'hair',key:k,n:v.n,c:v.c,r:v.c>=12000?'epic':'rare'});for(const [k,v] of Object.entries(ART.EYES_SHOP))out.push({id:'eyes:'+k,slot:'eyes',key:k,n:v.n,c:v.c,r:'epic'});for(const [k,v] of Object.entries(ART.HATS))if(v.c)out.push({id:'hat:'+k,slot:'hat',key:k,n:v.n,c:v.c,r:v.r});for(const [k,v] of Object.entries(ART.TOPS))if(v.c)out.push({id:'top:'+k,slot:'top',key:k,n:v.n,c:v.c,r:v.r});for(const [k,v] of Object.entries(ART.ACCS))if(v.c)out.push({id:'acc:'+k,slot:'acc',key:k,n:v.n,c:v.c,r:v.r});return out;}
 function owns(slot,key){if(!key)return true;if(slot==='hair'&&ART.HAIR_STYLES.includes(key))return true;if(slot==='eyes'&&ART.EYES.includes(key))return true;if(slot==='top'&&key==='hoodie')return true;return S.cosmetics.includes(slot+':'+key);}
 function tryOn(id){const it=shopItems().find(x=>x.id===id);if(!it)return;const av=Object.assign({},S.av);av[it.slot]=it.key;const owned=S.cosmetics.includes(id);const can=(S.wallet||0)>=it.c;
@@ -3173,10 +3183,11 @@ function render(){
   const skRow=(s,locked)=>{const r=sk(s.id);const can=!locked&&S.sp>0&&r<s.max;return `<div class="skill${r>=s.max?' max':''}${locked?' locked':''}"><div><b>${s.n} ${SKILLS.general.includes(s)?'<span class="chip" style="font-size:10px">general</span>':''}${locked?'<span class="chip a" style="font-size:10px">level '+s.req+'</span>':''}</b><span>${s.d(Math.max(1,r))}${r?' · now: '+s.d(r):''}</span><div class="pips">${Array.from({length:s.max},(_,i)=>`<i class="${i<r?'on':''}"></i>`).join('')}</div></div><button class="btn sm ${can?'a':''}" onclick="learn('${s.id}')" ${can?'':'disabled'}>${locked?'🔒':r>=s.max?'Max':'+'}</button></div>`;};
   const spent=Object.values(S.skills||{}).reduce((a,b)=>a+b,0);const total=skAll.reduce((a,s)=>a+s.max,0);
   $('#skills').innerHTML=skOpen.map(s=>skRow(s,false)).join('')+(skLocked.length?`<div class="section-label" style="margin-top:12px">Locked · keep levelling</div>`+skLocked.map(s=>skRow(s,true)).join(''):'')+`<p class="help" style="margin-top:10px">${spent} of ${total} ranks learned${skLocked.length?' · next unlock at level '+skLocked[0].req:''}.</p>`;
-  $('#crewSub').textContent=S.active.length+' / '+crewSlots()+' active · '+S.crew.length+' total';
+  {const down=S.crew.filter(c=>c.hp!==undefined&&c.hp<=0).length;
+   $('#crewSub').textContent=S.active.length+' / '+crewSlots()+' active · '+S.crew.length+' total'+(down?' · '+down+' down':'');}
   $('#crewList').innerHTML=S.crew.length?S.crew.map(c=>{const act=S.active.includes(c.id);return `<div class="crew${act?' active':''}"><div class="av">${ART.avatarSVG(c.av,70)}</div><div><div class="nm">${esc(c.name)} <span class="chip a">Lv ${c.lvl}</span></div><div class="role">${ROLES[c.role].e} ${ROLES[c.role].n}</div><div class="tr">${ROLES[c.role].d(c.lvl+sk('leader'))}</div><div class="hpbar2" style="margin-top:6px"><i style="width:${Math.max(0,(c.hp===undefined?crewMax(c):c.hp)/crewMax(c)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${(c.hp||0)<=0?'<b style="color:#ff8a92">Down. Cannot fight.</b> Mends '+(18+(S.base&&S.base.rooms.clinic?18:0))+' HP a night, or patch them up now.':'HP '+(c.hp===undefined?crewMax(c):c.hp)+' / '+crewMax(c)+((c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?' · mends '+(18+(S.base&&S.base.rooms.clinic?18:0))+' a night'+(S.base&&S.base.rooms.clinic?' (clinic)':''):'')}</div>
     <div class="xp" style="margin-top:6px"><i style="width:${Math.min(100,c.lvl>=5?100:c.xp/(c.lvl*6)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${c.lvl>=5?'Fully trained':'Experience '+c.xp+' / '+(c.lvl*6)+' to level '+(c.lvl+1)}</div>
-    <div class="a2">${(c.hp||0)<=0?`<button class="btn sm r" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>`:`<button class="btn sm ${act?'':'r'}" onclick="toggleCrew('${c.id}')">${act?'Leave at base':'Bring along'}</button>${(c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?`<button class="btn sm ghost" style="margin-top:4px" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>`:''}`}</div></div></div>`;}).join(''):'<p class="help">Nobody yet. Survivors hide in the places you search.</p>';
+    <div class="a2">${(c.hp||0)<=0?`<button class="btn sm r" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>${S.active.length<crewSlots()?'<div class="help" style="font-size:11px;margin-top:4px">Their slot is free - bring someone else along meanwhile.</div>':''}`:`<button class="btn sm ${act?'':'r'}" onclick="toggleCrew('${c.id}')">${act?'Leave at base':'Bring along'}</button>${(c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?`<button class="btn sm ghost" style="margin-top:4px" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>`:''}`}</div></div></div>`;}).join(''):'<p class="help">Nobody yet. Survivors hide in the places you search.</p>';
   // base
   const bh=$('#baseHead');
   if(!S.base){bh.className='card blood';bh.innerHTML='<h2>No base yet</h2><p>Clear any place, then tap <b>Claim as base</b> on it. Where you set up matters: a police station comes with an armory and walls, a pharmacy with a clinic, a gas station with a generator. You can move later for 20 scrap.</p>';}
@@ -3300,6 +3311,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.70',d:'Sep 19',t:'A crew member who is down no longer holds their slot',
+  i:['When someone in your crew went down they kept their place in your party - but they cannot fight, so the slot was spent on nobody. And their card swapped "Leave at base" for "Patch up", so there was no way to put anyone else in. With one slot and a hurt friend you fought alone until you spent a med on them.',
+     'Going down now hands the slot straight back. Bring someone else along while they mend, and put them back when they are patched up.',
+     'Saves already stuck like this are fixed when you open the game - the slot is freed for you.',
+     'You still cannot send a downed crew member out, and the crew screen now says how many are down and tells you when a slot has come free.']},
  {v:'6.69',d:'Sep 19',t:'The map was throwing away the buildings closest to you',
   i:['"Houses all around but not where I am." That was real, and it was the worst possible bug: the map asked the building server for the first 120 it could find, and a city block has 300+. Which 120 you got was decided by the order somebody happened to draw them in years ago - nothing to do with where you are standing.',
      'Measured on a real-shaped block: SIX buildings within walking reach of her, THREE of them on her screen. The gap right under your feet was the cut half.',
