@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.79';
+const VERSION='6.80';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3514,6 +3514,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.80',d:'Sep 19',t:'The sync check now times the exact thing your Shortcut waits on',
+  i:['"Server answers in 120 ms" was never the right measurement. Your Shortcut does not talk to that function - its last action sits on the STEP endpoint until that returns, and nothing was timing it.',
+     'The check now probes that endpoint directly with a deliberately invalid key, so it refuses instantly and writes nothing, and reports the round trip in milliseconds. Under 1.5 seconds and it tells you this is not your problem. Over, and it says so plainly, because iOS gives a Shortcut only a few seconds when it runs on a schedule.',
+     'Run "Why aren\'t my steps syncing?" on the Steps card and read the new line.']},
  {v:'6.79',d:'Sep 19',t:'The Shortcut button tells you when nothing came back',
   i:['Tapping the button asked iOS to run your Shortcut, said "Opening Shortcuts...", quietly checked four times, and then said NOTHING if nothing arrived. A deep link to a Shortcut that has been renamed or deleted does not fail - iOS just ignores it. So the button looked like it stopped working, with no way to tell which end was broken.',
      'If no steps arrive within 16 seconds it now says so, names the three things it can be - your Shortcut has a different name, it lost its Health permission after an iOS update, or it is sending the wrong key - and puts "Check my sync" and "Rename my shortcut" one tap away.',
@@ -3961,6 +3965,23 @@ async function syncDoctor(){
       row(true,'Server answers','yes, in '+(Date.now()-t0)+' ms');
     }catch(e){row(false,'Server answers','no - '+e.message);
       if(!verdict)verdict='The game cannot reach the server at all. Check your signal, then run this again.';}
+  }
+
+  // 2b. THE ENDPOINT THE SHORTCUT ACTUALLY WAITS ON. get_board answering fast
+  // says nothing about post_steps_link: different function, and the Shortcut's
+  // last action sits on THAT one until it returns. Probe it with a deliberately
+  // invalid key - it refuses in the same code path, writes nothing, and the
+  // number that comes back is the round trip her phone is really waiting for.
+  if(o.ok&&reach){
+    try{
+      const t0=Date.now();
+      await rpc('post_steps_link',{p:o.handle+'|latency-probe-not-a-key|0'});
+      const ms=Date.now()-t0;
+      if(ms<1500)row(true,'The step endpoint','answers in '+ms+' ms - fast enough, this is not what times your Shortcut out');
+      else{row(false,'The step endpoint','took '+ms+' ms. Your Shortcut waits on this, and iOS gives it only a few seconds when it runs on a schedule.');
+        if(!verdict)verdict='The server took '+ms+' ms to answer. That is slow enough to time your Shortcut out, especially when it runs on a schedule rather than when you tap it.';}
+    }catch(e){row(false,'The step endpoint','could not be reached - '+e.message);
+      if(!verdict)verdict='The game can reach the server but the step endpoint itself would not answer. That is the link your Shortcut posts to.';}
   }
 
   // 3. the key the Shortcut uses
