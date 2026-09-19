@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.81';
+const VERSION='6.82';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -4068,11 +4068,12 @@ function runShortcut(){
     if(!O().ok||S.loc||S.combat)return;
     if(stepsCounted()>was)return;                 // it worked, say nothing
     openSheet('<h2>Nothing came back</h2>'
-      +'<p>The game asked iOS to run <b>'+esc(S.scName||SC_NAME)+'</b> and no steps arrived in the 16 seconds after. That is one of three things, and the check below says which:</p>'
+      +'<p>The game asked iOS to run <b>'+esc(S.scName||SC_NAME)+'</b> and no steps arrived in the 16 seconds after. <b>Check my sync</b> below tests every link and tells you which one it is - it is usually the first of these:</p>'
       +'<div class="stack" style="margin-top:8px">'
-      +'<div class="note">Your Shortcut is not called <b>'+esc(S.scName||SC_NAME)+'</b> any more. iOS silently ignores the link when the name does not match exactly.</div>'
+      +'<div class="note">It ran but took too long and iOS killed it. In <b>Find Health Samples</b>, <b>Fill Missing</b> must be OFF - it makes Health invent an entry for every gap it can find.</div>'
       +'<div class="note">It ran but could not read Health - the permission gets dropped after an iOS update.</div>'
       +'<div class="note">It ran and sent the wrong key, so the server could not match it to you.</div>'
+      +'<div class="note">Or the name no longer matches <b>'+esc(S.scName||SC_NAME)+'</b> exactly - rare, but iOS ignores the link silently when it happens.</div>'
       +'</div>'
       +'<div class="grid2" style="margin-top:12px">'
       +'<button class="btn r" onclick="closeSheet();syncDoctor()">Check my sync</button>'
