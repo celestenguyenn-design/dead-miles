@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.67';
+const VERSION='6.68';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -572,6 +572,17 @@ function medsHeld(id){return id==='bandage'?(S.stock.meds||0):(medStock()[id]||0
 function medsTake(id){if(id==='bandage'){S.stock.meds=Math.max(0,(S.stock.meds||0)-1);}else{const m=medStock();m[id]=Math.max(0,(m[id]||0)-1);}}
 function medsGive(id,n){n=n||1;if(id==='bandage'){S.stock.meds=(S.stock.meds||0)+n;}else{const m=medStock();m[id]=(m[id]||0)+n;}}
 function medsTotal(){return MED_ORDER.reduce((a,id)=>a+medsHeld(id),0);}
+function packMeds(id){return S.pack.filter(x=>x.cat==='meds'&&(MEDS[x.id]?x.id:'bandage')===id).length;}
+function packMedsTotal(){return S.pack.filter(x=>x.cat==='meds').length;}
+// Everything she can reach right now, pack first: what is on her is what she
+// loses if she goes down, so it is what she should be spending.
+// The one the fight will reach for: strongest first, pack before stash.
+function bestMed(){
+  for(let i=MED_ORDER.length-1;i>=0;i--){const id=MED_ORDER[i];if(packMeds(id)>0)return id;}
+  for(let i=MED_ORDER.length-1;i>=0;i--){const id=MED_ORDER[i];if(medsHeld(id)>0)return id;}
+  return 'bandage';
+}
+function medsAll(){return MED_ORDER.map(id=>({id,pack:packMeds(id),stock:medsHeld(id)})).filter(x=>x.pack||x.stock);}
 const maxHp=()=>Math.max(30,Math.round(hydroHpMult()*(1-infectPenalty())*(100+(S.lvl-1)*10+sk('tough')*10+sk('thickskin')*8+sk('survivalist')*5+(bg('firefighter')?10:0)-(bg('gamer')?10:0))));
 const eqItem=(slot)=>S.eq[slot]?S.gear.find(g=>g.uid===S.eq[slot]):null;
 const dr=()=>(eqItem('armor')?eqItem('armor').dr:0)+(eqItem('head')?eqItem('head').dr:0);
@@ -1998,7 +2009,7 @@ function renderCombat(){
     <button class="btn" onclick="swapSheet()">🔄 Switch weapon<small>${swapOptions().length} in your gear${w?' · costs your turn':' · free, hands empty'}</small></button>
     <button class="btn" onclick="shootGuard()" ${g&&(ammoN||g.id==='mercy')?'':'disabled'}>${g?g.e+' '+esc(g.n)+(temperOf(g)?' <span class="chip s">'+esc(temperOf(g).n)+'</span>':''):'🔫 No gun'}<small>${g?(wDmg(g)[0]+sk('steadyaim')*3)+'-'+(wDmg(g)[1]+sk('steadyaim')*3)+' · '+ammoN+' rounds'+(g.dur!==undefined?' · '+g.dur+' left':''):'find one'}</small></button>
     <button class="btn" onclick="act('brace')">🛡️ Brace<small>${sk('steady')?60+sk('steady')*10:50}% less damage this round</small></button>
-    <button class="btn" onclick="act('med')" ${meds?'':'disabled'}>🩹 Patch up<small>${meds} meds</small></button>
+    <button class="btn" onclick="act('med')" ${meds?'':'disabled'}>${meds?MEDS[bestMed()].e:'🩹'} Patch up<small>${meds?esc(MEDS[bestMed()].n)+' · +'+Math.min(medHeal(bestMed()),maxHp()-S.hp):'no meds'}</small></button>
     <button class="btn ghost" onclick="act('flee')" ${C.where==='raid'?'disabled':''}>🏃 Run<small>70% · drop 25% pack</small></button>
   </div>
   <ul class="clog" style="margin-top:10px">${C.log.map(l=>`<li class="${l.c}">${esc(l.m)}</li>`).join('')}</ul>`;
@@ -2211,23 +2222,34 @@ function renderTrader(){const el=$('#trader');if(!el)return;if(!S.base){el.inner
   el.innerHTML=TRADE.map(t=>{let c=Math.max(1,Math.round(t.c*(1-sk('haggler')*0.1-sk('trader')*0.15)));return `<button class="tr${S.stock.scrap<c?' off':''}" onclick="trade('${t.id}')"><span class="e">${t.e}</span><b>${t.n}</b><span class="chip a">${c}🔩</span></button>`;}).join('');}
 function heal(){
   if(S.hp>=maxHp()){toast('HP is full');return;}
-  if(!medsTotal()){toast('No meds in stash');return;}
-  const have=MED_ORDER.filter(id=>medsHeld(id)>0);
-  if(have.length===1){healWith(have[0]);return;}       // nothing to choose between
+  const have=medsAll();
+  if(!have.length){toast('No meds anywhere');return;}
+  const opts=[];
+  for(const x of have){if(x.pack)opts.push({id:x.id,from:'pack',n:x.pack});if(x.stock)opts.push({id:x.id,from:'stock',n:x.stock});}
+  if(opts.length===1){healWith(opts[0].id,opts[0].from);return;}   // nothing to choose between
   const missing=Math.max(0,maxHp()-S.hp);
   openSheet('<h2>Patch up</h2>'
     +'<div class="kv"><span>You are on</span><b>'+S.hp+' / '+maxHp()+'</b><span>Missing</span><b>'+missing+' HP</b></div>'
     +'<div class="stack" style="margin-top:10px">'
-    +have.map(id=>{const h=Math.min(medHeal(id),missing);const waste=medHeal(id)-h;
-      return '<button class="room2" onclick="closeSheet();healWith(\''+id+'\')"><div class="e">'+MEDS[id].e+'</div>'
-        +'<div class="t"><b>'+esc(MEDS[id].n)+'</b> <span class="chip s">'+medsHeld(id)+' left</span>'
-        +'<span>+'+h+' HP'+(waste>0?' · '+waste+' of it wasted right now':'')+' · '+esc(MEDS[id].d)+'</span></div></button>';}).join('')
+    +opts.map(o=>{const h=Math.min(medHeal(o.id),missing);const waste=medHeal(o.id)-h;
+      return '<button class="room2" onclick="closeSheet();healWith(\''+o.id+'\',\''+o.from+'\')"><div class="e">'+MEDS[o.id].e+'</div>'
+        +'<div class="t"><b>'+esc(MEDS[o.id].n)+'</b> <span class="chip s">'+o.n+(o.from==='pack'?' on you':' stashed')+'</span>'
+        +'<span>+'+h+' HP'+(waste>0?' · '+waste+' of it wasted right now':'')+' · '+esc(MEDS[o.id].d)+'</span></div></button>';}).join('')
     +'</div><button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet()">Not now</button>',true);
 }
-function healWith(id){
-  if(medsHeld(id)<1){toast('None left');return;}
+function healWith(id,from){
   if(S.hp>=maxHp()){toast('HP is full');return;}
-  medsTake(id);const h=medHeal(id);const was=S.hp;
+  // default to the pack, because those are the ones a death takes off her
+  if(!from)from=packMeds(id)>0?'pack':'stock';
+  if(from==='pack'){
+    const it=S.pack.find(x=>x.cat==='meds'&&(MEDS[x.id]?x.id:'bandage')===id);
+    if(!it){toast('None left');return;}
+    S.pack=S.pack.filter(x=>x!==it);
+  }else{
+    if(medsHeld(id)<1){toast('None left');return;}
+    medsTake(id);
+  }
+  const h=medHeal(id);const was=S.hp;
   S.hp=Math.min(maxHp(),S.hp+h);
   if(id==='abx'&&S.infect){S.infect=null;S.infectStep=0;log('The antibiotics cleared the infection.');}
   toast('+'+(S.hp-was)+' HP ('+MEDS[id].n.toLowerCase()+')','a');SFX.play('loot');
@@ -3165,11 +3187,13 @@ function render(){
   $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',candy:'🍬'}[k]}</div><b>${k==='meds'?medsTotal():(S.stock[k]||0)}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`
   // Break the med pile out by tier and say what each is worth against HER bar
   // right now, so a trauma kit is visibly not a bandage.
-  {const el=$('#medRow');if(el){const have=MED_ORDER.filter(id=>medsHeld(id)>0);
+  {const el=$('#medRow');if(el){const have=medsAll();
+    const chip=(id,k,lbl)=>`<span class="chip${id==='bloodbag'||id==='adrena'?' l':id==='kit'?' a':''}">${MEDS[id].e} ${esc(MEDS[id].n)} <b>x${k}</b>${lbl?' <span class="sub">'+lbl+'</span>':''} · +${Math.min(medHeal(id),maxHp())}</span>`;
     el.innerHTML=have.length
       ? '<div class="section-label">Your meds</div><div class="row" style="margin-top:4px">'
-        +have.map(id=>`<span class="chip${id==='bloodbag'||id==='adrena'?' l':id==='kit'?' a':''}">${MEDS[id].e} ${esc(MEDS[id].n)} <b>x${medsHeld(id)}</b> · +${Math.min(medHeal(id),maxHp())}</span>`).join('')
+        +have.map(x=>(x.pack?chip(x.id,x.pack,'on you'):'')+(x.stock?chip(x.id,x.stock,'stashed'):'')).join('')
         +'</div>'
+        +(packMedsTotal()?'<p class="help" style="margin-top:4px">Meds <b>on you</b> are in your pack - you lose them if you go down, so spend those first.</p>':'')
       : '<p class="help">No meds. The trader sells everything from bandages to a blood bag.</p>';}}
     +(S.stock.chests>0?`<button class="s chestbtn" onclick="openStashChest()"><div class="e">🧳</div><b>${S.stock.chests}</b><span>${S.keys>0?'Open one':sk('lockpick')?'Pick one':'Locked'}</span></button>`:'');
   $('#dropRow').hidden=!(S.base&&S.base.rooms.radio);const used=S.flags.dropDate===S.steps.date;$('#dropBtn').textContent=used?'📻 Drop used today':'📻 Call in today\'s supply drop';$('#dropBtn').classList.toggle('ghost',used);$('#dropHelp').textContent=used?'Next one after midnight.':'Three free items into your pack.';
@@ -3276,6 +3300,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.68',d:'Sep 19',t:'Meds you are CARRYING now show up, and you can use them',
+  i:['A trauma kit picked up as loot sits in your PACK until you stash it, and the meds list only ever read your STASH. So you could be carrying a trauma kit while the game told you you had one bandage. That is the "trauma kit does not even show up in my inventory" - it was real.',
+     'Your meds now list both, labelled: <b>on you</b> for what is in your pack, <b>stashed</b> for what is at base.',
+     'PATCH UP COULD ONLY SPEND FROM THE STASH, so a trauma kit in your pack was unusable outside a fight - you had to walk home and stash it first. It can spend either now, and defaults to the ones on you, because those are the ones you lose if you go down.',
+     'The Patch up button in a fight now names what it is about to use and how much it will heal, instead of just counting meds.',
+     'One thing no update can fix: meds you stashed BEFORE v6.67 were already merged into one pile, so old trauma kits cannot be told apart from old bandages any more. Anything you pick up or buy from here on keeps its kind.']},
  {v:'6.67',d:'Sep 19',t:'Healing keeps up with you now, and there is a proper ladder of it',
   i:['A heal was a FLAT number while your health grows 10 a level, so it quietly got worse the whole game: 40 HP is 40% of your bar at level 1 and 10% of it at level 30. Every heal is a SHARE of your bar now - bandages 20%, antibiotics 32%, trauma kit 55% - and never less than it used to be, so low levels are untouched and high levels stop feeling useless.',
      'YOUR STASH WAS EATING YOUR GOOD MEDS. Everything you put away became one generic pile, so a trauma kit you saved for an emergency came back out healing the same as a bandage. Meds keep their kind now. At level 20 that is a 160 HP kit next to a 58 HP bandage - you have been throwing those away without being told.',
