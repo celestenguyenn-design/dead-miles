@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.73';
+const VERSION='6.74';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -299,7 +299,34 @@ function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossK
   if(S.steps&&S.steps.lastSyncDate===S.steps.date&&S.steps.lastSync>stepsCounted())
     {S.steps.lastSync=stepsCounted();}
   if(S.flare&&S.flare.endsAt<=Date.now())S.flare=null;
-  repairTypedSteps();}
+  repairTypedSteps();carePackage();}
+/* ONE-TIME CARE PACKAGE (v6.74). Armour subtracted a flat 2-9 against raid
+   bosses swinging for 138, heals stopped keeping pace with the health bar
+   around level 10, and the stash quietly melted trauma kits into bandages.
+   People got ground down by our bugs rather than by the game. Anyone still in
+   the hole when they open this build gets picked up off the floor, once, ever.
+   Deliberately about one good day's haul - she asked for this game to be
+   HARDER, so this is a make-good, not a new economy. */
+function carePackage(){
+  if(!S||S.carePkg===1)return;
+  if(!S.onboarded)return;              // not a player yet - do NOT burn their one shot
+  // The offer stays open for a week rather than being judged on whatever second
+  // she happened to open the app. Someone healthy at noon who gets wrecked that
+  // evening should still be caught; someone who never needs it just never sees
+  // it, and after seven days it is gone so it cannot become a safety net.
+  if(!S.carePkgUntil)S.carePkgUntil=Date.now()+7*86400000;
+  if(Date.now()>S.carePkgUntil){S.carePkg=1;return;}
+  const low=S.hp<maxHp()*0.5, bare=!medsTotal()&&(S.stock.scrap||0)<25;
+  if(!(low||bare))return;              // fine right now - check again next time
+  S.carePkg=1;
+  S.hp=maxHp();S.hydro=100;
+  medsGive('bandage',3);medsGive('abx',1);medsGive('kit',1);
+  S.stock.food+=5;S.stock.water+=5;S.stock.scrap+=40;
+  for(const c of (S.crew||[]))if(c.hp!==undefined&&c.hp<=0)c.hp=crewMax(c);
+  setTimeout(()=>{if(typeof S==='undefined'||!S)return;
+    log('A care package was waiting at the gate: patched up to full, 3 bandages, antibiotics, a trauma kit, 5 food, 5 water and 40 scrap. Armour and healing were broken against you for a while - that one is on us.');
+    try{toast('Care package: back to full','l');SFX.play('legend');save();render();}catch(e){}},700);
+}
 /* v6.63 and earlier, "That's my total" recorded the gap between what she typed
    and what the phone had counted as steps the phone would NEVER see. It was
    only behind, so when it caught up those steps landed a second time: 15,000
@@ -3366,6 +3393,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.74',d:'Sep 19',t:'A care package, because the last few weeks were our fault',
+  i:['Armour subtracted a flat 2 to 9 while raid bosses swung for 138. Healing stopped keeping pace with your health bar somewhere around level 10. Your stash quietly turned trauma kits into bandages. If you have been getting ground down lately, that was us, not the game being hard.',
+     'So: open the game and if you are in the hole you get patched up to full, plus 3 bandages, antibiotics, a trauma kit, 5 food, 5 water and 40 scrap. Anyone in your crew who was down is back on their feet.',
+     'Once, ever, and only if you actually need it - under half health, or out of meds with almost no scrap. The offer stays open a week so it catches you whenever the bad day lands, and then it is gone. It is about one good day\'s haul, not a fortune, because the game is still meant to be hard.']},
  {v:'6.73',d:'Sep 19',t:'When you have nothing, the game now tells you how to get out of it',
   i:['"I don\'t have food, bandages or any scrap." The way out existed the whole time and nothing said a word about it - which is the same failure as every other one this week.',
      'Low health, no meds anywhere and under 10 scrap now puts a card on your road screen listing every way out that costs nothing, with the numbers read from YOUR save: what tomorrow morning gives you back, what your garden feeds you, how many watch jobs are left today and what they pay, and what the trader charges.',
