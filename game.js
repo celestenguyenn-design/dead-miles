@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.97';
+const VERSION='6.98';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2143,11 +2143,42 @@ function renderCombat(){
 
 /* ================= looting ================= */
 function rarToast(it){const r=it.r||'common';if(r==='legendary'){toast('LEGENDARY: '+it.n,'l');SFX.play('legend');}else if(r==='epic'){toast('Epic: '+it.n,'p');SFX.play('rare');}else if(r==='rare'){toast('Rare: '+it.n,'a');SFX.play('rare');}else SFX.play('loot');}
+/* v6.98 - A FULL PACK WAS EATING LOOT BEHIND A TOAST. Her words: "your backpack
+   should tell you how full it is like 49/150 or something because we lose stuff
+   when it's full." The count already existed - as a small grey .sub beside the
+   word Pack, on the PACK tab, which is not the tab you are on while you are
+   looting. And the loss itself was a toast: one line, three seconds, gone, and
+   nothing in the log afterwards to say what you dropped.
+   Now it is a meter that lives where the looting happens, it changes colour
+   before it matters, and every dropped item is written to the log. */
+function packFill(){const n=S.pack.length,c=capacity();return {n,c,left:Math.max(0,c-n),pct:c?n/c:0};}
+function packTone(){const f=packFill();return f.left<=0?'blood':f.left<=2?'amber':'';}
+function packChipHTML(){
+  const f=packFill();const t=packTone();
+  const col=t==='blood'?'var(--blood)':t==='amber'?'#ffa500':'var(--bone)';
+  return '<span style="color:'+col+';font-weight:700">'+f.n+' / '+f.c+'</span>'
+    +'<span class="help"> · '+(f.left<=0?'FULL - new finds are left behind':f.left+' space'+(f.left===1?'':'s')+' left')+'</span>';
+}
+function renderPackMeter(){
+  const el=$('#packMeter');if(!el)return;
+  const f=packFill();
+  // Out at a place, or close enough to full that she needs the warning early.
+  if(!S.loc&&f.left>2){el.hidden=true;return;}
+  el.hidden=false;
+  const t=packTone();
+  el.className='card'+(t?' '+t:'');
+  el.innerHTML='<h2>Pack <span class="sub">'+packChipHTML()+'</span></h2>'
+    +'<div class="bar" style="height:8px;border-radius:4px;background:var(--ash2);overflow:hidden;margin-top:8px">'
+    +'<i style="display:block;height:100%;width:'+Math.round(Math.min(1,f.pct)*100)+'%;background:'
+    +(t==='blood'?'var(--blood)':t==='amber'?'#ffa500':'linear-gradient(90deg,var(--rot2),var(--rot))')+'"></i></div>'
+    +(f.left<=0?'<p class="help" style="margin-top:8px"><b style="color:var(--blood)">Anything you find now is left behind.</b> Stash at base, or drop something you do not want.</p>'
+     :f.left<=2?'<p class="help" style="margin-top:8px">Nearly full. Once it is full, new finds are lost - they are not held for you.</p>':'');
+}
 function takeItem(it,loc){
   if(it.gear){S.gear.push({uid:uid(),id:it.id,...GEAR[it.id]});if(loc)loc.found.push({...it,ft:Date.now()});log('Found a '+it.n+'. It is in your Gear, under You - gear never goes in your pack.');rarToast(it);return true;}
   if(it.cat==='key'){S.keys++;if(loc)loc.found.push({...it,ft:Date.now()});log('Found a chest key.');rarToast(it);return true;}
   if(it.cat==='cosmetic'){if(S.cosmetics.includes(it.id)){S.stock.scrap+=10;log('Another '+it.n+'. Traded for 10 scrap.');return true;}S.cosmetics.push(it.id);if(loc)loc.found.push({...it,ft:Date.now()});log('Found '+it.n+' to wear.');rarToast(it);return true;}
-  if(S.pack.length>=capacity()){toast('Pack full. Left '+it.n+' behind.','d');return false;}
+  if(S.pack.length>=capacity()){toast('Pack full. Left '+it.n+' behind.','d');log('Pack was full ('+S.pack.length+'/'+capacity()+') - left '+it.n+' behind.');return false;}
   const item={...it,uid:uid()};if(item.cat==='ammo'){item.qty=(item.qty||6)+(roleLvl('hunter')?1+Math.floor(roleLvl('hunter')/2):0)+sk('scrounger');}
   S.pack.push(item);if(loc)loc.found.push({...item,ft:Date.now()});rarToast(it);return true;
 }
@@ -3448,9 +3479,9 @@ function render(){
       if(!hit)card.classList.remove('goalhit');}})();$('#goalLeft').innerHTML='<b>'+fmt(S.steps.today)+'</b> / '+fmt(S.goal);$('#goalRight').textContent=S.steps.today>=S.goal?'Done. +2 food, +2 water, +15 XP.':fmt(S.goal-S.steps.today)+' to go';
   $('#journal').innerHTML=S.journal.slice(0,12).map(j=>`<li><time>${timeStr(j.t)}</time><span>${esc(j.m)}</span></li>`).join('')||'<li><span class="help">Nothing yet.</span></li>';
   // pack
-  $('#packSub').textContent=S.pack.length+' / '+capacity();$('#runMult').textContent='x'+runMult().toFixed(1);$('#packPts').textContent=fmt(packPts());$('#keyCount').textContent=S.keys;
+  $('#packSub').innerHTML=packChipHTML();renderPackMeter();$('#runMult').textContent='x'+runMult().toFixed(1);$('#packPts').textContent=fmt(packPts());$('#keyCount').textContent=S.keys;
   $('#bankBtn').disabled=!!S.loc||!S.pack.length||!!S.combat;$('#bankBtn').textContent=S.base?'Stash it at '+S.base.n:'Claim a base first';
-  $('#packAlert').hidden=!S.pack.some(p=>p.cat==='chest'&&(S.keys>0||sk('lockpick')));
+  $('#packAlert').hidden=!(S.pack.some(p=>p.cat==='chest'&&(S.keys>0||sk('lockpick')))||packFill().left<=0);
   $('#packList').innerHTML=S.pack.length?S.pack.map(it=>{
     const act=it.cat==='chest'?`<button class="btn xs a" onclick="openChest('${it.uid}')">${S.keys>0?'Open':sk('lockpick')?'Pick':'Locked'}</button>`
       :it.drink?`<button class="btn xs" onclick="useDrink('${it.uid}')" title="${esc((DRINKS[it.drink]||{}).d||'')}">Drink</button>`
@@ -3612,6 +3643,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.98',d:'Sep 19',t:'The pack tells you how full it is, where you are actually looting',
+  i:['YOU WERE LOSING LOOT TO A FULL PACK WITH NO WARNING. The count existed - as small grey text next to the word Pack, on the Pack tab, which is not the tab you are on while you are searching a house.',
+     'There is a meter on the Road now, right above the place you are clearing. It shows <b>8 / 10</b>, goes amber with two spaces left and red when it is full, and says plainly that new finds are left behind rather than held.',
+     'And when something IS dropped, it goes in your log - <i>Pack was full (10/10) - left Box of rounds behind</i> - instead of a toast that disappears in three seconds. The Pack tab dot lights up too.']},
  {v:'6.97',d:'Sep 19',t:'Rebuilding beat inspecting, so the rebuild prompt is a button now',
   i:['WHAT FINALLY FIXED YOUR SYNC WAS NOT ANOTHER EDIT. It was handing the Shortcuts AI a spec and letting it build the whole thing from scratch. Your hand-built one looked identical in every screenshot - same address, same POST, same JSON, same p field, same Sum bubble - and delivered nothing. Whatever was different was something no screenshot can show.',
      'So that prompt is now a button on the Steps card, with your address and key already in it: <b>It all looks right and still nothing arrives</b> &rarr; <b>Copy the rebuild prompt</b>.',
