@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.74';
+const VERSION='6.75';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3393,6 +3393,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.75',d:'Sep 19',t:'The map fix from yesterday never actually reached your phone',
+  i:['v6.69 fixed the map throwing away the buildings closest to you. It did not work for anyone, and the reason is embarrassing: places are cached on your phone per area for SEVEN DAYS, and the cache had no version on it. So every one of you kept being handed yesterday\'s broken list. A fix that cannot reach a cached phone is not a fix.',
+     'The cache is stamped now. Anything built by a query we have since changed is thrown out the moment you open the map, and this can never happen again - every future map change carries a new stamp with it.',
+     'Reproduced with her own cached list: 1 of the 6 buildings within reach showing, and 6 of 6 after the stamp discards it.',
+     'You do not have to do anything. If you want it this second, Refresh places on the map still forces it.']},
  {v:'6.74',d:'Sep 19',t:'A care package, because the last few weeks were our fault',
   i:['Armour subtracted a flat 2 to 9 while raid bosses swung for 138. Healing stopped keeping pace with your health bar somewhere around level 10. Your stash quietly turned trauma kits into bandages. If you have been getting ground down lately, that was us, not the game being hard.',
      'So: open the game and if you are in the hole you get patched up to full, plus 3 bandages, antibiotics, a trauma kit, 5 food, 5 water and 40 scrap. Anyone in your crew who was down is back on their feet.',

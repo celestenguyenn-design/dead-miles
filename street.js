@@ -145,11 +145,20 @@ function onPos(p){
 }
 
 /* ---------- places from OpenStreetMap ---------- */
+// BUMP THIS whenever the Overpass query, the radius, or the pick-the-nearest
+// logic changes, or players keep the old results for up to a week.
+const POI_CACHE_V=2;
 async function fetchPois(pos,force){
   STREET.lastFetch=pos;const cell=(Math.round(pos.lat/0.004)*0.004).toFixed(3)+','+(Math.round(pos.lon/0.004)*0.004).toFixed(3);
   if(force)try{localStorage.removeItem('dm.pois.'+cell);}catch(e){}
   else try{const c=JSON.parse(localStorage.getItem('dm.pois.'+cell)||'null');
-    if(c&&c.pois&&c.pois.length&&Date.now()-c.t<7*86400000){STREET.pois=c.pois;updateMarkers();$('#mapStatus').textContent=STREET.pois.length+' places nearby';return;}}catch(e){}
+    if(c&&c.v===POI_CACHE_V&&c.pois&&c.pois.length&&Date.now()-c.t<7*86400000){
+      STREET.pois=c.pois;updateMarkers();
+      const near=STREET.pos?Math.round(Math.min(...STREET.pois.map(x=>geoDist(x,STREET.pos)))):null;
+      $('#mapStatus').textContent=STREET.pois.length+' places nearby'+(near!==null?' · nearest '+near+' m':'');
+      return;}
+    // an older stamp means the list was built by a query we have since fixed
+    if(c&&c.v!==POI_CACHE_V)localStorage.removeItem('dm.pois.'+cell);}catch(e){}
   $('#mapStatus').textContent='Looking up the buildings around you...';
 
   /* Two separate requests, not one.
@@ -212,7 +221,7 @@ async function fetchPois(pos,force){
   STREET.pois=shops.concat(houses);
 
   if(STREET.pois.length){
-    try{localStorage.setItem('dm.pois.'+cell,JSON.stringify({t:Date.now(),pois:STREET.pois}));}catch(e){}
+    try{localStorage.setItem('dm.pois.'+cell,JSON.stringify({v:POI_CACHE_V,t:Date.now(),pois:STREET.pois}));}catch(e){}
     const near=STREET.pos?Math.round(Math.min(...STREET.pois.map(x=>geoDist(x,STREET.pos)))):null;
     $('#mapStatus').textContent=STREET.pois.length+' places nearby ('+shops.length+' shops, '+houses.length+' buildings)'
       +(near!==null?' · nearest '+near+' m':'');
