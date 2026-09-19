@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.82';
+const VERSION='6.83';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2906,8 +2906,12 @@ async function pullSteps(){
     if(rows&&rows.length){
       const v=Math.max(...rows.map(r=>r.steps));
       const t=new Date(rows[0].posted_at).getTime();if(!isNaN(t))o.lastPost=t;
+      /* Keep the posts themselves. "highest = 14" is a dead end; "11:04am 14,
+         12:04pm 14, 1:04pm 14" names the fault out loud. She should not have to
+         read a diagnostic to me over chat for the game to say what it received. */
+      o.posts=rows.slice(0,24).map(r=>({t:r.posted_at,n:r.steps}));o.postsDate=todayStr();
       syncCounted(v,'phone');          // idempotent: same reading twice changes nothing
-    }
+    } else if(rows){o.posts=[];o.postsDate=todayStr();}
     o.err='';}catch(e){o.err=e.message;}
   save();if(typeof C==='undefined'||!C)render();else renderOnline();
 }
@@ -3243,7 +3247,27 @@ function clearManual(){
 }
 // kept so old call sites and the Shortcut URL keep working
 function syncTotal(v,src){return syncCounted(v,src);}
-function autoSyncFromUrl(){try{const q=new URLSearchParams(location.search);const h=new URLSearchParams(location.hash.replace(/^#/,''));const v=parseInt(q.get('steps')||h.get('steps'),10);if(v>=0){syncTotal(v,'shortcut');history.replaceState(null,'',location.pathname);}}catch(e){}}
+/* A Shortcut can hand us one number ("3,338") or the whole list of Health
+   samples ("14, 226, 98, ..."), depending on whether Calculate Statistics is in
+   it and which bubble got attached at the end. Both are the same day's steps.
+   The game does the arithmetic rather than making the arithmetic her problem -
+   attaching the sample list instead of the Sum used to post ONE sample. */
+function parseStepsParam(s){
+  if(s===null||s===undefined)return NaN;
+  s=String(s).trim();if(!s)return NaN;
+  const parts=s.split(/[\n\r;|]+|,\s+/).map(x=>x.trim()).filter(Boolean);
+  const num=x=>{const d=x.replace(/[^0-9]/g,'');return d?parseInt(d,10):NaN;};
+  if(parts.length>1){let sum=0,seen=0;
+    for(const x of parts){const n=num(x);if(!isNaN(n)){sum+=n;seen++;}}
+    return seen?sum:NaN;}
+  return num(parts[0]);
+}
+function autoSyncFromUrl(){try{
+  const q=new URLSearchParams(location.search);const h=new URLSearchParams(location.hash.replace(/^#/,''));
+  const raw=q.get('steps')!==null?q.get('steps'):h.get('steps');
+  const v=parseStepsParam(raw);
+  if(v>=0&&v<1000000){syncTotal(v,'shortcut');history.replaceState(null,'',location.pathname);}
+}catch(e){}}
 async function readClipboard(){try{const t=await navigator.clipboard.readText();const m=String(t).replace(/,/g,'').match(/\d{2,6}/);if(!m){toast('No step count on the clipboard');return;}syncTotal(parseInt(m[0],10),'clipboard');}catch(e){toast('Clipboard is blocked here. Type it in Sync.');}}
 
 /* ================= scene ================= */
@@ -3514,6 +3538,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.83',d:'Sep 19',t:'The game now shows you what your phone actually sent',
+  i:['YOUR HEALTH SAYS 3,338 AND THE GAME SAYS 14. Those steps are on your phone, so the break is somewhere between Health and here - and until now the game only ever reported the HIGHEST number it had received, which cannot tell "it never ran" apart from "it ran and sent the wrong number". Those two have opposite fixes.',
+     'The Steps card and the sync check now list every post your phone has made today, with the time each one arrived. Nothing listed means iOS never delivered anything - that is a Shortcut or a Health permission problem, not a game one. Posts listed but all carrying the SAME number means your Shortcut is running fine and sending a fixed value instead of your step count, and the game now says that in those words.',
+     'A FIXED VALUE USUALLY MEANS THE WRONG BUBBLE. If the thing attached at the end of your Shortcut is the Health Samples themselves rather than the Sum from Calculate Statistics, iOS sends one sample - a couple of minutes of walking - instead of your day.',
+     'So the game stopped depending on it. The address now accepts the whole list of samples and adds them up itself: 14, 226, 98 becomes 338. Either bubble works now, and a single number like 3,338 still reads as 3,338.',
+     'None of this can inflate you. A repeat of a number you already have changes nothing, and a lower one never drags your total down.']},
  {v:'6.81',d:'Sep 19',t:'A Shortcut that cannot time out',
   i:['FILL MISSING was the bug. Your Find Health Samples action had it switched on, which tells Health to invent an entry for every gap it can find - so it grinds through your whole history instead of reading today. That is why Group by Day changed nothing: the slow part was never the grouping. Turn it OFF and the existing shortcut should stop timing out.',
      'Your triggers were also stacked hourly - At 22:00 or At 21:00 or At 20:00, all the way down. That is why the failure notification kept coming back all day: it was running every hour and failing every hour.',
@@ -4009,10 +4039,17 @@ async function syncDoctor(){
         row(false,'Steps on the server','NOTHING has arrived today');
         if(!verdict)verdict='The server has not received a single step from your phone today. That means your Shortcut did not run, or it is sending the wrong key. This is the broken link - the game is fine.';
       }else{
+        o.posts=rows.slice(0,24).map(r=>({t:r.posted_at,n:r.steps}));o.postsDate=todayStr();
         const best=Math.max(...rows.map(r=>r.steps));
         const newest=new Date(rows[0].posted_at);
         const mins=Math.round((Date.now()-newest.getTime())/60000);
         row(true,'Steps on the server',rows.length+' arrived today · highest '+fmt(best)+' · newest '+(mins<1?'just now':mins<60?mins+' min ago':Math.round(mins/60)+'h ago'));
+        /* Posts arriving, all carrying the same value, is a WORKING shortcut
+           sending the WRONG number - the opposite fix from "it never ran", and
+           the two were indistinguishable while only the highest was reported. */
+        if(rows.length>2&&rows.every(r=>r.steps===rows[0].steps)){
+          row(false,'The number itself','every one of the '+rows.length+' posts says '+fmt(best)+' - that is a fixed value, not a step count');
+          if(!verdict)verdict='Your shortcut is running and reaching the server, but it sends the same number every time. The bubble at the end of it is the wrong one: it has to be the Sum from Calculate Statistics, not the samples themselves.';}
         // 5. did the game take it?
         const c=stepsCounted();
         if(c>=best)row(true,'The game took it','counted '+fmt(c)+', which is everything the server has');
@@ -4031,6 +4068,7 @@ async function syncDoctor(){
     +out.map(r=>'<div style="display:flex;gap:8px;padding:7px 9px;border-radius:8px;background:rgba(255,255,255,.05);border-left:4px solid '+(r.ok?'var(--rot)':'var(--blood)')+'">'
       +'<span>'+(r.ok?'✓':'✗')+'</span><span style="flex:1;min-width:0"><b>'+esc(r.label)+'</b><div class="help">'+esc(r.detail)+'</div></span></div>').join('')
     +'</div>'
+    +stepPostLog()
     +'<div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(230,165,48,.12);border-left:4px solid var(--amber)">'
     +'<b style="color:var(--amber)">What to do</b><div style="margin-top:4px">'+esc(verdict)+'</div></div>'
     +'<div class="grid2" style="margin-top:10px">'
@@ -4084,6 +4122,25 @@ function runShortcut(){
   try{location.href='shortcuts://run-shortcut?name='+encodeURIComponent(S.scName||SC_NAME);}
   catch(e){toast('Could not open Shortcuts','d');}
 }
+/* Every number her phone has actually sent today, with the time it arrived.
+   This is the one screen that separates "iOS never ran it" from "it ran and
+   sent the wrong number" - and those two have completely different fixes. */
+function stepPostLog(){
+  const o=O();
+  // undefined = never read the server today, which is not the same as "nothing
+  // arrived" and must not be reported as it.
+  if(!o.ok||!o.posts||o.postsDate!==todayStr())return '';
+  const ps=o.posts;
+  if(!ps.length)return '<div class="note" style="margin-top:8px"><b style="color:#ffb35c">Your phone has sent nothing today.</b> Not a wrong number - nothing at all. That is iOS: the shortcut did not run, or it could not read Health.</div>';
+  const same=ps.length>2&&ps.every(x=>x.n===ps[0].n);
+  const rows=ps.slice(0,8).map(x=>{const d=new Date(x.t);
+    return '<span>'+esc(isNaN(d)?'?':timeStr(d.getTime()))+'</span><b>'+fmt(x.n)+'</b>';}).join('');
+  return '<div style="margin-top:8px"><div class="section-label">What your phone has sent today</div>'
+    +'<div class="kv" style="margin-top:4px">'+rows+'</div>'
+    +(ps.length>8?'<span class="help">'+(ps.length-8)+' more earlier.</span>':'')
+    +(same?'<div class="note" style="margin-top:8px"><b style="color:#ffb35c">Every post is the same number.</b> Your shortcut is sending a fixed value, not your step count - the bubble at the end of it is the wrong one. It should be the <b>Sum</b> from Calculate Statistics.</div>':'')
+    +'</div>';
+}
 function renderStepSync(){
   const el=$('#stepSyncBody');if(!el)return;const o=O();
   if(!o.ok){el.innerHTML='<p class="help">Sign in above first. Your shortcut code lives on the server, so the game has to be online to show it to you.</p>';return;}
@@ -4093,6 +4150,7 @@ function renderStepSync(){
     +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run it now</button>'
     +'<button class="btn sm" onclick="fixShortcut()">Fix my shortcut</button>'
     +'<button class="btn sm ghost" onclick="renameShortcut()">Rename</button></div>'
+    +stepPostLog()
     +'<p class="help" style="margin-top:8px">If the shortcut runs but nothing arrives, the code inside it is out of date - that happens after you recover your account. <b>Fix my shortcut</b> gives you the new one.</p>';
 }
 function fixShortcut(){
