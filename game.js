@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.70';
+const VERSION='6.71';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -974,7 +974,7 @@ function rollDay(){
   if(S.steps.date&&S.steps.today>=0){S.steps.hist=(S.steps.hist||[]).filter(x=>x.d!==S.steps.date);
     S.steps.hist.unshift({d:S.steps.date,n:S.steps.today});S.steps.hist=S.steps.hist.slice(0,30);}
   S.steps.date=t;S.steps.today=0;S.steps.src={phone:0,typed:0,walk:0};S.steps.lastSync=0;S.steps.lastSyncDate='';S.flags.roadCheck=0;
-  S.hp=Math.min(maxHp(),S.hp+25+sk('longhaul')*10+sk('earlyriser')*5+(S.base&&S.base.t==='house'?1:0)+setPerk('morningHp'));
+  S.hp=Math.min(maxHp(),S.hp+Math.max(25,Math.round(maxHp()*0.30))+sk('longhaul')*10+sk('earlyriser')*5+(S.base&&S.base.t==='house'?1:0)+setPerk('morningHp'));
   if(S.base){const br=S.base.rooms.barrel||0;if(br){const w=br+(wxKind()==='rain'||wxKind()==='storm'?3:0);S.stock.water+=w;log('The rain barrel gave '+w+' water.');}
     const g=S.base.rooms.garden||0;if(g){const per=3+(bg('farmer')?2:0)+sk('greenthumb');S.stock.food+=per*g;log('The garden gave '+(per*g)+' food.');}if(S.base.t==='diner'){S.stock.food+=2;}}
   loseHydro(20);if(hydroState()==='empty'){S.hp=Math.max(1,S.hp-5);log('You woke up dried out. Find water.');}
@@ -2215,7 +2215,7 @@ function bank(){
     else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;}}
   rollWeek();S.league.score+=pts;ctEvent('stash',pts);if(meds)ctEvent('meds',meds);
   let eat=activeCrew().length;if(sk('rationing'))eat=Math.ceil(eat/2);S.stock.food=Math.max(0,S.stock.food-eat);if(sk('harvest'))S.stock.food+=sk('harvest');
-  S.hp=Math.min(maxHp(),S.hp+15);if(roleLvl('medic'))S.hp=Math.min(maxHp(),S.hp+20);
+  S.hp=Math.min(maxHp(),S.hp+Math.max(15,Math.round(maxHp()*0.10)));if(roleLvl('medic'))S.hp=Math.min(maxHp(),S.hp+Math.max(20,Math.round(maxHp()*0.13)));
   if(S.base.rooms.clinic&&medsTotal()>0&&S.hp<maxHp()){medsTake(MED_ORDER.find(id=>medsHeld(id)>0));S.hp=maxHp();}
   log('Stashed '+fmt(raw)+' x'+runMult().toFixed(1)+' = '+fmt(pts)+' league points.'+(eat?' Crew ate '+eat+' food.':''));toast('+'+fmt(pts)+' league points','a');SFX.play('win');
   S.pack=[];S.run=0;save();render();pushPlayer();
@@ -2265,7 +2265,7 @@ function healWith(id,from){
   toast('+'+(S.hp-was)+' HP ('+MEDS[id].n.toLowerCase()+')','a');SFX.play('loot');
   save();render();
 }
-function eat(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.food<1){toast('No food in stash');return;}S.stock.food--;S.hp=Math.min(maxHp(),S.hp+15+sk('comfortfood')*5+(bg('chef')?10:0)+(bg('farmer')?5:0));save();render();}
+function eat(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.food<1){toast('No food in stash');return;}S.stock.food--;S.hp=Math.min(maxHp(),S.hp+Math.max(15,Math.round(maxHp()*0.08))+sk('comfortfood')*5+(bg('chef')?10:0)+(bg('farmer')?5:0));save();render();}
 function equip(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;
   if(g.broken&&S.eq[g.slot]!==uidv){toast(g.n+' is wrecked. Repairing it costs '+repairCost(g)+' scrap.','d');return;}
   S.eq[g.slot]=S.eq[g.slot]===uidv?null:uidv;SFX.play('ui');save();render();}
@@ -3311,6 +3311,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.71',d:'Sep 19',t:'Being broke is no longer a dead end - food and sleep keep up with you too',
+  i:['v6.67 scaled MEDS to your health bar and left everything else flat, which is how you end up at 10% HP with no meds and no scrap and nothing you can actually do. At level 20 a meal was 6% of your bar, stashing 6%, and a WHOLE NIGHT 10%. Ten nights to sleep off one bad fight.',
+     'A meal, a stash run and a night\'s sleep are now shares of your bar too, floored at the old numbers so nothing is ever worse than before. A night is 30%: THREE NIGHTS from near-death to full at every level, instead of ten.',
+     'That also kills something ugly. Dying revives you at 40%, so at 10% with an empty stash the best move in the game was to go and get yourself killed. One night now heals exactly what dying does, and costs you nothing.',
+     'If you are stuck right now: EAT (food is the one thing you always have), DRINK if you are parched - being dried out cuts your maximum HP by 15% on its own - and sleep. Walking still earns, and watch duty at your base pays scrap.']},
  {v:'6.70',d:'Sep 19',t:'A crew member who is down no longer holds their slot',
   i:['When someone in your crew went down they kept their place in your party - but they cannot fight, so the slot was spent on nobody. And their card swapped "Leave at base" for "Patch up", so there was no way to put anyone else in. With one slot and a hurt friend you fought alone until you spent a med on them.',
      'Going down now hands the slot straight back. Bring someone else along while they mend, and put them back when they are patched up.',
