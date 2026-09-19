@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.91';
+const VERSION='6.92';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2900,18 +2900,36 @@ function keyDead(){
     toast('Signed out: nothing was saving to the server. Sign in again in Settings.','d');}
   if(typeof C==='undefined'||!C)render();
 }
+/* v6.92 - A TEST POST WAS PASSING ITSELF OFF AS HER PHONE, AND IT COST HER THE
+   TROUBLESHOOTING PANEL. testStepKey() writes a real 1-step row, pullSteps()
+   read the newest row as o.lastPost, and #stepsHelp branches on exactly that:
+   falsy shows the orange "Nothing from your phone today" panel with the big
+   Run my Health shortcut button; truthy shows a quiet "your phone last sent
+   steps at 15:32". So my test silently replaced her only troubleshooting UI
+   with a reassurance that was false - her phone had sent nothing since 10:00.
+   Her words: "there used to be a button right under the why aren't my steps
+   syncing ... it's also disappeared."
+   lastPost, the counted maximum and the log now all read REAL posts only.
+   It is also recomputed on every pull rather than only ever being set, so a
+   lastPost left over from yesterday can no longer make today look synced. */
+function isTestPost(o,t,n){
+  if(n!==1||!o||!o.testAt)return false;
+  const ms=(typeof t==='number')?t:new Date(t).getTime();
+  return !isNaN(ms)&&Math.abs(ms-o.testAt)<180000;
+}
 async function pullSteps(){
   const o=O();if(!o.ok)return;const since=new Date();since.setHours(0,0,0,0);
   try{const rows=await rpc('get_steps',{p_handle:o.handle,p_token:o.token,p_since:since.toISOString()});o.lastPull=Date.now();
     if(rows&&rows.length){
-      const v=Math.max(...rows.map(r=>r.steps));
-      const t=new Date(rows[0].posted_at).getTime();if(!isNaN(t))o.lastPost=t;
+      const real=rows.filter(r=>!isTestPost(o,r.posted_at,r.steps));
+      const t=real.length?new Date(real[0].posted_at).getTime():0;
+      o.lastPost=(real.length&&!isNaN(t))?t:0;
       /* Keep the posts themselves. "highest = 14" is a dead end; "11:04am 14,
          12:04pm 14, 1:04pm 14" names the fault out loud. She should not have to
          read a diagnostic to me over chat for the game to say what it received. */
       o.posts=rows.slice(0,24).map(r=>({t:r.posted_at,n:r.steps}));o.postsDate=todayStr();
-      syncCounted(v,'phone');          // idempotent: same reading twice changes nothing
-    } else if(rows){o.posts=[];o.postsDate=todayStr();}
+      if(real.length)syncCounted(Math.max(...real.map(r=>r.steps)),'phone');  // idempotent: same reading twice changes nothing
+    } else if(rows){o.posts=[];o.postsDate=todayStr();o.lastPost=0;}
     o.err='';}catch(e){o.err=e.message;}
   save();if(typeof C==='undefined'||!C)render();else renderOnline();
 }
@@ -3481,7 +3499,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();
+  renderOnline();renderStepsHelp();renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -3568,6 +3586,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.92',d:'Sep 19',t:'The Run my Health shortcut button was never drawn on the tab you read it on',
+  i:['YOU WERE RIGHT THAT IT DISAPPEARED, AND IT WAS A REAL BUG, NOT YOUR MEMORY. The panel under <b>Why aren\'t my steps syncing?</b> lives on the Road tab, but it was being drawn by a function that quits early unless the BASE tab is the open one. So on Road you saw the placeholder text the page ships with and no buttons at all.',
+     'It now draws itself, on its own tab. <b>Run my Health shortcut</b> is back, and it is the red primary button in both cases - it used to turn into a grey ghost in second place the moment anything arrived, and a junk 14 counts as "anything".',
+     '<b>Fix my shortcut</b> is also back on the Steps card; a version of mine dropped it.']},
  {v:'6.91',d:'Sep 19',t:'The test button was posting a row that looked like your phone',
   i:['MY OWN TEST WAS MUDDYING THE ONE LIST THAT ANSWERS THIS. Test my key posts a real 1-step row, and the log printed it under "What your phone has sent today" right next to your genuine readings - so a 15:32 / 1 sat under a 10:00 / 14 and read as your shortcut sending 1 step.',
      'That row is now named <b>my test button, not your phone</b>, it no longer counts toward the "every post is the same number" warning, and if it is the ONLY row today the card says so out loud: the server and your key are fine, the fault is inside the shortcut.']},
@@ -4212,7 +4234,7 @@ function stepPostLog(){
   if(!o.ok||!o.posts||o.postsDate!==todayStr())return '';
   const ps=o.posts;
   if(!ps.length)return '<div class="note" style="margin-top:8px"><b style="color:#ffb35c">Your phone has sent nothing today.</b> Not a wrong number - nothing at all. That is iOS: the shortcut did not run, or it could not read Health.</div>';
-  const isTest=x=>x.n===1&&o.testAt&&Math.abs(x.t-o.testAt)<180000;
+  const isTest=x=>isTestPost(o,x.t,x.n);
   const real=ps.filter(x=>!isTest(x));
   const same=real.length>2&&real.every(x=>x.n===real[0].n);
   const rows=ps.slice(0,8).map(x=>{const d=new Date(x.t);
@@ -4335,6 +4357,7 @@ function renderStepSync(){
 
     +'<p class="help" style="margin-top:10px">The game cannot read Apple Health - your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number here. '+posted+'</p>'
     +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run it now</button>'
+    +'<button class="btn sm" onclick="fixShortcut()">Fix my shortcut</button>'   /* v6.87 dropped this one. It is how she gets a fresh code after recovering an account. */
     +'<button class="btn sm" onclick="syncDoctor()">Check my sync</button>'
     +'<button class="btn sm ghost" onclick="renameShortcut()">Rename</button></div>'
     +stepPostLog();
@@ -4441,7 +4464,52 @@ function renderStepHist(){
     +'<div style="display:flex;gap:2px;align-items:flex-end;margin:6px 0 2px">'+bars+'</div>'
     +'<p class="help" style="margin:2px 0 0">'+line+'</p>';
 }
-function renderOnline(){if(offscreen('#onlineStatus'))return;
+/* v6.92 - THE PANEL UNDER "Why aren't my steps syncing?" WAS NEVER DRAWN WHERE
+   SHE READS IT. #stepsHelp lives on the ROAD tab. It was rendered at the tail of
+   renderOnline(), whose first statement is `if(offscreen('#onlineStatus'))return`
+   - and #onlineStatus lives on the BASE tab. So the whole block only ever ran
+   while Base was the open tab, and on Road she saw whatever index.html ships as
+   placeholder text: "Go online in Settings and set up the phone shortcut once."
+   No buttons. That is her report, exactly: "there used to be a button right
+   under the why aren't my steps syncing ... it's also disappeared."
+   It renders on its own now, gated on its OWN view. */
+function renderStepsHelp(){
+  const sHelp=$('#stepsHelp');if(!sHelp)return;
+  if(offscreen('#stepsHelp'))return;
+  const o=O();
+
+    if(!o.ok){sHelp.innerHTML='<span style="color:#ffb35c">The game is signed out, so steps cannot arrive.</span> Open <b>Base</b>, then <b>Settings</b>, and sign in - then <b>Phone step sync</b> there has everything for your shortcut.';}
+    else{const t=o.lastPull||0;const mins=t?Math.round((Date.now()-t)/60000):-1;
+      const when=mins<0?'not yet this session':(mins<1?'just now':mins+' min ago');
+      if(!o.lastPost){
+        sHelp.innerHTML='<div style="padding:10px 12px;border-radius:8px;background:rgba(255,165,0,.14);border-left:4px solid #ffa500">'
+          +'<b style="color:var(--bone)">Nothing from your phone today.</b>'
+          +(function(){const y=stepDays()[5];return y&&y.n!==null
+             ? '<div class="help" style="margin-top:4px">Your count resets at midnight - yesterday you finished on <b>'+fmt(y.n)+'</b>. So a zero this early is normal; it only means trouble if it stays zero after you have walked.</div>'
+             : '';})()
+          +'<div class="help" style="margin-top:4px">The game is not allowed to read Apple Health. Your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number. Run it and your steps land here.</div>'
+          +'<div class="help" style="margin-top:6px">If it runs and nothing arrives, the code inside it is out of date - that happens after you recover your account. <a href="#" onclick="fixShortcut();return false;" style="color:var(--steel);text-decoration:underline">Fix my shortcut</a></div>'
+          +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run my Health shortcut</button>'
+          +'<button class="btn sm ghost" onclick="syncNow()">Just check again</button></div>'
+          +'<div class="help" style="margin-top:6px">Or type today\'s total from the Health app in the box above and tap Sync - that always works. '
+          +'<a href="#" onclick="renameShortcut();return false;" style="color:var(--steel);text-decoration:underline">Shortcut named something else?</a></div></div>'
+          +'<span class="help" style="display:block;margin-top:6px">Checked the server '+esc(when)+'. To make this automatic: Shortcuts app, Automation tab, Time of Day, a few times a day, Run Immediately.</span>';
+      }else{
+        /* v6.92 - THE BUTTON SHE USES WAS NOT REMOVED, IT WAS DEMOTED. This
+           branch runs the moment ANYTHING arrives today, and a junk 14 counts
+           as "arrived" - so on every day her sync half-works, the red
+           "Run my Health shortcut" she has always tapped turns into a grey
+           ghost in second place behind a button that only re-reads the server.
+           From her side that is indistinguishable from it being gone, and she
+           said so: "it's also disappeared." The primary action does not get to
+           depend on the game's opinion of whether she needs it. */
+        sHelp.innerHTML='<b style="color:var(--bone)">Checked the server '+esc(when)+'.</b> Your phone last sent steps at '+esc(timeStr(o.lastPost))+'.'
+          +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run my Health shortcut</button>'
+          +'<button class="btn sm ghost" onclick="syncNow()">Just check again</button></div>'
+          +'<span class="help">It checks on its own every minute and the moment you open the game. You never need to delete the icon. <a href="#" onclick="fixShortcut();return false;" style="color:var(--steel);text-decoration:underline">Fix my shortcut</a></span>';
+      }}
+  }
+function renderOnline(){renderStepsHelp();if(offscreen('#onlineStatus'))return;
   const o=O();const st=$('#onlineStatus');if(!st)return;
   st.textContent=o.ok?'@'+o.handle:(o.err?'error':'off');
   let body='';
@@ -4471,31 +4539,6 @@ function renderOnline(){if(offscreen('#onlineStatus'))return;
     renderConvoy();}catch(e){}
   try{renderCheckin();renderCalls();}catch(e){}
   renderStepHist();
-  const sHelp=$('#stepsHelp');
-  if(sHelp){
-    if(!o.ok){sHelp.innerHTML='<span style="color:#ffb35c">The game is signed out, so steps cannot arrive.</span> Open <b>Base</b>, then <b>Settings</b>, and sign in - then <b>Phone step sync</b> there has everything for your shortcut.';}
-    else{const t=o.lastPull||0;const mins=t?Math.round((Date.now()-t)/60000):-1;
-      const when=mins<0?'not yet this session':(mins<1?'just now':mins+' min ago');
-      if(!o.lastPost){
-        sHelp.innerHTML='<div style="padding:10px 12px;border-radius:8px;background:rgba(255,165,0,.14);border-left:4px solid #ffa500">'
-          +'<b style="color:var(--bone)">Nothing from your phone today.</b>'
-          +(function(){const y=stepDays()[5];return y&&y.n!==null
-             ? '<div class="help" style="margin-top:4px">Your count resets at midnight - yesterday you finished on <b>'+fmt(y.n)+'</b>. So a zero this early is normal; it only means trouble if it stays zero after you have walked.</div>'
-             : '';})()
-          +'<div class="help" style="margin-top:4px">The game is not allowed to read Apple Health. Your <b>'+esc(S.scName||SC_NAME)+'</b> shortcut reads it and sends the number. Run it and your steps land here.</div>'
-          +'<div class="help" style="margin-top:6px">If it runs and nothing arrives, the code inside it is out of date - that happens after you recover your account. <a href="#" onclick="fixShortcut();return false;" style="color:var(--steel);text-decoration:underline">Fix my shortcut</a></div>'
-          +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run my Health shortcut</button>'
-          +'<button class="btn sm ghost" onclick="syncNow()">Just check again</button></div>'
-          +'<div class="help" style="margin-top:6px">Or type today\'s total from the Health app in the box above and tap Sync - that always works. '
-          +'<a href="#" onclick="renameShortcut();return false;" style="color:var(--steel);text-decoration:underline">Shortcut named something else?</a></div></div>'
-          +'<span class="help" style="display:block;margin-top:6px">Checked the server '+esc(when)+'. To make this automatic: Shortcuts app, Automation tab, Time of Day, a few times a day, Run Immediately.</span>';
-      }else{
-        sHelp.innerHTML='<b style="color:var(--bone)">Checked the server '+esc(when)+'.</b> Your phone last sent steps at '+esc(timeStr(o.lastPost))+'.'
-          +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="syncNow()">Sync my steps now</button>'
-          +'<button class="btn sm ghost" onclick="runShortcut()">Run my Health shortcut</button></div>'
-          +'<span class="help">It checks on its own every minute and the moment you open the game. You never need to delete the icon. <a href="#" onclick="fixShortcut();return false;" style="color:var(--steel);text-decoration:underline">Fix my shortcut</a></span>';
-      }}
-  }
   /* v6.88 - THE SETUP GUIDE STILL BUILT THE WRONG ONE.
      v6.87 fixed the Steps card but this guide, one layer down, was still
      walking a new player through building the Open URLs shortcut. Two reasons
