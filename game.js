@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.80';
+const VERSION='6.81';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3514,6 +3514,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.81',d:'Sep 19',t:'A Shortcut that cannot time out',
+  i:['FILL MISSING was the bug. Your Find Health Samples action had it switched on, which tells Health to invent an entry for every gap it can find - so it grinds through your whole history instead of reading today. That is why Group by Day changed nothing: the slow part was never the grouping. Turn it OFF and the existing shortcut should stop timing out.',
+     'Your triggers were also stacked hourly - At 22:00 or At 21:00 or At 20:00, all the way down. That is why the failure notification kept coming back all day: it was running every hour and failing every hour.',
+     'AND THE REAL FIX: the setup now builds a shortcut with NO SERVER CALL IN IT. Find Health Samples, Sum, and Open URLs pointing at the game with the number in the address. There is nothing to wait for, so there is nothing that can time out. The game takes the number the moment it opens and sends it on itself, over the connection your leaderboard already uses.',
+     'It works whether the game was closed or already open, the same number twice does not double, and a lower number never drags your total down.',
+     'The old direct-to-server version is still in Settings under a fold if you want it.']},
  {v:'6.80',d:'Sep 19',t:'The sync check now times the exact thing your Shortcut waits on',
   i:['"Server answers in 120 ms" was never the right measurement. Your Shortcut does not talk to that function - its last action sits on the STEP endpoint until that returns, and nothing was timing it.',
      'The check now probes that endpoint directly with a deliberately invalid key, so it refuses instantly and writes nothing, and reports the round trip in milliseconds. Under 1.5 seconds and it tells you this is not your problem. Over, and it says so plainly, because iOS gives a Shortcut only a few seconds when it runs on a schedule.',
@@ -4040,6 +4046,13 @@ async function fetchStepKey(){
     return k;}catch(e){return null;}
 }
 function stepCode(){const o=O();return o.handle+'|'+(o.stepKey||o.token)+'|';}
+// THE SHORTCUT THAT CANNOT TIME OUT (v6.81). "Get Contents of URL" sits and
+// waits for the server to answer, so anything slow anywhere between her phone
+// and Supabase becomes "Dead Miles Steps took too long to run". Opening the
+// GAME with the number in the address waits for nothing: the game takes it the
+// moment it opens and posts it itself, over the same connection that already
+// works for her leaderboard.
+function stepOpenUrl(){return location.origin+location.pathname+'?steps=';}
 function runShortcut(){
   toast('Opening Shortcuts...');
   // A deep link to a Shortcut that has been renamed, deleted, or simply does
@@ -4122,6 +4135,7 @@ function syncNow(){
 let LAST_ACTIVE=Date.now();
 function onResume(){
   const away=Date.now()-LAST_ACTIVE;LAST_ACTIVE=Date.now();
+  try{autoSyncFromUrl();}catch(e){}       // a Shortcut may have just opened us with ?steps=
   if(away>6*3600000){location.reload();return;}
   if(O().ok){pullSteps();loadFriends();partySync();bossSync();takeGifts();}
   if(typeof C==='undefined'||!C)render();
@@ -4241,13 +4255,22 @@ function renderOnline(){if(offscreen('#onlineStatus'))return;
           +'<span class="help">It checks on its own every minute and the moment you open the game. You never need to delete the icon. <a href="#" onclick="fixShortcut();return false;" style="color:var(--steel);text-decoration:underline">Fix my shortcut</a></span>';
       }}
   }
-  const sh=$('#shortcutHelp');if(sh){const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=stepCode();if(o.ok&&!o.stepKey)fetchStepKey();sh.innerHTML=o.ok?`<b>iPhone, one time.</b> Two things to copy:<br>
-  <div class="section-label" style="margin-top:8px">A. The address</div><input id="syncUrl" readonly value="${esc(url)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncUrl').value,'syncUrl')">Copy address</button>
-  <div class="section-label" style="margin-top:10px">B. Your code</div><input id="syncPrefix" readonly value="${esc(prefix)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncPrefix').value,'syncPrefix')">Copy code</button>
+  const sh=$('#shortcutHelp');if(sh){const openUrl=stepOpenUrl();const url=SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key;const prefix=stepCode();if(o.ok&&!o.stepKey)fetchStepKey();sh.innerHTML=o.ok?`<b>iPhone, one time.</b> Three actions, no server to wait for - which is why this one cannot time out.
+  <div class="section-label" style="margin-top:8px">The address</div><input id="syncUrl" readonly value="${esc(openUrl)}" style="margin:6px 0;font-size:11px"><button class="btn sm a" onclick="copyText($('#syncUrl').value,'syncUrl')">Copy address</button>
   <ol style="padding-left:20px;margin:10px 0">
-  <li><b>Shortcuts</b> app → <b>Shortcuts</b> tab → <b>+</b>. Add three actions with the search: <b>Find Health Samples</b> (Type: Steps, filter Start Date is today), <b>Calculate Statistics</b> (Sum of Health Samples), <b>Get Contents of URL</b>.</li>
-  <li>In <b>Get Contents of URL</b>: paste the <b>address</b> (A) in the URL box. Tap <b>Show More</b>. Set <b>Method</b> to <b>POST</b>. Set <b>Request Body</b> to <b>JSON</b>. Tap <b>Add new field</b> → <b>Text</b>. In the <b>Key</b> box type the single letter <b>p</b>. In the <b>Text</b> box paste your <b>code</b> (B), then with the cursor right after the last <b>|</b> tap the <b>Sum</b> bubble above the keyboard.</li>
-  <li>Name it <b>Dead Miles Steps</b>, tap Done, tap play to test. It should end with <b>true</b>.</li>
+  <li><b>Shortcuts</b> app &rarr; <b>+</b>. Add three actions with the search box: <b>Find Health Samples</b>, <b>Calculate Statistics</b>, <b>Open URLs</b>.</li>
+  <li><b>Find Health Samples</b>: Type is <b>Steps</b>, and one filter - <b>Start Date is today</b>. Then scroll down in that action and make sure <b style="color:var(--blood)">Fill Missing is OFF</b> and <b>Limit is off</b>. Fill Missing makes Health invent an entry for every gap it can find, which is enough on its own to hang the whole shortcut.</li>
+  <li><b>Calculate Statistics</b>: <b>Sum</b> of <b>Health Samples</b>.</li>
+  <li><b>Open URLs</b>: paste the address above, then with the cursor at the very end (right after the <b>=</b>) tap the <b>Statistic</b> bubble above the keyboard. The line should read <b>...?steps=</b> followed by a blue bubble.</li>
+  <li>Name it <b>Dead Miles Steps</b>, Done, then tap play. The game opens and your steps are in.</li>
+  </ol>
+  <div class="note"><b>If yours already exists and keeps timing out, check two things before rebuilding it.</b> In <b>Find Health Samples</b>, turn <b>Fill Missing OFF</b> - that one setting can make Health grind through every day it has ever recorded. And check the triggers at the very top: an hourly stack (At 22:00 or At 21:00 or At 20:00...) means it runs all day and fails all day, one notification each time.</div>
+  <p class="help"><b>Why this one is different.</b> The old version posted to the server and then sat there waiting for an answer - if anything between your phone and the server was slow, iOS killed it and you got "took too long to run". This one just opens the game with the number in the address. There is nothing to wait for, so there is nothing to time out. The game sends it on from there, over the same connection your leaderboard already uses.</p>
+  <details style="margin-top:8px"><summary class="help">The old direct-to-server version, if you want it</summary><div style="margin-top:6px">
+  <input id="syncUrl2" readonly value="${esc(url)}" style="margin:6px 0;font-size:11px"><button class="btn sm ghost" onclick="copyText($('#syncUrl2').value,'syncUrl2')">Copy address</button>
+  <input id="syncPrefix" readonly value="${esc(prefix)}" style="margin:6px 0;font-size:11px"><button class="btn sm ghost" onclick="copyText($('#syncPrefix').value,'syncPrefix')">Copy code</button>
+  <p class="help">Use <b>Get Contents of URL</b> instead of Open URLs: Method <b>POST</b>, Request Body <b>JSON</b>, one Text field with Key <b>p</b> and your code, then the Sum bubble after the last <b>|</b>. This is the one that can time out.</p>
+  </div></details>
   <li><b>Automation</b> tab → <b>+</b> → <b>Time of Day</b> → a time, Daily, Run Immediately → <b>Next</b> → tap <b>Dead Miles Steps</b>. Make a few (noon, 4 pm, 8 pm, 11 pm).</li>
   </ol>
   <b>Android:</b> install the tiny companion app <a href="./DeadMilesSteps.apk">DeadMilesSteps.apk</a> (Android asks once to allow installs from your browser), paste the handle <b>${esc(o.handle)}</b> and token <b style="word-break:break-all">${esc(o.token)}</b> into it, tap Allow reading steps, then Save. It posts your Health Connect steps every hour on its own.`:'Go online first, then your personal sync address and code appear here.';}
