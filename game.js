@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.77';
+const VERSION='6.78';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2144,7 +2144,7 @@ function renderCombat(){
 /* ================= looting ================= */
 function rarToast(it){const r=it.r||'common';if(r==='legendary'){toast('LEGENDARY: '+it.n,'l');SFX.play('legend');}else if(r==='epic'){toast('Epic: '+it.n,'p');SFX.play('rare');}else if(r==='rare'){toast('Rare: '+it.n,'a');SFX.play('rare');}else SFX.play('loot');}
 function takeItem(it,loc){
-  if(it.gear){S.gear.push({uid:uid(),id:it.id,...GEAR[it.id]});if(loc)loc.found.push({...it,ft:Date.now()});log('Found a '+it.n+'.');rarToast(it);return true;}
+  if(it.gear){S.gear.push({uid:uid(),id:it.id,...GEAR[it.id]});if(loc)loc.found.push({...it,ft:Date.now()});log('Found a '+it.n+'. It is in your Gear, under You - gear never goes in your pack.');rarToast(it);return true;}
   if(it.cat==='key'){S.keys++;if(loc)loc.found.push({...it,ft:Date.now()});log('Found a chest key.');rarToast(it);return true;}
   if(it.cat==='cosmetic'){if(S.cosmetics.includes(it.id)){S.stock.scrap+=10;log('Another '+it.n+'. Traded for 10 scrap.');return true;}S.cosmetics.push(it.id);if(loc)loc.found.push({...it,ft:Date.now()});log('Found '+it.n+' to wear.');rarToast(it);return true;}
   if(S.pack.length>=capacity()){toast('Pack full. Left '+it.n+' behind.','d');return false;}
@@ -3360,7 +3360,7 @@ function render(){
       :`<span class="pt">+${it.pts}</span>`;
     const sub=it.drink?(DRINKS[it.drink]||{}).d:it.snack?(SNACKS[it.snack]||{}).d:'';
     return `<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span><span style="flex:1;min-width:0">${esc(it.n)}${it.qty?' x'+it.qty:''}${sub?`<br><span class="help" style="font-size:11px">${esc(sub)}</span>`:''}</span>${act}</div>`;}).join(''):'<p class="help">Empty.</p>';
-  const GT={all:()=>true,weapons:g=>g.slot==='melee'||g.slot==='ranged',armor:g=>g.slot==='armor'||g.slot==='head',bags:g=>g.slot==='bag'};
+  const GT={all:()=>true,weapons:g=>g.slot==='melee'||g.slot==='ranged',armor:g=>ARMOR_SLOTS.includes(g.slot),bags:g=>g.slot==='bag'};
   const RORD={common:0,uncommon:1,rare:2,epic:3,legendary:4};
   const gearShown=S.gear.filter(GT[GEAR_TAB]||GT.all).sort((a,b)=>((S.eq[b.slot]===b.uid)-(S.eq[a.slot]===a.uid))||(RORD[b.r||'common']-RORD[a.r||'common']));
   const spare=spareGear();
@@ -3514,6 +3514,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'6.78',d:'Sep 19',t:'Your new gloves and boots were invisible',
+  i:['Gear has never gone in your pack - it goes straight to GEAR, under You. But when v6.72 added the Hands and Feet slots, the Armor tab kept its own old list of what counts as armour, so gauntlets and boots were filed correctly and then filtered out of the only screen you would look for them on. The tab count was wrong too.',
+     'They are all there and they have been the whole time. The Armor tab now reads from the one list of armour slots, so this cannot drift again.',
+     'And the message when you find gear now tells you where it went, instead of leaving you to hunt through your bag for something that was never going to be in it.']},
  {v:'6.77',d:'Sep 19',t:'Sealed rooms, fists that are no longer better than a katana, and the friend the board was hiding',
   i:['SEALED ROOMS. About 1 place in 40 now has a door somebody locked from the OUTSIDE - a chained meat locker, a nailed-shut nursery, a bricked-up stairwell, a bolted storm cellar. It is not searched, it is broken into, and one of four named things is still awake in there. Clearing one pays around 50 scrap, 2 keys, half a dozen rare-or-better items, a trauma kit and a 35% legendary roll. You can always leave it sealed.',
      'YOUR FISTS WERE BETTER THAN A KATANA. baseDmg added your full level, and then the swing added your level AGAIN - so bare hands got it twice while every weapon got it once. At level 22 that was fists 48 against a katana\'s 46, and fists never break and cost nothing. Fists now land around the worst weapon in the game, which is what they are for: saving your good weapon on a walker.',
