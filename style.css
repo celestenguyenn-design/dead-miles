@@ -470,3 +470,20 @@ a{color:var(--amber)}
 .squad{margin-top:8px;padding:8px 10px;border-left:4px solid var(--rot);background:rgba(127,191,77,.10);border-radius:0 8px 8px 0}
 .squad .chip{margin:2px 4px 2px 0}
 .note{margin-top:8px;padding:8px 10px;border-left:4px solid var(--amber);background:rgba(230,165,48,.12);border-radius:0 8px 8px 0;font-size:14px;color:var(--bone2)}
+
+/* Side-by-side base comparison (v7.18). The move sheet used to list what you
+   GAIN and, separately, what you LOSE, which meant holding your current base in
+   your head and doing the subtraction yourself. Her words: "the compare system
+   doesn't really compare". Three columns: what it is, now, after. */
+.cmp{margin-top:8px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.cmphead,.cmprow{display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:8px;padding:8px 10px;align-items:start}
+.cmphead{background:var(--panel2);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.cmphead b{color:var(--bone2)}
+.cmphead i{font-style:normal;color:var(--amber)}
+.cmprow{border-top:1px solid var(--line);font-size:13px;line-height:1.35}
+.cmprow>span{color:var(--muted)}
+.cmprow>i{font-style:normal;color:var(--bone2)}
+.cmprow>b{color:var(--bone)}
+.cmprow .up{color:var(--rot)}
+.cmprow .dn{color:#ff8a92}
+.cmprow .same{color:var(--muted)}

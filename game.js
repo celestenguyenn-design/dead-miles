@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.17';
+const VERSION='7.18';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2370,24 +2370,35 @@ function searchRoom(i){pushSoon();
    armour curve and the v6.67 heals means one or two meds, not a whole stash.
    It scales with her level through mk() like everything else, and the reward
    floor is "nothing common" so the trip is never wasted. */
+// Four bolts, a crowbar and whatever you wreck getting through. It used to cost
+// NOTHING - you simply chose to open the best container in the game, which made
+// the choice fake. It also gives scrap somewhere else to go, which is the whole
+// point of scrap being scarce.
+const SEAL_COST=35;
 function breakSeal(i){
   const loc=S.loc;if(!loc)return;const r=loc.rooms[i];if(!r||!r.sealed||r.done)return;
   const k=sealOf(r.sealed);
   const meds=medsTotal()+packMedsTotal();
+  const canPay=S.stock.scrap>=SEAL_COST;
   openSheet('<h2>'+esc(k.n)+'</h2>'
     +'<p>'+esc(k.d)+'</p>'
     +'<div class="note"><b>Whatever is in there is still in there.</b> Opening it starts a fight you cannot walk away from clean, and it hits far harder than anything on the street. What is behind it is worth it.</div>'
     +'<div class="kv" style="margin-top:8px"><span>You are on</span><b>'+S.hp+' / '+maxHp()+'</b>'
-      +'<span>Meds you can reach</span><b'+(meds?'':' style="color:#ff8a92"')+'>'+meds+'</b></div>'
+      +'<span>Meds you can reach</span><b'+(meds?'':' style="color:#ff8a92"')+'>'+meds+'</b>'
+      +'<span>Breaking the bolts</span><b'+(canPay?'':' style="color:#ff8a92"')+'>'+SEAL_COST+' scrap (you have '+fmt(S.stock.scrap)+')</b></div>'
     +(meds<1?'<p class="help" style="color:#ff8a92;margin-top:6px">No meds anywhere. You can still try it.</p>':'')
     +'<div class="grid2" style="margin-top:12px">'
     +'<button class="btn ghost" onclick="closeSheet()">Leave it sealed</button>'
-    +'<button class="btn r" onclick="closeSheet();sealGo('+i+')">Break it open</button>'
+    +(canPay?'<button class="btn r" onclick="closeSheet();sealGo('+i+')">Break it open \u00b7 '+SEAL_COST+'\u{1F529}</button>'
+            :'<button class="btn" disabled>Need '+SEAL_COST+' scrap</button>')
     +'</div>',true);
 }
 function sealGo(i){
   const loc=S.loc;if(!loc)return;const r=loc.rooms[i];if(!r||!r.sealed||r.done)return;
+  if(S.stock.scrap<SEAL_COST){toast('Need '+SEAL_COST+' scrap to break the bolts','d');return;}
   gearCheck(()=>{
+    if(S.stock.scrap<SEAL_COST)return;
+    S.stock.scrap-=SEAL_COST;
     const k=sealOf(r.sealed);
     const boss=mk(r.sealed);
     // It is not alone in there. Two of whatever else was shut in with it.
@@ -2408,7 +2419,24 @@ function sealAfter(won){
   if(r){r.done=true;r.sealed=null;}
   // Nothing common comes out of a room somebody bricked over.
   const got=[];const nItems=4+rint(0,2);
-  const pool=table(['meds','ammo','scrap','food','water'],3,9).map(x=>({...x,w:x.w*rarW(x)*((RAR[x.r||'common'].w>=3)?3.2:1)}));
+  // Measured before changing it: the old pool delivered 4.9 items, 100 %
+  // rare-or-better - but 86 % of them were the RARE tier, which in this game is
+  // fuel cans, shells and antibiotics. Rare on the label, restock on the floor.
+  // Her words: "the items there were not appealing". Gear is what a room
+  // somebody bricked over should be hiding, so gear is now in the pool and two
+  // pieces of it are GUARANTEED.
+  // table()'s THIRD argument is the GEAR weight, and this pool was passing 9 -
+  // which is why a sealed room handed over five weapons a time once gear could
+  // win a roll at all. She has already said there are too many weapons. The
+  // general pool is supplies with gear at a normal weight; the good piece comes
+  // from the guaranteed draw below, not from luck.
+  const pool=table(['meds','ammo','scrap','food','water'],3,1).map(x=>({...x,w:x.w*rarW(x)*((RAR[x.r||'common'].w>=4)?4:(RAR[x.r||'common'].w>=3)?2:1)}));
+  const gearPool=table([],0,1).filter(x=>x.gear&&RAR[x.r||'common'].w>=3);
+  for(let j=0;j<1&&gearPool.length;j++){
+    let g=wpick(gearPool,'w');
+    for(let t=0;t<12&&RAR[g.r||'common'].w<4;t++)g=wpick(gearPool,'w');
+    if(takeItem({id:g.id,n:g.n,e:g.e,pts:g.pts,cat:'gear',gear:true,r:g.r},loc))got.push(g.n);
+  }
   for(let j=0;j<nItems;j++){
     let it=wpick(pool,'w');
     for(let g=0;g<14&&RAR[it.r||'common'].w<3;g++)it=wpick(pool,'w');
@@ -2516,6 +2544,30 @@ function moveBaseSheet(){
       return '<div class="note" style="margin-top:8px"><b>You stash within 60 m of your base pin.</b> '
         +(d!==null?'Your current base is '+Math.round(d)+' m from here. ':'')
         +'But the perk follows the <b>building</b> and the stash spot follows the <b>pin</b>, and they do not have to match: claim this place for what it gives you, then move the pin to wherever you actually walk with "Move my base pin here" on the map. 20 scrap, keeps everything.</div>';})()
+    // A REAL comparison, added v7.18. Everything below this still explains the
+    // move in detail; this is the part that answers "am I better off" without
+    // arithmetic. Same fact on one row, current base on the left, new one on
+    // the right, and the direction coloured.
+    +(first?'':(function(){
+      const defNow=defense();
+      const defAfter=Math.max(0,defNow-(lose.def||0)+(gain.def||0));
+      const dirn=(a,b,higherBetter)=>{
+        if(a===b)return '<span class="same">'+b+' (same)</span>';
+        const better=higherBetter?(b>a):(b<a);
+        return '<span class="'+(better?'up':'dn')+'">'+b+' ('+(b>a?'+':'')+(b-a)+')</span>';
+      };
+      const r=(label,now2,after)=>'<div class="cmprow"><span>'+label+'</span><i>'+now2+'</i><b>'+after+'</b></div>';
+      return '<div class="cmp">'
+        +'<div class="cmphead"><span></span><b>Now &middot; '+esc(S.base.n)+'</b><i>After &middot; '+esc(loc.n)+'</i></div>'
+        +r('Rooms',lose.names.length?esc(lose.names.join(', ')):'none',gain.names.length?esc(gain.names.join(', ')):'<span class="dn">none - build it all</span>')
+        +r('Defense',defNow,dirn(defNow,defAfter,true))
+        +r('Raiders',
+           '+'+age+' raid power',
+           '<span class="up">+0, and one raid-free day</span>')
+        +r('Keeps paying',now?esc(now):'nothing',fwd?esc(fwd):'nothing')
+        +r('Costs to move','&mdash;','<span class="dn">20 scrap + '+fmt(lose.steps)+' steps of work</span>')
+        +'</div>';
+    })())
     +'<div class="section-label" style="margin-top:10px">What this place gives you</div>'
     +(gain.names.length
       ? '<div class="kv">'+row('Free right away',esc(gain.names.join(', ')))
