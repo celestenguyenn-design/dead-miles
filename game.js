@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.4';
+const VERSION='7.5';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3699,6 +3699,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.5',d:'Sep 20',t:'Squad raids only told the server anything once you had finished',
+  i:['YOU SAW HIM JOIN AT THE MOMENT HE FINISHED, AND THAT WAS THE BUG. Squad presence works by watching whose damage total goes up while you are fighting - but the only thing that ever sent your damage to the server was the END of the fight. So two people could hammer the same boss for ten minutes and each learn about the other only when the other was done.',
+     'Damage now posts every 6 seconds while you are swinging. The shared health bar drops as your friend hits it, their name appears within seconds of their first swing, and the turn rotation starts splitting its attention while it still matters.',
+     'The bar is carefully NOT double-counted: mid-fight posts are banked, the end-of-fight post sends only what is left, and the on-screen bar only discounts damage the server has not been told about yet.']},
  {v:'7.4',d:'Sep 20',t:'Two perks had quietly switched the difficulty off',
   i:['YOU SAID THE HOUSES NEARBY BARELY HAVE ZOMBIES ANY MORE. They did not - two perks were deleting them, and both were bugs rather than balance.',
      '<b>A crew Scout was emptying the county.</b> Its bonus was being added straight into the chance a place has NO enemies at all: 27% empty with no scout, 55% at scout 1, 71% at scout 3, <b>87% at scout 5</b>, and over 100% with Leader on top. A scout is supposed to stop you being ambushed, not remove what is inside the building. It is 41% at max now, and capped.',

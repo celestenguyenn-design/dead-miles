@@ -606,6 +606,9 @@ function liveRaidAfter(won){
     // damage a squadmate did to the same boss, and post it a second time under
     // her handle - the bar would fall twice as fast as the fight earned.
     dealt=(C&&C.myDealt!==undefined)?C.myDealt:(boss?Math.max(0,(boss.startHp||boss.max)-Math.max(0,boss.hp)):0);
+    // squadPoll has been posting as the fight went on; send only what is left
+    // over, or every mid-fight swing gets counted a second time here.
+    dealt=Math.max(0,Math.round(dealt-(SQUAD.posted||0)));
   }
   if(r&&dealt>0)raidSync(r,dealt);
   if(!won){
@@ -678,19 +681,33 @@ function liveRaidAfter(won){
    cannot stall anybody else's fight. That is the trade that makes this work
    over a polling connection instead of real netcode. */
 const SQUAD_FRESH=210000;                  // a mate is "still in it" 3.5 min after their last hit
-const SQUAD={on:false,base:{},mates:{},seen:{},timer:0,r:null};
+const SQUAD={on:false,base:{},mates:{},seen:{},timer:0,r:null,posted:0};
 function squadMe(){const o=(typeof O==='function')?O():null;return ((o&&o.handle)||'').toLowerCase();}
 function squadStart(r,st){
   squadStop();
-  SQUAD.on=true;SQUAD.r=r;SQUAD.mates={};SQUAD.seen={};
+  SQUAD.on=true;SQUAD.r=r;SQUAD.mates={};SQUAD.seen={};SQUAD.posted=0;
   SQUAD.base=(st&&st.hits)?Object.assign({},st.hits):{};
   SQUAD.timer=setInterval(squadPoll,6000);
 }
 function squadStop(){if(SQUAD.timer)clearInterval(SQUAD.timer);SQUAD.timer=0;SQUAD.on=false;SQUAD.r=null;}
+/* v7.5 - SQUAD PRESENCE COULD NOT ARRIVE UNTIL THE OTHER PERSON HAD FINISHED.
+   v6.63 built presence on "a handle whose damage goes up while you are fighting
+   is someone swinging beside you", which is a good mechanic and was never able
+   to fire: the ONLY call that posted damage was liveRaidAfter(), at the end of
+   the fight. So each client hammered the boss locally for minutes and told the
+   server nothing until it was over. Her report, exactly:
+     "he actually ended up coming in the raid really late ... he also completed
+      it already. So I think when he completed it, then I saw him join."
+   The poll now sends the damage done since the last poll, so the shared bar and
+   everyone's hit counter move every 6 seconds while the fight is happening. */
 async function squadPoll(){
   if(!SQUAD.on||typeof C==='undefined'||!C||C.over||C.where!=='liveraid'){squadStop();return;}
-  const res=await raidSync(SQUAD.r,0);
-  if(res&&!res.error)squadApply(res);
+  const send=Math.max(0,Math.round((C.myDealt||0)-(SQUAD.posted||0)));
+  const res=await raidSync(SQUAD.r,send);
+  if(res&&!res.error){
+    if(send>0)SQUAD.posted=(SQUAD.posted||0)+send;   // only bank it once the server took it
+    squadApply(res);
+  }
 }
 function squadName(h){
   const f=(typeof friends!=='undefined'?friends:[]||[]).find(x=>(x.handle||'').toLowerCase()===h);
@@ -718,7 +735,11 @@ function squadApply(res){
   // poll that crosses her own swing would otherwise heal the boss on screen.
   const boss=C.enemies.find(e=>e.warden);
   if(boss&&res.max>0){
-    const hp=Math.max(0,Math.round(boss.max*(Math.max(0,res.hp)/res.max))-(C.myDealt||0));
+    // Only the damage the server has NOT been told about yet. Subtracting the
+    // full myDealt once the poll started posting would take it off twice and
+    // the bar would fall at double speed - the same trap liveRaidAfter names.
+    const unposted=Math.max(0,(C.myDealt||0)-(SQUAD.posted||0));
+    const hp=Math.max(0,Math.round(boss.max*(Math.max(0,res.hp)/res.max))-unposted);
     if(hp<boss.hp){boss.hp=hp;news=true;}
     if(boss.hp<=0&&!boss.dead){boss.dead=true;boss.hp=0;clog('Between you, it goes down.','good');}
   }
