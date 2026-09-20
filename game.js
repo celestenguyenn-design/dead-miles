@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.12';
+const VERSION='7.14';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3350,10 +3350,37 @@ async function pushOn(){
   renderPush();
 }
 function isIOS(){return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}
+// The card used to read the BROWSER's subscription and call that "on". Those are
+// two different questions: the phone can hold a perfectly good subscription while
+// the server has no row for it, and then nothing ever arrives and the card still
+// says on. It happens for real - the sender DELETES a row the moment Apple or
+// Google answers 404/410 for it, which is correct (a dead endpoint must not be
+// retried forever) but leaves the phone looking subscribed and unreachable.
+// So: whenever the phone has a subscription and she is online, quietly post it
+// again. save_push_sub is an upsert, so a live row is untouched and a deleted one
+// comes back. Once per app open, and only marked done once it actually succeeds.
+// renderPush() runs on every render pass, so this needs an IN-FLIGHT guard as
+// well as a done flag: serviceWorker.ready can simply never resolve (it does
+// not on an insecure origin), and without the guard that would leave one
+// pending promise per frame rather than one in total.
+let pushSynced=false,pushSyncing=false;
+async function pushResync(){
+  if(pushSynced||pushSyncing)return;
+  const o=O();if(!o.ok)return;
+  pushSyncing=true;
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();if(!sub)return;
+    const j=sub.toJSON();
+    await rpc('save_push_sub',{p_handle:o.handle,p_token:o.token,p_endpoint:sub.endpoint,p_p256dh:j.keys.p256dh,p_auth:j.keys.auth,p_tz:-new Date().getTimezoneOffset()});
+    pushSynced=true;
+  }catch(e){}
+  pushSyncing=false;
+}
 async function pushTest(){
   try{const reg=await navigator.serviceWorker.ready;
     await reg.showNotification('Dead Miles',{body:'This is what a nudge looks like. The real ones come from the server.',icon:'./icon.png',tag:'test'});
-    pushSay('Sent a test to this phone. If you did not see it, notifications are muted for this app in your phone settings.');
+    pushSay('That one came from the phone itself, so it only proves the phone can show a notification. The real nudges come from the server.');
   }catch(e){pushSay('Could not show a test notification: '+e.message);}
 }
 async function pushOff(){
@@ -3430,8 +3457,9 @@ async function renderPush(){
   if(st==='unsupported'){el.innerHTML=`<p class="help">${isIOS()&&!standalone?'On an iPhone, notifications only work from the home-screen icon. Tap the Safari share button, Add to Home Screen, then open the game from that icon.':'This browser does not support notifications.'}</p>${note}${diag}`;return;}
   if(st==='blocked'){el.innerHTML=`<p class="help">Notifications are switched off for this app in your phone settings. On Android: long-press the icon, App info, Notifications, turn on. On iPhone: Settings, Notifications, Dead Miles, Allow.</p>${note}${diag}`;return;}
   if(!o.ok){el.innerHTML=`<p class="help">Go online in the Online box below first. Notifications are tied to your handle.</p>${note}${diag}`;return;}
+  if(st==='on')pushResync();
   el.innerHTML=(st==='on'
-    ?`<p class="help">On for this phone. You will hear about horde night an hour before, raids, a streak about to break, and your rival passing you.</p><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pushTest()">Send a test</button><button class="btn sm ghost" onclick="pushOff()">Turn off</button></div>`
+    ?`<p class="help">On for this phone. You will hear about horde night an hour before, raids, a streak about to break, and your rival passing you.</p><div class="row" style="margin-top:8px"><button class="btn sm" onclick="pushTest()">Test this phone</button><button class="btn sm ghost" onclick="pushOff()">Turn off</button></div>`
     :`<p class="help">Get a nudge for horde night, raids, a streak about to break, and when your rival passes you. Nothing else.</p><div class="row" style="margin-top:8px"><button class="btn sm r" onclick="pushOn()">Turn on notifications</button></div>`)+note+diag;
 }
 let updateReady=false;
