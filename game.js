@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.6';
+const VERSION='7.7';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -651,7 +651,28 @@ const capacity=()=>10+(eqItem('bag')?eqItem('bag').cap:0)+(roleLvl('quartermaste
    Fists now creep up slowly and land around the worst weapon in the game,
    which is what they are for: a fallback that saves your good weapon on a
    walker, never a reason to stop carrying one. */
-const baseDmg=()=>{const g=Math.floor((S.lvl||1)/4);return [3+g,6+g];};
+/* v7.7 - v6.77 UNDER-CORRECTED, AND THE REASON IS THE SHARED LEVEL TERM.
+   It stopped fists getting her level TWICE, but left two scaling sources on
+   them against a weapon's one: baseDmg still grew with floor(lvl/4), and act()
+   adds a flat (lvl-1) to fists and weapons alike. A weapon's own damage is
+   fixed, so the flat term drowns it as she levels. Measured mean hit:
+
+        lvl    fists   lead pipe   katana
+          1      4.5        10.5     24.5
+         10     15.5        19.5     33.5
+         20     28.5        29.5     43.5     <- fists draw level with the pipe
+         30     40.5        39.5     53.5     <- fists BEAT it
+         40     53.5        49.5     63.5     <- a katana is +19% over free
+
+   At level 40 the flat term is 61% of a katana hit, so what you are holding
+   barely matters. Her friend found the conclusion before we did: stop carrying
+   weapons. Fists are flat now, and take half the level term, so a weapon stays
+   about twice a fist at every level instead of converging on it. */
+const FIST_LVL_SHARE=0.5;
+const fistLvlBonus=()=>Math.round(((S.lvl||1)-1)*FIST_LVL_SHARE);
+const baseDmg=()=>[3,6];
+// What fists ACTUALLY land, level included - so the button can stop lying.
+const fistDmg=()=>{const b=baseDmg(),x=fistLvlBonus();return [b[0]+x,b[1]+x];};
 function addXp(n){if(setPerk('xp'))n=Math.round(n*(1+setPerk('xp')));if(S.pet==='cat')n=Math.round(n*petXpMult());if(bg('gamer'))n=Math.round(n*(1.25+sk('metaknowledge')*0.05));S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
 const activeCrew=()=>S.active.map(id=>S.crew.find(c=>c.id===id)).filter(c=>c&&(c.hp===undefined||c.hp>0));
 const woundedCrew=()=>S.crew.filter(c=>c.hp!==undefined&&c.hp<=0);
@@ -1845,7 +1866,7 @@ function act(kind){
   // nothing wears down.
   if(kind==='attack'||kind==='fists'){const w=kind==='fists'?null:eqItem('melee');const dm=w?wDmg(w):baseDmg();
     if(Math.random()<t.dodge){clog(t.n+' sidesteps your swing.','');SFX.play('miss');}
-    else if(Math.random()<(buffOn('numb')?0.72:0.9)){let d=Math.round((rint(dm[0],dm[1])+(S.lvl-1)+(w?dmgBonus():0))*hydroDmg()*(buffOn('wired')?1.15:1));
+    else if(Math.random()<(buffOn('numb')?0.72:0.9)){let d=Math.round((rint(dm[0],dm[1])+(w?(S.lvl-1):fistLvlBonus())+(w?dmgBonus():0))*hydroDmg()*(buffOn('wired')?1.15:1));
       if(buffOn('sharp')&&!C.sharpUsed){C.sharpUsed=true;d=Math.round(d*1.5);clog('Cold brew. That one landed properly.','good');}
       // Saint Jude pays you for being nearly dead: up to +60% at 1 HP, nothing
       // at full. It is a comeback weapon, not a better weapon.
@@ -2139,9 +2160,9 @@ function renderCombat(){
   ${S.buff&&S.buff.fights>0?`<div class="help" style="margin-top:6px;color:var(--amber)">${esc(BUFF_TEXT[S.buff.k]||'')}</div>`:''}
   <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}${hit?`<span class="spark">${SPARK[e.fx.k||'slash']}</span>`:''}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.plate&&!e.cracked?' · <b style="color:var(--steel)">plated - a heavy swing cracks it</b>':''}${e.enraged?' · <b style="color:#ff8a92">enraged</b>':''}${e.caller?' · calls more':''}${e.frenzy?' · frenzies low':''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
   <div class="acts">
-    <button class="btn r" onclick="attackGuard()">${w?w.e+' '+esc(w.n)+(temperOf(w)?' <span class="chip s">'+esc(temperOf(w).n)+'</span>':''):'👊 Fists'}<small>${w?(wDmg(w)[0]+dmgBonus())+'-'+(wDmg(w)[1]+dmgBonus())+' · '+w.dur+' left':baseDmg()[0]+'-'+baseDmg()[1]+' dmg'}</small></button>
+    <button class="btn r" onclick="attackGuard()">${w?w.e+' '+esc(w.n)+(temperOf(w)?' <span class="chip s">'+esc(temperOf(w).n)+'</span>':''):'👊 Fists'}<small>${w?(wDmg(w)[0]+dmgBonus())+'-'+(wDmg(w)[1]+dmgBonus())+' · '+w.dur+' left':fistDmg()[0]+'-'+fistDmg()[1]+' dmg'}</small></button>
     <button class="btn" onclick="heavyGuard()" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · ${60+sk('bruiser')*12}% hit · costs 2 durability</small></button>
-    ${w?`<button class="btn" onclick="act('fists')">👊 Fists<small>${baseDmg()[0]}-${baseDmg()[1]} dmg · saves your ${esc(w.n)}</small></button>`:''}
+    ${w?`<button class="btn" onclick="act('fists')">👊 Fists<small>${fistDmg()[0]}-${fistDmg()[1]} dmg · saves your ${esc(w.n)}</small></button>`:''}
     <button class="btn" onclick="swapSheet()">🔄 Switch weapon<small>${swapOptions().length} in your gear${w?' · costs your turn':' · free, hands empty'}</small></button>
     <button class="btn" onclick="shootGuard()" ${g&&(ammoN||g.id==='mercy')?'':'disabled'}>${g?g.e+' '+esc(g.n)+(temperOf(g)?' <span class="chip s">'+esc(temperOf(g).n)+'</span>':''):'🔫 No gun'}<small>${g?(wDmg(g)[0]+sk('steadyaim')*3)+'-'+(wDmg(g)[1]+sk('steadyaim')*3)+' · '+ammoN+' rounds'+(g.dur!==undefined?' · '+g.dur+' left':''):'find one'}</small></button>
     <button class="btn" onclick="act('brace')">🛡️ Brace<small>${sk('steady')?60+sk('steady')*10:50}% less damage this round</small></button>
@@ -3564,7 +3585,7 @@ function render(){
     return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''}${temperOf(g)?` <span class="chip${g.temper==='perfect'?' a':g.temper==='crude'?' d':''}">${esc(temperOf(g).n)}</span>`:''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${repairMax(g)&&repairMissing(g)?`<button class="btn sm${g.broken?' r':''}${S.stock.scrap<repairCost(g)?' off':''}" onclick="repair('${g.uid}')">Repair ${repairCost(g)}🔩</button>`:''}${benchable(g)?`<button class="btn sm" onclick="benchSheet('${g.uid}')">🛠️ Workbench</button>`:''}<button class="btn sm ghost${giftBlocked(g)?' off':''}" onclick="giftSheet('${g.uid}')">Gift ${giftCost(g)}</button><button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
   // you
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
-  $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):baseDmg()[0]+'-'+baseDmg()[1]} +${S.lvl-1}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
+  $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):fistDmg()[0]+'-'+fistDmg()[1]} ${eqItem('melee')?'+'+(S.lvl-1):''}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
   $('#cosmeticCount').textContent=S.cosmetics.length+' looks unlocked';
   $('#spSub').textContent=S.sp+' point'+(S.sp===1?'':'s')+' to spend';$('#youAlert').hidden=!S.sp;$('#clsDesc').textContent=(CLASSES[S.cls]?CLASSES[S.cls].e+' '+CLASSES[S.cls].n:'')+(S.bg&&BACKGROUNDS[S.bg]?' · '+BACKGROUNDS[S.bg].e+' '+BACKGROUNDS[S.bg].n+' background':'')+'. One point per level and per county milestone. General skills are open to every class.';
   const skAll=skillList();const skOpen=skAll.filter(s=>!s.req||S.lvl>=s.req);const skLocked=skAll.filter(s=>s.req&&S.lvl<s.req).sort((a,b)=>a.req-b.req);
@@ -3709,6 +3730,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.7',d:'Sep 20',t:'Fists were beating real weapons again by level 30',
+  i:['YOUR FRIEND WAS RIGHT AND THE NUMBERS WERE UGLY. Mean damage per hit: at level 20 fists (28.5) drew level with a Lead pipe (29.5); at level 30 they BEAT it; at level 40 a Katana - an epic weapon that wears out and costs scrap to fix - was only 19% better than free, infinite punching.',
+     'The cause was the flat level bonus. It is added to fists and weapons alike, but a weapon\'s own damage never grows, so by level 40 your level alone was 61% of a katana hit and what you were holding barely mattered. Fists were also still growing on their own on top of that.',
+     'Fists are flat now and take half the level bonus, so a weapon is about twice a fist at every level instead of catching up. And the Fists button finally shows what it actually hits for - it had been quoting its base and leaving the level out.']},
  {v:'7.6',d:'Sep 20',t:'Your locked chests were never lost - there was just no button',
   i:['THEY WERE SAFE THE WHOLE TIME. Every chest you stashed was sitting in your save; the button to open them simply stopped being drawn.',
      'The code that adds it had drifted onto its own line sixteen lines below the thing it was supposed to attach to, with a whole block in between - so JavaScript read it as a separate statement, worked it out, and threw it away. Every single render. No error, nothing in the log.',
