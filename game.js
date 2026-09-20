@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.8';
+const VERSION='7.9';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -51,8 +51,8 @@ const GEAR={
   // ranged added v6.37 - both use bolts, and both give some of them back
   bow:{n:'Hunting bow',e:'🏹',slot:'ranged',dmg:[16,24],dur:14,ammo:'bolts',w:2.5,pts:26,r:'uncommon',quiet:true,recover:0.55},
   crossbow:{n:'Crossbow',e:'🎯',slot:'ranged',dmg:[28,38],dur:9,ammo:'bolts',w:1,pts:42,r:'rare',quiet:true,recover:0.4},
-  jacket:{n:'Leather jacket',e:'🧥',slot:'armor',dr:2,w:4,pts:14,r:'common'},pads:{n:'Hockey pads',e:'🏒',slot:'armor',dr:4,w:2,pts:20,r:'uncommon'},vest:{n:'Riot vest',e:'🦺',slot:'armor',dr:6,w:.9,pts:34,r:'rare'},
-  helmet:{n:'Motorcycle helmet',e:'⛑️',slot:'head',dr:2,w:2.5,pts:12,r:'common'},riot:{n:'Riot helmet',e:'🪖',slot:'head',dr:3,w:1,pts:22,r:'rare'},
+  jacket:{n:'Leather jacket',e:'🧥',slot:'armor',dr:2,dur:18,w:4,pts:14,r:'common'},pads:{n:'Hockey pads',e:'🏒',slot:'armor',dr:4,dur:22,w:2,pts:20,r:'uncommon'},vest:{n:'Riot vest',e:'🦺',slot:'armor',dr:6,dur:26,w:.9,pts:34,r:'rare'},
+  helmet:{n:'Motorcycle helmet',e:'⛑️',slot:'head',dr:2,dur:18,w:2.5,pts:12,r:'common'},riot:{n:'Riot helmet',e:'🪖',slot:'head',dr:3,dur:20,w:1,pts:22,r:'rare'},
   pack2:{n:'Hiking pack',e:'🎒',slot:'bag',cap:6,w:1.5,pts:16,r:'uncommon'},pack3:{n:'Military ruck',e:'🪖',slot:'bag',cap:12,w:.5,pts:28,r:'rare'},
   // legendaries: never in the normal roll, only chests and bosses
   mercy:{n:'Mercy',e:'🎯',slot:'ranged',dmg:[38,54],dur:75,ammo:'shells',w:0,pts:90,r:'legendary',norepair:true,legend:'Fires without a shell 35% of the time'},
@@ -71,7 +71,7 @@ const GEAR={
   // we should add boots, head, chest, gloves, that way we have more things we
   // can upgrade." Four armour slots now, each with a common/uncommon/rare rung
   // and one legendary, so there is a ladder in every one of them.
-  workgloves:{n:'Work gloves',    e:'🧤',slot:'hands',dr:1,w:7,  pts:7, r:'common'},
+  workgloves:{n:'Work gloves',    e:'🧤',slot:'hands',dr:1,dur:16,w:7,  pts:7, r:'common'},
   tacgloves: {n:'Tactical gloves',e:'🧤',slot:'hands',dr:2,w:3.5,pts:15,r:'uncommon'},
   gauntlets: {n:'Welding gauntlets',e:'🧤',slot:'hands',dr:4,w:1.2,pts:26,r:'rare'},
   surefoot:  {n:'Sure Hands',     e:'🤲',slot:'hands',dr:3,w:0,  pts:80,r:'legendary',legend:'Your weapon wears out half as fast'},
@@ -1783,6 +1783,26 @@ function startCombat(enemies,where,job){
 function clog(m,c){if(!C||!C.log)return;C.log.unshift({m,c:c||''});C.log=C.log.slice(0,14);}
 function alive(){return C.enemies.filter(e=>!e.dead);}
 function targetEnemy(){let t=C.enemies[C.target];if(!t||t.dead){const a=alive();t=a[0];C.target=C.enemies.indexOf(t);}return t;}
+/* v7.9 - ARMOUR NEVER WORE OUT, SO IT COST NOTHING TO OWN. Her note: "armor
+   should have durability so we're not racking free scrap lol" - and she is
+   describing the exact hole v7.3 identified. Repairs are the only sink in this
+   game that recurs, and half the equipment slots were exempt from it: a Riot
+   vest bought once protected for the rest of the save.
+   One equipped piece wears per hit TAKEN, chosen at random, so a four-piece set
+   spreads the damage instead of burning four points a hit. At zero it wrecks
+   and unequips like any other gear - your damage reduction visibly drops, which
+   is the pressure to go and pay for it.
+   Nightingale and Vigil keep no durability at all: they are the legendaries
+   that never break, which is the distinction she drew in v7.8. */
+function wearArmor(){
+  const worn=ARMOR_SLOTS.map(k=>eqItem(k)).filter(g=>g&&g.dur!==undefined&&g.dur>0);
+  if(!worn.length)return;
+  const g=pick(worn);
+  if(Math.random()<sk('irongrip')*0.25)return;     // the same save a weapon gets
+  g.dur--;
+  if(g.dur<=0)breakWeapon(g);
+  else if(g.dur<=3)clog(g.n+' is close to giving out - '+g.dur+' more hit'+(g.dur===1?'':'s')+'.','hit');
+}
 function hurt(n,src){let d=Math.max(1,Math.round((n-dr())*(1-drSoak())));
   // Vigil caps the OPENING hit of a fight. It does nothing for the rest of the
   // fight, so it is protection against being ambushed, not a damage sponge.
@@ -1790,6 +1810,7 @@ function hurt(n,src){let d=Math.max(1,Math.round((n-dr())*(1-drSoak())));
    if(a&&a.id==='vigil'&&!C.vigilUsed){C.vigilUsed=true;if(d>5){d=5;clog('Vigil takes the first blow for you.','good');}}}
   if(C.brace)d=Math.ceil(d*(1-(sk('steady')?0.6+sk('steady')*0.1:0.5)));if(S.pet==='dog'&&Math.random()<petBlock()){clog(S.petName+' lunges and takes the hit meant for you.','good');return;}if(C.adrena===C.turn&&S.hp-d<=0){d=S.hp-1;clog('The adrenaline holds you up at 1 HP.','good');}
   else if(sk('ironjaw')&&!C.jaw&&S.hp-d<=0){C.jaw=true;d=S.hp-1;clog('Iron Jaw. You stay on your feet at 1 HP.','good');}
+  wearArmor();
   S.hp-=d;C.pfx={d,t:Date.now()};clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
 function dealTo(t,d,label,kind){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));
   if(t.plate&&!t.cracked){
@@ -1872,9 +1893,10 @@ function breakWeapon(w){if(w.dur===undefined||w.dur>0)return;
     return;
   }
   const keep=(w.r==='epic'||w.r==='legendary');
-  if(keep){w.broken=true;w.dur=0;if(S.eq[slot]===w.uid)S.eq[slot]=null;
-    clog('The '+w.n+' is wrecked - it stays in your pack. It needs rebuilding.','sys');
-    toast(w.n+' wrecked, not lost. Repair it in Gear.','d');
+  const armour=ARMOR_SLOTS.indexOf(slot)>=0;
+  if(keep||armour){w.broken=true;w.dur=0;if(S.eq[slot]===w.uid)S.eq[slot]=null;
+    clog('The '+w.n+(armour?' is battered through. You are not wearing it any more - your damage reduction just dropped.':' is wrecked - it stays in your pack. It needs rebuilding.'),'sys');
+    toast(w.n+(armour?' is worn out. Repair it in Gear.':' wrecked, not lost. Repair it in Gear.'),'d');
   }else{clog('The '+w.n+(slot==='ranged'?' jams for good.':' breaks.'),'sys');
     S.gear=S.gear.filter(g=>g.uid!==w.uid);if(S.eq[slot]===w.uid)S.eq[slot]=null;}}
 function act(kind){
@@ -3752,6 +3774,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.9',d:'Sep 20',t:'Armour wears out now, so it costs something to own',
+  i:['ARMOUR NEVER WORE OUT, SO HALF YOUR EQUIPMENT WAS FREE FOREVER. A Riot vest bought once protected you for the rest of the save, and repairs are the only cost in this game that comes back around.',
+     'One piece takes a point of wear per hit you take, picked at random, so a full set spreads it instead of burning four points a hit. A Riot vest, Riot helmet and Work gloves together soak <b>62 hits</b> and cost <b>186 scrap</b> to put right - half that if you have an Armory at base.',
+     'When a piece goes through it comes off, and you will see your damage reduction drop. Iron Grip saves armour the same way it saves a weapon, and <b>Nightingale and Vigil never wear at all</b> - they are the legendaries that do not break.']},
  {v:'7.8',d:'Sep 20',t:'Legendaries are finite now, and enormous',
   i:['A LEGENDARY YOU CAN ALWAYS REBUILD IS NOT RARE, IT IS AN ANNUITY. Every one of them wrecked into "stays in your pack, pay scrap to rebuild", so the only cost of the best weapons in the game was scrap - the thing you have too much of.',
      'They are finite now, and they last: <b>The Harvest 70 swings, Mercy 75, The Last Word 80, Saint Jude 85, Whisper 90, Long Winter 100</b>. Some of those used to have SEVEN - worse than an uncommon hunting bow. When one runs out it is spent for good.',
