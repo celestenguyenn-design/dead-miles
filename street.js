@@ -255,7 +255,14 @@ function updateMarkers(){
     const rdone=rd&&(S.raidsDone||{})[rd.id];
     const html=rd
       ? `<div class="poi ${st} raid t${rd.tier}${rdone?' rdone':''}" style="--rc:${rdone?'#6b6b74':rd.T.col}"><span>${rd.T.e}</span><b>${rdone?'✓':rd.tier}</b></div>`
-      : `<div class="poi ${st}${p.t==='stronghold'?' sh':''}"><span>${p.e}</span></div>`;
+      : (function(){
+          // A landmark must be findable at a glance - that is the whole point of
+          // putting it on a map. Every house stays visible (she asked for that);
+          // the landmark just wears a ring so a direction is obvious.
+          const lm=landmarkOf(p);
+          if(lm)return `<div class="poi ${st} lmk"><span>${lm.e}</span></div>`;
+          return `<div class="poi ${st}${p.t==='stronghold'?' sh':''}"><span>${p.e}</span></div>`;
+        })();
     const had=STREET.markers[p.id];
     if(!had){const m=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]})}).addTo(STREET.map);m.on('click',()=>{const rr=raidAt(p);if(rr)openRaid(p.id);else tapPoi(p.id);});m._dmHtml=html;STREET.markers[p.id]=m;}
     // setIcon THROWS AWAY the element and builds a new one. This ran on every pin
@@ -268,6 +275,102 @@ function updateMarkers(){
 function drawBase(){if(!S.base||!S.base.geo||!STREET.map)return;if(!STREET.baseMarker){STREET.baseMarker=L.marker([S.base.geo.lat,S.base.geo.lon],{icon:L.divIcon({className:'poi-wrap',html:'<div class="poi base"><span>🏚️</span></div>',iconSize:[40,40],iconAnchor:[20,20]})}).addTo(STREET.map);}else STREET.baseMarker.setLatLng([S.base.geo.lat,S.base.geo.lon]);}
 
 /* ---------- looting a real place ---------- */
+/* ================= LANDMARKS (v7.19) =================
+   Her ask, in her words: "if im not home everything with better loot should be
+   spread out and have landmarks of some sort that can tell you what can be
+   found". So a landmark is three things at once:
+     - FAR. Only tier 2+ places can host one, so it is always a real walk.
+     - NAMED and FIXED. Chosen by a hash of the OSM id, so the same building is
+       the same landmark every time she opens the map, forever, with no server.
+     - HONEST ABOUT ITS CONTENTS before she goes. That is the whole point - a
+       reason to pick a direction, not a lottery ticket.
+   Restock is 12h against a normal place's 24h, because a landmark is the thing
+   worth building a walk around. */
+const LANDMARKS=[
+  {id:'depot',  n:'The rail depot',   e:'\u{1F689}', pay:'Tools, fuel and shells. Always a chest key.',   give:{key:1,scrap:[25,45],cats:['scrap','ammo']}},
+  {id:'ward',   n:'The flooded ward', e:'\u{1F3E5}', pay:'Antibiotics and a trauma kit. Meds you cannot buy.', give:{med:'kit',scrap:[10,20],cats:['meds']}},
+  {id:'armoury',n:'The armoury',      e:'\u{1F396}', pay:'Ammunition, and a weapon worth carrying.',      give:{gear:true,scrap:[15,30],cats:['ammo']}},
+  {id:'water',  n:'The water tower',  e:'\u{1F5FC}', pay:'A clear view: marks every raid on your map for the day.', give:{scout:true,scrap:[20,35],cats:['water','food']}},
+  {id:'yard',   n:'The scrapyard',    e:'\u{1F6E0}', pay:'Scrap by the armful, and parts for the bench.',  give:{parts:[2,4],scrap:[55,90],cats:['scrap']}},
+];
+// A place hosts a landmark when its own id hashes into the slot. 1 in 20 of the
+// FAR buildings - measured at 1 in 9 first, which put ~55 of them in a 400-
+// building field, and a landmark every other block is not a destination.
+function landmarkOf(p){
+  if(!p||p.house===undefined)return null;
+  const t=poiTierOf(p); if(!t||t.k<2)return null;
+  const h=rhash('lm:'+p.id);
+  if(h%20!==0)return null;
+  // NOT h % LANDMARKS.length. h is a multiple of 20 by the line above, and 20 is
+  // a multiple of 5, so that expression is ALWAYS 0 - every landmark in the world
+  // came out "the rail depot". Caught by reading the rendered list rather than
+  // trusting the selector. A second, independent hash has no such relationship.
+  return LANDMARKS[rhash('kind:'+p.id)%LANDMARKS.length];
+}
+function poiTierOf(p){
+  const b=S.base&&S.base.geo;
+  if(!b||!p)return (typeof farTierFor==='function')?farTierFor(null):null;
+  return farTierFor(geoDist(p,b));
+}
+function landmarkFresh(p){
+  const st=streetState();const t=st.looted[p.id];
+  return !(t&&Date.now()-t<12*3600000);
+}
+// Everything within reach or not, sorted by how far she would have to walk.
+function landmarksNear(){
+  const out=[];
+  for(const p of STREET.pois){
+    const lm=landmarkOf(p); if(!lm)continue;
+    const d=STREET.pos?Math.round(geoDist(p,STREET.pos)):null;
+    out.push({p,lm,d,tier:poiTierOf(p),fresh:landmarkFresh(p)});
+  }
+  return out.sort((a,b)=>(a.d===null?1e9:a.d)-(b.d===null?1e9:b.d));
+}
+function renderLandmarks(){
+  const el=$('#landmarkCard');if(!el)return;
+  if(!STREET.on||!S.base||!S.base.geo){el.hidden=true;return;}
+  const list=landmarksNear();
+  if(!list.length){el.hidden=true;return;}
+  el.hidden=false;el.className='card steel';
+  el.innerHTML='<h2>\u{1F5FA}\uFE0F Landmarks <span class="sub">worth the walk</span></h2>'
+    +'<p class="help">Far enough out that nobody has been. Each one says what is in it before you go.</p>'
+    +'<div class="stack" style="margin-top:8px">'
+    +list.slice(0,6).map(x=>
+      '<button class="room2'+(x.fresh?'':' off')+'" onclick="panTo(\''+x.p.id+'\')">'
+      +'<div class="e">'+x.lm.e+'</div>'
+      +'<div class="t"><b>'+esc(x.lm.n)+'</b> '
+      +'<span class="chip'+(x.tier.k>=3?' a':'')+'">'+esc(x.tier.n)+'</span>'
+      +(x.d!==null?'<span class="chip s">'+(x.d>=1000?(x.d/1000).toFixed(1)+' km':x.d+' m')+'</span>':'')
+      +'<span>'+esc(x.fresh?x.lm.pay:'Cleared. Restocks within 12 hours.')+'</span>'
+      +'<span class="help" style="font-size:11px">'+esc(x.p.n)+'</span></div></button>').join('')
+    +'</div>';
+}
+function panTo(id){
+  const p=STREET.pois.find(x=>x.id===id);if(!p||!STREET.map)return;
+  STREET.map.setView([p.lat,p.lon],18);
+  const d=STREET.pos?Math.round(geoDist(p,STREET.pos)):null;
+  toast(p.n+(d!==null?' \u00b7 '+(d>=1000?(d/1000).toFixed(1)+' km':d+' m')+' away':''),'l');
+}
+// Paid once, when the last room of a landmark is searched - so the declared
+// contents are a promise the place keeps, not a roll it might miss.
+function landmarkPayout(loc){
+  if(!loc||!loc.landmark||loc.lmPaid)return;
+  if(loc.rooms.some(r=>!r.done))return;
+  const lm=LANDMARKS.find(x=>x.id===loc.landmark);if(!lm)return;
+  loc.lmPaid=true;const g=lm.give;const got=[];
+  if(g.scrap){const n=rint(g.scrap[0],g.scrap[1]);S.stock.scrap+=n;got.push(n+' scrap');}
+  if(g.key){S.keys+=g.key;got.push(g.key+' chest key'+(g.key===1?'':'s'));}
+  if(g.parts){const n=rint(g.parts[0],g.parts[1]);S.parts=(S.parts||0)+n;got.push(n+' parts');}
+  if(g.med){medsGive(g.med,1);got.push(ITEMS[g.med]?ITEMS[g.med].n:'meds');}
+  if(g.gear){const pool=table([],0,1).filter(x=>x.gear&&RAR[x.r||'common'].w>=3);
+    if(pool.length){let it=wpick(pool,'w');
+      for(let t=0;t<10&&RAR[it.r||'common'].w<4;t++)it=wpick(pool,'w');
+      if(takeItem({id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r},loc))got.push(it.n);}}
+  if(g.scout){S.lmScout=todayStr();got.push('every raid on the map marked for today');}
+  log(lm.n+' paid out: '+got.join(', ')+'.');
+  toast(lm.e+' '+lm.n+' cleared','l');SFX.play('legend');
+  save();render();
+}
 function tapPoi(id){
   const p=STREET.pois.find(x=>x.id===id);if(!p)return;const st=poiState(p);
   if(S.loc&&S.loc.geo!==id){toast('Finish or leave '+S.loc.n+' first');return;}
@@ -275,8 +378,14 @@ function tapPoi(id){
   if(st==='far'){toast(p.n+': walk closer ('+Math.round(geoDist(p,STREET.pos))+' m)');return;}
   if(!onFootCheck('search a place'))return;   // looting from a moving car does not count
   if(S.loc&&S.loc.geo===id){$('#locCard').scrollIntoView({behavior:'smooth'});return;}
-  const loc=makeLoc(p.t,p.n);loc.geo=id;loc.e=p.e;S.loc=loc;streetState().visits++;
-  log('Reached '+p.n+' (on your street).');SFX.play('arrive');save();render();$('#locCard').scrollIntoView({behavior:'smooth'});
+  const tier=poiTierOf(p)||farTierFor(null);
+  const lm=landmarkOf(p);
+  const loc=makeLoc(p.t,lm?lm.n:p.n,tier?tier.k:1);loc.geo=id;loc.e=lm?lm.e:p.e;
+  if(lm)loc.landmark=lm.id;
+  S.loc=loc;streetState().visits++;
+  log('Reached '+(lm?lm.n+' ('+p.n+')':p.n)+' \u00b7 '+(tier?tier.n:'')+'. '+(tier?tier.d:''));
+  if(lm)toast(lm.e+' '+lm.n,'l');
+  SFX.play(lm?'rare':'arrive');save();render();$('#locCard').scrollIntoView({behavior:'smooth'});
 }
 function setHomeHere(){
   if(!STREET.pos){toast('Waiting for GPS');return;}
@@ -337,6 +446,7 @@ function renderRaidList(){
 function renderStreet(){
   if(!STREET.on)return;const hd=homeDistance();
   try{renderRaidList();}catch(e){}
+  try{renderLandmarks();}catch(e){}
   const el=$('#mapInfo');if(!el)return;
   const near=STREET.pois.filter(p=>poiState(p)==='near').length;
   const lootedNear=STREET.pois.filter(p=>poiState(p)==='looted').length;

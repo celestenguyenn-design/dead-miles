@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.18';
+const VERSION='7.19';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -991,11 +991,11 @@ const VET_TITLES=['','Veteran','Ranger','Pathfinder','Outrider','Long Walker','L
 function vetTitle(){const r=vetRank();return r?(VET_TITLES[Math.min(r,VET_TITLES.length-1)]+(r>=VET_TITLES.length?' '+(r-VET_TITLES.length+2):'')):'';}
 function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05-setPerk('dist')));if(wxKind()==='snow')dist=Math.round(dist*1.1);S.walk.dist=dist;S.walk.progress=0;S.walk.toNext=dist;}
 function bossName(){if(eventNow()==='halloween')return 'The Gourd King';return BOSS_NAMES[hash(weekId()+'boss')%BOSS_NAMES.length];}
-function makeLoc(force,nameOverride){
+function makeLoc(force,nameOverride,far){
   let type;
   if(force)type=LOCS.find(l=>l.t===force)||LOCS[0];else if(S.walk.district>=1&&Math.random()<0.12&&S.campCleared!==weekId())type=LOCS.find(l=>l.t==='stronghold');else type=wpick(LOCS.filter(l=>l.w>0),'w');
   const rooms=type.rooms.map(r=>({n:r.n,noise:r.noise,cats:r.cats,shelf:r.shelf,gear:r.gear||0,keyish:!!r.keyish,stage:r.stage||0,done:false,items:null,peek:null}));
-  const loc={t:type.t,e:type.e,n:nameOverride||pick(type.n),rooms,noise:0,found:[],cleared:false,wave:0,threat:type.threat,stronghold:!!type.stronghold,stage:0};
+  const loc={t:type.t,e:type.e,n:nameOverride||pick(type.n),rooms,noise:0,found:[],cleared:false,wave:0,threat:type.threat,stronghold:!!type.stronghold,stage:0,far:(far===undefined?1:far)};
   for(const r of rooms)r.items=rollRoom(r,loc);
   // A SEALED ROOM (v6.77). Rare on purpose - about 1 place in 40 - and never in
   // a stronghold, which already has its own boss at the end. It is not searched,
@@ -1019,11 +1019,37 @@ const SEALS=[
 ];
 function sealOf(id){return SEALS.find(x=>x.id===id)||SEALS[0];}
 function rarW(it){const r=RAR[it.r||'common'].w;return r>=3?1+sk('eagleeye')*0.15+sk('rng')*0.1+setPerk('rare'):1;}
+/* ================= DISTANCE TIERS (v7.19) =================
+   Her friend: "it doesn't really feel like a walking game - he's always standing
+   in place looting a million houses." He was right, and the cause was concrete:
+   a house 20 m from your base pin rolled EXACTLY the same loot table as one a
+   mile away, because loot quality came from the walk-mode district and the live
+   map ignored distance entirely. There was no reason to walk anywhere.
+
+   Her refinement is what these tiers encode: she still wants something to loot
+   when she is at home, so the home block is not empty - it is just ORDINARY.
+   The good stuff is far enough away that getting it is the walk.
+
+   Applied ONLY to places reached from the live map. A loc with no `far` set
+   (the whole step-driven walk loop) uses tier 1 and is completely unchanged. */
+const FAR_TIERS=[
+  {k:0,n:'Home block', max:300,     mult:0.75,rar:0.5,d:'Picked over. Everyday supplies, nothing you would keep.'},
+  {k:1,n:'Nearby',     max:1000,    mult:1.0, rar:1.0,d:'Normal for the county.'},
+  {k:2,n:'Out of town',max:2500,    mult:1.35,rar:2.2,d:'Far enough that nobody has bothered. Better odds on gear.'},
+  {k:3,n:'Deep',       max:Infinity,mult:1.7, rar:3.5,d:'Nobody walks out this far. It is all still here.'},
+];
+function farTierFor(m){return (m==null)?FAR_TIERS[1]:(FAR_TIERS.find(t=>m<t.max)||FAR_TIERS[3]);}
+function farTierOf(loc){return FAR_TIERS[(loc&&loc.far!==undefined)?loc.far:1]||FAR_TIERS[1];}
 function rollRoom(r,loc){
-  const lm=lootMult()*(loc.stronghold?1.4:1);const list=table(r.cats,r.shelf,r.gear).map(x=>({...x,w:x.w*rarW(x)}));const n=rint(1,3);const out=[];
+  const ft=farTierOf(loc);
+  const lm=lootMult()*(loc.stronghold?1.4:1)*ft.mult;
+  // Distance buys RARITY, not just bigger numbers - a pile of more canned beans
+  // is not a reason to walk a mile. Only rare-and-up are re-weighted.
+  const list=table(r.cats,r.shelf,r.gear*ft.mult).map(x=>({...x,w:x.w*rarW(x)*((RAR[x.r||'common'].w>=3)?ft.rar:1)}));
+  const n=rint(1,3);const out=[];
   for(let i=0;i<n;i++){const it=wpick(list,'w');if(it.gear)out.push({id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r});else out.push({id:it.id,n:it.n,e:it.e,pts:Math.round(it.pts*lm),cat:it.cat,qty:it.qty,r:it.r});}
-  if(Math.random()<0.07)out.push({id:'chest',...ITEMS.chest});
-  if(Math.random()<(r.keyish?0.06:0.025))out.push({id:'key',...ITEMS.key});
+  if(Math.random()<0.07*ft.mult)out.push({id:'chest',...ITEMS.chest});
+  if(Math.random()<(r.keyish?0.06:0.025)*ft.mult)out.push({id:'key',...ITEMS.key});
   if(Math.random()<0.04){const c=rollCosmetic();if(c)out.push(c);}
   if(eventNow()==='halloween'&&Math.random()<0.3)out.push({id:'candy',n:'Halloween candy',e:'🍬',pts:3,cat:'candy',r:'uncommon',qty:rint(2,5)});
   return out;
@@ -2348,6 +2374,7 @@ function searchRoom(i){pushSoon();
   if(r.sealed){breakSeal(i);return;}if(loc.stronghold&&r.stage>loc.stage){toast('Push deeper first');return;}r.done=true;S.roomsSearched=(S.roomsSearched||0)+1;
   for(const it of r.items)takeItem(it,loc);
   ctEvent('rooms',1);
+  if(typeof landmarkPayout==='function')try{landmarkPayout(loc);}catch(e){}
   if(!loc.stronghold&&S.crew.length<8&&Math.random()<0.07){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was hiding in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was hiding in the ${esc(r.n.toLowerCase())}. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(1)}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
   else if(!S.pet&&(Math.random()<0.03||(S.roomsSearched||0)>=40)){petJoin(Math.random()<0.6?'dog':'cat');}
   else if(S.pet&&(S.pets||[]).length<PET_MAX&&Math.random()<0.012){petJoin(Math.random()<0.5?'dog':'cat');}
@@ -4019,9 +4046,16 @@ function renderLoc(){
       :loc.rival==='maya'?`<p><b style="color:var(--bone)">${esc(r.n)}</b> has a fire going out front. Maya waves you over: "Three food for two antibiotics. Fair?"</p><div class="grid2" style="margin-top:12px"><button class="btn a" onclick="rivalAct('trade')">Trade (3 food → 2 antibiotics)</button><button class="btn" onclick="S.loc.rival='';save();render()">No thanks</button></div>`
       :`<p><b style="color:var(--bone)">${esc(r.n)}</b>. Two of Nadia's scouts are watching the door from a truck bed. They have seen you.</p><div class="grid2" style="margin-top:12px"><button class="btn d" onclick="rivalAct('fight')">Take them on</button><button class="btn" onclick="rivalAct('slip')">Slip past (100 steps)</button></div><p class="help" style="margin-top:8px">Beat them: their ammo and scrap are yours.</p>`;
     el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">rival crew</span></h2>`+body;return;}
-  if(!loc.cleared){el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">unknown</span></h2><p>Door is ajar. No telling what is inside. Threat here: ${'☠'.repeat(Math.min(5,Math.round(district().threat*loc.threat+(isNight()?1:0))))}${isNight()?' · horde night':''}</p>${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn r" onclick="enterLoc()">Go in</button><button class="btn" onclick="leaveLoc()">Keep walking</button></div>`;return;}
+  // Say out loud what distance is buying her. Without this the tier is invisible
+  // and the walk has no feedback - which was the whole complaint.
+  const _ft=farTierOf(loc);
+  const _lmk=loc.landmark&&typeof LANDMARKS!=='undefined'?LANDMARKS.find(x=>x.id===loc.landmark):null;
+  const tierLine=(loc.geo?'<div class="note" style="margin-top:8px">'
+      +(_lmk?'<b>'+esc(_lmk.n)+'.</b> '+esc(_lmk.pay)+'<br>':'')
+      +'<b>'+esc(_ft.n)+'.</b> '+esc(_ft.d)+'</div>':'');
+  if(!loc.cleared){el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.geo?esc(_ft.n):'unknown'}</span></h2><p>Door is ajar. No telling what is inside. Threat here: ${'☠'.repeat(Math.min(5,Math.round(district().threat*loc.threat+(isNight()?1:0))))}${isNight()?' · horde night':''}</p>${tierLine}${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn r" onclick="enterLoc()">Go in</button><button class="btn" onclick="leaveLoc()">Keep walking</button></div>`;return;}
   const done=loc.rooms.every(r=>r.done);
-  el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.rooms.filter(r=>r.done).length}/${loc.rooms.length} searched</span></h2>
+  el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.rooms.filter(r=>r.done).length}/${loc.rooms.length} searched</span></h2>${tierLine}
   <div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span><span class="help">${loc.noise>=70?'Something is stirring':loc.noise>=40?'Keep it down':'Quiet'}</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div>
   <div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done?'disabled':''}><span class="n">${r.sealed?'🔒 ':''}${esc(r.n)}</span><span class="m">${r.done?'searched':r.sealed?'<b style="color:var(--blood)">SEALED - something is in there</b>':'noise +'+r.noise}</span>${r.peek&&!r.done?`<span class="peek">🔭 ${esc(r.peek)}</span>`:''}</button>`).join('')}</div>
   ${loc.found.length?`<div class="section-label" style="margin-top:12px">Found here</div><div class="loot" style="margin-top:6px">${loc.found.map(it=>`<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span>${esc(it.n)}<span class="pt">+${it.pts}</span></div>`).join('')}</div>`:''}

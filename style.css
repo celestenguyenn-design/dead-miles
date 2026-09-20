@@ -487,3 +487,9 @@ a{color:var(--amber)}
 .cmprow .up{color:var(--rot)}
 .cmprow .dn{color:#ff8a92}
 .cmprow .same{color:var(--muted)}
+
+/* Landmark pins (v7.19). Every house stays on the map - she asked for that
+   explicitly - so a landmark is marked by a ring, not by hiding its neighbours. */
+.poi.lmk{box-shadow:0 0 0 3px rgba(230,165,48,.9),0 0 16px rgba(230,165,48,.65);border-color:var(--amber);z-index:500}
+.poi.lmk::after{content:'';position:absolute;inset:-7px;border-radius:50%;border:2px solid rgba(230,165,48,.45);animation:lmkring 2.6s ease-in-out infinite}
+@keyframes lmkring{0%,100%{transform:scale(1);opacity:.75}50%{transform:scale(1.18);opacity:.25}}
