@@ -1,6 +1,6 @@
 /* Dead Miles Street mode: a real map of where you are, real nearby buildings as loot spots.
    Needs Leaflet (index.html loads it) and the game globals from game.js. */
-const STREET={on:false,map:null,me:null,accC:null,watch:null,pos:null,pois:[],markers:{},zombies:[],lastFetch:null,timer:0,baseMarker:null,wake:null,err:''};
+const STREET={on:false,map:null,me:null,accC:null,watch:null,pos:null,pois:[],all:{},loading:false,markers:{},zombies:[],lastFetch:null,timer:0,baseMarker:null,wake:null,err:''};
 const POI_KIND={pharmacy:['pharmacy','💊'],police:['police','🚓'],fuel:['gas','⛽'],hospital:['clinic','🏥'],clinic:['clinic','🏥'],doctors:['clinic','🏥'],dentist:['clinic','🏥'],veterinary:['clinic','🏥'],
   fast_food:['diner','🍔'],restaurant:['diner','🍔'],cafe:['diner','☕'],bar:['diner','🍺'],pub:['diner','🍺'],ice_cream:['diner','🍦'],
   supermarket:['grocery','🛒'],convenience:['grocery','🛒'],grocery:['grocery','🛒'],greengrocer:['grocery','🛒'],bakery:['grocery','🥖'],deli:['grocery','🥪'],
@@ -140,26 +140,79 @@ function onPos(p){
     STREET.accC=L.circle([pos.lat,pos.lon],{radius:pos.acc,color:'#8fb3c9',weight:1,fillOpacity:.08}).addTo(STREET.map);}
   else{STREET.me.setLatLng([pos.lat,pos.lon]);STREET.accC.setLatLng([pos.lat,pos.lon]).setRadius(pos.acc);}
   if(first){STREET.map.setView([pos.lat,pos.lon],17);spawnZombies(true);}
-  if(!STREET.lastFetch||geoDist(STREET.lastFetch,pos)>250)fetchPois(pos);else if(STREET.pois.length)$('#mapStatus').textContent=STREET.pois.length+' places nearby';
+  // 250 -> 130. The building query reaches 220 m, so refetching at 250 m meant
+  // she was already outside the loaded area when the request started, and the
+  // wait was unavoidable. Starting at 130 m loads the next block while she is
+  // still walking through this one.
+  if(!STREET.lastFetch||geoDist(STREET.lastFetch,pos)>130){if(!STREET.loading)fetchPois(pos);}
+  rebuildVisible();
+  if(STREET.pois.length&&!STREET.loading)$('#mapStatus').textContent=STREET.pois.length+' places nearby';
   drawBase();updateMarkers();renderStreet();
 }
 
 /* ---------- places from OpenStreetMap ---------- */
 // BUMP THIS whenever the Overpass query, the radius, or the pick-the-nearest
 // logic changes, or players keep the old results for up to a week.
-const POI_CACHE_V=2;
+/* STREAMING THE MAP (v7.24). Her report: "is there a way to not have to refresh
+   the live map every time we go onto a new block? then we have to wait for the
+   map to load again... like have houses pop up as we walk."
+
+   Two causes, both in onPos/fetchPois:
+     1. The refetch only fired after she had moved 250 m. The building query has
+        a 220 m radius, so by then she was already PAST the edge of what was
+        loaded - the wait was built in. It now starts at 130 m, while she is
+        still inside the loaded area, so the next block arrives before she does.
+     2. `STREET.pois = shops.concat(houses)` REPLACED the list. The moment a new
+        block landed, every pin from the block behind her vanished, including
+        places she could still have walked back to. It looked like the map had
+        reset because it had.
+
+   Everything fetched now accumulates in STREET.all and the VISIBLE set is
+   derived from it - so pins appear as she walks into range and only leave when
+   they are genuinely far behind. The per-band house cap moved here too, which
+   is more correct than it was: it now follows where she is standing right now
+   rather than wherever she happened to be when that block was fetched.        */
+const POI_RANGE=700;        // how far back pins stay on the map
+const POI_KEEP=500;         // hard cap on the session's remembered places
+function rememberPois(list){
+  for(const p of list)STREET.all[p.id]=p;
+  const ids=Object.keys(STREET.all);
+  if(ids.length>POI_KEEP&&STREET.pos){
+    ids.sort((a,b)=>geoDist(STREET.all[b],STREET.pos)-geoDist(STREET.all[a],STREET.pos));
+    for(let i=0;i<ids.length-POI_KEEP;i++)delete STREET.all[ids[i]];
+  }
+}
+function rebuildVisible(){
+  const pos=STREET.pos;
+  const all=Object.keys(STREET.all).map(k=>STREET.all[k]);
+  if(!pos){STREET.pois=all;return;}
+  const near=all.filter(p=>geoDist(p,pos)<=POI_RANGE);
+  const shops=near.filter(p=>!p.house);
+  const bt=(S.base&&S.base.geo)?farTierFor(geoDist(S.base.geo,pos)):FAR_TIERS[1];
+  const CAP=[55,55,16,9][bt.k];
+  const houses=near.filter(p=>p.house).sort((a,b)=>geoDist(a,pos)-geoDist(b,pos)).slice(0,CAP);
+  STREET.pois=shops.concat(houses);
+}
+// bumped: the cached shape now stores more houses, since the density cap moved
+// out of the fetch and into rebuildVisible()
+const POI_CACHE_V=3;
 async function fetchPois(pos,force){
   STREET.lastFetch=pos;const cell=(Math.round(pos.lat/0.004)*0.004).toFixed(3)+','+(Math.round(pos.lon/0.004)*0.004).toFixed(3);
   if(force)try{localStorage.removeItem('dm.pois.'+cell);}catch(e){}
   else try{const c=JSON.parse(localStorage.getItem('dm.pois.'+cell)||'null');
     if(c&&c.v===POI_CACHE_V&&c.pois&&c.pois.length&&Date.now()-c.t<7*86400000){
-      STREET.pois=c.pois;updateMarkers();
+      rememberPois(c.pois);rebuildVisible();updateMarkers();
       const near=STREET.pos?Math.round(Math.min(...STREET.pois.map(x=>geoDist(x,STREET.pos)))):null;
       $('#mapStatus').textContent=STREET.pois.length+' places nearby'+(near!==null?' · nearest '+near+' m':'');
       return;}
     // an older stamp means the list was built by a query we have since fixed
     if(c&&c.v!==POI_CACHE_V)localStorage.removeItem('dm.pois.'+cell);}catch(e){}
-  $('#mapStatus').textContent='Looking up the buildings around you...';
+  // Do NOT blank the count while she can already see pins - that is what made a
+  // background top-up look like the map had gone away and come back.
+  STREET.loading=true;
+  $('#mapStatus').textContent=STREET.pois.length
+    ? STREET.pois.length+' places nearby \u00b7 loading the next block\u2026'
+    : 'Looking up the buildings around you...';
 
   /* Two separate requests, not one.
      The old query asked for shops AND parks AND every building in one statement.
@@ -222,18 +275,21 @@ async function fetchPois(pos,force){
   // and worth more. A wall of identical houses next to the base is the whole
   // point of being able to play at home; the same wall a mile out is what made
   // walking pointless. Shops and landmarks are never trimmed.
+  // Store more than any one band shows, because the density cap is applied at
+  // DISPLAY time now (rebuildVisible) and follows where she is standing.
   const shops=pois.filter(p=>!p.house);
-  const bt=(S.base&&S.base.geo)?farTierFor(geoDist(S.base.geo,pos)):FAR_TIERS[1];
-  const CAP=[55,55,16,9][bt.k];
-  const houses=pois.filter(p=>p.house).sort((a,b)=>geoDist(a,pos)-geoDist(b,pos)).slice(0,CAP);
-  STREET.pois=shops.concat(houses);
+  const houses=pois.filter(p=>p.house).sort((a,b)=>geoDist(a,pos)-geoDist(b,pos)).slice(0,80);
+  const got=shops.concat(houses);
+  rememberPois(got);rebuildVisible();
+  STREET.loading=false;
 
-  if(STREET.pois.length){
-    try{localStorage.setItem('dm.pois.'+cell,JSON.stringify({v:POI_CACHE_V,t:Date.now(),pois:STREET.pois}));}catch(e){}
+  if(got.length){
+    try{localStorage.setItem('dm.pois.'+cell,JSON.stringify({v:POI_CACHE_V,t:Date.now(),pois:got}));}catch(e){}
     const near=STREET.pos?Math.round(Math.min(...STREET.pois.map(x=>geoDist(x,STREET.pos)))):null;
     $('#mapStatus').textContent=STREET.pois.length+' places nearby ('+shops.length+' shops, '+houses.length+' buildings)'
       +(near!==null?' · nearest '+near+' m':'');
   }else{
+    STREET.loading=false;
     STREET.lastFetch=null;                     // retry on the next GPS ping
     // Say what actually went wrong. "Found nothing" was the same message whether
     // the server was down, rate-limited, or the area is genuinely bare.
