@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.7';
+const VERSION='7.8';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -55,18 +55,18 @@ const GEAR={
   helmet:{n:'Motorcycle helmet',e:'⛑️',slot:'head',dr:2,w:2.5,pts:12,r:'common'},riot:{n:'Riot helmet',e:'🪖',slot:'head',dr:3,w:1,pts:22,r:'rare'},
   pack2:{n:'Hiking pack',e:'🎒',slot:'bag',cap:6,w:1.5,pts:16,r:'uncommon'},pack3:{n:'Military ruck',e:'🪖',slot:'bag',cap:12,w:.5,pts:28,r:'rare'},
   // legendaries: never in the normal roll, only chests and bosses
-  mercy:{n:'Mercy',e:'🎯',slot:'ranged',dmg:[38,54],dur:8,ammo:'shells',w:0,pts:90,r:'legendary',legend:'Fires without a shell 35% of the time'},
-  lastword:{n:'The Last Word',e:'⚾',slot:'melee',dmg:[16,24],dur:9,w:0,pts:80,r:'legendary',legend:'30% chance a hit knocks the enemy out of its next turn'},
-  oldreliable:{n:'Old Reliable',e:'🔧',slot:'melee',dmg:[16,24],dur:20,w:0,pts:70,r:'legendary',legend:'20 swings between rebuilds - twice any other weapon - but the bill is the biggest in the county'},
-  whisper:{n:'Whisper',e:'🔫',slot:'ranged',dmg:[24,32],dur:12,ammo:'ammo',w:0,pts:85,r:'legendary',legend:'Makes no noise'},
+  mercy:{n:'Mercy',e:'🎯',slot:'ranged',dmg:[38,54],dur:75,ammo:'shells',w:0,pts:90,r:'legendary',norepair:true,legend:'Fires without a shell 35% of the time'},
+  lastword:{n:'The Last Word',e:'⚾',slot:'melee',dmg:[16,24],dur:80,w:0,pts:80,r:'legendary',norepair:true,legend:'30% chance a hit knocks the enemy out of its next turn'},
+  oldreliable:{n:'Old Reliable',e:'🔧',slot:'melee',dmg:[16,24],dur:30,w:0,pts:70,r:'legendary',legend:'The only legendary that can be rebuilt. Every other one is finite - this one comes back, for the biggest bill in the county'},
+  whisper:{n:'Whisper',e:'🔫',slot:'ranged',dmg:[24,32],dur:90,ammo:'ammo',w:0,pts:85,r:'legendary',norepair:true,legend:'Makes no noise'},
   nightingale:{n:'Nightingale',e:'🦺',slot:'armor',dr:4,w:0,pts:85,r:'legendary',legend:'Heals 5 HP every combat round'},
   // Four more legendaries. Five was a small pile for people who walk every day,
   // and every one of these is a different REASON to swap rather than a bigger
   // number - the point is a choice, not a ladder.
-  harvest:{n:'The Harvest',e:'🌾',slot:'melee',dmg:[20,26],dur:7,w:0,pts:82,r:'legendary',legend:'Hits every enemy in the room for half damage'},
+  harvest:{n:'The Harvest',e:'🌾',slot:'melee',dmg:[20,26],dur:70,w:0,pts:82,r:'legendary',norepair:true,legend:'Hits every enemy in the room for half damage'},
   vigil:{n:'Vigil',e:'🕯️',slot:'armor',dr:5,w:0,pts:88,r:'legendary',legend:'The first hit of every fight cannot take more than 5 HP'},
-  saintjude:{n:'Saint Jude',e:'📿',slot:'melee',dmg:[14,30],dur:10,w:0,pts:84,r:'legendary',legend:'The worse your health, the harder it swings'},
-  longwinter:{n:'Long Winter',e:'❄️',slot:'ranged',dmg:[20,28],dur:14,ammo:'ammo',w:0,pts:86,r:'legendary',legend:'Every hit slows the target - it loses one turn in three'},
+  saintjude:{n:'Saint Jude',e:'📿',slot:'melee',dmg:[14,30],dur:85,w:0,pts:84,r:'legendary',norepair:true,legend:'The worse your health, the harder it swings'},
+  longwinter:{n:'Long Winter',e:'❄️',slot:'ranged',dmg:[20,28],dur:100,ammo:'ammo',w:0,pts:86,r:'legendary',norepair:true,legend:'Every hit slows the target - it loses one turn in three'},
   // HANDS and FEET (v6.72). Her ask: "we only have like 3 types of armor ...
   // we should add boots, head, chest, gloves, that way we have more things we
   // can upgrade." Four armour slots now, each with a common/uncommon/rare rung
@@ -1815,7 +1815,7 @@ function swapSheet(){
     +'<div class="stack" style="margin-top:8px">'
     +opts.map(g=>'<button class="room2" onclick="doSwap(\''+g.uid+'\')"><div class="e">'+esc(g.e)+'</div>'
       +'<div class="t"><b class="rc-'+esc(g.r||'common')+'">'+esc(g.n)+'</b>'
-      +'<span>'+(g.dmg?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · ':'')+(temperOf(g)?esc(temperOf(g).n)+' · ':'')+(g.dur+' swing'+(g.dur===1?'':'s')+' left')+'</span></div></button>').join('')
+      +'<span>'+(g.dmg?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · ':'')+(temperOf(g)?esc(temperOf(g).n)+' · ':'')+(g.dur+' swing'+(g.dur===1?'':'s')+' left')+(g.norepair?' · <b style="color:var(--amber)">no rebuild</b>':'')+'</span></div></button>').join('')
     +'</div>'
     +'<button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet();renderCombat()">Never mind</button>',true);
 }
@@ -1850,8 +1850,27 @@ function swingGuard(kind,cost){
 }
 function attackGuard(){swingGuard('attack',1);}
 function heavyGuard(){swingGuard('heavy',2);}
+/* v7.8 - A LEGENDARY THAT CAN ALWAYS BE REBUILT IS NOT RARE, IT IS AN ANNUITY.
+   Every epic and legendary wrecked into "stays in your pack, pay to rebuild",
+   so the only real cost of the best weapons in the game was scrap - which she
+   has too much of. Her call: "having all legendary weapons repairable is too
+   op. Only make the ones that originally never break be repairable but increase
+   durability for legendaries to make it actually like a legendary."
+   So legendaries are FINITE now, and enormous: 70-100 swings of lifetime where
+   a katana had 10 between rebuilds, and some legendaries used to have SEVEN -
+   worse than an uncommon hunting bow. Old Reliable is the exception, because
+   being rebuildable is its entire identity; it keeps a smaller number and the
+   bill that goes with it. When a finite one runs out it is spent, not wrecked:
+   leaving a dead unrepairable item in her Gear list forever would be worse. */
 function breakWeapon(w){if(w.dur===undefined||w.dur>0)return;
   const slot=w.slot||'melee';                       // guns wear out too now
+  if(w.norepair){
+    if(S.eq[slot]===w.uid)S.eq[slot]=null;
+    S.gear=S.gear.filter(g=>g.uid!==w.uid);
+    clog('The '+w.n+' has given everything it had. It is finished.','sys');
+    toast(w.n+' is spent - it cannot be rebuilt','d');SFX.play('hurt');
+    return;
+  }
   const keep=(w.r==='epic'||w.r==='legendary');
   if(keep){w.broken=true;w.dur=0;if(S.eq[slot]===w.uid)S.eq[slot]=null;
     clog('The '+w.n+' is wrecked - it stays in your pack. It needs rebuilding.','sys');
@@ -1880,7 +1899,8 @@ function act(kind){
         const d2=Math.round(d*0.6);dealTo(t,d2,'The '+w.n+' comes back around','slash');clog('Vicious: a second cut.','good');}
       if(sk('cleave')&&Math.random()<sk('cleave')*0.2){const o=alive().find(e=>e!==t);if(o){dealTo(o,Math.round(d/2),'The swing carries into '+o.n);}}
       if(w&&!(Math.random()<sk('irongrip')*0.25)&&!(eqItem('hands')&&eqItem('hands').id==='surefoot'&&Math.random()<0.5)){w.dur--;if(w.dur<=0&&Math.random()<sk('juryrig')*0.2){w.dur=1;clog('You jury-rig the '+w.n+' back together.','good');}
-        if(w.dur>0&&w.dur<=3)clog(w.n+': '+w.dur+' swing'+(w.dur===1?'':'s')+' left before it gives out.','hit');
+        if(w.dur>0&&w.dur<=3)clog(w.n+': '+w.dur+' swing'+(w.dur===1?'':'s')+' left'+(w.norepair?' - and it CANNOT be rebuilt. Switch to something else to keep it.':' before it gives out.'),'hit');
+        else if(w.norepair&&w.dur>0&&w.dur<=10)clog(w.n+' is down to '+w.dur+' swings, and it cannot be rebuilt.','sys');
         breakWeapon(w);}}
     else{clog('You miss.','');SFX.play('miss');}
   }
@@ -2627,7 +2647,7 @@ function atBench(){return !!((S.base&&S.base.rooms.armory)||roleLvl('engineer'))
    An audit of all 64 skills found this was the only one never read.
    It now raises the ceiling instead: a mechanic's repaired gear holds more
    swings than it did new, which is what a tune-up actually means. */
-function repairMax(g){const base=(GEAR[g.id]&&GEAR[g.id].dur)||0;if(!base)return 0;
+function repairMax(g){if(g&&g.norepair)return 0;const base=(GEAR[g.id]&&GEAR[g.id].dur)||0;if(!base)return 0;
   const t=temperOf(g);return Math.max(1,base+(t?t.dur:0)+sk('tuneup')*2);}
 function repairMissing(g){return Math.max(0,repairMax(g)-Math.max(0,g.dur||0));}
 function repairCost(g){
@@ -2639,6 +2659,7 @@ function repairCost(g){
 }
 function repair(uidv){
   const g=S.gear.find(x=>x.uid===uidv);if(!g)return;
+  if(g.norepair){toast('The '+g.n+' cannot be rebuilt. What it has is what it has.','d');return;}
   if(!repairMax(g)){toast('Nothing to repair on that');return;}
   if(!repairMissing(g)){toast(g.n+' is already in good shape');return;}
   const c=repairCost(g);
@@ -2724,6 +2745,7 @@ function benchSheet(uidv){
     +'<div class="kv" style="margin-top:6px"><span>'+esc(g.e+' '+g.n)+'</span><b class="rc-'+esc(g.r||'common')+'">'+esc(RAR[g.r||'common'].n)+(up?' +'+up:'')+'</b>'
       +'<span>Now</span><b>'+stat+'</b>'
       +(repairMax(g)?'<span>Durability</span><b>'+Math.max(0,g.dur||0)+' / '+repairMax(g)+'</b>':'')
+      +(g.norepair?'<span>Lifetime</span><b style="color:var(--amber)">'+Math.max(0,g.dur||0)+' swings left <span class="help">- this one cannot be rebuilt</span></b>':'')
       +(temperable(g)?'<span>Temper</span><b>'+(t?esc(t.n)+' <span class="help">'+esc(t.d)+'</span>':'<span class="help">none yet</span>')+'</b>':'')
       +'<span>Your parts</span><b>'+partsHave()+'</b><span>Your scrap</span><b>'+fmt(S.stock.scrap)+'</b></div>'
     +'<div class="section-label" style="margin-top:12px">Work it up</div>'
@@ -3730,6 +3752,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.8',d:'Sep 20',t:'Legendaries are finite now, and enormous',
+  i:['A LEGENDARY YOU CAN ALWAYS REBUILD IS NOT RARE, IT IS AN ANNUITY. Every one of them wrecked into "stays in your pack, pay scrap to rebuild", so the only cost of the best weapons in the game was scrap - the thing you have too much of.',
+     'They are finite now, and they last: <b>The Harvest 70 swings, Mercy 75, The Last Word 80, Saint Jude 85, Whisper 90, Long Winter 100</b>. Some of those used to have SEVEN - worse than an uncommon hunting bow. When one runs out it is spent for good.',
+     '<b>Old Reliable is the exception</b>, because being rebuilt is its whole identity. 30 swings, and the biggest repair bill in the county, forever.',
+     'You will never be caught out by it: the swap list marks them <b>no rebuild</b>, the workbench shows a Lifetime instead of a Durability, and the combat log starts warning you at ten swings left instead of three.']},
  {v:'7.7',d:'Sep 20',t:'Fists were beating real weapons again by level 30',
   i:['YOUR FRIEND WAS RIGHT AND THE NUMBERS WERE UGLY. Mean damage per hit: at level 20 fists (28.5) drew level with a Lead pipe (29.5); at level 30 they BEAT it; at level 40 a Katana - an epic weapon that wears out and costs scrap to fix - was only 19% better than free, infinite punching.',
      'The cause was the flat level bonus. It is added to fists and weapons alike, but a weapon\'s own damage never grows, so by level 40 your level alone was 61% of a katana hit and what you were holding barely mattered. Fists were also still growing on their own on top of that.',
