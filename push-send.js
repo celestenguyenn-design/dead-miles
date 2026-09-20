@@ -6,7 +6,14 @@ const SB = 'https://edejxfcsjqwedbgulygi.supabase.co';
 // browser that opens the game - so it was never a secret worth keeping in the
 // repo settings. One fewer value for her to add by hand.
 const ANON = process.env.SB_ANON || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkZWp4ZmNzanF3ZWRiZ3VseWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0NTExMzEsImV4cCI6MjEwNTAyNzEzMX0.Z0T954DSwTVlRM37i_fJLVtu_x2IrdOoJMx6ImInVKI';
-const SECRET = process.env.PUSH_SECRET;
+// Trim every secret. GitHub stores an Actions secret exactly as pasted, and a
+// paste from a phone or a text file almost always carries a trailing newline.
+// On 2026-09-20 that newline was the whole failure: web-push rejects a VAPID key
+// that has ANY character outside URL-safe base64, so the job died at startup
+// with "must be a URL safe Base 64" while the key itself was correct.
+const env = k => (process.env[k] || '').trim();
+const SECRET = env('PUSH_SECRET');
+const VAPID_PRIVATE = env('VAPID_PRIVATE');
 const VAPID_PUBLIC = 'BDjXfxZW0UP34n25eFRp736S9ED4EInA8J-HP_0_VMz30hR06YzTEr2fyHLpmuabuU3ubSvUinRCIvM20Pmb4yw';
 
 // Touch the database whether or not notifications are set up. Nothing was
@@ -27,9 +34,23 @@ async function keepWarm() {
 // Missing keys used to throw a stack trace here every 15 minutes, which left a
 // red X on the repo for days and said nothing useful. The keep-warm ping above
 // still runs; only the sending is skipped. See the top of the async block.
-const MISSING = ['VAPID_PRIVATE', 'PUSH_SECRET'].filter(k => !process.env[k]);
+const MISSING = [['VAPID_PRIVATE', VAPID_PRIVATE], ['PUSH_SECRET', SECRET]].filter(p => !p[1]).map(p => p[0]);
 const webpush = require('web-push');
-if (!MISSING.length) webpush.setVapidDetails('mailto:noreply@example.com', VAPID_PUBLIC, process.env.VAPID_PRIVATE);
+// Say what is wrong in one readable line instead of a 12-frame stack trace, and
+// never let a bad key take down the keep-warm ping below.
+let VAPID_BAD = '';
+if (!MISSING.length) {
+  if (!/^[A-Za-z0-9\-_]{43}$/.test(VAPID_PRIVATE)) {
+    VAPID_BAD = `VAPID_PRIVATE is ${VAPID_PRIVATE.length} characters and should be 43 of A-Z a-z 0-9 - _ `
+      + `(no "=", no "+", no "/", no spaces). Re-copy it from the setup page and re-paste the secret.`;
+  } else {
+    try {
+      webpush.setVapidDetails('mailto:noreply@example.com', VAPID_PUBLIC, VAPID_PRIVATE);
+    } catch (e) {
+      VAPID_BAD = `VAPID_PRIVATE rejected: ${e.message}`;
+    }
+  }
+}
 
 async function rpc(fn, args) {
   const r = await fetch(`${SB}/rest/v1/rpc/${fn}`, {
@@ -135,8 +156,12 @@ function decide(row, everyone) {
     console.log('Add them under Settings > Secrets and variables > Actions, then this job starts sending too.');
     return;
   }
-  if (!ANON || !SECRET || !process.env.VAPID_PRIVATE) {
-    console.log('Missing SB_ANON, PUSH_SECRET or VAPID_PRIVATE. Nothing sent.');
+  if (VAPID_BAD) {
+    console.log('Notifications are set up but the key is wrong. ' + VAPID_BAD);
+    return;
+  }
+  if (!ANON) {
+    console.log('Missing SB_ANON. Nothing sent.');
     return;
   }
   const rows = await rpc('push_targets', { p_secret: SECRET });
