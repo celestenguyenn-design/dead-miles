@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.10';
+const VERSION='7.11';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -293,11 +293,21 @@ function migrateGear(){
   if(!S||!Array.isArray(S.gear))return;
   let changed=0;
   for(const g of S.gear){
-    if(g.gv===710)continue;
+    if(g.gv===711)continue;
     const cat=GEAR[g.id];
     if(!cat){g.gv=710;continue;}
     // the catalogue is the authority on whether a thing can be rebuilt
     if(cat.norepair)g.norepair=true; else delete g.norepair;
+    /* v7.11 recovery, and it must come FIRST. A finite legendary can never sit
+       at zero by play - breakWeapon removes it - so zero is the fingerprint of
+       the reroll bug and nothing else. Run after the old-save rules and the
+       "wrecked -> 20%" branch claims it instead, handing back a fifth of a
+       weapon the workbench destroyed. */
+    if(cat.norepair&&cat.dur&&!(g.dur>0)&&g.gv===710){
+      g.dur=durMax(g);delete g.broken;g.gv=711;changed++;
+      log('The '+g.n+' was wrecked by a fault at the workbench, not by you. It has been made whole.');
+      continue;
+    }
     const oldMax=PRE78_DUR[g.id], newMax=cat.dur;
     if(oldMax!==undefined&&newMax!==undefined&&newMax!==oldMax){
       const had=(g.dur===undefined)?oldMax:g.dur;
@@ -310,7 +320,7 @@ function migrateGear(){
     else if(cat.dr!==undefined&&cat.dur!==undefined&&g.dur===undefined){
       g.dur=cat.dur;changed++;
     }
-    g.gv=710;
+    g.gv=711;
   }
   if(changed)save();
 }
@@ -326,7 +336,7 @@ function ensureState(){if(!S)return;try{migrateGear();}catch(e){}S.bossPity=S.bo
   // A temper can lower a weapon's ceiling, so never let a stored durability
   // sit above it - that renders as "9 / 7" and repairs would read as free.
   for(const g of (S.gear||[])){
-    const mx=repairMax(g);
+    const mx=durMax(g);
     if(mx&&g.dur===undefined)g.dur=mx;     // guns from before they could wear out
     if(mx&&g.dur>mx)g.dur=mx;
   }
@@ -2709,8 +2719,22 @@ function atBench(){return !!((S.base&&S.base.rooms.armory)||roleLvl('engineer'))
    An audit of all 64 skills found this was the only one never read.
    It now raises the ceiling instead: a mechanic's repaired gear holds more
    swings than it did new, which is what a tune-up actually means. */
-function repairMax(g){if(g&&g.norepair)return 0;const base=(GEAR[g.id]&&GEAR[g.id].dur)||0;if(!base)return 0;
+/* v7.11 - THE WORST BUG I HAVE SHIPPED IN THIS FILE, AND IT LASTED AN HOUR.
+   Reported through her by another player: "i was tempering a legendary wep and
+   it broke it instantly ... i usually reroll for tempering."
+   reroll() ends with
+       if(g.dur!==undefined) g.dur = Math.min(g.dur, repairMax(g));
+   which exists because a worse temper can LOWER a weapon's ceiling and a stored
+   durability must never sit above it. v7.8 then taught repairMax() to return 0
+   for a norepair legendary - so that clamp set the durability of every finite
+   legendary to ZERO on reroll, and the next swing deleted it for good.
+   The cause is the same one as the shells, the armour tempers and the scout:
+   ONE FUNCTION ANSWERING TWO QUESTIONS. repairMax meant both "what is this
+   item's ceiling" and "is this item allowed to be repaired", and v7.8 changed
+   the second without noticing the first. They are separate now. */
+function durMax(g){const base=(GEAR[g.id]&&GEAR[g.id].dur)||0;if(!base)return 0;
   const t=temperOf(g);return Math.max(1,base+(t?t.dur:0)+sk('tuneup')*2);}
+function repairMax(g){if(g&&g.norepair)return 0;return durMax(g);}
 function repairMissing(g){return Math.max(0,repairMax(g)-Math.max(0,g.dur||0));}
 function repairCost(g){
   const miss=repairMissing(g);if(!miss)return 0;
@@ -2784,7 +2808,7 @@ function reroll(uidv){
   S.stock.scrap-=sc;S.parts=partsHave()-pc;
   g.temper=rollTemper();
   const t=TEMPERS[g.temper];
-  if(g.dur!==undefined)g.dur=Math.min(g.dur,repairMax(g));   // a worse temper can shrink the bar
+  if(g.dur!==undefined)g.dur=Math.max(1,Math.min(g.dur,durMax(g)));  // a worse temper can shrink the ceiling - it must never zero the weapon
   const better=old&&TEMPER_ORDER.indexOf(g.temper)<TEMPER_ORDER.indexOf(old);
   log('Reworked the '+g.n+': '+t.n+'. '+t.d+'.');
   toast(g.n+' is now '+t.n+(old?(better?' - better than before':g.temper===old?' - the same again':' - worse than before'):''),
@@ -3814,6 +3838,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.11',d:'Sep 20',t:'Rerolling a temper was destroying legendary weapons - fixed, and yours is back',
+  i:['THIS ONE WAS MINE AND IT WAS BAD. Rerolling the temper on a finite legendary set its durability to ZERO on the spot, and the next swing deleted it for good. Reported by Isabel: "i was tempering a legendary wep and it broke it instantly".',
+     'The reroll always clamped durability to the weapon\'s ceiling, because a worse temper can lower it. Yesterday I taught that same function to answer a different question - "is this allowed to be repaired" - and a finite legendary answers zero. So the clamp read the ceiling as zero. The two questions are separate functions now.',
+     '<b>If it happened to you, your weapon is back at full durability</b> the moment you open the game. Nothing you did caused it and you are not paying for it.']},
  {v:'7.10',d:'Sep 20',t:'The legendaries you already owned have been brought over properly',
   i:['GEAR COPIES ITS STATS WHEN YOU FIND IT, so yesterday\'s changes only applied to things found AFTER them. Everything already in your Gear kept its old numbers - and an old legendary was one bad patch away from being unrepairable while still carrying its old 8 swings.',
      'Your rule, applied: <b>never used gets the full new lifetime</b> (an untouched Mercy goes 8 &rarr; 75). <b>Used is scaled by how much was left</b> - a Whisper half worn goes 6/12 &rarr; 45/90. Anything already wrecked gets a fifth of the new lifetime back and is no longer broken, rather than being destroyed by a rule that did not exist when it broke.',
@@ -5233,7 +5261,7 @@ const GEAR_SLOTS=[
 function gearLabel(g){
   const t=temperOf(g);
   const what=g.dmg?`${g.dmg[0]}-${g.dmg[1]} dmg`:(g.dr!==undefined?`-${g.dr} damage`:(g.cap?`+${g.cap} room`:''));
-  const dur=(g.dur!==undefined&&repairMax(g))?` · ${g.dur} left`:'';
+  const dur=(g.dur!==undefined&&durMax(g))?` · ${g.dur} left`:'';
   return `${g.e} ${g.n}${t?' ('+t.n+')':''}${what?' - '+what:''}${dur}${g.broken?' - WRECKED':''}`;
 }
 function gearPicker(){
