@@ -506,3 +506,9 @@ a{color:var(--amber)}
 .chip.tl.t2{border-color:rgba(90,169,230,.7);color:var(--r-rare)}
 .chip.tl.t3{border-color:rgba(230,165,48,.8);color:var(--amber)}
 .chip.tl.a{opacity:1;font-weight:700}
+
+/* Cache pins (v7.21). A cache is the one thing on the map that pays purely for
+   having walked, so it reads as a soft green pulse rather than a threat. */
+.poi.cache{box-shadow:0 0 0 3px rgba(127,191,77,.9),0 0 18px rgba(127,191,77,.6);border-color:var(--rot);z-index:520}
+.poi.cache::after{content:'';position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(127,191,77,.4);animation:cacheping 2.2s ease-out infinite}
+@keyframes cacheping{0%{transform:scale(.85);opacity:.9}100%{transform:scale(1.35);opacity:0}}

@@ -216,8 +216,16 @@ async function fetchPois(pos,force){
   const seen=new Set(pois.map(x=>x.id));
   for(const el of bld.els){if(!seen.has(el.type+'/'+el.id))add(el,true);}
 
+  // HOUSE DENSITY FOLLOWS DISTANCE FROM BASE (v7.21). Her words: "there should
+  // only be a bunch of houses to loot if you're by your house... but if you're
+  // actually walking away from your base pin, can be houses to loot" - fewer,
+  // and worth more. A wall of identical houses next to the base is the whole
+  // point of being able to play at home; the same wall a mile out is what made
+  // walking pointless. Shops and landmarks are never trimmed.
   const shops=pois.filter(p=>!p.house);
-  const houses=pois.filter(p=>p.house).sort((a,b)=>geoDist(a,pos)-geoDist(b,pos)).slice(0,55);
+  const bt=(S.base&&S.base.geo)?farTierFor(geoDist(S.base.geo,pos)):FAR_TIERS[1];
+  const CAP=[55,55,16,9][bt.k];
+  const houses=pois.filter(p=>p.house).sort((a,b)=>geoDist(a,pos)-geoDist(b,pos)).slice(0,CAP);
   STREET.pois=shops.concat(houses);
 
   if(STREET.pois.length){
@@ -259,6 +267,8 @@ function updateMarkers(){
           // A landmark must be findable at a glance - that is the whole point of
           // putting it on a map. Every house stays visible (she asked for that);
           // the landmark just wears a ring so a direction is obvious.
+          const ch=cacheAt(p);
+          if(ch&&!cacheTaken(ch))return `<div class="poi ${st} cache"><span>${ch.keep.e}</span></div>`;
           const lm=landmarkOf(p);
           const tt=poiTierOf(p);
           const tc=(S.base&&S.base.geo&&tt)?' t'+tt.k:'';
@@ -266,7 +276,7 @@ function updateMarkers(){
           return `<div class="poi ${st}${p.t==='stronghold'?' sh':''}${tc}"><span>${p.e}</span></div>`;
         })();
     const had=STREET.markers[p.id];
-    if(!had){const m=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]})}).addTo(STREET.map);m.on('click',()=>{const rr=raidAt(p);if(rr)openRaid(p.id);else tapPoi(p.id);});m._dmHtml=html;STREET.markers[p.id]=m;}
+    if(!had){const m=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]})}).addTo(STREET.map);m.on('click',()=>{const cc=cacheAt(p);if(cc&&!cacheTaken(cc)){cacheCollect(p.id);return;}const rr=raidAt(p);if(rr)openRaid(p.id);else tapPoi(p.id);});m._dmHtml=html;STREET.markers[p.id]=m;}
     // setIcon THROWS AWAY the element and builds a new one. This ran on every pin
     // on every GPS ping - 44 rebuilds a second while walking, for pins that had
     // not changed - and each new element restarts its bob animation, which is
@@ -472,6 +482,7 @@ function renderStreet(){
   if(!STREET.on)return;const hd=homeDistance();
   try{renderRaidList();}catch(e){}
   try{renderLandmarks();}catch(e){}
+  try{renderCaches();}catch(e){}
   const el=$('#mapInfo');if(!el)return;
   const near=STREET.pois.filter(p=>poiState(p)==='near').length;
   const lootedNear=STREET.pois.filter(p=>poiState(p)==='looted').length;
@@ -521,7 +532,11 @@ function raidId(poiId,w){return 'r:'+poiId+':'+(w===undefined?raidWindow():w);}
 // ~1 in 7 places hosts a raid in a given window; the rare tiers stay rare.
 function raidAt(p,w){
   w=(w===undefined)?raidWindow():w;
-  if(rhash(p.id+'|'+w+'|raid')%100>=15)return null;
+  // 15 -> 6. Raid existence must stay GLOBAL: if it depended on distance from
+  // MY base, two people on the same street would see different raids and could
+  // not join each other from the map. So raids get scarcer everywhere, and the
+  // reason to walk out lives in landmarks, loot tiers and caches instead.
+  if(rhash(p.id+'|'+w+'|raid')%100>=6)return null;
   const roll=rhash(p.id+'|'+w+'|tier')%100;
   const tier=roll<35?1:roll<63?2:roll<83?3:roll<95?4:5;
   const T=RAID_TIERS[tier-1];
@@ -533,7 +548,10 @@ function liveRaids(){
   if(!STREET.on||!STREET.pois.length)return [];
   return STREET.pois.map(p=>raidAt(p)).filter(Boolean);
 }
-function raidNear(r){const p=STREET.pois.find(x=>x.id===r.poi);return p&&STREET.pos?geoDist(p,STREET.pos)<=reachRadius()*2:false;}
+// Her words: "I can still be like a block away from a raid and it'll still count
+// as me close enough to raid it". It was reachRadius()*2 - up to 140 m, which is
+// a block. A raid is now the same reach as anything else you have to stand at.
+function raidNear(r){const p=STREET.pois.find(x=>x.id===r.poi);return p&&STREET.pos?geoDist(p,STREET.pos)<=reachRadius():false;}
 
 let RAID_STATE=null;                          // last known shared HP for the open raid
 async function raidSync(r,dmg){
@@ -792,6 +810,106 @@ function liveRaidAfter(won){
   log('Raid cleared: '+cur.n+' (tier '+cur.tier+'). +'+scrap+' scrap, +'+((cur.tier>=4?2:1)+(here&&cur.tier>=3?1:0))+' keys, +'+(40*cur.tier)+' XP'+(got.length?', '+got.join(', '):'')+'.'+(here?' Walked-in bonus applied.':''));
   toast('Tier '+cur.tier+' raid cleared','l');SFX.play('legend');
   save();render();pushPlayer();
+}
+
+/* ================= FIELD CACHES (v7.21) =================
+   Her ask, in her words: "there should also be some type of like collectible
+   like you know like Pokemon Go Pikmin Bloom - you walk to an area, bloom the
+   flowers, go to the Pokestop and it'll give you a collectible of some sort."
+
+   A cache is the small, certain, repeatable reward for being somewhere. It is
+   deliberately NOT a fight and NOT a loot table: you walk to it, you tap it, you
+   get something, and it is gone until tomorrow. That is the whole loop, and it
+   is the only content in the game that pays purely for having walked.
+
+   FAR ONLY. Caches never spawn inside the home block - if they did they would be
+   one more reason to stand still, which is the thing all of this is fixing.
+
+   They reset DAILY rather than on the raid's two-hour window, so a walk she does
+   every day pays every day, and she cannot farm one spot by waiting.           */
+const KEEPSAKES=[
+  {id:'tag',   n:'Dog tag',        e:'\u{1FAAA}', d:'A name, a blood type, and a date that stops.'},
+  {id:'photo', n:'Creased photo',  e:'\u{1F5BC}️', d:'Four people at a lake. Somebody folded it small enough to carry.'},
+  {id:'key',   n:'House key',      e:'\u{1F511}', d:'Still on a lanyard from a school nobody attends.'},
+  {id:'ring',  n:'Wedding ring',   e:'\u{1F48D}', d:'Engraved inside. You do not read it out loud.'},
+  {id:'letter',n:'Unsent letter',  e:'✉️', d:'Addressed, stamped, never posted.'},
+  {id:'toy',   n:'Plastic soldier',e:'\u{1FA96}', d:'Chewed. Somebody loved this thing.'},
+  {id:'cass',  n:'Mixtape',        e:'\u{1F4FC}', d:'Side A is labelled in three different pens.'},
+  {id:'compass',n:'Brass compass', e:'\u{1F9ED}', d:'Still points north. Still the only thing that does.'},
+];
+function cacheDay(){return (typeof todayStr==='function')?todayStr():String(new Date().getDate());}
+// Deterministic per place per day, and only out past the home block.
+function cacheAt(p){
+  if(!p)return null;
+  const t=poiTierOf(p); if(!t||t.k<2)return null;
+  if(!S.base||!S.base.geo)return null;
+  const h=rhash('cache:'+p.id+'|'+cacheDay());
+  if(h%100>=14)return null;
+  return {id:'c:'+p.id+':'+cacheDay(), poi:p.id, keep:KEEPSAKES[rhash('keep:'+p.id+'|'+cacheDay())%KEEPSAKES.length]};
+}
+function cacheTaken(c){return !!((S.caches||{})[c.id]);}
+function cacheCollect(poiId){
+  const p=STREET.pois.find(x=>x.id===poiId);if(!p)return;
+  const c=cacheAt(p);if(!c){toast('Nothing here');return;}
+  if(cacheTaken(c)){toast('You already took this one today');return;}
+  if(!STREET.pos||geoDist(p,STREET.pos)>reachRadius()){
+    toast('Walk to it · '+(STREET.pos?Math.round(geoDist(p,STREET.pos)):'?')+' m away');return;}
+  if(!onFootCheck('open a cache'))return;
+  if(!S.caches)S.caches={};
+  S.caches[c.id]=Date.now();
+  // keep the map of taken caches from growing forever
+  const ks=Object.keys(S.caches);
+  if(ks.length>400)ks.sort((a,b)=>S.caches[a]-S.caches[b]).slice(0,ks.length-400).forEach(k=>delete S.caches[k]);
+  const t=poiTierOf(p);
+  const scrap=8+rint(0,7)+Math.round((t.k-1)*6);
+  const parts=Math.random()<0.45?1:0;
+  S.stock.scrap+=scrap;if(parts)S.parts=(S.parts||0)+parts;
+  if(!S.keeps)S.keeps={};
+  const first=!S.keeps[c.keep.id];
+  S.keeps[c.keep.id]=(S.keeps[c.keep.id]||0)+1;
+  S.keepsTotal=(S.keepsTotal||0)+1;
+  log('Cache at '+p.n+': '+c.keep.e+' '+c.keep.n+', +'+scrap+' scrap'+(parts?', +1 part':'')+'.');
+  toast(c.keep.e+' '+c.keep.n+(first?' · NEW':''),first?'l':'a');
+  SFX.play(first?'unlock':'loot');
+  save();render();updateMarkers();
+  if(first)openSheet('<h2>'+c.keep.e+' '+esc(c.keep.n)+'</h2>'
+    +'<p class="help" style="font-style:italic">'+esc(c.keep.d)+'</p>'
+    +'<p>Found at '+esc(p.n)+'. It goes on the shelf at your base.</p>'
+    +'<button class="btn r wide" onclick="closeSheet()">Keep it</button>');
+}
+function cachesNear(){
+  const out=[];
+  for(const p of STREET.pois){
+    const c=cacheAt(p);if(!c||cacheTaken(c))continue;
+    out.push({p,c,d:STREET.pos?Math.round(geoDist(p,STREET.pos)):null});
+  }
+  return out.sort((a,b)=>(a.d===null?1e9:a.d)-(b.d===null?1e9:b.d));
+}
+function renderCaches(){
+  const el=$('#cacheCard');if(!el)return;
+  if(!STREET.on){el.hidden=true;return;}
+  const found=Object.keys(S.keeps||{}).length;
+  const list=cachesNear();
+  if(!list.length&&!found){el.hidden=true;return;}
+  el.hidden=false;el.className='card';
+  el.innerHTML='<h2>\u{1F9ED} Caches <span class="sub">'+found+'/'+KEEPSAKES.length+' keepsakes</span></h2>'
+    +(list.length
+      ?'<p class="help">Out past the home block somebody left something. Walk to it and take it - once each, per day.</p>'
+        +'<div class="stack" style="margin-top:8px">'
+        +list.slice(0,4).map(x=>{
+          const inReach=x.d!==null&&x.d<=reachRadius();
+          return '<button class="room2'+(inReach?'':' off')+'" onclick="cacheCollect(\''+esc(x.p.id)+'\')">'
+            +'<div class="e">'+x.c.keep.e+'</div>'
+            +'<div class="t"><b>'+esc(x.p.n)+'</b>'
+            +(x.d!==null?'<span class="chip'+(inReach?' a':' s')+'">'+(x.d>=1000?(x.d/1000).toFixed(1)+' km':x.d+' m')+'</span>':'')
+            +'<span>'+(inReach?'In reach - tap to take it':'Walk to it')+'</span></div></button>';}).join('')
+        +'</div>'
+      :'<p class="help">Nothing out here right now. Caches sit past the home block and reset every day.</p>')
+    +(found?'<div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px">'
+      +KEEPSAKES.map(k=>(S.keeps&&S.keeps[k.id])
+        ?'<span class="chip a" title="'+esc(k.d)+'">'+k.e+' '+esc(k.n)+' ×'+S.keeps[k.id]+'</span>'
+        :'<span class="chip s" style="opacity:.45">'+k.e+' ?</span>').join('')
+      +'</div>':'');
 }
 
 /* ================= THE MUSTER (v7.20) =================
