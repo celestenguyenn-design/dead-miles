@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.0';
+const VERSION='7.1';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3669,6 +3669,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.1',d:'Sep 20',t:'You can see your friend in the raid before either of you swings',
+  i:['LANDING A HIT WAS THE ONLY WAY TO KNOW A SQUAD HAD FORMED, AND THAT WAS CONFUSING. The raid card already listed who was "in there now" before you committed - but the moment the fight started, the strip went back to saying <b>Fighting alone</b> until somebody landed a hit.',
+     'Now it names them: <i>Tiff is in this raid but has not swung yet.</i> And once anyone is mid-fight, arrivals show as a dim <b>not swung</b> chip beside the people already swinging.',
+     'It still takes turns only once they actually hit it - a friend standing there with their phone in a pocket should not make it hit you half as often - and the strip says so instead of leaving you guessing.']},
  {v:'7.0',d:'Sep 20',t:'The trader sells shells and bolts now, not just rounds',
   i:['THIS ONE WAS MINE, AND IT WAS TWO HOURS OLD. The trader has always sold a Box of rounds. It never sold shells or bolts - which did not matter while every kind of ammo melted into one counter anyway.',
      'Splitting them apart yesterday made them real, and left a shotgun or a crossbow with no way to restock except finding some on the ground. <b>Shotgun shells (x4) for 14 scrap</b> and a <b>Bundle of bolts (x8) for 10</b> are on the trader now.',

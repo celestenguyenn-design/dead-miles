@@ -737,14 +737,42 @@ function squadTarget(){
   const m=SQUAD.mates[live[idx-1]];
   return (m&&m.name)||live[idx-1];
 }
+/* v7.1 - "LANDING A HIT ONLY IS CONFUSING", AND SHE IS RIGHT. Presence before
+   the fight already existed: entering a raid sets S.raidCur and pushes it, so
+   the raid card lists who is "In there now" before you commit. But the strip
+   INSIDE the fight was built purely on confirmed damage, so it read
+   "Fighting alone" while your friend was standing right beside you with their
+   first swing still loading. The only thing that told you a squad had formed
+   was a hit landing - which is the mechanic she called confusing.
+   The board knows they are there. Show it.
+   The turn rotation stays hit-based on purpose: a mate who is present but has
+   not swung (walked off, phone in a pocket) must not halve her incoming damage,
+   and the strip now says so in as many words instead of leaving it a mystery. */
+function squadHere(){
+  if(!SQUAD.on||!SQUAD.r||typeof raidHere!=='function')return [];
+  const swinging=new Set(squadLive().map(h=>String(SQUAD.mates[h].name||h).toLowerCase()));
+  try{return raidHere(SQUAD.r).filter(n=>!swinging.has(String(n).toLowerCase()));}catch(e){return [];}
+}
 function squadStrip(){
   if(!SQUAD.on)return '';
-  const live=squadLive();
-  if(!live.length)return '<div class="help" style="margin-top:6px">Fighting alone. If a friend joins this raid you will take turns and it will hit half as often.</div>';
+  const live=squadLive(), here=squadHere();
+  if(!live.length){
+    if(here.length){
+      const w=here.map(n=>'<span class="chip">'+esc(n)+'</span>').join('');
+      return '<div class="squad"><div class="row"><span class="chip l">In here with you</span>'+w+'</div>'
+        +'<div class="help" style="margin-top:4px">'+(here.length===1?esc(here[0])+' is':'They are')+' in this raid but '
+        +(here.length===1?'has':'have')+' not swung yet. <b>The moment '+(here.length===1?'they land a hit':'one of them lands a hit')
+        +' it starts taking turns</b> and stops coming for you every round.</div></div>';
+    }
+    return '<div class="help" style="margin-top:6px">Fighting alone. If a friend joins this raid you will take turns and it will hit half as often.</div>';
+  }
   const who=live.map(h=>esc(SQUAD.mates[h].name)+' <b>'+fmt(SQUAD.mates[h].dmg)+'</b>');
   const t=squadTarget();
-  return '<div class="squad"><div class="row"><span class="chip l">Squad of '+(live.length+1)+'</span>'+who.map(w=>'<span class="chip">'+w+'</span>').join('')+'</div>'
-    +'<div class="help" style="margin-top:4px">'+(t?'This round it turns on <b>'+esc(t)+'</b>.':'This round it comes for <b>you</b>.')+'</div></div>';
+  return '<div class="squad"><div class="row"><span class="chip l">Squad of '+(live.length+1)+'</span>'+who.map(w=>'<span class="chip">'+w+'</span>').join('')
+    +here.map(n=>'<span class="chip" style="opacity:.6">'+esc(n)+' · not swung</span>').join('')+'</div>'
+    +'<div class="help" style="margin-top:4px">'+(t?'This round it turns on <b>'+esc(t)+'</b>.':'This round it comes for <b>you</b>.')
+    +(here.length?' <span style="opacity:.75">'+esc(here.join(', '))+' will join the rotation once '+(here.length===1?'they hit':'they hit')+' it.</span>':'')
+    +'</div></div>';
 }
 // Who the board says is standing in this raid right now - so she can see the
 // squad forming BEFORE she commits to the fight.
