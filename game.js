@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.14';
+const VERSION='7.15';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -625,20 +625,24 @@ const SFX={ctx:null,
   init(){if(this.ctx)return;try{this.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}},
   tone(f,d,type,vol,slide){if(!S||!S.sfx||!this.ctx)return;const c=this.ctx;const o=c.createOscillator();const g=c.createGain();o.type=type||'square';o.frequency.setValueAtTime(f,c.currentTime);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(20,f+slide),c.currentTime+d);g.gain.setValueAtTime(vol||.08,c.currentTime);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+d);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+d);},
   noise(d,vol){if(!S||!S.sfx||!this.ctx)return;const c=this.ctx;const b=c.createBuffer(1,c.sampleRate*d,c.sampleRate);const data=b.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*(1-i/data.length);const s=c.createBufferSource();s.buffer=b;const g=c.createGain();g.gain.value=vol||.1;s.connect(g);g.connect(c.destination);s.start();},
+  // A cue that fires dozens of times a session (every swing, every step) is the
+  // one that wears out, and it wears out because it is bit-identical each time.
+  // A few percent of pitch wander is most of the fix and costs nothing.
+  j(f,amt){return f*(1+(Math.random()*2-1)*(amt===undefined?.05:amt));},
   play(n){this.init();if(!this.ctx)return;if(this.ctx.state==='suspended')this.ctx.resume();
     switch(n){
-      case 'hit':this.noise(.12,.15);this.tone(140,.12,'square',.1,-80);break;
-      case 'miss':this.tone(300,.1,'sine',.05,-150);break;
-      case 'hurt':this.tone(110,.25,'sawtooth',.1,-60);this.noise(.2,.08);break;
-      case 'shot':this.noise(.08,.3);this.tone(90,.15,'square',.12,-60);break;
-      case 'loot':this.tone(660,.08,'square',.06);setTimeout(()=>this.tone(880,.12,'square',.06),70);break;
+      case 'hit':this.noise(.12,.13+Math.random()*.05);this.tone(this.j(140,.09),.12,'square',.1,-80);break;
+      case 'miss':this.tone(this.j(300,.08),.1,'sine',.05,-150);break;
+      case 'hurt':this.tone(this.j(110,.08),.25,'sawtooth',.1,-60);this.noise(.2,.08);break;
+      case 'shot':this.noise(.08,.28+Math.random()*.06);this.tone(this.j(90,.07),.15,'square',.12,-60);break;
+      case 'loot':{const k=this.j(660,.04);this.tone(k,.08,'square',.06);setTimeout(()=>this.tone(k*4/3,.12,'square',.06),70);break;}
       case 'rare':[523,659,784].forEach((f,i)=>setTimeout(()=>this.tone(f,.15,'triangle',.08),i*80));break;
       case 'legend':[523,659,784,1046,1318].forEach((f,i)=>setTimeout(()=>this.tone(f,.25,'triangle',.09),i*90));break;
       case 'levelup':[392,523,659,784].forEach((f,i)=>setTimeout(()=>this.tone(f,.2,'square',.07),i*100));break;
-      case 'growl':this.tone(70,.5,'sawtooth',.09,-30);this.noise(.4,.06);break;
+      case 'growl':this.tone(this.j(70,.12),.5,'sawtooth',.09,-30);this.noise(.4,.06);break;
       case 'chest':this.tone(200,.1,'square',.06);setTimeout(()=>this.tone(300,.1,'square',.06),100);setTimeout(()=>this.tone(600,.3,'triangle',.08),200);break;
       case 'ui':this.tone(500,.05,'sine',.04);break;
-      case 'step':this.noise(.04,.035);break;
+      case 'step':this.noise(.04,.028+Math.random()*.014);break;
       case 'thunder':this.tone(48,.9,'sawtooth',.11,-24);this.noise(.7,.05);break;
       case 'unlock':[659,880,1046].forEach((f,i)=>setTimeout(()=>this.tone(f,.18,'triangle',.07),i*110));break;
       case 'nemesis':[196,165,131].forEach((f,i)=>setTimeout(()=>this.tone(f,.35,'sawtooth',.09),i*160));break;
@@ -646,6 +650,18 @@ const SFX={ctx:null,
       case 'arrive':[440,554].forEach((f,i)=>setTimeout(()=>this.tone(f,.15,'triangle',.07),i*120));break;
       case 'dead':[300,250,200,120].forEach((f,i)=>setTimeout(()=>this.tone(f,.3,'sawtooth',.08),i*180));break;
       case 'win':[523,659,784,1046].forEach((f,i)=>setTimeout(()=>this.tone(f,.18,'square',.07),i*90));break;
+      // The bench shattering a weapon is the most expensive thing that happens in
+      // the game and it was borrowing 'hurt', the same cue as taking a scratch.
+      // Metal cracking, then falling: a hard noise burst and a pitch that drops
+      // out from under it, with two shards after.
+      case 'shatter':this.noise(.22,.24);this.tone(420,.3,'sawtooth',.10,-380);
+        setTimeout(()=>{this.noise(.1,.12);this.tone(260,.14,'square',.06,-160);},150);
+        setTimeout(()=>{this.noise(.07,.08);this.tone(180,.18,'square',.05,-120);},300);break;
+      case 'buy':this.tone(760,.06,'triangle',.06);setTimeout(()=>this.tone(1014,.1,'triangle',.05),60);break;
+      case 'salvage':this.noise(.16,.12);this.tone(this.j(200,.1),.14,'square',.05,-70);
+        setTimeout(()=>this.tone(this.j(520,.06),.09,'triangle',.05),140);break;
+      case 'heal':[392,523].forEach((f,i)=>setTimeout(()=>this.tone(f,.22,'sine',.07),i*110));break;
+      case 'packfull':this.tone(240,.13,'square',.07);setTimeout(()=>this.tone(180,.2,'square',.07),130);break;
     }}
 };
 
@@ -899,7 +915,7 @@ async function fetchWeather(){
   const w=S.wx;if(w&&Date.now()-w.t<30*60000)return;
   let lat=40.71,lon=-74.01;
   try{const u='https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+'&current=weather_code,temperature_2m,is_day&temperature_unit=fahrenheit&timezone=America%2FNew_York';
-    const r=await fetch(u);const j=await r.json();const c=j.current;S.wx={t:Date.now(),code:c.weather_code,kind:WX_CODES(c.weather_code),temp:Math.round(c.temperature_2m),day:!!c.is_day};save();render();}catch(e){}
+    const r=await fetch(u);const j=await r.json();const c=j.current;const was=wxKind();S.wx={t:Date.now(),code:c.weather_code,kind:WX_CODES(c.weather_code),temp:Math.round(c.temperature_2m),day:!!c.is_day};if(S.wx.kind==='storm'&&was!=='storm'){log('Thunder somewhere west. The storm is coming in.');SFX.play('thunder');}save();render();}catch(e){}
 }
 function isNight(){const h=new Date().getHours();return h>=20||h<6||(S.wx&&!S.wx.day&&h>=18);}
 function wxKind(){return S.wx?S.wx.kind:'clear';}
@@ -2301,7 +2317,7 @@ function takeItem(it,loc){
   if(it.gear){S.gear.push({uid:uid(),id:it.id,...GEAR[it.id]});if(loc)loc.found.push({...it,ft:Date.now()});log('Found a '+it.n+'. It is in your Gear, under You - gear never goes in your pack.');rarToast(it);return true;}
   if(it.cat==='key'){S.keys++;if(loc)loc.found.push({...it,ft:Date.now()});log('Found a chest key.');rarToast(it);return true;}
   if(it.cat==='cosmetic'){if(S.cosmetics.includes(it.id)){S.stock.scrap+=10;log('Another '+it.n+'. Traded for 10 scrap.');return true;}S.cosmetics.push(it.id);if(loc)loc.found.push({...it,ft:Date.now()});log('Found '+it.n+' to wear.');rarToast(it);return true;}
-  if(S.pack.length>=capacity()){toast('Pack full. Left '+it.n+' behind.','d');log('Pack was full ('+S.pack.length+'/'+capacity()+') - left '+it.n+' behind.');return false;}
+  if(S.pack.length>=capacity()){toast('Pack full. Left '+it.n+' behind.','d');SFX.play('packfull');log('Pack was full ('+S.pack.length+'/'+capacity()+') - left '+it.n+' behind.');return false;}
   const item={...it,uid:uid()};if(item.cat==='ammo'){item.qty=(item.qty||6)+(roleLvl('hunter')?1+Math.floor(roleLvl('hunter')/2):0)+sk('scrounger');}
   S.pack.push(item);if(loc)loc.found.push({...item,ft:Date.now()});rarToast(it);return true;
 }
@@ -2618,7 +2634,7 @@ function healWith(id,from){
   const h=medHeal(id);const was=S.hp;
   S.hp=Math.min(maxHp(),S.hp+h);
   if(id==='abx'&&S.infect){S.infect=null;S.infectStep=0;log('The antibiotics cleared the infection.');}
-  toast('+'+(S.hp-was)+' HP ('+MEDS[id].n.toLowerCase()+')','a');SFX.play('loot');
+  toast('+'+(S.hp-was)+' HP ('+MEDS[id].n.toLowerCase()+')','a');SFX.play('heal');
   save();render();
 }
 function eat(){if(S.hp>=maxHp()){toast('HP is full');return;}if(S.stock.food<1){toast('No food in stash');return;}S.stock.food--;S.hp=Math.min(maxHp(),S.hp+Math.max(15,Math.round(maxHp()*0.08))+sk('comfortfood')*5+(bg('chef')?10:0)+(bg('farmer')?5:0));save();render();}
@@ -2775,13 +2791,13 @@ function salvage(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;const v
   S.gear=S.gear.filter(x=>x.uid!==uidv);for(const k in S.eq)if(S.eq[k]===uidv)S.eq[k]=null;
   S.stock.scrap+=v;S.parts=(S.parts||0)+pp;
   log('Salvaged the '+g.n+' for '+v+' scrap and '+pp+' part'+(pp===1?'':'s')+'.');
-  toast('+'+v+' scrap · +'+pp+' parts','a');SFX.play('chest');save();render();}
+  toast('+'+v+' scrap · +'+pp+' parts','a');SFX.play('salvage');save();render();}
 function salvageAll(){const sp=spareGear();if(!sp.length)return;let v=0,pp=0;
   for(const g of sp){v+=salvageValue(g);pp+=PART_YIELD[g.r||'common']||1;}
   const ids=new Set(sp.map(g=>g.uid));S.gear=S.gear.filter(g=>!ids.has(g.uid));
   S.stock.scrap+=v;S.parts=(S.parts||0)+pp;
   log('Salvaged '+sp.length+' spare pieces for '+v+' scrap and '+pp+' parts.');
-  toast('+'+v+' scrap · +'+pp+' parts','a');SFX.play('chest');save();render();}
+  toast('+'+v+' scrap · +'+pp+' parts','a');SFX.play('salvage');save();render();}
 /* ================= THE UPGRADE LADDER (v7.12) =================
    Her design, in her words: "attempting upgrades or fails should be like
    MapleStory. Either it downgrades or breaks. Have a reroll system somehow."
@@ -2822,7 +2838,7 @@ function buySafety(kind){
   S.dust=dustHave()-c;
   if(kind==='scroll')S.scrolls=scrollsHave()+1; else S.pins=pinsHave()+1;
   log('Traded '+c+' dust for a '+(kind==='scroll'?'protection scroll':'anvil pin')+'.');
-  toast(kind==='scroll'?'\u{1F4DC} Protection scroll':'\u{1F528} Anvil pin','a');
+  toast(kind==='scroll'?'\u{1F4DC} Protection scroll':'\u{1F528} Anvil pin','a');SFX.play('buy');
   save();render();
 }
 function upStat(g,dir){              // dir +1 up, -1 down
@@ -2882,7 +2898,7 @@ function upgrade(uidv,useScroll,usePin){
     const slot=g.slot||'melee';if(S.eq[slot]===g.uid)S.eq[slot]=null;
     S.gear=S.gear.filter(x=>x.uid!==g.uid);
     log('The '+g.n+' shattered on the bench. You swept up '+d+' dust.');
-    toast(g.n+' was destroyed · +'+d+' dust','d');SFX.play('hurt');
+    toast(g.n+' was destroyed · +'+d+' dust','d');SFX.play('shatter');
     save();render();closeSheet();return;
   }
   save();render();
