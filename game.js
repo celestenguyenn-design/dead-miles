@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.1';
+const VERSION='7.2';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -196,7 +196,7 @@ const SKILLS={
   chef:[{id:'comfortfood',n:'Comfort Food',max:3,d:r=>'Eating heals +'+(5*r)+' more'},{id:'rationing',n:'Rationing',max:1,d:r=>'Crew eat half as much when you stash'},{id:'sharpknife',n:'Sharp Knife',max:3,d:r=>'+'+r+' melee damage'}],
   firefighter:[{id:'axeman',n:'Axeman',max:3,d:r=>'+'+(2*r)+' melee damage'},{id:'thickskin',n:'Thick Skin',max:3,d:r=>'+'+(8*r)+' max HP'},{id:'lungs',n:'Good Lungs',max:1,d:r=>'Bloater bursts hurt half as much'},{id:'brave',n:'Brave',max:1,d:r=>'You are never ambushed'}],
   carpenter:[{id:'framing',n:'Framing',max:3,d:r=>'Each wall level gives +'+(3*r)+' more defense'},{id:'trapmaker',n:'Trapmaker',max:3,d:r=>'Each trap level gives +'+(2*r)+' more defense'},{id:'boards',n:'Boarded Up',max:3,d:r=>'Raiders that break in take '+(10*r)+'% less'}],
-  mechanic:[{id:'tuneup',n:'Tune-up',max:3,d:r=>'Repairs restore +'+(2*r)+' more durability'},{id:'juryrig',n:'Jury-rig',max:3,d:r=>(20*r)+'% chance a breaking weapon holds together'},{id:'gennie',n:'Generator Whisperer',max:2,d:r=>'Generator cuts raid odds another '+(5*r)+'%'}],
+  mechanic:[{id:'tuneup',n:'Tune-up',max:3,d:r=>'Repaired gear holds +'+(2*r)+' more swings than new'},{id:'juryrig',n:'Jury-rig',max:3,d:r=>(20*r)+'% chance a breaking weapon holds together'},{id:'gennie',n:'Generator Whisperer',max:2,d:r=>'Generator cuts raid odds another '+(5*r)+'%'}],
   gamer:[{id:'metaknowledge',n:'Meta Knowledge',max:3,d:r=>'+'+(5*r)+'% XP'},{id:'speedrunner',n:'Speedrunner',max:3,d:r=>'Places are '+(5*r)+'% closer'},{id:'lore',n:'Lore',max:2,d:r=>'Boss legendary chance climbs +'+r+'% more per phase'},{id:'rng',n:'RNG Manipulation',max:2,d:r=>'Rare finds '+(10*r)+'% more likely'}],
 
   brawler:[{id:'heavyhands',n:'Heavy Hands',max:3,d:r=>'+'+(2*r)+' melee damage'},{id:'irongrip',n:'Iron Grip',max:3,d:r=>(25*r)+'% chance a swing costs no durability'},{id:'secondwind',n:'Second Wind',max:3,d:r=>'Heal '+(6*r)+' HP when a fight ends'},{id:'bruiser',n:'Bruiser',max:2,d:r=>'Heavy swing hits '+(12*r)+'% more often'},{id:'cleave',n:'Cleave',max:2,d:r=>(20*r)+'% chance a swing also hits a second enemy for half'},
@@ -2583,8 +2583,16 @@ function gearPower(g){
 }
 function repairPer(g){return Math.max(1,Math.min(9,Math.round(gearPower(g)/5)));}
 function atBench(){return !!((S.base&&S.base.rooms.armory)||roleLvl('engineer'));}
+/* v7.2 - TUNE-UP WAS THE ONE DEAD PERK IN THE GAME. She asked whether it works.
+   It did not: sk('tuneup') appeared in exactly zero places, so three skill
+   points bought nothing. Its description was impossible on top of that -
+   "Repairs restore +N more durability" when repair() has always done
+   g.dur = repairMax(g), a FULL restore, leaving nothing partial to improve.
+   An audit of all 64 skills found this was the only one never read.
+   It now raises the ceiling instead: a mechanic's repaired gear holds more
+   swings than it did new, which is what a tune-up actually means. */
 function repairMax(g){const base=(GEAR[g.id]&&GEAR[g.id].dur)||0;if(!base)return 0;
-  const t=temperOf(g);return Math.max(1,base+(t?t.dur:0));}
+  const t=temperOf(g);return Math.max(1,base+(t?t.dur:0)+sk('tuneup')*2);}
 function repairMissing(g){return Math.max(0,repairMax(g)-Math.max(0,g.dur||0));}
 function repairCost(g){
   const miss=repairMissing(g);if(!miss)return 0;
@@ -3669,6 +3677,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.2',d:'Sep 20',t:'Tune-up did nothing at all, and you were right to ask',
+  i:['IT WAS THE ONLY DEAD PERK IN THE GAME. I checked all 64: <b>Tune-up</b> was the one whose code was never read anywhere, so up to three skill points bought you literally nothing.',
+     'Its description was impossible anyway - "repairs restore more durability" when repairing has always filled a weapon all the way up. There was no partial repair for it to improve.',
+     'It does the real version now: <b>repaired gear holds +2/+4/+6 more swings than it did new</b>. A Lead pipe is 6 swings factory; at Tune-up 3 it comes off the bench with 12, and it stacks on top of a Sturdy temper rather than replacing it.']},
  {v:'7.1',d:'Sep 20',t:'You can see your friend in the raid before either of you swings',
   i:['LANDING A HIT WAS THE ONLY WAY TO KNOW A SQUAD HAD FORMED, AND THAT WAS CONFUSING. The raid card already listed who was "in there now" before you committed - but the moment the fight started, the strip went back to saying <b>Fighting alone</b> until somebody landed a hit.',
      'Now it names them: <i>Tiff is in this raid but has not swung yet.</i> And once anyone is mid-fight, arrivals show as a dim <b>not swung</b> chip beside the people already swinging.',
