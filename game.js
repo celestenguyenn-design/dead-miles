@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='6.99';
+const VERSION='7.0';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2444,7 +2444,17 @@ const TRADE=[{id:'bandage',n:'Bandages',e:'🩹',c:10,give:s=>s.meds++},
   {id:'abx',n:'Antibiotics',e:'💉',c:25,give:()=>medsGive('abx',1)},
   {id:'kit',n:'Trauma kit',e:'🧰',c:45,give:()=>medsGive('kit',1)},
   {id:'adrena',n:'Adrenaline shot',e:'⚡',c:60,give:()=>medsGive('adrena',1)},
-  {id:'bloodbag',n:'Blood bag',e:'🩸',c:90,give:()=>medsGive('bloodbag',1)},{id:'beans',n:'Canned food',e:'🥫',c:5,give:s=>s.food++},{id:'water',n:'Water bottle',e:'💧',c:5,give:s=>s.water++},{id:'ammo',n:'Box of rounds (x6)',e:'📦',c:12,give:s=>s.ammo+=6},{id:'key',n:'Chest key',e:'🗝️',c:25,give:()=>S.keys++}];
+  {id:'bloodbag',n:'Blood bag',e:'🩸',c:90,give:()=>medsGive('bloodbag',1)},{id:'beans',n:'Canned food',e:'🥫',c:5,give:s=>s.food++},{id:'water',n:'Water bottle',e:'💧',c:5,give:s=>s.water++},{id:'ammo',n:'Box of rounds (x6)',e:'📦',c:12,give:()=>addAmmoStock('ammo',6)},
+  /* v7.0 - THE TRADER ONLY SOLD ONE OF THE THREE. Rounds had a slot; shells and
+     bolts did not, which did not matter while every kind of ammo melted into one
+     counter. v6.96 made them separate and real, and in doing so left a shotgun or
+     a crossbow with NO way to restock except finding some. Her note: "ammo should
+     be in the trader too." Priced off what each kind is worth per shot: a shell
+     drives 34-50 damage against a round's 22-30, and a bow gets most of its bolts
+     back, so bolts are the cheap one. */
+  {id:'shells',n:'Shotgun shells (x4)',e:'🟥',c:14,give:()=>addAmmoStock('shells',4)},
+  {id:'bolts',n:'Bundle of bolts (x8)',e:'🎯',c:10,give:()=>addAmmoStock('bolts',8)},
+  {id:'key',n:'Chest key',e:'🗝️',c:25,give:()=>S.keys++}];
 function trade(id){const t=TRADE.find(x=>x.id===id);if(!t)return;if(!S.base){toast('The trader only comes to a base');return;}let c=t.c;c=Math.max(1,Math.round(c*(1-sk('haggler')*0.1-sk('trader')*0.15)));if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}S.stock.scrap-=c;t.give(S.stock);log('Bought '+t.n+' from the trader for '+c+' scrap.');toast(t.e+' '+t.n,'a');SFX.play('chest');save();render();}
 function renderTrader(){const el=$('#trader');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first. The trader only stops where there are walls.</p>';return;}
   el.innerHTML=TRADE.map(t=>{let c=Math.max(1,Math.round(t.c*(1-sk('haggler')*0.1-sk('trader')*0.15)));return `<button class="tr${S.stock.scrap<c?' off':''}" onclick="trade('${t.id}')"><span class="e">${t.e}</span><b>${t.n}</b><span class="chip a">${c}🔩</span></button>`;}).join('');}
@@ -3659,6 +3669,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.0',d:'Sep 20',t:'The trader sells shells and bolts now, not just rounds',
+  i:['THIS ONE WAS MINE, AND IT WAS TWO HOURS OLD. The trader has always sold a Box of rounds. It never sold shells or bolts - which did not matter while every kind of ammo melted into one counter anyway.',
+     'Splitting them apart yesterday made them real, and left a shotgun or a crossbow with no way to restock except finding some on the ground. <b>Shotgun shells (x4) for 14 scrap</b> and a <b>Bundle of bolts (x8) for 10</b> are on the trader now.',
+     'Priced off what each is worth: a shell drives 34-50 damage where a round does 22-30, and a bow gets most of its bolts back, so bolts are the cheap one.']},
  {v:'6.99',d:'Sep 19',t:'Tempers were being sold on armour and did nothing at all',
   i:['YOUR FRIEND IS RIGHT AGAIN. Every stat a temper carries is a weapon stat - damage, durability, or an extra swing. Armour has none of the three. So rolling <b>Vicious</b> onto a riot helmet took your scrap and parts, printed "12% chance to strike twice" on the card, and changed absolutely nothing.',
      'The workbench no longer offers a gamble that cannot pay out. Armour and bags keep <b>Work it up</b>, which really does add +1 armour and +2 carry, and the card now says plainly why there is no temper section.',
