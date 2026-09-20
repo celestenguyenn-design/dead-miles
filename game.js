@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.11';
+const VERSION='7.12';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -324,7 +324,7 @@ function migrateGear(){
   }
   if(changed)save();
 }
-function ensureState(){if(!S)return;try{migrateGear();}catch(e){}S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
+function ensureState(){if(!S)return;try{migrateGear();}catch(e){}S.bossPity=S.bossPity||0;S.dust=S.dust||0;S.scrolls=S.scrolls||0;S.pins=S.pins||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
   if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};if(S.eq&&S.eq.hands===undefined)S.eq.hands=null;if(S.eq&&S.eq.feet===undefined)S.eq.feet=null;
   // free any slot a downed crew member is still sitting in (they never gave it
@@ -2782,21 +2782,112 @@ function salvageAll(){const sp=spareGear();if(!sp.length)return;let v=0,pp=0;
   S.stock.scrap+=v;S.parts=(S.parts||0)+pp;
   log('Salvaged '+sp.length+' spare pieces for '+v+' scrap and '+pp+' parts.');
   toast('+'+v+' scrap · +'+pp+' parts','a');SFX.play('chest');save();render();}
-const UPG_COST=[10,20,35];
-function upgrade(uidv){
+/* ================= THE UPGRADE LADDER (v7.12) =================
+   Her design, in her words: "attempting upgrades or fails should be like
+   MapleStory. Either it downgrades or breaks. Have a reroll system somehow."
+   Three decisions she made, and they shape everything here:
+     1. A legendary can NEVER break. Finite durability is already its scarcity,
+        and losing one to a coin flip after v7.11 would be cruel. It downgrades.
+     2. Failure leaves DUST, and dust is the ONLY way to buy the safety items -
+        so a bad run funds the next attempt's insurance instead of being a pure
+        loss, and the safety net cannot be bought with the scrap she has too
+        much of.
+     3. The risk starts ABOVE the old ceiling. +1 to +3 stay guaranteed exactly
+        as they were, so nothing already in her gear got more dangerous today.
+   Armour never breaks either: a wrecked weapon is an inconvenience, a wrecked
+   armour set is a death. */
+const UPG_COST=[10,20,35,60,95,140,200];
+const UPG_MAX=7;
+const UPG_ODDS={            // from level -> {ok, down, break}, must sum to 1
+  3:{ok:0.70,dn:0.30,br:0.00},
+  4:{ok:0.50,dn:0.40,br:0.10},
+  5:{ok:0.35,dn:0.50,br:0.15},
+  6:{ok:0.25,dn:0.55,br:0.20},
+};
+const DUST_YIELD={common:1,uncommon:2,rare:3,epic:5,legendary:8};
+const SAFE_COST={scroll:10,pin:16};
+function dustHave(){return S.dust||0;}
+function scrollsHave(){return S.scrolls||0;}
+function pinsHave(){return S.pins||0;}
+// Armour and legendaries cannot break - that risk becomes a downgrade instead.
+function canBreak(g){return !(g.r==='legendary'||g.dr!==undefined||g.cap);}
+function upgOdds(g,up){
+  const o=UPG_ODDS[up];if(!o)return null;
+  if(!canBreak(g)&&o.br>0)return {ok:o.ok,dn:o.dn+o.br,br:0};
+  return o;
+}
+function buySafety(kind){
+  const c=SAFE_COST[kind];if(!c)return;
+  if(dustHave()<c){toast('Need '+c+' dust. Failed upgrades leave dust behind.','d');return;}
+  S.dust=dustHave()-c;
+  if(kind==='scroll')S.scrolls=scrollsHave()+1; else S.pins=pinsHave()+1;
+  log('Traded '+c+' dust for a '+(kind==='scroll'?'protection scroll':'anvil pin')+'.');
+  toast(kind==='scroll'?'\u{1F4DC} Protection scroll':'\u{1F528} Anvil pin','a');
+  save();render();
+}
+function upStat(g,dir){              // dir +1 up, -1 down
+  if(g.dmg){g.dmg=[Math.max(1,g.dmg[0]+2*dir),Math.max(2,g.dmg[1]+2*dir)];}
+  else if(g.dr!==undefined){g.dr=Math.max(0,g.dr+1*dir);}
+  else if(g.cap){g.cap=Math.max(1,g.cap+2*dir);}
+}
+function dustFrom(g){return DUST_YIELD[g.r||'common']||1;}
+function upgrade(uidv,useScroll,usePin){
   const g=S.gear.find(x=>x.uid===uidv);if(!g||!benchable(g))return;
-  const up=g.up||0;if(up>=3){toast('Fully upgraded');return;}
+  const up=g.up||0;if(up>=UPG_MAX){toast('This is as far as it goes');return;}
   const c=UPG_COST[up], pc=upgradeParts(g);
   if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}
   if(partsHave()<pc){toast('Need '+pc+' parts. Salvage gear to get them - you have '+partsHave()+'.','d');return;}
-  S.stock.scrap-=c;S.parts=partsHave()-pc;g.up=up+1;
-  if(g.dmg){g.dmg=[g.dmg[0]+2,g.dmg[1]+2];}else if(g.dr!==undefined){g.dr+=1;}else if(g.cap){g.cap+=2;}
-  log('Worked the '+g.n+' up to +'+g.up+' ('+c+' scrap, '+pc+' parts).');
-  toast(g.n+' +'+g.up,'a');SFX.play('chest');save();render();
+  const odds=upgOdds(g,up);
+  if(odds&&!confirm('Take '+g.n+' to +'+(up+1)+'?\n\n'
+      +Math.round(odds.ok*100)+'% it works\n'
+      +Math.round(odds.dn*100)+'% it slips back to +'+Math.max(0,up-1)
+      +(odds.br>0?'\n'+Math.round(odds.br*100)+'% it is destroyed':'')
+      +'\n\nCosts '+c+' scrap and '+pc+' parts either way.'))return;
+  // pay first: an attempt costs the same whatever it does
+  S.stock.scrap-=c;S.parts=partsHave()-pc;
+  /* v7.12 - insurance is spent only when it ACTUALLY fires. Burning a scroll on
+     an attempt that succeeded, or on a legendary that could never shatter, is
+     the kind of quiet tax that makes a player stop using the system at all. */
+  useScroll=!!(useScroll&&scrollsHave()>0);
+  usePin=!!(usePin&&pinsHave()>0);
+
+  if(!odds){                                    // +1..+3, still a certainty
+    g.up=up+1;upStat(g,1);
+    log('Worked the '+g.n+' up to +'+g.up+' ('+c+' scrap, '+pc+' parts).');
+    toast(g.n+' +'+g.up,'a');SFX.play('chest');save();render();
+    if($('#modal').classList.contains('on'))benchSheet(uidv);
+    return;
+  }
+  const r=Math.random();
+  let outcome = r<odds.ok ? 'ok' : (r<odds.ok+odds.dn ? 'dn' : 'br');
+  let spentScroll=false,spentPin=false;
+  if(outcome==='br'&&useScroll){outcome='dn';spentScroll=true;S.scrolls=scrollsHave()-1;}
+  if(outcome==='dn'&&usePin){outcome='hold';spentPin=true;S.pins=pinsHave()-1;}
+
+  if(outcome==='ok'){
+    g.up=up+1;upStat(g,1);
+    log('The '+g.n+' took the work. It is +'+g.up+' now.');
+    toast(g.n+' +'+g.up,g.up>=5?'l':'a');SFX.play(g.up>=5?'legend':'chest');
+  }else if(outcome==='hold'){
+    log('The '+g.n+' slipped, but the anvil pin held it at +'+up+'.');
+    toast('Anvil pin held it at +'+up,'a');SFX.play('chest');
+  }else if(outcome==='dn'){
+    const d=dustFrom(g);S.dust=dustHave()+d;
+    g.up=Math.max(0,up-1);upStat(g,-1);
+    log('The '+g.n+' came apart at the seams and slipped to +'+g.up+'. Swept up '+d+' dust.'
+        +(spentScroll?' The scroll took the worst of it - that is what it was for.':''));
+    toast(g.n+' slipped to +'+g.up+' · +'+d+' dust','d');SFX.play('hurt');
+  }else{
+    const d=dustFrom(g)*2;S.dust=dustHave()+d;
+    const slot=g.slot||'melee';if(S.eq[slot]===g.uid)S.eq[slot]=null;
+    S.gear=S.gear.filter(x=>x.uid!==g.uid);
+    log('The '+g.n+' shattered on the bench. You swept up '+d+' dust.');
+    toast(g.n+' was destroyed · +'+d+' dust','d');SFX.play('hurt');
+    save();render();closeSheet();return;
+  }
+  save();render();
   if($('#modal').classList.contains('on'))benchSheet(uidv);
 }
-// Rerolling is the gamble. Crude is the single most likely result and it is a
-// real downgrade, so a good temper is something you decide whether to risk.
 function reroll(uidv){
   const g=S.gear.find(x=>x.uid===uidv);if(!g||!benchable(g))return;
   if(!temperable(g)){toast('Tempers only change how a weapon hits. Use Work it up on this.','d');return;}
@@ -2835,9 +2926,34 @@ function benchSheet(uidv){
       +(temperable(g)?'<span>Temper</span><b>'+(t?esc(t.n)+' <span class="help">'+esc(t.d)+'</span>':'<span class="help">none yet</span>')+'</b>':'')
       +'<span>Your parts</span><b>'+partsHave()+'</b><span>Your scrap</span><b>'+fmt(S.stock.scrap)+'</b></div>'
     +'<div class="section-label" style="margin-top:12px">Work it up</div>'
-    +'<p class="help">'+(up>=3?'This is as far as it goes.':'+2 damage (or +1 armor, +2 carry) a level, three levels. Parts only come from breaking down gear.')+'</p>'
-    +(up>=3?'':'<button class="btn r wide" style="margin-top:6px" onclick="upgrade(\''+g.uid+'\')"'
-        +((S.stock.scrap<uc||partsHave()<upc)?' disabled':'')+'>To +'+(up+1)+' · '+uc+'🔩 · '+upc+' parts</button>')
+    +(function(){
+      if(up>=UPG_MAX)return '<p class="help">+'+UPG_MAX+' is as far as anything goes.</p>';
+      const o=upgOdds(g,up);
+      if(!o)return '<p class="help">+2 damage (or +1 armor, +2 carry) a level. <b>Safe up to +3</b> - past that it gets interesting.</p>';
+      /* v7.12 - the odds are shown BEFORE the button, not inside a confirm she
+         has already decided to tap through. This is the moment the decision is
+         actually made. */
+      return '<div class="note" style="margin-top:6px;border-left-color:'+(o.br>0?'var(--blood)':'#ffa500')+'">'
+        +'<div class="row" style="gap:10px;flex-wrap:wrap">'
+        +'<span class="chip" style="background:rgba(95,208,138,.18)">'+Math.round(o.ok*100)+'% works</span>'
+        +'<span class="chip" style="background:rgba(255,165,0,.18)">'+Math.round(o.dn*100)+'% slips to +'+Math.max(0,up-1)+'</span>'
+        +(o.br>0?'<span class="chip" style="background:rgba(230,62,92,.22)">'+Math.round(o.br*100)+'% destroyed</span>'
+                :'<span class="chip help">cannot be destroyed</span>')+'</div>'
+        +'<div class="help" style="margin-top:6px">You pay the scrap and parts either way.'
+        +(o.br===0&&(g.r==='legendary'||g.dr!==undefined)?' '+(g.dr!==undefined?'Armour':'A legendary')+' never shatters - the worst case is a slip.':'')+'</div></div>';
+    })()
+    +(up>=UPG_MAX?'':'<div class="row" style="margin-top:8px">'
+        +'<button class="btn r" onclick="upgrade(\''+g.uid+'\','+(scrollsHave()>0?'$(\'#upScroll\').checked':'false')+','+(pinsHave()>0?'$(\'#upPin\').checked':'false')+')"'
+        +((S.stock.scrap<uc||partsHave()<upc)?' disabled':'')+'>To +'+(up+1)+' · '+uc+'🔩 · '+upc+' parts</button></div>')
+    +(upgOdds(g,up)?'<div class="row" style="margin-top:6px;gap:12px;flex-wrap:wrap">'
+        +((scrollsHave()>0&&upgOdds(g,up).br>0)?'<label class="help"><input type="checkbox" id="upScroll"> Use a <b>protection scroll</b> ('+scrollsHave()+') - a shatter becomes a slip</label>':'')
+        +(pinsHave()>0?'<label class="help"><input type="checkbox" id="upPin"> Use an <b>anvil pin</b> ('+pinsHave()+') - a slip changes nothing</label>':'')
+        +'</div>':'')
+    +'<div class="section-label" style="margin-top:12px">Dust</div>'
+    +'<p class="help">Every failed attempt leaves dust. Dust is the only thing that buys insurance - scrap cannot. You have <b>'+fmt(dustHave())+'</b>.</p>'
+    +'<div class="row" style="margin-top:6px">'
+    +'<button class="btn sm" onclick="buySafety(\'scroll\')"'+(dustHave()<SAFE_COST.scroll?' disabled':'')+'>Protection scroll · '+SAFE_COST.scroll+' dust</button>'
+    +'<button class="btn sm" onclick="buySafety(\'pin\')"'+(dustHave()<SAFE_COST.pin?' disabled':'')+'>Anvil pin · '+SAFE_COST.pin+' dust</button></div>'
     +(!temperable(g)?'<p class="help" style="margin-top:14px">Tempers are a weapon thing - every one of them changes damage, durability or an extra swing, and '+esc(g.dr!==undefined?'armour':'a bag')+' has none of those. <b>Work it up</b> is the whole bench for this.</p>':''
     )+(!temperable(g)?'':'<div class="section-label" style="margin-top:14px">Rework the temper</div>'
     +'<p class="help">A gamble, not a ladder. Whatever it has now is gone, and these are the real odds:</p>'
@@ -3838,6 +3954,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.12',d:'Sep 20',t:'The upgrade ladder: +7, and it can go wrong',
+  i:['UPGRADES USED TO BE A SHOP. Pay scrap, get +1, three times, done. Now the ceiling is <b>+7</b> and everything past +3 is a gamble you can see before you take it.',
+     '<b>+1 to +3 are still guaranteed</b> - nothing you already own got more dangerous. Then: +4 is 70/30, +5 is 50/40/10, +6 is 35/50/15, +7 is 25/55/20 (works / slips back / destroyed). You pay the scrap and parts either way, and the odds are printed on the bench before you commit.',
+     '<b>A legendary can never shatter, and neither can armour</b> - that risk turns into a slip instead. Losing a legendary to a coin flip is not a thing this game does.',
+     'Every failure leaves <b>dust</b>, and dust is the only thing that buys insurance - scrap cannot. A <b>protection scroll</b> (10 dust) turns a shatter into a slip; an <b>anvil pin</b> (16 dust) holds your level through a slip. Both are spent only when they actually fire.']},
  {v:'7.11',d:'Sep 20',t:'Rerolling a temper was destroying legendary weapons - fixed, and yours is back',
   i:['THIS ONE WAS MINE AND IT WAS BAD. Rerolling the temper on a finite legendary set its durability to ZERO on the spot, and the next swing deleted it for good. Reported by Isabel: "i was tempering a legendary wep and it broke it instantly".',
      'The reroll always clamped durability to the weapon\'s ceiling, because a worse temper can lower it. Yesterday I taught that same function to answer a different question - "is this allowed to be repaired" - and a finite legendary answers zero. So the clamp read the ceiling as zero. The two questions are separate functions now.',
