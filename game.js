@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.9';
+const VERSION='7.10';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -274,7 +274,47 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.r
   raids:[],raidPending:null,campCleared:'',bossKilled:'',milestones:[],
   ct:{date:'',daily:[],week:'',weekly:null,pending:{}},party:{code:'',data:null,pending:{}},wx:null,
   journal:[],flags:{roadCheck:0,dropDate:'',lastRaidCheck:''},lastAnim:0,combat:null,online:{handle:'',token:'',ok:false,err:'',lastPull:0,lastPost:0}};}
-function ensureState(){if(!S)return;S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
+
+/* ===== v7.10 - MIGRATING GEAR SHE ALREADY OWNS =====
+   Gear copies its stats at pickup (`{uid:uid(), id, ...GEAR[id]}`), so v7.8 and
+   v7.9 changed the CATALOGUE and touched nothing already in a save. Two Mercies
+   would behave differently depending on when they were found, and armour bought
+   before v7.9 would never wear at all. Worse in the other direction: the moment
+   an old legendary picked up `norepair` it would be unrepairable AND still
+   carrying its old 7-14 durability, so it would be destroyed in a couple of
+   fights. She spotted it and set the rule herself:
+     "If the person never used them, please give them the full durability
+      amount. If it is used do not give them the full durability."
+   So: untouched gets the full new lifetime, used is scaled by how much was
+   left, and something already wrecked gets a fifth of the new lifetime back
+   rather than being deleted for a rule that did not exist when it broke. */
+const PRE78_DUR={harvest:7,mercy:8,lastword:9,saintjude:10,whisper:12,longwinter:14,oldreliable:20};
+function migrateGear(){
+  if(!S||!Array.isArray(S.gear))return;
+  let changed=0;
+  for(const g of S.gear){
+    if(g.gv===710)continue;
+    const cat=GEAR[g.id];
+    if(!cat){g.gv=710;continue;}
+    // the catalogue is the authority on whether a thing can be rebuilt
+    if(cat.norepair)g.norepair=true; else delete g.norepair;
+    const oldMax=PRE78_DUR[g.id], newMax=cat.dur;
+    if(oldMax!==undefined&&newMax!==undefined&&newMax!==oldMax){
+      const had=(g.dur===undefined)?oldMax:g.dur;
+      if(g.broken||had<=0){g.dur=Math.max(1,Math.round(newMax*0.2));delete g.broken;}
+      else if(had>=oldMax)g.dur=newMax;                       // never used - full
+      else g.dur=Math.max(1,Math.round(newMax*(had/oldMax))); // used - pro rata
+      changed++;
+    }
+    // armour predates having durability at all: it has never worn, so it is full
+    else if(cat.dr!==undefined&&cat.dur!==undefined&&g.dur===undefined){
+      g.dur=cat.dur;changed++;
+    }
+    g.gv=710;
+  }
+  if(changed)save();
+}
+function ensureState(){if(!S)return;try{migrateGear();}catch(e){}S.bossPity=S.bossPity||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
   if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};if(S.eq&&S.eq.hands===undefined)S.eq.hands=null;if(S.eq&&S.eq.feet===undefined)S.eq.feet=null;
   // free any slot a downed crew member is still sitting in (they never gave it
@@ -3774,6 +3814,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.10',d:'Sep 20',t:'The legendaries you already owned have been brought over properly',
+  i:['GEAR COPIES ITS STATS WHEN YOU FIND IT, so yesterday\'s changes only applied to things found AFTER them. Everything already in your Gear kept its old numbers - and an old legendary was one bad patch away from being unrepairable while still carrying its old 8 swings.',
+     'Your rule, applied: <b>never used gets the full new lifetime</b> (an untouched Mercy goes 8 &rarr; 75). <b>Used is scaled by how much was left</b> - a Whisper half worn goes 6/12 &rarr; 45/90. Anything already wrecked gets a fifth of the new lifetime back and is no longer broken, rather than being destroyed by a rule that did not exist when it broke.',
+     'Armour you already owned has never worn a single point, so it starts full. It runs once, the first time you open the game, and never touches your gear again.']},
  {v:'7.9',d:'Sep 20',t:'Armour wears out now, so it costs something to own',
   i:['ARMOUR NEVER WORE OUT, SO HALF YOUR EQUIPMENT WAS FREE FOREVER. A Riot vest bought once protected you for the rest of the save, and repairs are the only cost in this game that comes back around.',
      'One piece takes a point of wear per hit you take, picked at random, so a full set spreads it instead of burning four points a hit. A Riot vest, Riot helmet and Work gloves together soak <b>62 hits</b> and cost <b>186 scrap</b> to put right - half that if you have an Armory at base.',
