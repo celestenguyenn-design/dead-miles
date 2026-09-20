@@ -339,19 +339,32 @@ function avatarSVG(av,size,opts){
   const w=size||100,h=Math.round((size||100)*1.3);TOP_AV=av;const bp=bodyParts(bs,skin,tc,av.top||'hoodie',weapon);
   const o=bs==='sticker'?'stroke="#1e1418" stroke-width="2.2" stroke-linejoin="round"':bs==='bean'?'stroke="#2a1a14" stroke-width="1.4" stroke-linejoin="round"':'';
   const ot=TOPS[av.top||'hoodie'];const hooded=!av.hat&&ot&&ot.kind==='onesie';const uid=AV_CLIP;
+  // opts.alive makes the figure breathe and blink. It adds NOTHING to the
+  // drawing - every shape, colour and coordinate is identical either way, and
+  // with the flag off the output string is byte-for-byte what it always was.
+  // Only DOM-inserted SVG animates; an <img src="data:..."> (which is how the
+  // road scene draws sprites through spriteImg) does not run SMIL, so the flag
+  // is only worth passing where the avatar is rendered as real markup.
+  const alive=opts.alive&&mood!=='dead';
+  const liveA=alive?`<g><animateTransform attributeName="transform" type="translate" values="0 0;0 -1.3;0 0" dur="${(3.1+(opts.phase||0)*0.7).toFixed(1)}s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1" keyTimes="0;0.5;1"/>`:'';
+  const liveB=alive?'</g>':'';
+  // Blink: squash the eyes vertically about their own centre line (y=55) for a
+  // few frames. Scaling in SMIL is about the origin, hence the translate pair.
+  const blinkA=alive?`<g transform="translate(0,55)"><g><animateTransform attributeName="transform" type="scale" values="1 1;1 1;1 0.08;1 1" keyTimes="0;${(0.93-(opts.phase||0)*0.04).toFixed(2)};${(0.96-(opts.phase||0)*0.04).toFixed(2)};1" dur="${(4.4+(opts.phase||0)*1.3).toFixed(1)}s" repeatCount="indefinite"/><g transform="translate(0,-55)">`:'';
+  const blinkB=alive?'</g></g></g>':'';
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -8 100 138" width="${w}" height="${h}" ${opts.attrs||''} aria-hidden="true">
-  ${hooded?'':(o?`<g ${o}>${hairBack(style,hc)}</g>`:hairBack(style,hc))}
+  ${liveA}${hooded?'':(o?`<g ${o}>${hairBack(style,hc)}</g>`:hairBack(style,hc))}
   ${bp.back}
   ${bp.head}
   ${av.beard?beard(av.beard,HAIR_COLORS[av.beardColor===undefined?(av.hairColor||0):av.beardColor]||hc):''}
-  ${eyes(av.eyes||'round',mood)}
+  ${blinkA}${eyes(av.eyes||'round',mood)}${blinkB}
   ${mouth(mood)}
   ${hooded?`<clipPath id="fh${uid}"><ellipse cx="50" cy="49" rx="31.5" ry="30"/></clipPath><g clip-path="url(#fh${uid})">${hairFront(style,hc)}</g>`
     :(o?`<g ${o}>${hairFront(style,hc)}</g>`:hairFront(style,hc))}
   ${hooded?onesieHood(av.top,o):''}
   ${av.hat?'':onesieEars(av.top||'hoodie',o)}
   ${o?`<g ${o}>${hatShape(av.hat,hc)}</g>`:hatShape(av.hat,hc)}
-  ${accShape(av.acc)}
+  ${accShape(av.acc)}${liveB}
   </svg>`;
 }
 // zombies + raiders
