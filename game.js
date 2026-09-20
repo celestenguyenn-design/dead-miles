@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.3';
+const VERSION='7.4';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -207,7 +207,7 @@ const SKILLS={
     {id:'coldbarrel',n:'Cold Barrel',max:1,req:6,d:r=>'The first shot of every fight does half again as much'},
     {id:'doubletap',n:'Double Tap',max:3,req:9,d:r=>(10*r)+'% chance a shot fires twice'},
     {id:'ammosense',n:'Ammo Sense',max:2,req:13,d:r=>(12*r)+'% chance a shot uses no ammo'}],
-  scavenger:[{id:'deeppockets',n:'Deep Pockets',max:3,d:r=>'+'+(2*r)+' pack capacity'},{id:'eagleeye',n:'Eagle Eye',max:3,d:r=>'Rare finds '+(15*r)+'% more likely'},{id:'lightstep',n:'Light Step',max:3,d:r=>'Every search makes '+(4*r)+' less noise'},{id:'lockpick',n:'Lockpick',max:3,d:r=>(30*r)+'% chance to open a chest with no key'},{id:'haggler',n:'Haggler',max:2,d:r=>'+'+(5*r)+'% stash value'},
+  scavenger:[{id:'deeppockets',n:'Deep Pockets',max:3,d:r=>'+'+(2*r)+' pack capacity'},{id:'eagleeye',n:'Eagle Eye',max:3,d:r=>'Rare finds '+(15*r)+'% more likely'},{id:'lightstep',n:'Light Step',max:3,d:r=>'Every search makes '+(12*r)+'% less noise'},{id:'lockpick',n:'Lockpick',max:3,d:r=>(30*r)+'% chance to open a chest with no key'},{id:'haggler',n:'Haggler',max:2,d:r=>'+'+(5*r)+'% stash value'},
     {id:'appraiser',n:'Appraiser',max:3,req:6,d:r=>'Salvage gives another '+(20*r)+'% scrap'},
     {id:'packrat',n:'Pack Rat',max:3,req:9,d:r=>'+'+(2*r)+' more pack capacity'},
     {id:'shadow',n:'Shadow',max:2,req:13,d:r=>(12*r)+'% chance to slip past a road encounter'}],
@@ -965,8 +965,18 @@ function worldCrowd(en){
 function encounterFor(loc){
   const th=district().threat*loc.threat;const rng=Math.random();
   if(loc.stronghold){return strongholdStage(loc.stage+1);}
-  const ambushCut=roleLvl('scout')?0.2+roleLvl('scout')*0.08:0;
-  let quiet=0.27+ambushCut;if(wxKind()==='fog')quiet-=0.1;if(wxKind()==='rain')quiet-=0.08;
+  /* v7.4 - A LEVELLED SCOUT WAS EMPTYING THE COUNTY. `quiet` is the chance a
+     place has NO enemies at all, and the scout's bonus was added straight into
+     it: 27% empty at base, 55% at scout 1, 71% at scout 3, 87% at scout 5, and
+     past 1.0 with Leader on top - every place, forever. The role text says
+     "ambushes drop by 20+l*8%", and an ambush is being CAUGHT OUT, not the
+     county being empty. The scout already grants what it should: you always
+     strike first, and one room is scouted before you enter.
+     Her report: "houses i look nearby don't rlly have that many zombies
+     anymore." Scaled down hard and capped, so a maxed scout is a real edge and
+     never an off switch. */
+  const ambushCut=roleLvl('scout')?0.04+roleLvl('scout')*0.02:0;
+  let quiet=Math.min(0.42,0.27+ambushCut);if(wxKind()==='fog')quiet-=0.1;if(wxKind()==='rain')quiet-=0.08;
   if(rng<quiet)return [];
   let count=th<1.5?(Math.random()<0.3?2:1):th<2.5?rint(1,3):rint(2,3);if(isNight()||wxKind()==='storm')count++;count+=modCount();count=Math.max(1,count);count=Math.min(S.walk.district>=3?5:4,count);const out=[];
   for(let i=0;i<count;i++){if(S.walk.district>=1&&Math.random()<0.15)out.push(worldEnemy(Math.random()<0.7?'raider':'gunner'));else{const k=wpick(Object.entries(ENEMIES).filter(([k,v])=>v.w>0).map(([k,v])=>({k,w:v.w*(isNight()&&k==='runner'?2:1)})),'w').k;out.push(worldEnemy(k));}}
@@ -2190,7 +2200,12 @@ function searchRoom(i){pushSoon();
   if(!loc.stronghold&&S.crew.length<8&&Math.random()<0.07){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was hiding in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was hiding in the ${esc(r.n.toLowerCase())}. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(1)}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
   else if(!S.pet&&(Math.random()<0.03||(S.roomsSearched||0)>=40)){petJoin(Math.random()<0.6?'dog':'cat');}
   else if(S.pet&&(S.pets||[]).length<PET_MAX&&Math.random()<0.012){petJoin(Math.random()<0.5?'dog':'cat');}
-  let noise=Math.max(4,Math.round((r.noise+rint(-6,8)-sk('lightstep')*4-(wxKind()==='rain'?10:0))*(dayMod().noise||1)));loc.noise=Math.min(100,loc.noise+noise);
+  /* Light Step was a flat -4 per rank against room noise of 18-44, so at rank 3
+     a full sweep of a house made 68 noise, a pharmacy 60, a clinic 61 - and a
+     wave needs 100. The perk did not reduce waves, it ABOLISHED them: no place
+     in the game could reach the threshold. It is a percentage now, so it always
+     helps and can never zero the mechanic out. */
+  let noise=Math.max(4,Math.round((r.noise+rint(-6,8))*(1-sk('lightstep')*0.12)*(wxKind()==='rain'?0.75:1)*(dayMod().noise||1)));loc.noise=Math.min(100,loc.noise+noise);
   crewXp(1);save();render();
   if(loc.noise>=100){loc.noise=55;loc.wave++;setTimeout(()=>startCombat([mk('walker'),mk(Math.random()<0.4?'runner':'walker')].concat(loc.wave>1?[mk('bloater')]:[]),'wave'),350);}
 }
@@ -3684,6 +3699,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.4',d:'Sep 20',t:'Two perks had quietly switched the difficulty off',
+  i:['YOU SAID THE HOUSES NEARBY BARELY HAVE ZOMBIES ANY MORE. They did not - two perks were deleting them, and both were bugs rather than balance.',
+     '<b>A crew Scout was emptying the county.</b> Its bonus was being added straight into the chance a place has NO enemies at all: 27% empty with no scout, 55% at scout 1, 71% at scout 3, <b>87% at scout 5</b>, and over 100% with Leader on top. A scout is supposed to stop you being ambushed, not remove what is inside the building. It is 41% at max now, and capped.',
+     '<b>Light Step was abolishing wave spawns, not reducing them.</b> It took a flat 4 noise off each search against rooms worth 18-44, so at rank 3 a full sweep of a house made 68 noise when a wave needs 100 - no building in the game could reach it. It is a percentage now: still 36% quieter at max, but it can never zero the mechanic out.']},
  {v:'7.3',d:'Sep 20',t:'Wanderers: people you meet out there who want your scrap',
   i:['SCRAP HAD NOWHERE LEFT TO GO. Every sink in this game was one-time - three upgrades per item, each base room once - while the faucets pay every single day. Finish your gear and your base and it just piles up.',
      'Clear a place now and there is a <b>1 in 5</b> chance somebody is picking through it. <b>Stitch</b> sells medicine, <b>Quill</b> sells ammo and a crossbow, <b>Old Sump</b> sells weapons and parts, and <b>Vesper</b> deals in things you cannot get anywhere else. They are gone the moment you move on.',
