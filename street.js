@@ -971,6 +971,14 @@ function musterShouldGo(){
   const rows=musterAll();if(!rows)return false;
   const mine=rows.find(r=>r.handle===musterMe());
   if(!mine||!mine.ready)return false;                  // I have not pressed Ready
+  // NOBODY ELSE HAS TURNED UP ON THE BOARD YET. "everyone is ready" is
+  // trivially true when everyone is one person - and callParty() marks the host
+  // ready the moment they call it, so on the very first 4-second tick the host
+  // was alone, unanimously ready, and the raid started by itself. Her report:
+  // "the party ended up starting on its own." A muster whose entire purpose is
+  // to WAIT must never read an empty room as consensus; alone it waits out the
+  // clock instead, which is the only honest meaning of "nobody else came".
+  if(rows.length<2)return Date.now()>=musterDeadline();
   if(Date.now()>=musterDeadline())return true;
   return rows.every(r=>r.ready);
 }
@@ -1081,8 +1089,12 @@ function renderMuster(){
     +'<div class="row" style="margin-top:8px;flex-wrap:wrap">'
     +rows.map(r=>'<span class="chip'+(r.ready?' a':'')+'">'+(r.ready?'✓ ':'… ')+esc(r.name)+(r.host?' (host)':'')+'</span>').join('')
     +'</div>'
-    +'<p class="help" style="margin-top:8px"><b>'+readyN+' of '+rows.length+' ready</b> · going in '
-    +(readyN===rows.length?'now':'in '+left+'s whatever happens')+'. Nobody starts before the rest.</p>'
+    +'<p class="help" style="margin-top:8px">'
+    +(rows.length<2
+      ? '<b>Waiting for your party to see this.</b> Nobody has picked it up yet · going in '+left+'s if nobody does.'
+      : '<b>'+readyN+' of '+rows.length+' ready</b> · going in '
+        +(readyN===rows.length?'now':'in '+left+'s whatever happens')+'. Nobody starts before the rest.')
+    +'</p>'
     +'<div class="grid2" style="margin-top:10px">'
     +'<button class="btn ghost" onclick="musterLeave()">Leave</button>'
     +(m.ready?'<button class="btn" disabled>Ready – waiting</button>'
