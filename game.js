@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.2';
+const VERSION='7.3';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1719,7 +1719,7 @@ function rivalAct(kind){
   const loc=S.loc;if(!loc||!loc.rival)return;const r=RIVALS.find(x=>x.id===loc.rival);const first=r.n.split("'")[0];
   if(kind==='race'){const p=0.5+(S.lvl-1)*0.03+roleLvl('scout')*0.05;if(Math.random()<p){loc.rival='';loc.rooms.forEach(rm=>rm.items.forEach(it=>{if(it.pts)it.pts=Math.round(it.pts*1.3);}));log('You beat '+first+' through the door. First pick of everything.');toast('You got there first','a');SFX.play('win');}
     else{loc.rival='';loc.rooms.forEach(rm=>{rm.items=rm.items.slice(0,1);});log(first+' got in first and stripped the place. Scraps left.');toast(first+' beat you to it','d');}}
-  else if(kind==='wait'){loc.rival='';loc.cleared=true;S.walk.toNext=Math.min(S.walk.dist,S.walk.toNext+150);S.walk.progress=S.walk.dist-S.walk.toNext;log('You waited out '+first+'. They cleared the walkers for you; it cost you 150 steps of daylight.');ctEvent('places',1);}
+  else if(kind==='wait'){loc.rival='';loc.cleared=true;rollWanderer(loc);S.walk.toNext=Math.min(S.walk.dist,S.walk.toNext+150);S.walk.progress=S.walk.dist-S.walk.toNext;log('You waited out '+first+'. They cleared the walkers for you; it cost you 150 steps of daylight.');ctEvent('places',1);}
   else if(kind==='trade'){if(S.pack.filter(x=>x.cat==='food').length<3){toast('Maya wants 3 food from your pack');return;}let n=0;S.pack=S.pack.filter(x=>{if(x.cat==='food'&&n<3){n++;return false;}return true;});for(let i=0;i<2;i++)S.pack.push({id:'abx',...ITEMS.abx,uid:uid()});loc.rival='';log('Traded 3 food to Maya for 2 antibiotics.');toast('Trade done','z');}
   else if(kind==='fight'){loc.rival='';const pw=nemPower();const en=[mk('raider'),mk('raider')];
     if(nem().lvl>=4)en.push(mk('gunner'));
@@ -1731,7 +1731,7 @@ function rivalAct(kind){
 function enterLoc(){
   const loc=S.loc;if(!loc||loc.cleared)return;
   const en=encounterFor(loc);
-  if(!en.length){loc.cleared=true;log(loc.n+' is quiet. You slip in.');ctEvent('places',1);save();render();return;}
+  if(!en.length){loc.cleared=true;rollWanderer(loc);log(loc.n+' is quiet. You slip in.');ctEvent('places',1);save();render();return;}
   gearCheck(()=>{const l2=S.loc;if(!l2||l2.cleared)return;startCombat(en,'enter');});
 }
 function pushStage(){const loc=S.loc;if(!loc||!loc.stronghold||loc.stage>=3)return;
@@ -2057,7 +2057,7 @@ function endCombat(won){
   const where=C.where;
   if(won){SFX.play('win');if(sk('secondwind'))S.hp=Math.min(maxHp(),S.hp+sk('secondwind')*6);
     log('Cleared '+C.enemies.length+' hostiles'+(where==='enter'&&S.loc?' inside '+S.loc.n:where==='road'?' on the road':'')+'.');
-    if(where==='enter'||where==='wave'){if(S.loc.stronghold&&where==='enter'){S.loc.stage++;S.loc.cleared=true;if(S.loc.stage>=3){S.campCleared=weekId();log('Stronghold cleared. The county is quieter for a while.');ctEvent('stronghold',1);}}else{S.loc.cleared=true;}if(where==='enter')ctEvent('places',1);}
+    if(where==='enter'||where==='wave'){if(S.loc.stronghold&&where==='enter'){S.loc.stage++;S.loc.cleared=true;if(S.loc.stage>=3){S.campCleared=weekId();log('Stronghold cleared. The county is quieter for a while.');ctEvent('stronghold',1);}}else{S.loc.cleared=true;rollWanderer(S.loc);}if(where==='enter')ctEvent('places',1);}
     if(where==='raid'){resolveRaidFight(true);}
     if(where==='watch'){watchReward(C.job);}
     if(where==='horde'){resolveHorde(true,true);}
@@ -2922,7 +2922,14 @@ function seasonClaimAll(){const r=seasonTierReady();if(!r.length){toast('Nothing
 function seasonCosmetic(slot){
   const pool=cosmeticPool().filter(c=>c.slot===slot&&!S.cosmetics.includes(c.id));
   const c=pool.length?pick(pool):null;
-  if(!c){S.stock.scrap+=60;log('Nothing new in that slot, so 60 scrap instead.');return;}
+  /* v7.3 - THE BIGGEST LATE-GAME SCRAP LEAK IN THE GAME. Once you own the pool
+     for a slot, every season reward in it converted to a flat 60 scrap - so the
+     longer you play, the more the season track becomes a scrap faucet, which is
+     exactly the inflation she is feeling. It pays in things that are not scrap
+     now: a chest key and parts, both of which have permanent sinks. */
+  if(!c){S.keys++;S.parts=partsHave()+4;
+    log('Nothing new in that slot - a chest key and 4 parts instead.');
+    toast('\u{1F5DD}\uFE0F +1 key · +4 parts','a');return;}
   S.cosmetics.push(c.id);
   S.seasonWorn=(S.seasonWorn||{});S.seasonWorn[c.id]=seasonNow().id;
   log('Season reward: '+c.n+'.');
@@ -3590,7 +3597,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();
+  renderOnline();renderStepsHelp();renderWanderer();renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -3677,6 +3684,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.3',d:'Sep 20',t:'Wanderers: people you meet out there who want your scrap',
+  i:['SCRAP HAD NOWHERE LEFT TO GO. Every sink in this game was one-time - three upgrades per item, each base room once - while the faucets pay every single day. Finish your gear and your base and it just piles up.',
+     'Clear a place now and there is a <b>1 in 5</b> chance somebody is picking through it. <b>Stitch</b> sells medicine, <b>Quill</b> sells ammo and a crossbow, <b>Old Sump</b> sells weapons and parts, and <b>Vesper</b> deals in things you cannot get anywhere else. They are gone the moment you move on.',
+     'Vesper is the one to save for: a <b>legendary weapon for 900 scrap</b>, and only ever one you do not already own. That is the first thing in this game worth saving across days.',
+     'And the biggest leak is closed: a season reward for a slot you have completed used to hand you 60 scrap. It gives a chest key and parts now - things with somewhere to be spent.']},
  {v:'7.2',d:'Sep 20',t:'Tune-up did nothing at all, and you were right to ask',
   i:['IT WAS THE ONLY DEAD PERK IN THE GAME. I checked all 64: <b>Tune-up</b> was the one whose code was never read anywhere, so up to three skill points bought you literally nothing.',
      'Its description was impossible anyway - "repairs restore more durability" when repairing has always filled a weapon all the way up. There was no partial repair for it to improve.',
@@ -4459,6 +4471,118 @@ async function testStepKey(){
    the shape that worked, it POSTs straight to the server, and no browser
    hand-off can misdeliver it. So the card asks which one she has FIRST, and
    each branch carries the test that can actually say anything about it. */
+
+/* ================= WANDERERS (v7.3) =================
+   Her brief: "Scrap should be used for other things to do as well, other types
+   of side quests, trading different npcs especially if we find them. Make some
+   things super rare and scrap a little more scarce."
+
+   The scrap problem was never the prices, it was the SHAPE: every sink in the
+   game is one-time (three upgrades per item, each base room once) while the
+   faucets are per-day. Finish your gear and your base and there is nothing left
+   to buy, forever. A wanderer is a sink that never closes - they turn up where
+   you cleared, they are gone when you move on, and what they carry is the only
+   place some of it can be bought at all. */
+const WANDERERS=[
+  {id:'stitch', n:'Stitch',  e:'\u{1FA7A}', line:'"I fix people. Mostly. You look like you can pay."',
+   pool:['kit','adrena','bloodbag','bandage','abx']},
+  {id:'quill',  n:'Quill',   e:'\u{1F3F9}', line:'"I do not fight. I sell to people who do."',
+   pool:['bolts','shells','ammo','key','crossbow']},
+  {id:'sump',   n:'Old Sump',e:'\u{1F527}', line:'"Everything here was somebody else\'s. Do not ask."',
+   pool:['sledge','katana','shotgun','key','parts']},
+  {id:'vesper', n:'Vesper',  e:'\u{1F576}️', line:'"I only come out for people who have scrap to lose."',
+   pool:['legend','legend','wanted','skull','badge']},
+];
+/* Priced against the trader she already knows: a chest key is 25 there and 40
+   here, because a wanderer is a luxury, not a supply line. The legendary line
+   is deliberately brutal - it is the first thing in this game worth saving for
+   across days rather than buying the moment you see it. */
+const WARES={
+  bandage:  {n:'Bandages (x3)',      e:'\u{1FA79}', c:26,  give:()=>{for(let i=0;i<3;i++)medsGive('bandage',1);}},
+  abx:      {n:'Antibiotics (x2)',   e:'\u{1F489}', c:55,  give:()=>{medsGive('abx',1);medsGive('abx',1);}},
+  kit:      {n:'Trauma kit',         e:'\u{1F9F0}', c:60,  give:()=>medsGive('kit',1)},
+  adrena:   {n:'Adrenaline shot',    e:'⚡',    c:80,  give:()=>medsGive('adrena',1)},
+  bloodbag: {n:'Blood bag',          e:'\u{1FA78}', c:120, give:()=>medsGive('bloodbag',1)},
+  ammo:     {n:'Rounds (x18)',       e:'\u{1F4E6}', c:30,  give:()=>addAmmoStock('ammo',18)},
+  shells:   {n:'Shells (x12)',       e:'\u{1F7E5}', c:38,  give:()=>addAmmoStock('shells',12)},
+  bolts:    {n:'Bolts (x24)',        e:'\u{1F3AF}', c:26,  give:()=>addAmmoStock('bolts',24)},
+  key:      {n:'Chest key',          e:'\u{1F5DD}️', c:40, give:()=>{S.keys++;}},
+  parts:    {n:'Salvaged parts (x6)',e:'⚙️', c:50, give:()=>{S.parts=partsHave()+6;}},
+  crossbow: {n:'Crossbow',           e:'\u{1F3F9}', c:110, r:'rare',  gear:'crossbow'},
+  sledge:   {n:'Sledgehammer',       e:'\u{1F528}', c:150, r:'epic',  gear:'sledge'},
+  katana:   {n:'Katana',             e:'\u{1F5E1}️', c:180, r:'epic', gear:'katana'},
+  shotgun:  {n:'Pump shotgun',       e:'\u{1F3AF}', c:170, r:'epic',  gear:'shotgun'},
+  wanted:   {n:'Wanted poster',      e:'\u{1F4DC}', c:140, r:'legendary', trophy:'wanted'},
+  skull:    {n:'Raider skull mask',  e:'\u{1F480}', c:130, r:'legendary', trophy:'skull'},
+  badge:    {n:'Sheriff badge',      e:'⭐',    c:120, r:'legendary', trophy:'badge'},
+};
+const WANDER_LEGEND=['mercy','lastword','oldreliable','whisper'];
+function wareLegend(){
+  const owned=new Set(S.gear.map(g=>g.id));
+  const left=WANDER_LEGEND.filter(id=>!owned.has(id));
+  if(!left.length)return null;
+  const id=pick(left);const G=GEAR[id];
+  return {k:'legend:'+id,n:G.n,e:G.e,c:900,r:'legendary',gear:id,legend:G.legend};
+}
+function wareOf(k){
+  if(k==='legend')return wareLegend();
+  const w=WARES[k];if(!w)return null;
+  return Object.assign({k},w);
+}
+// A wanderer turns up where you just cleared. They are gone when you move on,
+// which is the whole reason to buy now rather than come back later.
+function rollWanderer(loc){
+  if(!loc||loc.npc!==undefined)return;
+  if(!S.online||!S.lvl)return;
+  if(Math.random()>0.18){loc.npc=null;return;}
+  const w=pick(WANDERERS);
+  const seen=new Set();const stock=[];
+  for(const k of shuffleArr(w.pool.slice())){
+    const it=wareOf(k);
+    if(!it||seen.has(it.k))continue;
+    seen.add(it.k);stock.push(it);
+    if(stock.length>=3)break;
+  }
+  if(!stock.length){loc.npc=null;return;}
+  loc.npc={id:w.id,stock};
+  log(w.n+' is picking through '+loc.n+'. They will trade.');
+  toast(w.e+' '+w.n+' is here','l');SFX.play('rare');
+}
+function shuffleArr(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function wanderBuy(i){
+  const loc=S.loc;if(!loc||!loc.npc)return;
+  const it=loc.npc.stock[i];if(!it||it.sold)return;
+  if(S.stock.scrap<it.c){toast('Need '+it.c+' scrap. You have '+fmt(S.stock.scrap)+'.','d');return;}
+  S.stock.scrap-=it.c;it.sold=true;
+  if(it.gear){const g={uid:uid(),id:it.gear,...GEAR[it.gear]};S.gear.push(g);
+    log('Bought '+it.n+' off '+wanderName()+' for '+it.c+' scrap. It is in your Gear.');}
+  else if(it.trophy){const T=ITEMS[it.trophy];S.shelf.push({id:it.trophy,n:T.n,e:T.e});
+    log('Bought '+it.n+' off '+wanderName()+' for '+it.c+' scrap. It is on your shelf.');}
+  else{it.give();log('Bought '+it.n+' off '+wanderName()+' for '+it.c+' scrap.');}
+  toast(it.e+' '+it.n,(it.r==='legendary'?'l':it.r==='epic'?'p':'a'));
+  SFX.play(it.r==='legendary'?'legend':'chest');
+  save();render();
+}
+function wanderName(){const loc=S.loc;const w=loc&&loc.npc&&WANDERERS.find(x=>x.id===loc.npc.id);return w?w.n:'a wanderer';}
+function renderWanderer(){
+  const el=$('#npcCard');if(!el)return;
+  const loc=S.loc;
+  if(!loc||!loc.npc){el.hidden=true;return;}
+  const w=WANDERERS.find(x=>x.id===loc.npc.id);if(!w){el.hidden=true;return;}
+  el.hidden=false;el.className='card steel';
+  const rows=loc.npc.stock.map((it,i)=>{
+    const afford=S.stock.scrap>=it.c;
+    return '<button class="tr'+(afford&&!it.sold?'':' off')+'" onclick="wanderBuy('+i+')"'+(it.sold?' disabled':'')+'>'
+      +'<span class="e">'+it.e+'</span><b class="rc-'+esc(it.r||'common')+'">'+esc(it.n)+'</b>'
+      +(it.legend?'<span class="help" style="display:block">'+esc(it.legend)+'</span>':'')
+      +'<span>'+(it.sold?'sold':fmt(it.c)+'\u{1F529}')+'</span></button>';
+  }).join('');
+  el.innerHTML='<h2>'+w.e+' '+esc(w.n)+' <span class="sub">passing through</span></h2>'
+    +'<p class="help" style="font-style:italic">'+esc(w.line)+'</p>'
+    +'<div class="trgrid" style="margin-top:8px">'+rows+'</div>'
+    +'<p class="help" style="margin-top:8px">You have <b>'+fmt(S.stock.scrap)+'</b> scrap. '
+    +'<b>They are gone once you move on</b> - nothing here comes back.</p>';
+}
 function renderStepSync(){
   const el=$('#stepSyncBody');if(!el)return;const o=O();
   if(!o.ok){el.innerHTML='<p class="help">Sign in above first. Your shortcut code lives on the server, so the game has to be online to show it to you.</p>';return;}
