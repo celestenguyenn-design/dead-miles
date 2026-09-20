@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.16';
+const VERSION='7.17';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3766,14 +3766,33 @@ function drawScene(t){
   const bx=W*0.55+(1-prog)*W*0.7;drawBuilding(bx,S.loc?S.loc.t:'house',S.loc?S.loc.e:'');
   const rz=mulberry(S.walk.houses+3);for(let i=0;i<2;i++){const zx=bx+230+i*80+rz()*40;if(zx<W+40){const sway=Math.sin(t/500+i)*3;const lean=Math.sin(t/900+i)*4;drawSprite(ART.zombieSVG(i===0?'walker':'runner',100),zx+lean,300+sway,110);}}
   // crew behind, pet in front
-  const ac=activeCrew();ac.slice(0,2).forEach((c,i)=>drawSprite(ART.avatarSVG(c.av,100),W*0.26-70-i*55,300-(walking?Math.abs(Math.sin(t/140+i+1))*5:Math.sin(t/800+i)*1.5),105));
-  drawSprite(ART.avatarSVG(S.av,100,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''}),W*0.26,296-bob,120);
+  // The wanderer, standing outside the place you just cleared. They shift their
+  // weight while they wait; they are a person, not a signpost.
+  if(S.loc&&S.loc.npc&&S.loc.npc.id){
+    const nsway=reduced?0:Math.sin(t/760)*2.2, nlean=reduced?0:Math.sin(t/1130)*2;
+    drawSprite(ART.avatarSVG(blinkAv(wanderAv(S.loc.npc.id),t,5),100),bx-104+nlean,300+nsway,112);
+  }
+  const ac=activeCrew();ac.slice(0,2).forEach((c,i)=>drawSprite(ART.avatarSVG(blinkAv(c.av,t,i+1),100),W*0.26-70-i*55,300-(walking?Math.abs(Math.sin(t/140+i+1))*5:Math.sin(t/800+i)*1.5),105));
+  drawSprite(ART.avatarSVG(blinkAv(S.av,t,0),100,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':''}),W*0.26,296-bob,120);
   if(S.pet)drawSprite(ART.petSVG(S.pet,64,S.petCoat,{still:true}),W*0.26+70,356-(walking?Math.abs(Math.sin(t/110))*6:Math.abs(Math.sin(t/700))*1.5),62);
   // weather particles
   if(!reduced&&(k==='rain'||k==='storm'||k==='snow')){if(particles.length<(k==='snow'?80:140))particles.push({x:Math.random()*W,y:Math.random()*H,v:k==='snow'?rnd(.6,1.4):rnd(6,10),d:rnd(-1,1)});ctx.strokeStyle=k==='snow'?'rgba(255,255,255,.8)':'rgba(180,200,230,.5)';ctx.lineWidth=k==='snow'?3:1.5;ctx.lineCap='round';for(const p of particles){ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x+(k==='snow'?0:-2),p.y+(k==='snow'?2:14));ctx.stroke();p.y+=p.v*(k==='snow'?1:4);p.x+=k==='snow'?Math.sin(t/800+p.d)*.8:-1;if(p.y>H){p.y=-10;p.x=Math.random()*W;}}}
   if(k==='storm'&&!reduced&&Math.random()<0.01){ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(0,0,W,H);}
   const fog=ctx.createLinearGradient(0,H-110,0,H);fog.addColorStop(0,'rgba(20,18,22,0)');fog.addColorStop(1,'rgba(20,18,22,.95)');ctx.fillStyle=fog;ctx.fillRect(0,H-110,W,110);
   if(k==='fog'){ctx.fillStyle='rgba(120,120,130,.35)';ctx.fillRect(0,0,W,H);}
+}
+// The DOM avatars blink with SMIL; a canvas sprite cannot, because spriteImg
+// hands the SVG to an <img src="data:..."> and browsers do not animate those.
+// So the scene blinks by SWAPPING to a second sprite with closed eyes for a
+// fraction of a second. spriteImg caches on the SVG string, so this costs two
+// cached images per character rather than a new one every frame. Each character
+// gets its own period and offset from `seed`, so nobody blinks in unison.
+function blinkAv(av,t,seed){
+  // With reduced motion the scene draws ONCE, so a blink would freeze the eyes
+  // shut forever on whatever frame it landed on. Never blink in that mode.
+  if(reduced)return av;
+  const period=3400+seed*610;
+  return ((t+seed*937)%period)<140?Object.assign({},av,{eyes:'sleepy'}):av;
 }
 function drawSprite(svg,x,y,h){const img=ART.spriteImg(svg);if(!img.complete||!img.naturalWidth){img.onload=()=>animateOnce();return;}const w=h*img.naturalWidth/img.naturalHeight;ctx.drawImage(img,x-w/2,y,w,h);}
 function drawBuilding(x,kind,emoji){const w=220,h=170,y=290-h;const col={house:'#4a3d44',pharmacy:'#2f4a5a',gas:'#5a4a2f',grocery:'#2f5a44',police:'#2f3a5a',clinic:'#5a2f3a',hardware:'#5a3f2f',surplus:'#3f4a2f',diner:'#6a3a2a',stronghold:'#5a2a22'}[kind]||'#4a3d44';
@@ -4857,6 +4876,20 @@ async function testStepKey(){
    to buy, forever. A wanderer is a sink that never closes - they turn up where
    you cleared, they are gone when you move on, and what they carry is the only
    place some of it can be bought at all. */
+// Her friend's report: "Sully is here" / "Old Vesper is here" but no NPC anywhere.
+// Verified - and they were right, in the most literal way. rollWanderer() set
+// loc.npc, logged it, toasted it and rendered a trade card, and the road scene
+// drew the building, the zombies, the crew, the player and the pet and NOTHING
+// for the wanderer. Someone announced themselves and then was simply not there.
+// Each one now has a fixed look, so meeting Vesper twice means meeting the same
+// person twice - which is the whole point of naming them.
+const WANDER_AV={
+  stitch:{skin:2,hair:'bun',   hairColor:5,eyes:'round', top:'labcoat', topColor:0,acc:'glasses'},
+  quill: {skin:1,hair:'braid', hairColor:2,eyes:'almond',top:'flannel', topColor:4,hat:'beanie'},
+  sump:  {skin:3,hair:'buzz',  hairColor:5,eyes:'round', top:'overalls',topColor:3,hat:'cap',beard:'full'},
+  vesper:{skin:0,hair:'long',  hairColor:0,eyes:'almond',top:'biker',   topColor:0,acc:'shades'},
+};
+function wanderAv(id){return WANDER_AV[id]||WANDER_AV.stitch;}
 const WANDERERS=[
   {id:'stitch', n:'Stitch',  e:'\u{1FA7A}', line:'"I fix people. Mostly. You look like you can pay."',
    pool:['kit','adrena','bloodbag','bandage','abx']},
