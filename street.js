@@ -260,8 +260,10 @@ function updateMarkers(){
           // putting it on a map. Every house stays visible (she asked for that);
           // the landmark just wears a ring so a direction is obvious.
           const lm=landmarkOf(p);
-          if(lm)return `<div class="poi ${st} lmk"><span>${lm.e}</span></div>`;
-          return `<div class="poi ${st}${p.t==='stronghold'?' sh':''}"><span>${p.e}</span></div>`;
+          const tt=poiTierOf(p);
+          const tc=(S.base&&S.base.geo&&tt)?' t'+tt.k:'';
+          if(lm)return `<div class="poi ${st} lmk${tc}"><span>${lm.e}</span></div>`;
+          return `<div class="poi ${st}${p.t==='stronghold'?' sh':''}${tc}"><span>${p.e}</span></div>`;
         })();
     const had=STREET.markers[p.id];
     if(!had){const m=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'poi-wrap',html,iconSize:[34,34],iconAnchor:[17,17]})}).addTo(STREET.map);m.on('click',()=>{const rr=raidAt(p);if(rr)openRaid(p.id);else tapPoi(p.id);});m._dmHtml=html;STREET.markers[p.id]=m;}
@@ -443,6 +445,29 @@ function renderRaidList(){
       +'</button>';}).join('');
 }
 
+// What band the ground under her feet is in. Without this the tiers are real but
+// invisible: she opens the map, sees the same houses as before, and has no way
+// to know which ones changed. Her question, exactly: "how do you really know if
+// I'm home in an area".
+function hereTier(){
+  if(!S.base||!S.base.geo||!STREET.pos)return null;
+  return farTierFor(geoDist(S.base.geo,STREET.pos));
+}
+function tierLegend(){
+  // No base pin means NOTHING is tiered - farTierFor(null) answers "Nearby" for
+  // the whole map and the feature quietly does nothing. That must be loud, not
+  // silent, because the pin is the thing that defines where "home" is.
+  if(!S.base||!S.base.geo)
+    return '<div class="note" style="margin-top:8px"><b>No base pin yet.</b> Distance is measured from it, '
+      +'so until you drop one every place counts as ordinary. Tap <b>Move my base pin here</b> while you are at home.</div>';
+  const t=hereTier();const d=homeDistance();
+  return '<div class="note" style="margin-top:8px"><b>'+esc(t?t.n:'\u2014')+'</b>'
+    +(d!==null?' \u00b7 '+(d>=1000?(d/1000).toFixed(1)+' km':Math.round(d)+' m')+' from your base':'')
+    +'<br><span class="help">'+esc(t?t.d:'')+'</span>'
+    +'<div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap">'
+    +FAR_TIERS.map(x=>'<span class="chip tl t'+x.k+(t&&t.k===x.k?' a':'')+'">'+esc(x.n)+'</span>').join('')
+    +'</div></div>';
+}
 function renderStreet(){
   if(!STREET.on)return;const hd=homeDistance();
   try{renderRaidList();}catch(e){}
@@ -462,7 +487,8 @@ function renderStreet(){
   el.innerHTML=`<span class="chip s">GPS ±${STREET.pos?Math.round(STREET.pos.acc):'?'} m${sp>1.2?' · '+(sp*3.6).toFixed(0)+' km/h':''}</span>`
     +`<span class="chip${(lock||!near)?' d':''}" id="mapNear">${nearTxt}</span>`
     +`${hd!==null?`<span class="chip a">Base ${Math.round(hd)} m</span>`:'<span class="chip">No base yet</span>'}`
-    +`<span class="chip d">${STREET.zombies.length} on the street</span>`;
+    +`<span class="chip d">${STREET.zombies.length} on the street</span>`
+    +tierLegend();
 }
 
 /* ================= LIVE RAIDS (v6.21) =================
@@ -552,7 +578,9 @@ function raidSheet(r){
         :'<p class="help" style="margin-top:6px">Go in at the same time as a friend and you fight it as a squad - it takes turns on you, so it hits each of you half as often.</p>';})()
     +raidPayout(r.tier,near)
     +'<div class="grid2" style="margin-top:10px">'
-    +'<button class="btn ghost" onclick="shareRaid(\''+esc(r.poi)+'\')">Invite a friend</button>'
+    +(partyHandles().length>1
+       ?'<button class="btn a" onclick="callParty(\''+esc(r.poi)+'\')">Call the party</button>'
+       :'<button class="btn ghost" onclick="shareRaid(\''+esc(r.poi)+'\')">Invite a friend</button>')
     +(mine?'<button class="btn" disabled>You fought this one</button>'
       :dead?'<button class="btn" disabled>Already down</button>'
       :near?'<button class="btn r" onclick="joinRaid(\''+esc(r.poi)+'\')">Join the raid</button>'
@@ -766,6 +794,184 @@ function liveRaidAfter(won){
   save();render();pushPlayer();
 }
 
+/* ================= THE MUSTER (v7.20) =================
+   Her report, three times over: "they join too late", "there has to be a way
+   where we're basically partied up and go into a raid together".
+
+   It was never a bug. There was no START GATE. You tapped a raid and your fight
+   began, locally, immediately; your friend tapped whenever they next looked at
+   their phone and THEIR fight began. The server summed damage under each handle
+   and that was the whole of "together". Nothing existed to join, which is why
+   posting damage every 6 s (v7.5) fixed the reporting and could not fix this.
+
+   A muster is the gate. The host calls it, everyone in the party gets a card
+   with a READY button and a 90-second clock, and NOBODY'S COMBAT STARTS until
+   everyone ready is in - then all clients begin against the same boss HP with
+   the same roster.
+
+   No new SQL: the muster rides on public state and the board everyone already
+   polls, exactly like the flare does. It polls fast (4 s) only while a muster is
+   open, instead of the normal 3 minutes.                                      */
+const MUSTER_WINDOW=90000;      // the host's clock: go with whoever is ready
+const MUSTER_POLL=4000;
+let MUSTER_TIMER=0;
+
+function musterMe(){return squadMe();}
+function partyHandles(){
+  return ((S.party&&S.party.data&&S.party.data.members)||[]).map(x=>String(x).toLowerCase()).filter(Boolean);
+}
+// Everyone's muster entry for the same raid - mine plus whatever the board says.
+function musterAll(){
+  const m=S.muster;if(!m||!m.id)return null;
+  const me=musterMe();
+  const rows=[{handle:me,name:S.name||me,ready:!!m.ready,host:m.host===me,at:m.at}];
+  for(const f of (typeof friends!=='undefined'?friends:[])){
+    const h=(f.handle||'').toLowerCase();if(!h||h===me)continue;
+    const fm=f.pub&&f.pub.muster;
+    if(!fm||fm.id!==m.id)continue;
+    rows.push({handle:h,name:(f.pub&&f.pub.name)||h,ready:!!fm.ready,host:fm.host===h,at:fm.at});
+  }
+  return rows;
+}
+function musterOpen(){
+  const m=S.muster;
+  if(!m||!m.id||m.started)return false;
+  if(m.endsAt&&m.endsAt<=Date.now())return false;      // the raid itself expired
+  return true;
+}
+function musterDeadline(){
+  const rows=musterAll();if(!rows)return 0;
+  const host=rows.find(r=>r.host)||rows[0];
+  return (host.at||Date.now())+MUSTER_WINDOW;
+}
+// Start when everyone who turned up is ready, or the host's clock runs out.
+// "Everyone who turned up" is deliberately not "everyone in the party": a
+// party member who has not opened the game must never be able to hold the
+// fight hostage.
+function musterShouldGo(){
+  if(!musterOpen())return false;
+  const rows=musterAll();if(!rows)return false;
+  const mine=rows.find(r=>r.handle===musterMe());
+  if(!mine||!mine.ready)return false;                  // I have not pressed Ready
+  if(Date.now()>=musterDeadline())return true;
+  return rows.every(r=>r.ready);
+}
+// The roster is sorted, so every client independently computes the SAME order
+// with nothing to arbitrate. That is what makes the turn rotation agree across
+// phones without a server refereeing it.
+function musterRoster(){
+  const rows=musterAll()||[];
+  return rows.filter(r=>r.ready).map(r=>({handle:r.handle,name:r.name})).sort((a,b)=>a.handle<b.handle?-1:1);
+}
+function callParty(poiId){
+  const p=STREET.pois.find(x=>x.id===poiId);const r=p&&raidAt(p);if(!r)return;
+  const o=O();
+  if(!o.ok){toast('Go online first - a muster needs your handle','d');return;}
+  const party=partyHandles();
+  if(party.length<2){toast('Join a party first (Party card, under You)','d');return;}
+  S.muster={id:r.id,poi:r.poi,n:r.n,w:r.w,tier:r.tier,boss:r.boss,endsAt:r.endsAt,
+            host:musterMe(),at:Date.now(),ready:true,started:false};
+  // keep the old flare too, so people outside the party still get the call
+  shareRaid(poiId);
+  save();pushPlayer();render();musterStartPolling();
+  log('Called a muster on the tier '+r.tier+' raid at '+r.n+'. Nobody goes in until everyone is ready.');
+  toast('Muster called · waiting on the party','l');
+}
+// Joining someone else's muster from the board.
+function musterAccept(id){
+  const me=musterMe();
+  for(const f of (typeof friends!=='undefined'?friends:[])){
+    const fm=f.pub&&f.pub.muster;
+    if(!fm||fm.id!==id)continue;
+    S.muster={id:fm.id,poi:fm.poi,n:fm.n,w:fm.w,tier:fm.tier,boss:fm.boss,endsAt:fm.endsAt,
+              host:fm.host,at:fm.at,ready:false,started:false,remote:true};
+    save();pushPlayer();render();musterStartPolling();
+    toast('Joined the muster · tap Ready','a');
+    return;
+  }
+  toast('That muster is gone','d');
+}
+function musterReady(){
+  if(!S.muster)return;
+  S.muster.ready=true;save();pushPlayer();render();
+  musterStartPolling();musterTick();
+}
+function musterLeave(){
+  S.muster=null;save();pushPlayer();render();musterStopPolling();toast('Left the muster');
+}
+function musterStartPolling(){
+  if(MUSTER_TIMER)return;
+  MUSTER_TIMER=setInterval(musterTick,MUSTER_POLL);
+}
+function musterStopPolling(){if(MUSTER_TIMER)clearInterval(MUSTER_TIMER);MUSTER_TIMER=0;}
+async function musterTick(){
+  if(!S.muster||S.muster.started){musterStopPolling();renderMuster();return;}
+  if(!musterOpen()){S.muster=null;save();pushPlayer();musterStopPolling();render();return;}
+  if(typeof loadFriends==='function')try{await loadFriends();}catch(e){}
+  renderMuster();
+  if(musterShouldGo())musterGo();
+}
+// Everyone starts here, against the same boss, with the same roster.
+async function musterGo(){
+  const m=S.muster;if(!m||m.started)return;
+  m.started=true;save();musterStopPolling();
+  const roster=musterRoster();
+  const r={id:m.id,poi:m.poi,n:m.n,w:m.w,tier:m.tier,boss:m.boss,endsAt:m.endsAt,T:RAID_TIERS[m.tier-1]};
+  // seed from ONE shared read so nobody opens on a fresh boss while a squadmate
+  // is already halfway through it
+  const st=await raidSync(r,0);
+  const names=roster.map(x=>x.name).join(', ');
+  log('Muster complete – going in with '+names+'.');
+  toast('Going in together · '+roster.length+' of you','l');
+  MUSTER_ROSTER=roster;
+  S.muster=null;save();pushPlayer();
+  enterRaid(r,!raidNear(r));
+}
+let MUSTER_ROSTER=null;
+function renderMuster(){
+  const el=$('#musterCard');if(!el)return;
+  // an invitation from somebody else that I have not accepted yet
+  if(!S.muster){
+    const me=musterMe();let inv=null;
+    for(const f of (typeof friends!=='undefined'?friends:[])){
+      const fm=f.pub&&f.pub.muster;
+      if(!fm||!fm.id||fm.started)continue;
+      if((f.handle||'').toLowerCase()===me)continue;
+      if(!partyHandles().includes((f.handle||'').toLowerCase()))continue;
+      if(fm.endsAt&&fm.endsAt<=Date.now())continue;
+      if((S.raidsDone||{})[fm.id])continue;
+      if((fm.at||0)+MUSTER_WINDOW<=Date.now())continue;
+      inv={fm,from:(f.pub&&f.pub.name)||f.handle};break;
+    }
+    if(!inv){el.hidden=true;return;}
+    el.hidden=false;el.className='card blood';
+    const left=Math.max(0,Math.round(((inv.fm.at||0)+MUSTER_WINDOW-Date.now())/1000));
+    el.innerHTML='<h2>\u{1F4E3} '+esc(inv.from)+' is calling the party</h2>'
+      +'<p><b style="color:var(--bone)">'+esc(inv.fm.boss||'A raid')+'</b> · tier '+inv.fm.tier+' at '+esc(inv.fm.n||'')+'</p>'
+      +'<p class="help">Nobody goes in until everyone is ready. <b>'+left+'s</b> left.</p>'
+      +'<div class="grid2" style="margin-top:10px">'
+      +'<button class="btn ghost" onclick="S.callsHidden=(S.callsHidden||[]).concat([\''+esc(inv.fm.id)+'\']);save();render()">Not now</button>'
+      +'<button class="btn r" onclick="musterAccept(\''+esc(inv.fm.id)+'\')">Join the muster</button></div>';
+    return;
+  }
+  const m=S.muster,rows=musterAll()||[];
+  el.hidden=false;el.className='card blood';
+  const left=Math.max(0,Math.round((musterDeadline()-Date.now())/1000));
+  const readyN=rows.filter(r=>r.ready).length;
+  el.innerHTML='<h2>\u{1F4E3} Muster <span class="sub">tier '+m.tier+'</span></h2>'
+    +'<p><b style="color:var(--bone)">'+esc(m.boss||'')+'</b> · '+esc(m.n||'')+'</p>'
+    +'<div class="row" style="margin-top:8px;flex-wrap:wrap">'
+    +rows.map(r=>'<span class="chip'+(r.ready?' a':'')+'">'+(r.ready?'✓ ':'… ')+esc(r.name)+(r.host?' (host)':'')+'</span>').join('')
+    +'</div>'
+    +'<p class="help" style="margin-top:8px"><b>'+readyN+' of '+rows.length+' ready</b> · going in '
+    +(readyN===rows.length?'now':'in '+left+'s whatever happens')+'. Nobody starts before the rest.</p>'
+    +'<div class="grid2" style="margin-top:10px">'
+    +'<button class="btn ghost" onclick="musterLeave()">Leave</button>'
+    +(m.ready?'<button class="btn" disabled>Ready – waiting</button>'
+             :'<button class="btn r" onclick="musterReady()">Ready</button>')
+    +'</div>';
+}
+
 /* ================= SQUAD RAIDS (v6.63) =================
    Her ask: the people she actually walks with should be able to fight the same
    raid together, taking turns, "that way it's not as hard."
@@ -797,6 +1003,21 @@ function squadStart(r,st){
   squadStop();
   SQUAD.on=true;SQUAD.r=r;SQUAD.mates={};SQUAD.seen={};SQUAD.posted=0;
   SQUAD.base=(st&&st.hits)?Object.assign({},st.hits):{};
+  // A MUSTERED raid knows its roster before a single blow lands, so the squad is
+  // real from round one. Without this the split only began once a squadmate's
+  // damage was first seen on the board - up to 6 s in, and the rounds before it
+  // were fought alone. That delay is what "they join too late" felt like from
+  // inside the fight, even after the reporting was fixed.
+  if(typeof MUSTER_ROSTER!=='undefined'&&MUSTER_ROSTER&&MUSTER_ROSTER.length>1){
+    const me=squadMe();const now=Date.now();
+    for(const p of MUSTER_ROSTER){
+      if(p.handle===me)continue;
+      SQUAD.mates[p.handle]={name:p.name,last:now,dmg:0,mustered:true};
+    }
+    C.roster=MUSTER_ROSTER.map(p=>p.handle);
+    C.turnOf=C.roster.indexOf(me);
+  }
+  MUSTER_ROSTER=null;
   SQUAD.timer=setInterval(squadPoll,6000);
 }
 function squadStop(){if(SQUAD.timer)clearInterval(SQUAD.timer);SQUAD.timer=0;SQUAD.on=false;SQUAD.r=null;}

@@ -493,3 +493,16 @@ a{color:var(--amber)}
 .poi.lmk{box-shadow:0 0 0 3px rgba(230,165,48,.9),0 0 16px rgba(230,165,48,.65);border-color:var(--amber);z-index:500}
 .poi.lmk::after{content:'';position:absolute;inset:-7px;border-radius:50%;border:2px solid rgba(230,165,48,.45);animation:lmkring 2.6s ease-in-out infinite}
 @keyframes lmkring{0%,100%{transform:scale(1);opacity:.75}50%{transform:scale(1.18);opacity:.25}}
+
+/* Distance-tier pins (v7.20). The tiers were real from v7.19 but invisible -
+   she opened the map, saw the same houses and asked how she was meant to tell.
+   Every house still shows; the ring says what band it is in. */
+.poi.t0{opacity:.62;filter:saturate(.55)}
+.poi.t1{box-shadow:0 0 0 2px rgba(185,178,164,.45)}
+.poi.t2{box-shadow:0 0 0 2px rgba(90,169,230,.85),0 0 10px rgba(90,169,230,.45)}
+.poi.t3{box-shadow:0 0 0 2px rgba(230,165,48,.95),0 0 14px rgba(230,165,48,.6)}
+.chip.tl{font-size:10px;letter-spacing:.04em;opacity:.55}
+.chip.tl.t0{border-color:rgba(185,178,164,.35)}
+.chip.tl.t2{border-color:rgba(90,169,230,.7);color:var(--r-rare)}
+.chip.tl.t3{border-color:rgba(230,165,48,.8);color:var(--amber)}
+.chip.tl.a{opacity:1;font-weight:700}

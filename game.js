@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.19';
+const VERSION='7.20';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -262,7 +262,7 @@ const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic co
 
 /* ================= state ================= */
 let S=null;
-function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},infect:null,diff:'normal',mapSkin:'bloom',checkin:{date:'',n:0},ladder:{date:'',hit:[]},
+function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,muster:null,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},infect:null,diff:'normal',mapSkin:'bloom',checkin:{date:'',n:0},ladder:{date:'',hit:[]},
   steps:{total:0,today:0,date:todayStr(),lastSync:0,lastSyncDate:''},
   walk:{toNext:0,dist:500,district:0,houses:0,progress:0,banked:0},
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
@@ -3351,7 +3351,13 @@ async function goOnline(handle,token){
   }catch(e){o.ok=false;o.err=e.message;save();render();}
 }
 function compactSave(){const c=JSON.parse(JSON.stringify(S));delete c.online;delete c.journal;delete c.wx;delete c.combat;if(c.party)delete c.party.data;return c;}
-function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code,raiding:(S.raidCur?{id:S.raidCur.id,n:S.raidCur.n,tier:S.raidCur.tier,at:Date.now()}:null),flare:(S.flare&&S.flare.endsAt>Date.now())?S.flare:null},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:ammoTotal()}};}
+function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code,raiding:(S.raidCur?{id:S.raidCur.id,n:S.raidCur.n,tier:S.raidCur.tier,at:Date.now()}:null),flare:(S.flare&&S.flare.endsAt>Date.now())?S.flare:null,
+    // The muster rides here for the same reason the flare does: every client
+    // already polls this board, so a ready-check needs no new table.
+    muster:(S.muster&&!S.muster.started&&(S.muster.at||0)+90000>Date.now())?
+      {id:S.muster.id,poi:S.muster.poi,n:S.muster.n,w:S.muster.w,tier:S.muster.tier,
+       boss:S.muster.boss,endsAt:S.muster.endsAt,host:S.muster.host,at:S.muster.at,
+       ready:!!S.muster.ready,started:!!S.muster.started}:null},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:ammoTotal()}};}
 let pushTimer=0;let pushSoonTimer=0;function pushSoon(){clearTimeout(pushSoonTimer);pushSoonTimer=setTimeout(()=>pushPlayer(),8000);}
 function pushPlayer(){const o=O();if(!o.ok||!S.onboarded||STALE)return Promise.resolve();clearTimeout(pushTimer);return new Promise(res=>{pushTimer=setTimeout(async()=>{try{rollWeek();
   const ok=await rpc('save_player',{p_handle:o.handle,p_token:o.token,p_name:S.name,p_tier:S.league.tier,p_week:S.league.week,p_score:S.league.score,p_state:publicState()});
@@ -4031,7 +4037,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();
+  renderOnline();renderStepsHelp();renderWanderer();if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
