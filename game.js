@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.5';
+const VERSION='7.6';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3584,6 +3584,17 @@ function render(){
     <div class="help" style="margin-top:4px">${S.base.geo?'This is also your <b>home</b> on the live map - same place, one pin. Stand within 60 m of it to stash.':'No map pin yet. Set one from the live map if you want to stash out walking.'}</div></div></div>`;}
   $('#baseAlert').hidden=!(S.raidPending&&S.base&&S.base.rooms.tower);
   $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(AMMO_KINDS.filter(k=>k!=='ammo'&&(S.stock[k]||0)>0)).concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',shells:'🟥',bolts:'🎯',candy:'🍬'}[k]}</div><b>${k==='meds'?medsTotal():(S.stock[k]||0)}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`
+    /* v7.6 - THE CHEST BUTTON WAS A DANGLING EXPRESSION. It lived on its own
+       line as `+(S.stock.chests>0? ... )` SIXTEEN lines below the assignment it
+       was meant to extend, with a whole meds-rendering block in between. After
+       that block's closing braces JavaScript starts a new statement, so it
+       parsed as unary plus on a string - computed every render, evaluated to
+       NaN, and thrown away. No error, no warning, and the chests were never
+       destroyed: they sat safe in S.stock.chests with nothing on screen to open
+       them. Her words, and the 'again' is earned - v6.50 and v6.51 were both
+       chests going missing: "Locked chests are gone again?"
+       It is part of the assignment now, where it cannot detach. */
+    +(S.stock.chests>0?`<button class="s chestbtn" onclick="openStashChest()"><div class="e">🧳</div><b>${S.stock.chests}</b><span>${S.keys>0?'Open one':sk('lockpick')?'Pick one':'Locked'}</span></button>`:'');
   // Break the med pile out by tier and say what each is worth against HER bar
   // right now, so a trauma kit is visibly not a bandage.
   {const el=$('#medRow');if(el){const have=medsAll();
@@ -3594,7 +3605,6 @@ function render(){
         +'</div>'
         +(packMedsTotal()?'<p class="help" style="margin-top:4px">Meds <b>on you</b> are in your pack - you lose them if you go down, so spend those first.</p>':'')
       : '<p class="help">No meds. The trader sells everything from bandages to a blood bag.</p>';}}
-    +(S.stock.chests>0?`<button class="s chestbtn" onclick="openStashChest()"><div class="e">🧳</div><b>${S.stock.chests}</b><span>${S.keys>0?'Open one':sk('lockpick')?'Pick one':'Locked'}</span></button>`:'');
   $('#dropRow').hidden=!(S.base&&S.base.rooms.radio);const used=S.flags.dropDate===S.steps.date;$('#dropBtn').textContent=used?'📻 Drop used today':'📻 Call in today\'s supply drop';$('#dropBtn').classList.toggle('ghost',used);$('#dropHelp').textContent=used?'Next one after midnight.':'Three free items into your pack.';
   const wk=S.work;$('#workCard').hidden=!(S.base&&wk);if(S.base&&wk){$('#workCard').innerHTML=`<h2>Under construction <span class="sub">${BUILD[wk.k].e} ${BUILD[wk.k].n} L${wk.lvl}</span></h2><div class="progress" style="margin-top:8px"><div class="bar"><i style="width:${Math.min(100,wk.done/wk.need*100)}%;background:linear-gradient(90deg,var(--amber),#ffd166)"></i></div><div class="row"><span><b>${fmt(Math.min(wk.done,wk.need))}</b> / ${fmt(wk.need)} steps of work</span><span>${fmt(Math.max(0,wk.need-wk.done))} to go</span></div></div><p class="help" style="margin-top:6px">Every step you walk is labor on it. Bigger builds take more walking. One job at a time.</p><div class="row" style="margin-top:6px"><button class="btn sm ghost" onclick="cancelWork()">Cancel (refund ${wk.scrap} scrap)</button></div>`;}
   $('#build').innerHTML=S.base?Object.entries(BUILD).map(([k,b])=>{const l=S.base.rooms[k]||0;const c=buildCost(k);const lb=buildLabor(k);const busy=!!S.work;return `<div class="room2${l?' own':''}"><div class="e">${b.e}</div><div class="t"><b>${b.n}${l?' L'+l:''}${b.def[l-1]?' · +'+b.def[l-1]+' def':''}</b><span>${b.d}${c!==null?' · next: '+c+' scrap + '+fmt(lb)+' steps':' · maxed'}</span></div>${c!==null?(busy&&S.work.k===k?'<span class="chip a">building</span>':`<button class="btn sm a" onclick="build('${k}')"${busy?' disabled':''}>Build</button>`):'<span class="chip z">max</span>'}</div>`;}).join(''):'<p class="help">Claim a base to build.</p>';
@@ -3699,6 +3709,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.6',d:'Sep 20',t:'Your locked chests were never lost - there was just no button',
+  i:['THEY WERE SAFE THE WHOLE TIME. Every chest you stashed was sitting in your save; the button to open them simply stopped being drawn.',
+     'The code that adds it had drifted onto its own line sixteen lines below the thing it was supposed to attach to, with a whole block in between - so JavaScript read it as a separate statement, worked it out, and threw it away. Every single render. No error, nothing in the log.',
+     'It is part of the stash grid again, where it cannot come loose. Open your Base and the <b>🧳 Open one</b> tile is back with your chests on it.']},
  {v:'7.5',d:'Sep 20',t:'Squad raids only told the server anything once you had finished',
   i:['YOU SAW HIM JOIN AT THE MOMENT HE FINISHED, AND THAT WAS THE BUG. Squad presence works by watching whose damage total goes up while you are fighting - but the only thing that ever sent your damage to the server was the END of the fight. So two people could hammer the same boss for ten minutes and each learn about the other only when the other was done.',
      'Damage now posts every 6 seconds while you are swinging. The shared health bar drops as your friend hits it, their name appears within seconds of their first swing, and the turn rotation starts splitting its attention while it still matters.',
