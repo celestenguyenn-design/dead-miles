@@ -3,6 +3,11 @@ on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
+    inputs:
+      test:
+        description: 'Send a test push to everyone right now'
+        type: boolean
+        default: false
 jobs:
   send:
     runs-on: ubuntu-latest
@@ -16,4 +21,5 @@ jobs:
         env:
           PUSH_SECRET: ${{ secrets.PUSH_SECRET }}
           VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          TEST_PUSH: ${{ inputs.test }}
         run: node push-send.js

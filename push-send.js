@@ -24,7 +24,7 @@ const VAPID_PUBLIC = 'BDjXfxZW0UP34n25eFRp736S9ED4EInA8J-HP_0_VMz30hR06YzTEr2fyH
 async function keepWarm() {
   const t = Date.now();
   try {
-    const r = await fetch(`${SB}/rest/v1/`, { headers: { apikey: ANON } });
+    const r = await fetch(`${SB}/rest/v1/`, { headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } });
     console.log(`Supabase answered ${r.status} in ${Date.now() - t}ms`);
   } catch (e) {
     console.log(`Supabase did not answer in ${Date.now() - t}ms: ${e.message}`);
@@ -168,13 +168,23 @@ function decide(row, everyone) {
   if (!rows || !rows.length) { console.log('No subscribers.'); return; }
   console.log(`${rows.length} subscription(s).`);
 
+  // The real nudges only fire when something is actually happening - a horde an
+  // hour out, an evening streak at risk. At 4am there is correctly nothing to
+  // say, which makes "it works" impossible to see from a log line. Running the
+  // workflow with the test box ticked sends one push to every subscriber right
+  // now. It is NOT recorded in push_mark, so it can never eat a real nudge.
+  const TEST = process.env.TEST_PUSH === 'true' || process.env.TEST_PUSH === '1';
   let sent = 0, dead = 0;
   for (const row of rows) {
-    for (const msg of decide(row, rows)) {
+    const msgs = TEST
+      ? [{ tag: 'test', day: null, title: 'Notifications are on',
+           body: 'This is the test push. Horde warnings, raid alerts and streak reminders come through here now.' }]
+      : decide(row, rows);
+    for (const msg of msgs) {
       const sub = { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } };
       try {
         await webpush.sendNotification(sub, JSON.stringify({ title: msg.title, body: msg.body, tag: msg.tag }));
-        await rpc('push_mark', { p_secret: SECRET, p_endpoint: row.endpoint, p_tag: msg.tag, p_day: msg.day });
+        if (msg.day) await rpc('push_mark', { p_secret: SECRET, p_endpoint: row.endpoint, p_tag: msg.tag, p_day: msg.day });
         sent++;
         console.log(`sent ${msg.tag} to ${row.handle}`);
       } catch (e) {
