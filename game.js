@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.33';
+const VERSION='7.34';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -84,7 +84,7 @@ const LEGEND_IDS=['mercy','lastword','oldreliable','whisper','nightingale','harv
 const CAT_LABEL={food:'Food',water:'Water',drink:'Drink',snack:'Snack',meds:'Meds',scrap:'Scrap',ammo:'Rounds',shells:'Shells',bolts:'Bolts',shelf:'Trophy',key:'Key',chest:'Chest',gear:'Gear',cosmetic:'Cosmetic',candy:'Candy'};
 const byCat=(c)=>Object.entries(ITEMS).filter(([k,v])=>v.cat===c&&v.w>0).map(([k,v])=>({id:k,...v}));
 function table(cats,shelfW,gearW){const out=[];for(const c of cats)out.push(...byCat(c));if(shelfW)out.push(...byCat('shelf').map(x=>({...x,w:x.w*shelfW})));if(gearW)out.push(...Object.entries(GEAR).filter(([k,v])=>v.w>0).map(([k,v])=>({id:k,gear:true,...v,w:v.w*gearW})));return out;}
-function cosmeticPool(){const out=[];for(const [k,v] of Object.entries(ART.HATS))if(!v.lock)out.push({id:'hat:'+k,slot:'hat',key:k,n:v.n,r:v.r});for(const [k,v] of Object.entries(ART.TOPS))if(v.r!=='common')out.push({id:'top:'+k,slot:'top',key:k,n:v.n,r:v.r});for(const [k,v] of Object.entries(ART.ACCS))out.push({id:'acc:'+k,slot:'acc',key:k,n:v.n,r:v.r});return out;}
+function cosmeticPool(){const out=[];for(const [k,v] of Object.entries(ART.HATS))if(!v.lock)out.push({id:'hat:'+k,slot:'hat',key:k,n:v.n,r:v.r});for(const [k,v] of Object.entries(ART.TOPS))if(v.r!=='common'&&!v.event)out.push({id:'top:'+k,slot:'top',key:k,n:v.n,r:v.r});for(const [k,v] of Object.entries(ART.ACCS))out.push({id:'acc:'+k,slot:'acc',key:k,n:v.n,r:v.r});return out;}
 const COS_W={rare:3,epic:1,legendary:.2};
 
 const LOCS=[
@@ -137,7 +137,7 @@ const STORY=[
  {id:'s15',t:'Still going',need:s=>s.steps.total>=1500000,txt:'The radio is mostly quiet now. Every few weeks a new voice, somewhere further out, reading names off a list and asking if anyone is still walking. You are.'}
 ];
 function eventNow(){const d=new Date();const m=d.getMonth()+1,day=d.getDate();if((m===10&&day>=15)||(m===11&&day<=2))return 'halloween';return '';}
-const HALLOWEEN_SHOP=[{id:'hat:witch',n:'Witch hat',c:40},{id:'hat:pumpkin',n:'Pumpkin head',c:60},{id:'top:skeleton',n:'Skeleton hoodie',c:50},{id:'acc:wings',n:'Bat wings',c:80}];
+const HALLOWEEN_SHOP=[{id:'hat:witch',n:'Witch hat',c:40},{id:'hat:pumpkin',n:'Pumpkin head',c:60},{id:'top:skeleton',n:'Skeleton hoodie',c:50},{id:'acc:wings',n:'Bat wings',c:80},{id:'top:onesie_bones',n:'Bones onesie',c:120}];
 const BOSS_NAMES=['Mad Dog Reyes','Sister Ash','The Butcher of Elm St','Two-Tooth Tully','Queen Wasp','Preacher Cole','Ghost Delacroix','Big Sal','The Widow Marsh','Cutter Vance'];
 const ROLES={
   brawler:{n:'Brawler',e:'🥊',d:(l)=>'Throws a '+(9+l*2)+'-'+(15+l*3)+' damage punch every round'},
@@ -4688,6 +4688,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.34',d:'Sep 21',t:'Hollow-een is set up: Oct 15 to Nov 2',
+  i:['NOTHING CHANGES TODAY. This is the event being put in place so it switches itself on at midnight on October 15 and off after November 2.',
+     'THE BONES ONESIE. A skeleton suit, ribs and all. It is in the Hollow-een shop on the Base tab for 120 candy and it is yours forever once bought. It cannot come out of a gumball machine or a loot roll - the event is the only way to get it.',
+     'SIX HOLLOW-EEN KEEPSAKES. While the event runs, about half the field caches out past your home block hold one of these instead of an ordinary keepsake: a guttering candle, a paper mask, a trick-or-treat bucket, a rubber bat, a fake cobweb, a carved lantern. Each one also pays 5 candy.',
+     'FIND ALL SIX and the set pays 100 candy, once - most of a onesie. They have their own row under Caches on the Road tab, and they stay in your collection after the event ends. You just cannot find more until next year.',
+     'Candy already turns up in rooms during the event, and the Gourd King already holds every stronghold. Caches need a base pin set on the map.']},
  {v:'7.33',d:'Sep 21',t:'Catching you up: everything since the upgrade ladder',
   i:['THIS SCREEN WENT QUIET FOR TWENTY VERSIONS. The list that feeds it stopped at 7.12, so the game had nothing to show you even though a lot changed. Here it all is, newest first.',
      'YOUR BASE IS DRAWN NOW (Base tab). Walls go from wire to timber to concrete, the tower grows, the garden, barrels, generator, forge and the rest all appear as you build them. Your crew walk the yard, the dog runs about, there is a campfire. Within a day of horde night they gather outside; within two hours they are at the fence.',

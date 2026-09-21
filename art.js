@@ -18,7 +18,9 @@ const TOPS={hoodie:{n:'Hoodie',r:'common'},varsity:{n:'Varsity jacket',r:'rare'}
   onesie_dino:{n:'Dino onesie',r:'epic',kind:'onesie',base:'#5aa86a',belly:'#e0d890',ears:'spikes'},
   onesie_snowfox:{n:'Snow fox onesie',r:'epic',kind:'onesie',base:'#f4f0ea',belly:'#fff',ears:'pointy',earIn:'#ff9ab0'},
   onesie_sparkmouse:{n:'Sparkmouse onesie',r:'legendary',kind:'onesie',base:'#f5d642',belly:'#f5d642',ears:'longblack',earIn:'#f5d642',cheeks:'#e63e3e',bolt:true},
-  onesie_flamefox:{n:'Flamefox onesie',r:'legendary',kind:'onesie',base:'#f08a3a',belly:'#fbe3b8',ears:'pointy',earIn:'#fbe3b8',flame:true}};
+  onesie_flamefox:{n:'Flamefox onesie',r:'legendary',kind:'onesie',base:'#f08a3a',belly:'#fbe3b8',ears:'pointy',earIn:'#fbe3b8',flame:true},
+  // Hollow-een only (v7.34). `event` keeps it out of the gumball machines and loot.
+  onesie_bones:{n:'Bones onesie',r:'epic',kind:'onesie',base:'#1e1e26',belly:'#1e1e26',ribs:true,event:'halloween'}};
 function outfitKind(top){const t=TOPS[top];return t&&t.kind||'top';}
 const ACCS={glasses:{n:'Round glasses',r:'rare'},scarf:{n:'Striped scarf',r:'rare'},eyepatch:{n:'Eyepatch',r:'epic'},shades:{n:'Aviators',r:'epic'},mask:{n:'Gas mask',r:'legendary'},bandaid:{n:'Cheek bandage',r:'rare',c:5000},choker:{n:'Choker',r:'rare',c:6000},stars:{n:'Star glasses',r:'epic',c:11000},flower:{n:'Hair flower',r:'rare',c:6000},blush:{n:'Extra blush',r:'rare',c:4000},freckles:{n:'Freckles',r:'rare',c:4000},wings:{n:'Bat wings',r:'legendary'}};
 
@@ -163,6 +165,7 @@ function topShape(top,c){
     if(t.pat==='cow')s+=`<ellipse cx="35" cy="86" rx="5" ry="4" fill="#2c2c36"/><ellipse cx="64" cy="102" rx="5" ry="4" fill="#2c2c36"/>`;
     if(t.teeth)s+=`<path d="M40 80 l3 5 l3 -5 l3 5 l3 -5 l3 5 l3 -5 l3 5 l3 -5" stroke="#fff" stroke-width="2" fill="none"/>`;
     if(t.bolt)s+=`<path d="M52 84 l-6 10 h5 l-3 9 l8 -12 h-5 l3 -7z" fill="#8a5a1a"/>`;
+    if(t.ribs)s+=`<path d="M50 80 v27" stroke="#e8e0d0" stroke-width="2.5"/><path d="M41 85 q9 -4 18 0 M40 91 q10 -4 20 0 M41 97 q9 -4 18 0 M43 103 q7 -3 14 0" stroke="#e8e0d0" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
     if(t.flame)s+=`<path d="M50 84 q-6 6 0 12 q6 -6 0 -12z" fill="#ff5a3a"/><path d="M50 88 q-3 3 0 6 q3 -3 0 -6z" fill="#ffd166"/>`;
     return s;}
   switch(top){

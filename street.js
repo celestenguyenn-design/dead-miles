@@ -935,6 +935,21 @@ const KEEPSAKES=[
   {id:'cass',  n:'Mixtape',        e:'\u{1F4FC}', d:'Side A is labelled in three different pens.'},
   {id:'compass',n:'Brass compass', e:'\u{1F9ED}', d:'Still points north. Still the only thing that does.'},
 ];
+/* HOLLOW-EEN KEEPSAKES (v7.34). Six that only exist while the event is on, in about
+   half the caches. They live in S.keepsEv, NOT S.keeps, so the ordinary "n of 8
+   keepsakes" count and the stats page never drift because of a seasonal set.
+   Which caches hold one is hashed from the place and the day, the same way the
+   cache itself is - so everyone walking the same street sees the same thing. */
+const HALLOWEEN_KEEPS=[
+  {id:'h_candle', n:'Guttering candle',       e:'\u{1F56F}\uFE0F', d:'Burned down to a thumb. Somebody sat up with it.'},
+  {id:'h_mask',   n:'Paper mask',             e:'\u{1F3AD}', d:'Elastic long gone. A child drew the teeth on.'},
+  {id:'h_bucket', n:'Trick-or-treat bucket',  e:'\u{1FAA3}', d:'Empty, and still carried a long way.'},
+  {id:'h_bat',    n:'Rubber bat',             e:'\u{1F987}', d:'On a string. It has outlasted the ceiling it hung from.'},
+  {id:'h_web',    n:'Fake cobweb',            e:'\u{1F578}\uFE0F', d:'The real ones have moved in on top of it.'},
+  {id:'h_lantern',n:'Carved lantern',         e:'\u{1F383}', d:'Plastic. The grin has not slipped once.'},
+];
+const HALLOWEEN_SET_CANDY=100, HALLOWEEN_KEEP_CANDY=5;
+function eventKeepsOn(){return (typeof eventNow==='function')&&eventNow()==='halloween';}
 function cacheDay(){return (typeof todayStr==='function')?todayStr():String(new Date().getDate());}
 // Deterministic per place per day, and only out past the home block.
 function cacheAt(p){
@@ -943,7 +958,10 @@ function cacheAt(p){
   if(!S.base||!S.base.geo)return null;
   const h=rhash('cache:'+p.id+'|'+cacheDay());
   if(h%100>=14)return null;
-  return {id:'c:'+p.id+':'+cacheDay(), poi:p.id, keep:KEEPSAKES[rhash('keep:'+p.id+'|'+cacheDay())%KEEPSAKES.length]};
+  const ev=eventKeepsOn()&&(rhash('evk:'+p.id+'|'+cacheDay())%2===0);
+  return {id:'c:'+p.id+':'+cacheDay(), poi:p.id, ev,
+    keep:ev?HALLOWEEN_KEEPS[rhash('keep:'+p.id+'|'+cacheDay())%HALLOWEEN_KEEPS.length]
+           :KEEPSAKES[rhash('keep:'+p.id+'|'+cacheDay())%KEEPSAKES.length]};
 }
 function cacheTaken(c){return !!((S.caches||{})[c.id]);}
 function cacheCollect(poiId){
@@ -963,11 +981,22 @@ function cacheCollect(poiId){
   const scrap=Math.round((8+rint(0,7)+Math.round((t.k-1)*6))*(1+0.3*ch+((typeof setPerk==='function')?setPerk('cache'):0)));
   const parts=Math.random()<0.45+0.15*ch?1:0;
   S.stock.scrap+=scrap;if(parts)S.parts=(S.parts||0)+parts;
-  if(!S.keeps)S.keeps={};
-  const first=!S.keeps[c.keep.id];
-  S.keeps[c.keep.id]=(S.keeps[c.keep.id]||0)+1;
+  let first,evLine='';
+  if(c.ev){
+    if(!S.keepsEv)S.keepsEv={};
+    first=!S.keepsEv[c.keep.id];S.keepsEv[c.keep.id]=(S.keepsEv[c.keep.id]||0)+1;
+    S.stock.candy=(S.stock.candy||0)+HALLOWEEN_KEEP_CANDY;evLine=', +'+HALLOWEEN_KEEP_CANDY+' candy';
+    if(!S.keepsEvDone&&HALLOWEEN_KEEPS.every(k=>S.keepsEv[k.id])){
+      S.keepsEvDone=(typeof todayStr==='function')?todayStr():'done';S.stock.candy+=HALLOWEEN_SET_CANDY;
+      log('All six Hollow-een keepsakes found. +'+HALLOWEEN_SET_CANDY+' candy.');
+      if(typeof toast==='function')toast('\u{1F383} Hollow-een set complete \u00b7 +'+HALLOWEEN_SET_CANDY+' candy','l');}
+  }else{
+    if(!S.keeps)S.keeps={};
+    first=!S.keeps[c.keep.id];
+    S.keeps[c.keep.id]=(S.keeps[c.keep.id]||0)+1;
+  }
   S.keepsTotal=(S.keepsTotal||0)+1;
-  log('Cache at '+p.n+': '+c.keep.e+' '+c.keep.n+', +'+scrap+' scrap'+(parts?', +1 part':'')+'.');
+  log('Cache at '+p.n+': '+c.keep.e+' '+c.keep.n+', +'+scrap+' scrap'+(parts?', +1 part':'')+evLine+'.');
   toast(c.keep.e+' '+c.keep.n+(first?' · NEW':''),first?'l':'a');
   SFX.play(first?'unlock':'loot');
   save();render();updateMarkers();
@@ -989,7 +1018,8 @@ function renderCaches(){
   if(!STREET.on){el.hidden=true;return;}
   const found=Object.keys(S.keeps||{}).length;
   const list=cachesNear();
-  if(!list.length&&!found){el.hidden=true;return;}
+  const evFound=Object.keys(S.keepsEv||{}).length;
+  if(!list.length&&!found&&!evFound&&!eventKeepsOn()){el.hidden=true;return;}
   el.hidden=false;el.className='card';
   el.innerHTML='<h2>\u{1F9ED} Caches <span class="sub">'+found+'/'+KEEPSAKES.length+' keepsakes</span></h2>'
     +(list.length
@@ -1007,6 +1037,13 @@ function renderCaches(){
     +(found?'<div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px">'
       +KEEPSAKES.map(k=>(S.keeps&&S.keeps[k.id])
         ?'<span class="chip a" title="'+esc(k.d)+'">'+k.e+' '+esc(k.n)+' ×'+S.keeps[k.id]+'</span>'
+        :'<span class="chip s" style="opacity:.45">'+k.e+' ?</span>').join('')
+      +'</div>':'')
+    +((evFound||eventKeepsOn())?'<div class="section-label" style="margin-top:12px">\u{1F383} Hollow-een set \u00b7 '+evFound+'/'+HALLOWEEN_KEEPS.length
+        +(eventKeepsOn()?' \u00b7 only until Nov 2':' \u00b7 back next October')+(S.keepsEvDone?' \u00b7 complete':'')+'</div>'
+      +'<div class="row" style="margin-top:6px;flex-wrap:wrap;gap:6px">'
+      +HALLOWEEN_KEEPS.map(k=>(S.keepsEv&&S.keepsEv[k.id])
+        ?'<span class="chip a" title="'+esc(k.d)+'">'+k.e+' '+esc(k.n)+' \u00d7'+S.keepsEv[k.id]+'</span>'
         :'<span class="chip s" style="opacity:.45">'+k.e+' ?</span>').join('')
       +'</div>':'');
 }
