@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.31';
+const VERSION='7.32';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2056,17 +2056,94 @@ function arrive(){
   log('Reached '+S.loc.n+' ('+district().n+').');toast('Reached '+S.loc.e+' '+S.loc.n,'a');SFX.play('arrive');
   if(navigator.vibrate)try{navigator.vibrate([60,40,60]);}catch(e){}
 }
-function rivalAct(kind){
+/* ================= RIVALS WITH A MEMORY (v7.32) =================
+   Nadia has remembered you since the nemesis system: she levels when she wins and
+   scars when she loses. Maya and Theo did not - every meeting was the first
+   meeting, the same offer and the same coin flip forever. Now all three keep a
+   standing relationship, and it is printed on their leaderboard row so the county
+   reads as three people you know rather than three names with a score.
+     MAYA  trades build trust. Stranger -> Regular (3) -> Friend (6) -> Family (12).
+           The rate improves, a second offer opens, and Family sometimes throws
+           in a key. Saying no never costs anything.
+     THEO  keeps score. Beat him three in a row and he trains (your odds dip);
+           lose three in a row and he gets cocky and gives you a head start.
+           After three races he will race you for stakes. Ten career wins and he
+           starts paying up when he loses.
+     NADIA unchanged underneath. Scar her five times and her scouts stop making
+           you pay to go around them. */
+const MAYA_TIERS=[{at:0,n:'Stranger'},{at:3,n:'Regular'},{at:6,n:'Friend'},{at:12,n:'Family'}];
+const THEO_STAKE=15;
+function rel(id){S.rel=S.rel||{};return S.rel[id]||(S.rel[id]=(id==='maya')?{trades:0,keys:0,last:''}:{won:0,lost:0,ws:0,ls:0,last:''});}
+function mayaTier(){const t=rel('maya').trades;return MAYA_TIERS.filter(x=>t>=x.at).length-1;}
+function mayaOffers(){const t=mayaTier();
+  const o=[{id:'abx',cat:'food',need:t>=2?2:3,give:'abx',n:t>=1?3:2}];
+  if(t>=2)o.push({id:'kit',cat:'water',need:3,give:'kit',n:1});
+  return o;}
+function mayaHave(cat){return S.pack.filter(x=>x.cat===cat).length;}
+function theoOdds(){const r=rel('theo');const base=0.5+(S.lvl-1)*0.03+roleLvl('scout')*0.05;
+  return clamp(base+(r.ls>=3?0.10:0)-(r.ws>=3?0.08:0),0.10,0.95);}
+function theoBonus(){return rel('theo').won>=5?1.4:1.3;}
+function nadiaYields(){return nem().scars>=5;}
+function relLine(id){
+  if(id==='maya'){const r=rel('maya'),t=mayaTier(),nx=MAYA_TIERS[t+1];
+    return MAYA_TIERS[t].n+' · '+r.trades+' trade'+(r.trades===1?'':'s')+(nx?' · '+nx.n+' at '+nx.at:' · she keeps a place at the fire for you');}
+  if(id==='theo'){const r=rel('theo');if(!r.won&&!r.lost)return 'You have not raced him yet';
+    return 'Races: you '+r.won+' · Theo '+r.lost+(r.ws>=3?' · he has been training':r.ls>=3?' · he is getting cocky':'');}
+  if(id==='nadia'){const n=nem();if(!n.beaten&&!n.lost)return 'Her scouts have not tried you yet';
+    return 'You '+n.beaten+' · Nadia '+n.lost+' · sends her '+NEM_RANKS[Math.min(n.lvl-1,NEM_RANKS.length-1)]+(nadiaYields()?' · her scouts let you pass':'');}
+  return '';}
+function rivalCardBody(loc){
+  const r=RIVALS.find(x=>x.id===loc.rival);const name='<b style="color:var(--bone)">'+esc(r.n)+'</b>';
+  const tag='<p class="help" style="margin-top:8px">'+esc(relLine(loc.rival))+'</p>';
+  if(loc.rival==='theo'){const R=rel('theo'),odds=Math.round(theoOdds()*100),raced=R.won+R.lost,can=raced>=3&&S.stock.scrap>=THEO_STAKE;
+    const mood=R.ls>=3?'Theo is already at the corner. He stops, waves you level, and gives you a head start.':R.ws>=3?'Theo is stretching on the kerb. He has clearly been training for this.':'Theo grins at you.';
+    return '<p>'+name+' is jogging up the other side of the street toward the same door. '+mood+'</p>'
+      +'<div class="grid2" style="margin-top:12px"><button class="btn r" onclick="rivalAct(\'race\')">Race them in ('+odds+'%)</button><button class="btn" onclick="rivalAct(\'wait\')">Let them go first</button></div>'
+      +(raced>=3?'<button class="btn a wide'+(can?'':' off')+'" style="margin-top:8px" '+(can?'':'disabled ')+'onclick="rivalAct(\'stakes\')">'+(can?'Race for stakes · '+THEO_STAKE+' scrap each ('+odds+'%)':'Stakes need '+THEO_STAKE+' scrap')+'</button>':'')
+      +'<p class="help" style="margin-top:8px">Win: first pick, '+Math.round((theoBonus()-1)*100)+'% more loot'+(R.won>=10?', and he pays 6 scrap':'')+'. Lose: scraps. Wait: they clear the walkers for you, costs 150 steps.</p>'+tag;}
+  if(loc.rival==='maya'){const t=mayaTier();
+    const hello=['Maya waves you over.','Maya looks up and nods - she knows your face now.','Maya shifts along the log to make room for you.','Maya already has a cup poured for you.'][t];
+    return '<p>'+name+' has a fire going out front. '+hello+'</p><div class="stack" style="margin-top:12px">'
+      +mayaOffers().map(o=>{const ok=mayaHave(o.cat)>=o.need;return '<button class="btn a wide'+(ok?'':' off')+'" '+(ok?'':'disabled ')+'onclick="rivalAct(\'trade\',\''+o.id+'\')">'+o.need+' '+o.cat+' → '+o.n+' '+esc(ITEMS[o.give].n.toLowerCase())+(ok?'':' · you have '+mayaHave(o.cat))+'</button>';}).join('')
+      +'<button class="btn wide" onclick="S.loc.rival=\'\';save();render()">No thanks</button></div>'+tag;}
+  const free=nadiaYields();
+  return '<p>'+name+'. Two of Nadia\'s scouts are watching the door from a truck bed. '+(free?'They see who it is and look away.':'They have seen you.')+'</p>'
+    +'<div class="grid2" style="margin-top:12px"><button class="btn d" onclick="rivalAct(\'fight\')">Take them on</button><button class="btn" onclick="rivalAct(\'slip\')">'+(free?'Walk past':'Slip past (100 steps)')+'</button></div>'
+    +'<p class="help" style="margin-top:8px">Beat them: their ammo and scrap are yours.</p>'+tag;
+}
+function rivalAct(kind,arg){
   const loc=S.loc;if(!loc||!loc.rival)return;const r=RIVALS.find(x=>x.id===loc.rival);const first=r.n.split("'")[0];
-  if(kind==='race'){const p=0.5+(S.lvl-1)*0.03+roleLvl('scout')*0.05;if(Math.random()<p){loc.rival='';loc.rooms.forEach(rm=>rm.items.forEach(it=>{if(it.pts)it.pts=Math.round(it.pts*1.3);}));log('You beat '+first+' through the door. First pick of everything.');toast('You got there first','a');SFX.play('win');}
-    else{loc.rival='';loc.rooms.forEach(rm=>{rm.items=rm.items.slice(0,1);});log(first+' got in first and stripped the place. Scraps left.');toast(first+' beat you to it','d');}}
+  if(kind==='race'||kind==='stakes'){
+    const R=rel('theo'),stake=kind==='stakes';
+    if(stake&&(R.won+R.lost<3||S.stock.scrap<THEO_STAKE)){toast('Stakes need '+THEO_STAKE+' scrap','d');return;}
+    const won=Math.random()<theoOdds();const bonus=theoBonus();R.last=todayStr();loc.rival='';
+    if(won){R.won++;R.ws++;R.ls=0;
+      loc.rooms.forEach(rm=>rm.items.forEach(it=>{if(it.pts)it.pts=Math.round(it.pts*bonus);}));
+      let extra='';if(stake){S.stock.scrap+=THEO_STAKE;extra+=' +'+THEO_STAKE+' scrap off Theo.';}
+      if(R.won>=10){S.stock.scrap+=6;extra+=' He pays up: +6 scrap.';}
+      log('You beat '+first+' through the door. First pick of everything.'+extra+' That is '+R.won+' to '+R.lost+'.');toast('You got there first'+(stake?' · +'+THEO_STAKE+' scrap':''),'a');SFX.play('win');
+      if(R.ws===3)log('Theo says he is going to start training. He means it.');}
+    else{R.lost++;R.ls++;R.ws=0;if(stake)S.stock.scrap-=THEO_STAKE;
+      loc.rooms.forEach(rm=>{rm.items=rm.items.slice(0,1);});
+      log(first+' got in first and stripped the place. Scraps left.'+(stake?' And '+THEO_STAKE+' scrap to Theo.':'')+' That is '+R.won+' to '+R.lost+'.');toast(first+' beat you to it'+(stake?' · -'+THEO_STAKE+' scrap':''),'d');}}
   else if(kind==='wait'){loc.rival='';loc.cleared=true;rollWanderer(loc);S.walk.toNext=Math.min(S.walk.dist,S.walk.toNext+150);S.walk.progress=S.walk.dist-S.walk.toNext;log('You waited out '+first+'. They cleared the walkers for you; it cost you 150 steps of daylight.');ctEvent('places',1);}
-  else if(kind==='trade'){if(S.pack.filter(x=>x.cat==='food').length<3){toast('Maya wants 3 food from your pack');return;}let n=0;S.pack=S.pack.filter(x=>{if(x.cat==='food'&&n<3){n++;return false;}return true;});for(let i=0;i<2;i++)S.pack.push({id:'abx',...ITEMS.abx,uid:uid()});loc.rival='';log('Traded 3 food to Maya for 2 antibiotics.');toast('Trade done','z');}
+  else if(kind==='trade'){
+    const o=mayaOffers().find(x=>x.id===(arg||'abx'));if(!o)return;
+    if(mayaHave(o.cat)<o.need){toast('Maya wants '+o.need+' '+o.cat+' from your pack');return;}
+    let n=0;S.pack=S.pack.filter(x=>{if(x.cat===o.cat&&n<o.need){n++;return false;}return true;});
+    for(let i=0;i<o.n;i++)S.pack.push({id:o.give,...ITEMS[o.give],uid:uid()});
+    const R=rel('maya'),before=mayaTier();R.trades++;R.last=todayStr();loc.rival='';
+    let line='Traded '+o.need+' '+o.cat+' to Maya for '+o.n+' '+ITEMS[o.give].n.toLowerCase()+'.';
+    if(before>=3&&Math.random()<0.25){S.keys++;R.keys++;line+=' She presses a chest key into your hand on the way out.';}
+    log(line);toast('Trade done','z');
+    if(mayaTier()>before){const T=MAYA_TIERS[mayaTier()];log('Maya counts you a '+T.n.toLowerCase()+' now. Her offers just got better.');toast('Maya: '+T.n,'l');SFX.play('rare');}}
   else if(kind==='fight'){loc.rival='';const pw=nemPower();const en=[mk('raider'),mk('raider')];
     if(nem().lvl>=4)en.push(mk('gunner'));
     en.forEach(e=>{e.n=nemName();e.hp=Math.round(e.hp*0.8*pw);e.max=e.hp;e.dmg=[Math.round(e.dmg[0]*pw),Math.round(e.dmg[1]*pw)];});
     startCombat(en,'rival');return;}
-  else if(kind==='slip'){loc.rival='';S.walk.toNext=Math.min(S.walk.dist,S.walk.toNext+100);S.walk.progress=S.walk.dist-S.walk.toNext;log('You slipped past Nadia\'s scouts. Cost you 100 steps.');}
+  else if(kind==='slip'){loc.rival='';
+    if(nadiaYields())log('Nadia\'s scouts watched you walk straight past. Nobody moved.');
+    else{S.walk.toNext=Math.min(S.walk.dist,S.walk.toNext+100);S.walk.progress=S.walk.dist-S.walk.toNext;log('You slipped past Nadia\'s scouts. Cost you 100 steps.');}}
   save();render();
 }
 function enterLoc(){
@@ -4399,7 +4476,7 @@ function render(){
   renderMap();renderParty();renderBoss();renderDeal();renderEvent();renderStory();renderShop();renderPet();renderStuck();
   const tier=TIERS[S.league.tier];$('#tierBadge').textContent=tier.e;$('#tierName').textContent=tier.n;$('#tierSub').textContent='Tier '+(S.league.tier+1)+' of '+TIERS.length+' · stash x'+tier.mult;
   const end=new Date(weekStart());end.setDate(end.getDate()+7);const left=Math.max(0,end-Date.now());$('#weekChip').textContent='Week of '+S.league.week;$('#resetChip').textContent=Math.floor(left/86400000)+'d '+Math.floor(left%86400000/3600000)+'h left';
-  const b=board();$('#board').innerHTML=b.map((r,i)=>`<div class="lbrow${r.me?' me':''}"><div class="rk">${i+1}</div><div class="av">${ART.avatarSVG(r.av,40)}</div><div class="nm">${esc(r.n)}${r.me?' (you)':''}<small>${r.me?'stash runs to score':esc(r.blurb)}</small></div><div class="sc">${fmt(r.s)}</div></div>`).join('');
+  const b=board();$('#board').innerHTML=b.map((r,i)=>`<div class="lbrow${r.me?' me':''}"><div class="rk">${i+1}</div><div class="av">${ART.avatarSVG(r.av,40)}</div><div class="nm">${esc(r.n)}${r.me?' (you)':''}<small>${r.me?'stash runs to score':esc(r.blurb)+'<br><span style="color:var(--amber)">'+esc(relLine(r.id))+'</span>'}</small></div><div class="sc">${fmt(r.s)}</div></div>`).join('');
   const myRank=b.findIndex(r=>r.me)+1;const lead=b[0].me?b[1]:b[0];$('#boardHelp').textContent=myRank===1?'You are in first. Hold it through Sunday night to move up.':'You are #'+myRank+', '+fmt(lead.s-S.league.score)+' behind '+lead.n+'. They keep walking while you sleep.';
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
@@ -4414,10 +4491,7 @@ function renderLoc(){
     ${loc.stage>0?`<div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div><div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done||r.stage>loc.stage?'disabled':''}><span class="n">${esc(r.n)}</span><span class="m">${r.done?'searched':r.stage>loc.stage?'locked: stage '+r.stage:'noise +'+r.noise}</span></button>`).join('')}</div>`:''}
     ${loc.found.length?`<div class="section-label" style="margin-top:12px">Found here</div><div class="loot" style="margin-top:6px">${loc.found.map(it=>`<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span>${esc(it.n)}<span class="pt">+${it.pts}</span></div>`).join('')}</div>`:''}
     ${bankedLine()}<div class="grid2" style="margin-top:12px">${next?`<button class="btn d" onclick="pushStage()">Push to ${next}</button>`:`<button class="btn" onclick="claimBase()">${S.base?'Move base here · compare first':'Claim as base'}</button>`}<button class="btn ${next?'':'r'}" onclick="leaveLoc()">${loc.stage?'Take the loot and go':'Keep walking'}</button></div>`;return;}
-  if(loc.rival){const r=RIVALS.find(x=>x.id===loc.rival);const first=r.n.split("'")[0];
-    const body=loc.rival==='theo'?`<p><b style="color:var(--bone)">${esc(r.n)}</b> is jogging up the other side of the street toward the same door. Theo grins at you.</p><div class="grid2" style="margin-top:12px"><button class="btn r" onclick="rivalAct('race')">Race them in (${Math.round((0.5+(S.lvl-1)*0.03+roleLvl('scout')*0.05)*100)}%)</button><button class="btn" onclick="rivalAct('wait')">Let them go first</button></div><p class="help" style="margin-top:8px">Win the race: first pick, 30% more loot. Lose: scraps. Wait: they clear the walkers for you, costs 150 steps.</p>`
-      :loc.rival==='maya'?`<p><b style="color:var(--bone)">${esc(r.n)}</b> has a fire going out front. Maya waves you over: "Three food for two antibiotics. Fair?"</p><div class="grid2" style="margin-top:12px"><button class="btn a" onclick="rivalAct('trade')">Trade (3 food → 2 antibiotics)</button><button class="btn" onclick="S.loc.rival='';save();render()">No thanks</button></div>`
-      :`<p><b style="color:var(--bone)">${esc(r.n)}</b>. Two of Nadia's scouts are watching the door from a truck bed. They have seen you.</p><div class="grid2" style="margin-top:12px"><button class="btn d" onclick="rivalAct('fight')">Take them on</button><button class="btn" onclick="rivalAct('slip')">Slip past (100 steps)</button></div><p class="help" style="margin-top:8px">Beat them: their ammo and scrap are yours.</p>`;
+  if(loc.rival){const body=rivalCardBody(loc);
     el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">rival crew</span></h2>`+body;return;}
   // Say out loud what distance is buying her. Without this the tier is invisible
   // and the walk has no feedback - which was the whole complaint.

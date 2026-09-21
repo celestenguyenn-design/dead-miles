@@ -452,6 +452,9 @@ function tapPoi(id){
   const lm=landmarkOf(p);
   const loc=makeLoc(p.t,lm?lm.n:p.n,tier?tier.k:1);loc.geo=id;loc.e=lm?lm.e:p.e;
   if(lm)loc.landmark=lm.id;
+  // Rival crews only ever appeared on the step-driven road - so someone who plays
+  // from the live map never met them at all. Rarer here than on the road (12%).
+  if(!lm&&typeof RIVALS!=='undefined'&&streetState().visits>2&&Math.random()<0.08)loc.rival=pick(RIVALS).id;
   S.loc=loc;streetState().visits++;
   // stats: how far from the base pin she has actually got to. No pin, no distance.
   if(S.base&&S.base.geo&&typeof lifeFar==='function')lifeFar(geoDist(p,S.base.geo),tier?tier.k:-1);
