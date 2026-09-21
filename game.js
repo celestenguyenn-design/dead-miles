@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.40';
+const VERSION='7.41';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -581,7 +581,7 @@ async function restoreCloudSnap(id){
     const cs=st&&st.public&&st.public.save;
     if(!cs||!cs.onboarded){toast('That restore point has no character in it.','d');return;}
     snapshot('before a server restore');
-    const keep=S.online;S=Object.assign(fresh(),cs);S.online=keep;S.combat=false;S.journal=[];ensureState();
+    const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),cs);S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();
     log('Restored the server save from '+ago(new Date((r&&r.at)||Date.now()).getTime())+'.');
     save();render();toast('Save restored','z');pushPlayer();
   }catch(e){toast(e.message,'d');}
@@ -1645,6 +1645,7 @@ function statsSheet(){
         (noPin&&!d.farM)?'<b style="color:var(--amber)">No base pin set.</b> Distance is measured from your base pin, so this cannot count until you drop one on the map.':(tierName?'Deepest band: '+esc(tierName)+'.':'Reach a place from the live map and it shows up here.'))
     +row('Raids won',fmt(d.raids),d.raidBest?'Hardest one: tier '+d.raidBest+'.':'')
     +row('Landmarks cleared',fmt(d.landmarks))
+    +((typeof townStats==='function'&&townStats())?(t=>row('Your town walked',t.pct==null?fmt(t.walked)+' squares':townPctText(t.pct),t.pct==null?'Open the live map once so it can count your streets.':fmt(t.got)+' of '+fmt(t.streets)+' street squares within 1 km of your base pin. Only you can see this.'))(townStats()):'')
     +'<button class="btn r wide" style="margin-top:12px" onclick="closeSheet()">Back</button>',true);
 }
 function closeWeek(){
@@ -4051,14 +4052,15 @@ async function goOnline(handle,token){
     o.handle=handle;o.ok=true;o.err='';identWrite(handle,o.token);log('Online as @'+handle+'.');toast('Online as @'+handle,'z');save();render();
     if(token&&token.trim()){try{const b=await rpc('get_base',{p_handle:handle});const cs=b&&b.public&&b.public.save;
       if(cs&&cs.onboarded){const cloudAt=cs.savedAt||0;const localAt=S.savedAt||0;const localNewer=S.onboarded&&(localAt>cloudAt+60000||(S.steps&&S.steps.total)>((cs.steps&&cs.steps.total)||0));
-        if(!S.onboarded){const keep=S.online;S=Object.assign(fresh(),cs);S.online=keep;S.combat=false;S.journal=[];ensureState();log('Brought your character back from the server.');save();closeSheet();render();toast('Welcome back, '+(S.name||handle),'z');identWrite(handle,o.token);pushPlayer();return;}
+        if(!S.onboarded){const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),cs);S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();log('Brought your character back from the server.');save();closeSheet();render();toast('Welcome back, '+(S.name||handle),'z');identWrite(handle,o.token);pushPlayer();return;}
         openSheet(`<h2>Found your save</h2><div class="big">${ART.avatarSVG(cs.av||S.av,70)}</div><p><b style="color:var(--bone)">${esc(cs.name||handle)}</b>, level ${cs.lvl||1}, ${fmt((cs.steps&&cs.steps.total)||0)} lifetime steps${cs.base?', base at '+esc(cs.base.n):''}.<br><span class="help">Cloud copy saved ${cloudAt?ago(cloudAt):'at an unknown time'}${S.onboarded?' · this phone saved '+(localAt?ago(localAt):'at an unknown time'):''}.</span></p>${localNewer?'<p style="color:#ff8a92"><b>Careful:</b> what is on this phone looks NEWER than the cloud copy. Restoring would roll you back. Keep this one unless you know the cloud copy is the right one.</p>':'<p>Restore it here? What is on this device right now gets replaced (a backup is kept under Settings for 7 days).</p>'}<div class="grid2"><button class="btn${localNewer?' r':''}" onclick="closeSheet();pushPlayer()">Keep this one</button><button class="btn${localNewer?'':' r'}" id="restoreBtn">Restore the cloud copy</button></div>`,true);
-        $('#restoreBtn').onclick=()=>{try{localStorage.setItem('deadmiles.backup',JSON.stringify({t:Date.now(),why:'before cloud restore',s:S}));}catch(e){}const keep=S.online;S=Object.assign(fresh(),cs);S.online=keep;S.combat=false;S.journal=[];ensureState();log('Restored your save from the cloud.');save();closeSheet();render();toast('Save restored. Undo is under Settings.','z');pushPlayer();};return;}
+        $('#restoreBtn').onclick=()=>{try{localStorage.setItem('deadmiles.backup',JSON.stringify({t:Date.now(),why:'before cloud restore',s:S}));}catch(e){}const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),cs);S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();log('Restored your save from the cloud.');save();closeSheet();render();toast('Save restored. Undo is under Settings.','z');pushPlayer();};return;}
       else if(!S.onboarded){toast('That handle and key match, but there is no saved character on the server yet.','d');return;}}catch(e){if(!S.onboarded){toast('Could not reach the server to find that save. Try again.','d');return;}}}
     await pushPlayer();await pullSteps();await loadFriends();await partySync();
   }catch(e){o.ok=false;o.err=e.message;save();render();}
 }
-function compactSave(){const c=JSON.parse(JSON.stringify(S));delete c.online;delete c.journal;delete c.wx;delete c.combat;if(c.party)delete c.party.data;return c;}
+// v7.41: c.town is where she has physically walked. It never leaves the phone.
+function compactSave(){const c=JSON.parse(JSON.stringify(S));delete c.town;delete c.online;delete c.journal;delete c.wx;delete c.combat;if(c.party)delete c.party.data;return c;}
 function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code,raiding:(S.raidCur?{id:S.raidCur.id,n:S.raidCur.n,tier:S.raidCur.tier,at:Date.now()}:null),flare:(S.flare&&S.flare.endsAt>Date.now())?S.flare:null,
     // The muster rides here for the same reason the flare does: every client
     // already polls this board, so a ready-check needs no new table.
@@ -5008,6 +5010,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.41',d:'Sep 21',t:'Paint the town',
+  i:['THE MAP REMEMBERS WHERE YOU HAVE WALKED. Every 50 m square you pass through on the live map turns amber and stays amber. Streets around your base pin that you have not walked yet show as a faint blue wash, so the map itself tells you where to go next.',
+     'A PERCENTAGE OF YOUR OWN NEIGHBOURHOOD. It counts the streets within 1 km of your base pin and tells you what share you have covered. Rewards at 1, 5, 10, 20, 35, 50, 75 and 100% - scrap, parts and chest keys. Tap the new chip under the live map to see them.',
+     'IT ONLY COUNTS ON FOOT, with a decent GPS fix. A car paints nothing.',
+     'IT STAYS ON YOUR PHONE. Where you have walked is not sent to the server, is not on the leaderboard, and cannot be seen by friends who visit your base. You need a base pin for it to work - drop one from the live map.']},
  {v:'7.40',d:'Sep 21',t:'Every county boss has a face, and legendary armour wears',
   i:['TEN BOSSES, TEN FACES. They were all the same masked raider. Now Sister Ash carries her riot shield, Preacher Cole has the hat and the book, Big Sal is as wide as a door with a sledgehammer, the Widow Marsh has her veil and a green vial, Queen Wasp wears stripes and a crown - each one built around the trick they already had. They show in the fight and in the Codex.',
      'YOU CAN SEE THEIR TRICKS COMING. A shield shimmers until you break it. Preacher Cole visibly prays his health back. And Big Sal, who only moves every other round, now says whether he is winding up or about to swing - which is exactly when Counter is worth pressing.',

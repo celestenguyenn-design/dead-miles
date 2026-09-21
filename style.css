@@ -619,3 +619,7 @@ button.room2{width:100%;text-align:left;color:inherit;font:inherit}
 .bs-tell.hot{color:#15121a;background:var(--amber);border-color:var(--amber);animation:bsTell .6s ease-in-out infinite}
 @keyframes bsTell{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,3px)}}
 @keyframes bsShield{0%,100%{filter:drop-shadow(0 0 3px #8fb3c9) drop-shadow(0 3px 2px rgba(0,0,0,.45))}50%{filter:drop-shadow(0 0 9px #cfe6f2) drop-shadow(0 3px 2px rgba(0,0,0,.45))}}
+/* v7.41 - paint the town */
+.townchip{width:100%;text-align:left;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.townchip b{color:var(--amber)}
+.townchip small{margin-left:auto;opacity:.7}

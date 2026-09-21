@@ -117,6 +117,7 @@ function streetStart(){
   }
   setTimeout(()=>{STREET.map.invalidateSize();if(STREET.pos)STREET.map.setView([STREET.pos.lat,STREET.pos.lon],17);},50);
   try{applyMapSkin();renderMapSkin();}catch(e){}
+  try{townDraw();townRow();townStreets();}catch(e){}
   $('#mapStatus').textContent=STREET.pos?STREET.pois.length+' places nearby':'Finding you...';
   if(navigator.wakeLock)navigator.wakeLock.request('screen').then(w=>STREET.wake=w).catch(()=>{});
   STREET.watch=navigator.geolocation.watchPosition(onPos,e=>{STREET.err=e.message;$('#mapStatus').textContent=e.code===1?'Location is blocked. Allow it for this site in Settings > Safari > Location (or the site settings) and reopen.':'Waiting for GPS: '+e.message;},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
@@ -136,10 +137,11 @@ function streetStop(){
 function onPos(p){
   const pos={lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy||20};const first=!STREET.pos;
   noteSpeed(pos,p.coords.speed);STREET.pos=pos;
+  try{townMark(pos);}catch(e){}
   if(!STREET.me){STREET.me=L.marker([pos.lat,pos.lon],{icon:L.divIcon({className:'me-icon',html:ART.avatarSVG(S.av,44),iconSize:[44,57],iconAnchor:[22,54]}),zIndexOffset:1000}).addTo(STREET.map);
     STREET.accC=L.circle([pos.lat,pos.lon],{radius:pos.acc,color:'#8fb3c9',weight:1,fillOpacity:.08}).addTo(STREET.map);}
   else{STREET.me.setLatLng([pos.lat,pos.lon]);STREET.accC.setLatLng([pos.lat,pos.lon]).setRadius(pos.acc);}
-  if(first){STREET.map.setView([pos.lat,pos.lon],17);spawnZombies(true);}
+  if(first){STREET.map.setView([pos.lat,pos.lon],17);spawnZombies(true);try{townDraw();townRow();townStreets();}catch(e){}}
   // 250 -> 130. The building query reaches 220 m, so refetching at 250 m meant
   // she was already outside the loaded area when the request started, and the
   // wait was unavoidable. Starting at 130 m loads the next block while she is
@@ -473,6 +475,7 @@ function setHomeHere(){
   // They read almost identically, so each now says which it is.
   log('Your base pin moved to where you are standing. Same base, same rooms - this only changes where you walk back to in order to stash.');
   toast('Base pin moved. Nothing you built was lost.','a');SFX.play('win');save();drawBase();render();pushPlayer();
+  try{townReady();townDraw();townRow();townStreets();}catch(e){}
 }
 function homeDistance(){if(!S.base||!S.base.geo||!STREET.pos)return null;return geoDist(S.base.geo,STREET.pos);}
 
@@ -1423,4 +1426,159 @@ function squadDown(){
     +'<p><b>'+esc(who)+'</b> got you clear before it finished you. You are out of this raid, but the damage you did stays on its health bar, and you kept your pack, your gear and your scrap.</p>'
     +'<p class="help">Going down alone costs you a lot. Going down with someone there costs you nothing - that is what a squad is for.</p>'
     +'<button class="btn r wide" onclick="closeSheet()">Get up</button>');
+}
+
+/* ================= PAINT THE TOWN (v7.41) =================
+   Her pick from the ideas list: "paint the town, i dont want my friends seeing the %
+   on the leaderboard". The map remembers which 50 m squares around your base pin you
+   have actually walked, and says what share of your neighbourhood's STREETS that is.
+
+   WHERE THIS LIVES, which is the whole point: S.town is a record of where she has
+   physically been. compactSave() deletes it, so it never reaches the server, the board,
+   a friend's visit, or a cloud restore point. It is in the phone's own save and in the
+   file export, and nowhere else.
+
+   The grid is anchored to the base pin: 40 x 40 squares, 1 km each way. Two bitsets of
+   200 bytes each, kept as base64 - one for "walked", one for "a street runs through
+   here" (one Overpass call, once). Percent = walked street squares / street squares. */
+const TOWN_CELL=50, TOWN_R=1000, TOWN_N=40, TOWN_ACC=35, TOWN_PAD=12, TOWN_MOVE=300, TOWN_GAP_M=150, TOWN_GAP_MS=60000;
+const TOWN_WAYS='residential|living_street|unclassified|tertiary|tertiary_link|secondary|secondary_link|primary|primary_link|pedestrian|footway|path|cycleway|track|steps';
+const TOWN_MILES=[[1,{scrap:30}],[5,{scrap:60,parts:5}],[10,{key:1}],[20,{scrap:100,parts:10}],[35,{key:2}],[50,{scrap:150,parts:20,key:1}],[75,{key:3,parts:30}],[100,{key:5,parts:50}]];
+const TOWN_BYTES=TOWN_N*TOWN_N/8;
+function townB64(u8){let s='';for(let i=0;i<u8.length;i++)s+=String.fromCharCode(u8[i]);return btoa(s);}
+function townU8(b64){const u=new Uint8Array(TOWN_BYTES);if(!b64)return u;try{const s=atob(b64);for(let i=0;i<s.length&&i<TOWN_BYTES;i++)u[i]=s.charCodeAt(i);}catch(e){}return u;}
+function townGet(u,i){return (u[i>>3]>>(i&7))&1;}
+function townSet(u,i){u[i>>3]|=(1<<(i&7));}
+// Make sure S.town matches the base pin, and the working copies are loaded.
+function townReady(){
+  const b=S.base&&S.base.geo;if(!b)return null;
+  if(S.town&&S.town.o&&geoDist(S.town.o,b)>TOWN_MOVE){
+    // The pin moved to a different neighbourhood. The old squares describe somewhere
+    // else, so they go - but what was already paid stays paid.
+    S.town={o:{lat:b.lat,lon:b.lon},w:'',st:null,paid:S.town.paid||0,hide:!!S.town.hide};STREET.town=null;
+    log('Your base pin moved to a new neighbourhood, so the town map starts fresh here. Rewards you already collected stay collected.');
+  }
+  if(!S.town||!S.town.o)S.town={o:{lat:b.lat,lon:b.lon},w:'',st:null,paid:0};
+  if(!STREET.town||STREET.town.key!==S.town.o.lat+','+S.town.o.lon)
+    STREET.town={key:S.town.o.lat+','+S.town.o.lon,w:townU8(S.town.w),st:S.town.st?townU8(S.town.st):null,last:null};
+  return STREET.town;
+}
+function townXY(lat,lon){
+  const o=S.town.o,k=111320,dx=(lon-o.lon)*k*Math.cos(o.lat*Math.PI/180),dy=(lat-o.lat)*k;
+  const x=Math.floor((dx+TOWN_R)/TOWN_CELL),y=Math.floor((TOWN_R-dy)/TOWN_CELL);
+  return (x<0||y<0||x>=TOWN_N||y>=TOWN_N)?-1:y*TOWN_N+x;
+}
+function townOffset(lat,lon,ex,ny){const k=111320;return [lat+ny/k,lon+ex/(k*Math.cos(lat*Math.PI/180))];}
+function townBounds(x0,x1,y){ // squares x0..x1 of row y, as Leaflet bounds
+  const o=S.town.o;const nw=townOffset(o.lat,o.lon,x0*TOWN_CELL-TOWN_R,TOWN_R-y*TOWN_CELL),se=townOffset(o.lat,o.lon,(x1+1)*TOWN_CELL-TOWN_R,TOWN_R-(y+1)*TOWN_CELL);
+  return [[nw[0],nw[1]],[se[0],se[1]]];
+}
+// A street square counts as walked if you were IN it, or in a square beside it that
+// has no street of its own. GPS drifts 10-15 m sideways, so a walk down a street that
+// runs along a grid line lands half its fixes next door. The "no street of its own"
+// part is what stops one street from clearing the parallel street a block over.
+function townStats(){
+  const T=townReady();if(!T)return null;
+  let walked=0,streets=0,got=0;const N=TOWN_N;
+  for(let i=0;i<N*N;i++){
+    const w=townGet(T.w,i);if(w)walked++;
+    if(!T.st||!townGet(T.st,i))continue;
+    streets++;
+    if(w){got++;continue;}
+    const x=i%N,y=(i/N)|0;
+    const nb=(xx,yy)=>{if(xx<0||yy<0||xx>=N||yy>=N)return 0;const j=yy*N+xx;return townGet(T.w,j)&&!townGet(T.st,j);};
+    if(nb(x-1,y)||nb(x+1,y)||nb(x,y-1)||nb(x,y+1))got++;
+  }
+  return {walked,streets,got,pct:streets?got/streets*100:null};
+}
+function townPctText(p){return p==null?'':(p>=10||p===0?Math.floor(p):Math.floor(p*10)/10)+'%';}
+function townMark(pos){
+  const T=townReady();if(!T)return 0;
+  if((pos.acc||99)>TOWN_ACC)return 0;                       // a vague fix paints nothing
+  if(drivingLock()||(STREET.lastSpd||0)>=VEHICLE_MS)return 0; // nor does a car
+  const pts=[[pos.lat,pos.lon]];
+  for(const [ex,ny] of [[TOWN_PAD,TOWN_PAD],[TOWN_PAD,-TOWN_PAD],[-TOWN_PAD,TOWN_PAD],[-TOWN_PAD,-TOWN_PAD]])pts.push(townOffset(pos.lat,pos.lon,ex,ny));
+  // fill in between two fixes taken close together, so a run does not leave gaps
+  const now=Date.now(),L0=T.last;
+  if(L0&&now-L0.t<TOWN_GAP_MS){const d=geoDist(L0,pos);if(d>20&&d<TOWN_GAP_M){const n=Math.ceil(d/20);for(let k=1;k<n;k++)pts.push([L0.lat+(pos.lat-L0.lat)*k/n,L0.lon+(pos.lon-L0.lon)*k/n]);}}
+  T.last={lat:pos.lat,lon:pos.lon,t:now};
+  let added=0;
+  for(const p of pts){const i=townXY(p[0],p[1]);if(i>=0&&!townGet(T.w,i)){townSet(T.w,i);added++;}}
+  if(added){S.town.w=townB64(T.w);townMiles();save();townDraw();townRow();}
+  return added;
+}
+function townMiles(){
+  const s=townStats();if(!s||s.pct==null)return;
+  while((S.town.paid||0)<TOWN_MILES.length&&s.pct>=TOWN_MILES[S.town.paid||0][0]){
+    const [at,g]=TOWN_MILES[S.town.paid||0];S.town.paid=(S.town.paid||0)+1;const got=[];
+    if(g.scrap){S.stock.scrap+=g.scrap;got.push(g.scrap+' scrap');}
+    if(g.parts){S.parts=(S.parts||0)+g.parts;got.push(g.parts+' parts');}
+    if(g.key){S.keys+=g.key;got.push(g.key+' chest key'+(g.key===1?'':'s'));}
+    log('You have walked '+at+'% of your neighbourhood. '+got.join(', ')+'.');
+    toast('\u{1F3A8} '+at+'% of your town walked · '+got.join(', '),'l');SFX.play(at>=50?'legend':'rare');
+  }
+}
+function townGive(g){const a=[];if(g.scrap)a.push(g.scrap+' scrap');if(g.parts)a.push(g.parts+' parts');if(g.key)a.push(g.key+' key'+(g.key===1?'':'s'));return a.join(' · ');}
+// One Overpass call, once per neighbourhood: which squares have a street you can walk.
+async function townStreets(force){
+  const T=townReady();if(!T||STREET.townLoading)return;
+  if(T.st&&!force)return;
+  if(!force&&S.town.tried&&Date.now()-S.town.tried<600000)return; // failed under 10 min ago
+  STREET.townLoading=true;S.town.tried=Date.now();townRow();
+  try{
+    const o=S.town.o,a=townOffset(o.lat,o.lon,-TOWN_R,-TOWN_R),b=townOffset(o.lat,o.lon,TOWN_R,TOWN_R);
+    const q='[out:json][timeout:60];way('+a[0].toFixed(5)+','+a[1].toFixed(5)+','+b[0].toFixed(5)+','+b[1].toFixed(5)+')[highway~"^('+TOWN_WAYS+')$"][access!~"^(private|no)$"][footway!~"^(sidewalk|crossing)$"];out ids geom qt;';
+    let els=null;
+    // Each mirror gets 30 s and no more. Measured while building this: the main server
+    // answered 504 after 16 s and the second simply never answered - without a limit the
+    // chip said "counting your streets..." forever.
+    for(const url of ['https://overpass-api.de/api/interpreter','https://overpass.private.coffee/api/interpreter','https://overpass.kumi.systems/api/interpreter']){
+      const ac=(typeof AbortController!=='undefined')?new AbortController():null;const timer=ac?setTimeout(()=>ac.abort(),30000):0;
+      try{const r=await fetch(url,{method:'POST',signal:ac?ac.signal:undefined,body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+        if(!r.ok)continue;const j=await r.json();if(j&&j.elements&&j.elements.length){els=j.elements;break;}}catch(e){}finally{clearTimeout(timer);}
+    }
+    if(els&&S.town&&S.town.o===o){
+      const st=new Uint8Array(TOWN_BYTES);
+      for(const w of els){const g=w.geometry||[];
+        for(let k=0;k<g.length;k++){
+          if(!g[k])continue;let i=townXY(g[k].lat,g[k].lon);if(i>=0)townSet(st,i);
+          if(k&&g[k-1]){const d=geoDist(g[k-1],g[k]),n=Math.ceil(d/15);for(let m=1;m<n;m++){i=townXY(g[k-1].lat+(g[k].lat-g[k-1].lat)*m/n,g[k-1].lon+(g[k].lon-g[k-1].lon)*m/n);if(i>=0)townSet(st,i);}}
+        }}
+      T.st=st;S.town.st=townB64(st);delete S.town.tried;townMiles();save();
+    }
+  }finally{STREET.townLoading=false;townDraw();townRow();}
+}
+// Walked squares in amber; streets you have not walked yet as a faint cool wash, so
+// the map itself shows where to go next. Runs along a row are merged into one shape.
+function townDraw(){
+  if(!STREET.map||typeof L==='undefined')return;
+  if(STREET.townLayer){STREET.townLayer.remove();STREET.townLayer=null;}
+  const T=townReady();if(!T||S.town.hide)return;
+  if(!STREET.townCanvas)STREET.townCanvas=L.canvas({padding:0.5});
+  const G=L.layerGroup(),N=TOWN_N;
+  const kind=i=>townGet(T.w,i)?2:(T.st&&townGet(T.st,i)?1:0);
+  for(let y=0;y<N;y++){let x=0;while(x<N){const k=kind(y*N+x);if(!k){x++;continue;}let x1=x;while(x1+1<N&&kind(y*N+x1+1)===k)x1++;
+    L.rectangle(townBounds(x,x1,y),{renderer:STREET.townCanvas,interactive:false,stroke:false,fillColor:k===2?'#e6a530':'#8fb3c9',fillOpacity:k===2?0.36:0.2}).addTo(G);x=x1+1;}}
+  STREET.townLayer=G.addTo(STREET.map);
+}
+function townRow(){
+  const el=$('#townRow');if(!el)return;
+  if(!S.base||!S.base.geo){el.innerHTML='<span class="help">\u{1F3A8} Drop your base pin and the map starts remembering which streets around it you have walked.</span>';return;}
+  const s=townStats();if(!s){el.innerHTML='';return;}
+  const next=TOWN_MILES[S.town.paid||0];
+  el.innerHTML='<button class="btn sm townchip" onclick="townSheet()">\u{1F3A8} <b>'+(s.pct==null?fmt(s.walked)+' squares':townPctText(s.pct))+'</b> of your town walked'
+    +(s.pct!=null&&next?'<small>next reward at '+next[0]+'%</small>':s.pct==null?'<small>'+(STREET.townLoading?'counting your streets...':'street count not loaded yet')+'</small>':'')+'</button>';
+}
+function townToggle(){if(!S.town)return;S.town.hide=!S.town.hide;save();townDraw();townSheet();}
+function townSheet(){
+  SFX.play('ui');const s=townStats();if(!s)return;
+  const paid=S.town.paid||0;
+  openSheet('<h2>Paint the town</h2>'
+    +'<div class="big" style="font-family:\'Bebas Neue\';font-size:46px;color:var(--amber);line-height:1">'+(s.pct==null?fmt(s.walked):townPctText(s.pct))+'</div>'
+    +'<p class="help" style="margin-top:-4px">'+(s.pct==null?'squares walked. The street count has not loaded yet, so there is no percentage.':'of the streets within 1 km of your base pin · '+fmt(s.got)+' of '+fmt(s.streets)+' street squares')+'</p>'
+    +'<p>Every 50 m square you walk through on the live map turns <b style="color:var(--amber)">amber</b> and stays that way. Streets you have not walked yet show as a faint blue wash, so the map tells you where to go next. It only counts on foot, with a decent GPS fix.</p>'
+    +'<p class="help"><b style="color:var(--bone)">This stays on your phone.</b> It is not sent to the server, it is not on the leaderboard, and friends who visit your base cannot see it. It is inside your own save file if you export one.</p>'
+    +TOWN_MILES.map((m,i)=>'<div class="kv" style="grid-template-columns:auto 1fr auto;gap:10px;opacity:'+(i<paid?.55:1)+'"><b>'+m[0]+'%</b><span>'+townGive(m[1])+'</span><span>'+(i<paid?'✓ collected':'')+'</span></div>').join('')
+    +(s.pct==null?'<button class="btn wide" style="margin-top:10px" onclick="closeSheet();townStreets(true)">Count my streets now</button>':'')
+    +'<div class="grid2" style="margin-top:10px"><button class="btn" onclick="townToggle()">'+(S.town.hide?'Show the paint on the map':'Hide the paint on the map')+'</button><button class="btn r" onclick="closeSheet()">Back</button></div>',true);
 }
