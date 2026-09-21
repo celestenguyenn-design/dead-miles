@@ -518,3 +518,82 @@ a{color:var(--amber)}
 #youSkills,#youCrew,#petCard,#youBoutique{scroll-margin-top:8px}
 .room2.on{border-color:var(--amber);background:rgba(230,165,48,.08)}
 button.room2{width:100%;text-align:left;color:inherit;font:inherit}
+/* ===== v7.35 - the battle stage ===== */
+.bstage{position:relative;height:184px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#15121c;margin-top:8px;isolation:isolate}
+.bs-bg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.bs-me,.bs-en,.bs-pet{position:absolute;transform:translateX(-50%);line-height:0}
+.bs-me{z-index:5}
+.bs-pet{left:6%;bottom:8px;z-index:6}
+.bs-en{background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.bs-en svg,.bs-me svg,.bs-pet svg{display:block;width:100%;height:auto;filter:drop-shadow(0 3px 2px rgba(0,0,0,.45))}
+.bs-me{width:84px}
+.bs-act,.bs-idle{display:block;transform-origin:50% 92%}
+.bs-idle{animation:bsIdle 2.4s ease-in-out infinite}
+.bs-en .bs-idle{animation:bsSway 2.1s ease-in-out infinite}
+.bs-en.gone{opacity:.28;filter:grayscale(.6)}
+.bs-en.gone .bs-act{transform:rotate(82deg) translateY(10px)}
+.bs-en.gone .bs-idle{animation:none}
+.bs-en.tgt::after{content:"";position:absolute;left:50%;bottom:-3px;width:74%;height:9px;transform:translateX(-50%);border-radius:50%;border:2px solid var(--amber);box-shadow:0 0 8px rgba(230,165,48,.7);animation:bsRing 1.2s ease-in-out infinite}
+.bs-en.tgt::before{content:"";position:absolute;left:50%;top:-16px;margin-left:-6px;border:6px solid transparent;border-top-color:var(--amber);animation:bsArrow .9s ease-in-out infinite;z-index:2}
+.bs-en.rage svg{filter:drop-shadow(0 0 5px #ff4a5a) drop-shadow(0 3px 2px rgba(0,0,0,.45))}
+.bs-en.plate svg{filter:drop-shadow(0 0 3px #8fb3c9) drop-shadow(0 3px 2px rgba(0,0,0,.45))}
+.bs-stun{position:absolute;left:50%;top:-6px;font-size:15px;line-height:1;transform:translateX(-50%);animation:bsSpin 1.4s linear infinite}
+.bs-hp{position:absolute;left:8%;right:8%;top:-7px;height:5px;border-radius:3px;background:rgba(0,0,0,.6);overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.bs-hp i{display:block;height:100%;background:linear-gradient(90deg,var(--rot2),var(--rot))}
+.bs-hp.me{position:static;height:9px;border-radius:5px}
+.bs-hp.me i{background:linear-gradient(90deg,#a3212f,#e63e5c)}
+.bs-hud{position:absolute;left:8px;top:8px;width:46%;z-index:9;padding:5px 7px 6px;border-radius:8px;background:rgba(12,12,18,.72);border:1px solid rgba(255,255,255,.08);line-height:1.2}
+.bs-hudrow{display:flex;justify-content:space-between;font-size:11px;color:var(--bone2);margin-bottom:4px}
+.bs-hudrow b{color:var(--bone);font-variant-numeric:tabular-nums}
+.bs-float{position:absolute;z-index:12;transform:translate(-50%,0);font-family:'Bebas Neue',Impact,sans-serif;font-size:24px;letter-spacing:.5px;color:#ffe08a;text-shadow:0 2px 0 #15121a,0 0 6px rgba(0,0,0,.8);opacity:0;pointer-events:none;white-space:nowrap;animation:bsFloat 900ms ease-out both}
+.bs-float.big{font-size:32px;color:#ffb060}
+.bs-float.hurt{color:#ff5a6a}
+.bs-float.good{color:#7fdf8f}
+.bs-float.dim{color:#b9b2a4;font-size:18px}
+.bs-fx{position:absolute;z-index:11;width:0;height:0;opacity:0;pointer-events:none}
+.bs-fx::before{content:"";position:absolute;left:-30px;top:-30px;width:60px;height:60px}
+.bs-fx.slash{animation:bsFade 300ms ease-out both}
+.bs-fx.slash::before{border-radius:50%;border:5px solid transparent;border-top-color:#fff;border-right-color:#ffe08a;transform:rotate(20deg);animation:bsSlash 300ms ease-out both;animation-delay:inherit}
+.bs-fx.heavy{animation:bsFade 380ms ease-out both}
+.bs-fx.heavy::before{left:-38px;top:-38px;width:76px;height:76px;border-radius:50%;background:radial-gradient(circle,#fff 0,#ffd166 28%,rgba(255,138,58,.7) 52%,rgba(255,138,58,0) 70%);animation:bsBurst 380ms ease-out both;animation-delay:inherit}
+.bs-fx.pop{animation:bsFade 240ms ease-out both}
+.bs-fx.pop::before{left:-18px;top:-18px;width:36px;height:36px;border-radius:50%;background:radial-gradient(circle,#fff 0,#ffd166 40%,rgba(255,209,102,0) 70%);animation:bsBurst 240ms ease-out both;animation-delay:inherit}
+.bs-fx.muzzle{animation:bsFade 180ms ease-out both}
+.bs-fx.muzzle::before{left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;background:radial-gradient(circle,#fff 0,#ffb060 45%,rgba(255,176,96,0) 72%);animation:bsBurst 180ms ease-out both;animation-delay:inherit}
+.bs-fx.bite{animation:bsFade 300ms ease-out both}
+.bs-fx.bite::before{border-radius:50%;border:5px solid transparent;border-left-color:#ff5a6a;border-bottom-color:#ff8a92;transform:rotate(-20deg);animation:bsSlash 300ms ease-out both;animation-delay:inherit}
+.bs-fx.heal{animation:bsFade 800ms ease-out both}
+.bs-fx.heal::before{left:-34px;top:-44px;width:68px;height:88px;border-radius:40px;background:radial-gradient(ellipse,rgba(127,223,143,.55) 0,rgba(127,223,143,0) 70%);animation:bsRise 800ms ease-out both;animation-delay:inherit}
+.bs-fx.brace{animation:bsFade 600ms ease-out both}
+.bs-fx.brace::before{left:-44px;top:-48px;width:88px;height:96px;border-radius:50%;border:3px solid #8fb3c9;box-shadow:0 0 14px rgba(143,179,201,.8) inset;animation:bsBurst 600ms ease-out both;animation-delay:inherit}
+.bs-shield.on{position:absolute;left:50%;top:6px;width:92px;height:104px;border-radius:50%;border:2px solid rgba(143,179,201,.7);box-shadow:0 0 12px rgba(143,179,201,.5) inset;animation:bsRing 1.6s ease-in-out infinite;pointer-events:none}
+.bs-tracer{position:absolute;z-index:10;height:3px;border-radius:2px;background:linear-gradient(90deg,rgba(255,224,138,0),#ffe08a 60%,#fff);transform-origin:0 50%;transform:rotate(calc(var(--a) * -1)) scaleX(0);opacity:0;pointer-events:none;animation:bsTracer 170ms ease-out both}
+.bs-vig{position:absolute;inset:0;z-index:8;pointer-events:none;opacity:0;background:radial-gradient(ellipse at 20% 60%,rgba(230,62,92,.55),rgba(230,62,92,0) 65%);animation:bsFade 420ms ease-out both}
+.bs-bulb{transform-origin:150px 0;animation:bsBulb 3.4s ease-in-out infinite}
+.bs-ember{animation:bsEmber 4.2s linear infinite}
+.enemy.slim{grid-template-columns:1fr;padding:7px 10px}
+.enemy.slim .n{font-size:18px}
+@keyframes bsIdle{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-3px) scaleY(1.02)}}
+@keyframes bsSway{0%,100%{transform:rotate(-4deg) translateX(-1px)}50%{transform:rotate(4deg) translateX(2px)}}
+@keyframes bsDash{0%{transform:none}38%{transform:translateX(70px) scale(1.08) rotate(6deg)}55%{transform:translateX(64px) scale(1.04)}100%{transform:none}}
+@keyframes bsKick{0%{transform:none}30%{transform:translateX(-12px) rotate(-5deg)}100%{transform:none}}
+@keyframes bsLunge{0%{transform:none}40%{transform:translateX(-64px) scale(1.1) rotate(-7deg)}58%{transform:translateX(-58px)}100%{transform:none}}
+@keyframes bsHit{0%{transform:none;filter:none}20%{transform:translateX(16px) rotate(8deg);filter:brightness(3) saturate(0)}55%{transform:translateX(9px) rotate(4deg);filter:brightness(1.6)}100%{transform:none;filter:none}}
+@keyframes bsHurt{0%{transform:none;filter:none}22%{transform:translateX(-16px) rotate(-8deg);filter:brightness(1.4) sepia(1) saturate(9) hue-rotate(-40deg)}60%{transform:translateX(-7px) rotate(-3deg)}100%{transform:none;filter:none}}
+@keyframes bsDodge{0%,100%{transform:none}45%{transform:translateX(20px) translateY(-6px)}}
+@keyframes bsDodgeL{0%,100%{transform:none}45%{transform:translateX(-20px) translateY(-6px)}}
+@keyframes bsDie{0%{transform:none;opacity:1;filter:none}25%{transform:translateX(12px) rotate(14deg);filter:brightness(2.4) saturate(0)}100%{transform:rotate(82deg) translateY(10px);opacity:.3;filter:grayscale(.6)}}
+@keyframes bsPop{0%{transform:scale(0) translateY(20px);opacity:0}100%{transform:none;opacity:1}}
+@keyframes bsFloat{0%{opacity:0;transform:translate(-50%,8px) scale(.6)}18%{opacity:1;transform:translate(-50%,-6px) scale(1.18)}30%{transform:translate(-50%,-10px) scale(1)}100%{opacity:0;transform:translate(-50%,-46px) scale(1)}}
+@keyframes bsFade{0%{opacity:0}15%{opacity:1}70%{opacity:1}100%{opacity:0}}
+@keyframes bsSlash{0%{transform:rotate(-70deg) scale(.5)}100%{transform:rotate(80deg) scale(1.25)}}
+@keyframes bsBurst{0%{transform:scale(.2)}100%{transform:scale(1.35)}}
+@keyframes bsRise{0%{transform:translateY(16px) scale(.8)}100%{transform:translateY(-22px) scale(1.1)}}
+@keyframes bsTracer{0%{opacity:0;transform:rotate(calc(var(--a) * -1)) scaleX(0)}30%{opacity:1;transform:rotate(calc(var(--a) * -1)) scaleX(1)}100%{opacity:0;transform:rotate(calc(var(--a) * -1)) scaleX(1)}}
+@keyframes bsShake{0%,100%{transform:none}20%{transform:translate(-7px,3px)}40%{transform:translate(6px,-3px)}60%{transform:translate(-4px,2px)}80%{transform:translate(3px,-1px)}}
+@keyframes bsBar{from{width:var(--from)}to{width:var(--to)}}
+@keyframes bsRing{0%,100%{opacity:.55;transform:translateX(-50%) scale(1)}50%{opacity:1;transform:translateX(-50%) scale(1.12)}}
+@keyframes bsArrow{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
+@keyframes bsSpin{to{transform:translateX(-50%) rotate(360deg)}}
+@keyframes bsBulb{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+@keyframes bsEmber{0%{transform:translateY(0);opacity:0}10%{opacity:.9}100%{transform:translateY(-150px) translateX(14px);opacity:0}}

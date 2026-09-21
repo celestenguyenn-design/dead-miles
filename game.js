@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.34';
+const VERSION='7.35';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -153,11 +153,58 @@ const PET_NAMES={dog:['Biscuit','Scout','Waffles','Pepper','Moose'],cat:['Mochi'
 function petLevel(){return Math.min(10,Math.floor((S.petXp||0)/4000)+1);}
 function petBlock(){return 0.25+0.02*(petLevel()-1);}
 function petXpMult(){return 1.15+0.01*(petLevel()-1);}
-const PET_MAX=8;
+/* v7.35 - NO REPEAT PETS. Her words: "we shouldn't be able to get repeats of pets,
+   they have no value. They're just sitting in the pet page."
+   There are 17 kinds (9 cats, 8 dogs) and the cap was EIGHT, rolled with
+   replacement - so repeats were not just worthless, they used up the slots that a
+   kind you did not have needed. The collection could never be finished.
+   Now a stray is always a kind you do not own; the cap is every kind there is;
+   and when you own them all a familiar stray turns up with a gift instead.
+   Repeats people already have can be rehomed: their steps go to the one you keep. */
+const PET_MAX=Object.keys(ART.CAT_COATS).length+Object.keys(ART.DOG_COATS).length;
+const PET_RAR_ORDER=['common','uncommon','rare','epic','legendary'],PET_COAT_W={common:40,uncommon:22,rare:10,epic:4,legendary:1};   // the same weights art.js rolls coats with
+function petOwns(kind,coat){return (S.pets||[]).some(x=>x.kind===kind&&x.coat===coat);}
+// A coat of this kind she does NOT own, at or above the rarity floor, weighted like
+// ART.randomCoat. Falls back to below the floor, then to nothing at all.
+function petNewCoat(kind,minRarity){
+  const src=kind==='dog'?ART.DOG_COATS:ART.CAT_COATS;const min=PET_RAR_ORDER.indexOf(minRarity||'common');
+  const free=Object.entries(src).filter(([k])=>!petOwns(kind,k));if(!free.length)return null;
+  let pool=free.filter(([k,v])=>PET_RAR_ORDER.indexOf(v.r)>=min);if(!pool.length)pool=free;
+  let t=0;for(const [k,v] of pool)t+=(PET_COAT_W[v.r]||1);let r=Math.random()*t;
+  for(const [k,v] of pool){r-=(PET_COAT_W[v.r]||1);if(r<=0)return k;}return pool[pool.length-1][0];
+}
+function petDupes(){ // every pet beyond the first of its kind+coat; the keeper is the active one, else the most walked
+  const groups={};for(const x of (S.pets||[])){(groups[x.kind+':'+x.coat]=groups[x.kind+':'+x.coat]||[]).push(x);}
+  const out=[];for(const k in groups){const g=groups[k];if(g.length<2)continue;
+    const xp=x=>x.id===S.petActive?(S.petXp||0):(x.xp||0);
+    const keep=g.find(x=>x.id===S.petActive)||g.slice().sort((a,b)=>xp(b)-xp(a))[0];
+    for(const x of g)if(x!==keep)out.push({pet:x,keep,xp:xp(x)});}
+  return out;
+}
+function petRehomeSheet(){
+  const d=petDupes();if(!d.length){toast('No repeats to rehome');return;}
+  openSheet('<h2>Rehome repeats</h2><p class="help">These are second copies of a kind you already have. Each one goes to a good home, and <b>every step it has walked goes to the one you keep</b>. You also get 10 scrap each for the collar and lead.</p>'
+    +'<div class="stack" style="margin-top:8px">'+d.map(x=>{const c=ART.coatInfo(x.pet.kind,x.pet.coat);
+      return '<div class="room2"><div class="e">'+ART.petSVG(x.pet.kind,40,x.pet.coat,{still:true})+'</div><div class="t"><b>'+esc(x.pet.name)+'</b><span><span class="rc-'+c.r+'">'+esc(c.n)+'</span> · '+fmt(x.xp)+' steps go to '+esc(x.keep.name)+'</span></div></div>';}).join('')+'</div>'
+    +'<button class="btn r wide" style="margin-top:12px" onclick="petRehomeGo()">Rehome '+d.length+' · +'+(d.length*10)+' scrap</button>'
+    +'<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet()">Keep them all</button>',true);
+}
+function petRehomeGo(){
+  const d=petDupes();if(!d.length)return;
+  for(const x of d){if(x.keep.id===S.petActive)S.petXp=(S.petXp||0)+x.xp;else x.keep.xp=(x.keep.xp||0)+x.xp;}
+  const gone=new Set(d.map(x=>x.pet.id));S.pets=S.pets.filter(x=>!gone.has(x.id));S.stock.scrap+=d.length*10;
+  log('Rehomed '+d.length+' repeat stray'+(d.length===1?'':'s')+'. Their steps went to the ones you kept. +'+(d.length*10)+' scrap.');
+  toast('Rehomed '+d.length+' · +'+(d.length*10)+' scrap','z');save();closeSheet();render();
+}
 function activePet(){return (S.pets||[]).find(p=>p.id===S.petActive)||null;}
 function setActivePet(id){const p=(S.pets||[]).find(x=>x.id===id);if(!p)return;const cur=activePet();if(cur){cur.xp=S.petXp||0;cur.name=S.petName;}S.petActive=p.id;S.pet=p.kind;S.petCoat=p.coat;S.petName=p.name;S.petXp=p.xp||0;SFX.play('ui');save();render();pushPlayer();}
-function petJoin(kind,minRarity){if(!S.pets)S.pets=[];if(S.pets.length>=PET_MAX){toast('A stray followed you, but there is no room. Eight is the limit.');return;}
-  const coat=ART.randomCoat(kind,minRarity);const ci=ART.coatInfo(kind,coat);const name=pick(PET_NAMES[kind]);const p={id:uid(),kind,coat,name,xp:0,found:Date.now()};S.pets.push(p);
+function petJoin(kind,minRarity){if(!S.pets)S.pets=[];
+  let coat=petNewCoat(kind,minRarity);
+  if(!coat){kind=kind==='dog'?'cat':'dog';coat=petNewCoat(kind,minRarity);}   // every coat of that kind is home already: try the other
+  if(!coat){ // she has all seventeen. A familiar face, and it brought something.
+    const gift=2000;S.petXp=(S.petXp||0)+gift;S.stock.scrap+=6;
+    log('A stray you already know trotted up, dropped something at your feet and left. +6 scrap, and '+(S.petName||'your companion')+' walked '+fmt(gift)+' steps further for the company.');
+    toast('A familiar stray · +6 scrap','a');save();return;}const ci=ART.coatInfo(kind,coat);const name=pick(PET_NAMES[kind]);const p={id:uid(),kind,coat,name,xp:0,found:Date.now()};S.pets.push(p);
   const first=!S.petActive;if(first){S.petActive=p.id;S.pet=kind;S.petCoat=coat;S.petName=name;S.petXp=0;}
   log('A '+ci.n.toLowerCase()+' followed you out. It is yours now.');if(ci.r==='legendary')SFX.play('legend');else SFX.play('rare');
   openSheet(`<h2>A ${esc(ci.n.toLowerCase())}!</h2><div class="big">${ART.petSVG(kind,96,coat)}</div><p><span class="rc-${ci.r}">${RAR[ci.r].n}</span> ${PETS[kind].n.toLowerCase()}. It followed you out and will not leave. ${PETS[kind].d}.</p><input id="petNameIn" type="text" maxlength="14" value="${esc(name)}" style="width:100%;margin:8px 0"><button class="btn r wide" onclick="namePet('${p.id}',$('#petNameIn').value);closeSheet();render()">${first?'Come on, then':'Welcome to the crew'}</button>`);}
@@ -174,7 +221,7 @@ function petFetch(){if(!S.pet)return;const lvl=petLevel();const kennel=S.base&&S
 function renderPet(){const el=$('#petCard');if(!el)return;if(!S.pet){el.innerHTML='<h2>Companion <span class="sub">none yet</span></h2><p class="help">Strays hide in the houses you search. Keep looting: one always turns up by your 40th room ('+Math.min(40,S.roomsSearched||0)+' searched). Nine kinds of cat and eight kinds of dog are out there, and the rare ones are rare.</p>';return;}
   const lvl=petLevel();const need=4000;const into=(S.petXp||0)-(lvl-1)*need;const p=PETS[S.pet];const ci=ART.coatInfo(S.pet,S.petCoat);const more=1+(lvl>=6?1:0)+(S.base&&S.base.rooms.kennel?1:0);
   el.innerHTML=`<h2>${esc(S.petName)} <span class="sub"><span class="rc-${ci.r}">${esc(ci.n)}</span> · level ${lvl}${lvl>=10?' (max)':''}</span></h2><div class="you"><div class="petbig">${ART.petSVG(S.pet,104,S.petCoat)}</div><div><div class="kv"><span>Bonus</span><b>${S.pet==='dog'?'blocks '+Math.round(petBlock()*100)+'% of hits':'+'+Math.round((petXpMult()-1)*100)+'% XP'}</b><span>Levels by</span><b>your steps</b><span>Brings back</span><b>${more} thing${more>1?'s':''} a morning</b></div>${lvl<10?`<div class="xp" style="margin-top:8px"><i style="width:${Math.min(100,into/need*100)}%"></i></div><p class="help">${fmt(Math.max(0,need-into))} steps to level ${lvl+1}</p>`:''}</div></div><p class="help" style="margin-top:8px">${S.petGifts&&S.petGifts.length?'This morning: '+esc(S.petGifts.join(', ')):'Nothing found yet. Sleep on it.'}</p><div class="row" style="margin-top:8px"><button class="btn sm ghost" onclick="renamePet()">Rename</button><span class="help">Only the active one walks with you, fetches, and levels.</span></div>
-  <h2 style="margin-top:14px;font-size:18px">Your strays <span class="sub">${(S.pets||[]).length} of ${PET_MAX}</span></h2><div class="petrow">${(S.pets||[]).map(x=>{const c=ART.coatInfo(x.kind,x.coat);const l=Math.min(10,Math.floor((x.id===S.petActive?S.petXp:x.xp||0)/4000)+1);return `<button class="petpick${x.id===S.petActive?' on':''}" style="border-color:${RAR[c.r].c}" onclick="setActivePet('${x.id}')">${ART.petSVG(x.kind,56,x.coat,{still:x.id!==S.petActive})}<b>${esc(x.name)}</b><span class="rc-${c.r}">${esc(c.n)}</span><span class="help">L${l}</span></button>`;}).join('')}</div><p class="help" style="margin-top:6px">More strays turn up as you search rooms, clear strays on watch duty, and take down county bosses (those are rare or better).</p>`;}
+  <h2 style="margin-top:14px;font-size:18px">Your strays <span class="sub">${(S.pets||[]).length} of ${PET_MAX}</span></h2><div class="petrow">${(S.pets||[]).map(x=>{const c=ART.coatInfo(x.kind,x.coat);const l=Math.min(10,Math.floor((x.id===S.petActive?S.petXp:x.xp||0)/4000)+1);return `<button class="petpick${x.id===S.petActive?' on':''}" style="border-color:${RAR[c.r].c}" onclick="setActivePet('${x.id}')">${ART.petSVG(x.kind,56,x.coat,{still:x.id!==S.petActive})}<b>${esc(x.name)}</b><span class="rc-${c.r}">${esc(c.n)}</span><span class="help">L${l}</span></button>`;}).join('')}</div>${petDupes().length?`<button class="btn sm wide" style="margin-top:8px" onclick="petRehomeSheet()">Rehome ${petDupes().length} repeat${petDupes().length===1?'':'s'} · their steps go to the one you keep</button>`:''}<p class="help" style="margin-top:6px">A new stray is always a kind you do not have yet. They turn up as you search rooms, clear strays on watch duty, and take down county bosses (those are rare or better).</p>`;}
 const CLASSES={
   brawler:{n:'Brawler',e:'🥊',d:'Hits hard up close. Starts with a bat and a leather jacket.',kit:['bat','jacket']},
   marksman:{n:'Marksman',e:'🎯',d:'Guns and ammo. Starts with a pistol, 6 rounds and a pipe.',kit:['pistol','pipe'],ammo:6},
@@ -1224,7 +1271,7 @@ function takeWatch(k){const w=watchState();if(S.loc||S.combat){toast('Finish wha
 function watchReward(k){const j=WATCH_JOBS[k];if(!j)return;const r=j.reward;const got=[];const list=table(['food','water','meds','scrap','ammo'],0.15,0.25);
   for(let i=0;i<r.items;i++){const it=wpick(list,'w');const item=it.gear?{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}:{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:it.cat,qty:it.qty,uid:uid(),r:it.r};if(takeItem(item,null))got.push(it.e+' '+it.n);}
   S.stock.scrap+=r.scrap;if(r.key&&Math.random()<r.key){S.keys++;got.push('🗝️ Chest key');}
-  if(k==='strays'&&Math.random()<0.1&&(S.pets||[]).length<PET_MAX){setTimeout(()=>petJoin(Math.random()<0.5?'dog':'cat'),400);}
+  if(k==='strays'&&Math.random()<0.1){setTimeout(()=>petJoin(Math.random()<0.5?'dog':'cat'),400);}
   log('Watch paid: '+r.scrap+' scrap'+(got.length?', '+got.join(', ')+' in your pack':'')+'.');toast('Watch paid: +'+r.scrap+' scrap'+(got.length?' +'+got.length+' items':''),'a');}
 function renderWatch(){const el=$('#watch');if(!el)return;const w=watchState();const left=watchMax()-w.used;$('#watchSub').textContent=left+' of '+watchMax()+' left today';
   if(left<=0){el.innerHTML='<p class="help">Nothing left to guard today. Back tomorrow'+(S.base&&(S.base.rooms.tower||0)<2?' - a Watchtower at base adds a job per level':'')+'.</p>';return;}
@@ -2217,17 +2264,17 @@ function hurt(n,src){let d=Math.max(1,Math.round((n-dr())*(1-drSoak())));
   // fight, so it is protection against being ambushed, not a damage sponge.
   {const a=eqItem('armor');
    if(a&&a.id==='vigil'&&!C.vigilUsed){C.vigilUsed=true;if(d>5){d=5;clog('Vigil takes the first blow for you.','good');}}}
-  if(C.brace)d=Math.ceil(d*(1-(sk('steady')?0.6+sk('steady')*0.1:0.5)));if(S.pet==='dog'&&Math.random()<petBlock()){clog(S.petName+' lunges and takes the hit meant for you.','good');return;}if(C.adrena===C.turn&&S.hp-d<=0){d=S.hp-1;clog('The adrenaline holds you up at 1 HP.','good');}
+  if(C.brace)d=Math.ceil(d*(1-(sk('steady')?0.6+sk('steady')*0.1:0.5)));if(S.pet==='dog'&&Math.random()<petBlock()){clog(S.petName+' lunges and takes the hit meant for you.','good');fxPush({k:'petblock',from:(C.actor===undefined?-1:C.actor)});return;}if(C.adrena===C.turn&&S.hp-d<=0){d=S.hp-1;clog('The adrenaline holds you up at 1 HP.','good');}
   else if(sk('ironjaw')&&!C.jaw&&S.hp-d<=0){C.jaw=true;d=S.hp-1;clog('Iron Jaw. You stay on your feet at 1 HP.','good');}
   wearArmor();
-  S.hp-=d;C.pfx={d,t:Date.now()};clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
+  S.hp-=d;C.pfx={d,t:Date.now()};fxPush({k:'hurt',d,from:(C.actor===undefined?-1:C.actor),big:d>=maxHp()*0.2});clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
 function dealTo(t,d,label,kind){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));
   if(t.warden&&(sk('raidvet')||setPerk('bossDmg')))d=Math.round(d*(1+0.05*sk('raidvet')+setPerk('bossDmg')));
   if(t.plate&&!t.cracked){
     if(kind==='heavy'){t.cracked=true;clog('The heavy swing splits '+t.n+"'s plating wide open.",'good');
       if(sk('shatter')&&Math.random()<0.5*sk('shatter')){t.stun=1;clog('Shatter: '+t.n+' goes down hard and loses its next turn.','good');}}
     else{const soak=Math.round(d*(0.55-(kind==='shot'?0.15*sk('piercing'):0)));d=Math.max(1,d-soak);clog('Most of that glanced off the plating.','');}
-  }if(t.shield>0){const s=Math.min(t.shield,d);t.shield-=s;d-=s;clog('The shield soaks '+s+'.'+(t.shield<=0?' It cracks apart.':''),'');if(d<=0){t.fx={d:0,t:Date.now()};C.lunge=Date.now();return;}}t.hp-=d;t.fx={d,t:Date.now(),k:kind||'slash'};C.lunge=Date.now();if(t.warden)C.myDealt=(C.myDealt||0)+d;clog(label+' for '+d+'.','you');if(t.wanted)ctEvent('boss',d);}
+  }if(t.shield>0){const s=Math.min(t.shield,d);t.shield-=s;d-=s;clog('The shield soaks '+s+'.'+(t.shield<=0?' It cracks apart.':''),'');if(d<=0){t.fx={d:0,t:Date.now()};C.lunge=Date.now();fxPush({k:'block',i:C.enemies.indexOf(t)});return;}}t.hp-=d;t.fx={d,t:Date.now(),k:kind||'slash'};fxPush({k:'hit',i:C.enemies.indexOf(t),d,kind:kind||'slash',by:/^(You |Heavy swing|The )/.test(label||'')?'me':'ally'});C.lunge=Date.now();if(t.warden)C.myDealt=(C.myDealt||0)+d;clog(label+' for '+d+'.','you');if(t.wanted)ctEvent('boss',d);}
 // Weapons she can actually put in her hand right now: melee, not wrecked, not
 // the one already equipped.
 function swapOptions(){return S.gear.filter(g=>g.slot==='melee'&&!g.broken&&(g.dur===undefined||g.dur>0)&&S.eq.melee!==g.uid);}
@@ -2312,12 +2359,13 @@ function breakWeapon(w){if(w.dur===undefined||w.dur>0)return;
     S.gear=S.gear.filter(g=>g.uid!==w.uid);if(S.eq[slot]===w.uid)S.eq[slot]=null;}}
 function act(kind){
   if(!C||C.over)return;C.brace=false;
+  C.fxq=[];C.fxNew=false;C.hp0=S.hp;for(const e of C.enemies)e.hp0=e.hp;   // the stage replays this round from here
   const t=targetEnemy();if(!t){endCombat(true);return;}
   // "Fists" is the same swing with the weapon deliberately left out of it. She
   // asked for this so a legendary is not spent on a walker: less damage, but
   // nothing wears down.
   if(kind==='attack'||kind==='fists'){const w=kind==='fists'?null:eqItem('melee');const dm=w?wDmg(w):baseDmg();
-    if(Math.random()<t.dodge){clog(t.n+' sidesteps your swing.','');SFX.play('miss');}
+    if(Math.random()<t.dodge){clog(t.n+' sidesteps your swing.','');SFX.play('miss');fxPush({k:'miss',i:C.target});}
     else if(Math.random()<(buffOn('numb')?0.72:0.9)){let d=Math.round((rint(dm[0],dm[1])+(w?(S.lvl-1):fistLvlBonus())+(w?dmgBonus():0))*hydroDmg()*(buffOn('wired')?1.15:1));
       if(buffOn('sharp')&&!C.sharpUsed){C.sharpUsed=true;d=Math.round(d*1.5);clog('Cold brew. That one landed properly.','good');}
       // Saint Jude pays you for being nearly dead: up to +60% at 1 HP, nothing
@@ -2335,12 +2383,12 @@ function act(kind){
         if(w.dur>0&&w.dur<=3)clog(w.n+': '+w.dur+' swing'+(w.dur===1?'':'s')+' left'+(w.norepair?' - and it CANNOT be rebuilt. Switch to something else to keep it.':' before it gives out.'),'hit');
         else if(w.norepair&&w.dur>0&&w.dur<=10)clog(w.n+' is down to '+w.dur+' swings, and it cannot be rebuilt.','sys');
         breakWeapon(w);}}
-    else{clog('You miss.','');SFX.play('miss');}
+    else{clog('You miss.','');SFX.play('miss');fxPush({k:'miss',i:C.target});}
   }
   else if(kind==='heavy'){const w=eqItem('melee');if(!w){toast('Need a melee weapon');return;}const hd=wDmg(w);
-    if(Math.random()<t.dodge+0.1){clog(t.n+' ducks the big swing.','');SFX.play('miss');}
+    if(Math.random()<t.dodge+0.1){clog(t.n+' ducks the big swing.','');SFX.play('miss');fxPush({k:'miss',i:C.target});}
     else if(Math.random()<0.6+sk('bruiser')*0.12){const d=Math.round((rint(hd[0],hd[1])+dmgBonus())*1.6*hydroDmg())+(S.lvl-1);dealTo(t,d,'Heavy swing lands','heavy');SFX.play('hit');}
-    else{clog('The heavy swing goes wide.','');SFX.play('miss');}
+    else{clog('The heavy swing goes wide.','');SFX.play('miss');fxPush({k:'miss',i:C.target});}
     w.dur=Math.max(0,w.dur-2);breakWeapon(w);
     if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+(w.quiet?3:8));
   }
@@ -2354,7 +2402,7 @@ function act(kind){
     for(let s=0;s<shots;s++){const tt=targetEnemy();if(!tt)break;
       if(Math.random()<(buffOn('numb')?0.74:0.92)){let d=Math.round((rint(wDmg(g)[0],wDmg(g)[1])+(S.lvl-1)+sk('steadyaim')*3)*hydroDmg()*(buffOn('wired')?1.15:1));if(sk('coldbarrel')&&!C.fired){d=Math.round(d*1.5);clog('Cold barrel. The first shot bites.','good');}if(Math.random()<sk('headshot')*0.1){d*=2;clog('Headshot.','good');}C.fired=true;tt.shot=true;C.muzzle=Date.now();dealTo(tt,d,'You fire the '+g.n,'shot');
         // Long Winter does not hit harder, it takes their turns away.
-        if(g.id==='longwinter'&&!tt.dead&&Math.random()<0.34){tt.stun=1;clog(tt.n+' stiffens up. It loses its next turn.','good');}}else{C.fired=true;clog('The shot goes wide.','');}}
+        if(g.id==='longwinter'&&!tt.dead&&Math.random()<0.34){tt.stun=1;clog(tt.n+' stiffens up. It loses its next turn.','good');}}else{C.fired=true;clog('The shot goes wide.','');fxPush({k:'miss',i:C.target});}}
     if(S.loc&&g.id!=='whisper')S.loc.noise=Math.min(100,S.loc.noise+Math.round(Math.max(5,25-sk('silencer')*8)*(g.quiet?0.3:1)));
     // A bow gets most of its bolts back. That is the whole reason to carry one.
     if(g.recover&&!free){
@@ -2372,7 +2420,7 @@ function act(kind){
       breakWeapon(g);
     }
   }
-  else if(kind==='brace'){C.brace=true;clog('You brace.','you');}
+  else if(kind==='brace'){C.brace=true;clog('You brace.','you');fxPush({k:'brace'});}
   else if(kind==='med'){
     // Unlimited patch-ups meant ten meds were 400 extra HP and no boss could
     // ever out-damage a pack. Two a fight (three with Field Dressing) turns
@@ -2389,7 +2437,7 @@ function act(kind){
     if(!m){toast('No meds');return;}
     const heal=medHeal(mid);
     if(m.stock)medsTake(mid);else S.pack=S.pack.filter(p=>p!==m);
-    S.hp=Math.min(maxHp(),S.hp+heal);
+    S.hp=Math.min(maxHp(),S.hp+heal);fxPush({k:'heal',n:heal});
     if(mid==='adrena'){C.jaw=false;C.adrena=C.turn;clog('Adrenaline. Nothing puts you down this round.','good');}
     if(mid==='abx'&&S.infect){S.infect=null;S.infectStep=0;clog('The antibiotics take hold. The infection is gone.','good');}
     clog('You use the '+MEDS[mid].n.toLowerCase()+': +'+heal+' HP.','good');SFX.play('loot');}
@@ -2421,7 +2469,7 @@ function act(kind){
   const ml=roleLvl('medic');if(ml&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+6+ml*3);clog(activeCrew().find(c=>c.role==='medic').name+' patches you: +'+(6+ml*3)+'.','good');}
   if(sk('triage')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('triage')*4);}
   if(eqItem('armor')&&eqItem('armor').id==='nightingale'&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+5);}
-  for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);if(sk('transfusion')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('transfusion')*3);clog('You patch up as '+e.n+' drops. +'+(sk('transfusion')*3)+' HP.','good');}clog(e.n+' goes down. +'+e.xp+' XP.','good');
+  for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;fxPush({k:'die',i:C.enemies.indexOf(e)});S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);if(sk('transfusion')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('transfusion')*3);clog('You patch up as '+e.n+' drops. +'+(sk('transfusion')*3)+' HP.','good');}clog(e.n+' goes down. +'+e.xp+' XP.','good');
     if(e.burst&&!e.shot){hurt(Math.round((e.burst+dr())*(sk('lungs')?0.5:1)),'The bloater bursts and');}
     if(e.human){if(Math.random()<0.5){const g=pick(['pipe','bat','jacket','helmet','crowbar']);S.gear.push({uid:uid(),id:g,...GEAR[g]});clog('It dropped a '+GEAR[g].n+'.','sys');}
       if(Math.random()<0.5){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:3,n:'Rounds (x3)'});clog('You take 3 rounds off the body.','sys');}
@@ -2472,10 +2520,11 @@ function enemyPhase(){
   C.duck=(C.where==='liveraid'&&typeof squadTarget==='function')?squadTarget():null;
   if(C.duck)clog(C.duck+' pulls it off you this round.','sys');
   for(const e of alive()){
+    C.actor=C.enemies.indexOf(e);
     if(e.stun>0){e.stun--;clog(e.n+' is still down.','');continue;}
-    if(e.scream&&Math.random()<e.scream){const w=mk('walker');C.enemies.push(w);clog('The screamer shrieks. Another walker shoves in.','hit');continue;}
+    if(e.scream&&Math.random()<e.scream){const w=mk('walker');C.enemies.push(w);fxPush({k:'spawn',i:C.enemies.length-1});clog('The screamer shrieks. Another walker shoves in.','hit');continue;}
     if(e.g){
-      if(e.g==='reinforce'&&!e.called&&e.hp<e.max/2){e.called=true;C.enemies.push(mk('raider'));clog(e.n+' whistles. Another raider drops off the trailer.','hit');}
+      if(e.g==='reinforce'&&!e.called&&e.hp<e.max/2){e.called=true;C.enemies.push(mk('raider'));fxPush({k:'spawn',i:C.enemies.length-1});clog(e.n+' whistles. Another raider drops off the trailer.','hit');}
       if(e.g==='heal'&&e.hp<e.max){e.hp=Math.min(e.max,e.hp+10);clog(e.n+' mutters a prayer and stands straighter. +10.','');}
       if(e.g==='flee'&&e.hp<e.max/4){e.dead=true;e.hp=0;e.fled=true;clog(e.n+' vaults the fence and is gone. The bounty walks with him, but he dropped his bag.','sys');S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:6});S.keys++;continue;}
       if(e.g==='slow'&&C.turn%2===1){clog(e.n+' winds up.','');continue;}
@@ -2488,7 +2537,7 @@ function enemyPhase(){
     // difficulty, it is a wall.
     if(e.caller&&C.turn%3===0&&(e.called||0)<2&&alive().length<5){
       e.called=(e.called||0)+1;
-      const w=mk(Math.random()<0.5?'walker':'runner');C.enemies.push(w);
+      const w=mk(Math.random()<0.5?'walker':'runner');C.enemies.push(w);fxPush({k:'spawn',i:C.enemies.length-1});
       clog(e.n+' bellows, and another one shoulders in.','hit');}
     const frenzied=e.frenzy&&e.hp<e.max/3;
     if(frenzied&&!e.wasFrenzied){e.wasFrenzied=true;clog(e.n+' goes berserk.','hit');SFX.play('growl');}
@@ -2500,7 +2549,7 @@ function enemyPhase(){
       hurt(d,e.n);
         if(e.g==='bleed'){C.bleed=Math.max(1,3-sk('clotting'));}if(e.g==='poison'){C.poison=Math.max(1,3-sk('clotting'));}
         if(e.g==='steal'&&S.pack.length&&Math.random()<0.3){const it=S.pack.splice(rint(0,S.pack.length-1),1)[0];clog(e.n+' lifts your '+it.n+' mid-swing.','hit');}}
-      else clog(e.n+' lunges and misses.','');}
+      else{clog(e.n+' lunges and misses.','');fxPush({k:'emiss',from:C.actor});}}
   }
   if(C.bleed>0){C.bleed--;const bd=Math.max(1,Math.round(4*(1-sk('clotting')*0.25)));S.hp-=bd;clog('You are bleeding. -'+bd+'.','hit');}
   if(C.poison>0){C.poison--;if(C.poison===0)clog('Your strength comes back.','good');}
@@ -2601,6 +2650,107 @@ function renderStuck(){
     +'<div class="stack" style="margin-top:8px">'+rows.map(r=>'<div class="note">'+r+'</div>').join('')+'</div>';
   el.hidden=false;
 }
+/* ================= THE BATTLE STAGE (v7.35) =================
+   Her words after the yard: "if we can even animate the fighting screens somehow,
+   this game would be amazing." The fight was a LIST - a portrait, enemy rows,
+   buttons - with a 22 px nudge and a row flash. Nothing ever crossed the screen.
+   Now there is a stage: you on the left, them on the right, a backdrop for where
+   the fight is, and the round PLAYS OUT on it in order.
+   How: act() is synchronous - your swing and every reply happen in one call and
+   the sheet is rebuilt once. So everything that happens is recorded as it happens
+   (fxPush, called from the real combat code: dealTo, hurt, the miss branches, the
+   death loop) and the next render turns that list into CSS animations with
+   staggered delays. Nothing waits on an animation, so tapping fast is never
+   slowed down - the next act() simply rebuilds the stage.
+   A render with no new events (tapping a target, a squad poll) plays nothing.
+   The people and zombies are the unchanged art.js sprites. */
+function fxPush(ev){if(!C)return;(C.fxq=C.fxq||[]).push(ev);C.fxNew=true;}
+const BS_SLOTS=[[60,8,1],[81,8,1],[70,50,0],[91,50,0],[49,50,0],[99,46,0]];   // x%, bottom px, front row?
+function bsBackdrop(where){
+  const inside=(where==='enter'||where==='wave'||where==='seal');
+  const base=(where==='raid'||where==='horde'),hot=(where==='liveraid'||where==='boss');
+  let s='<svg class="bs-bg" viewBox="0 0 300 176" preserveAspectRatio="xMidYMid slice" aria-hidden="true">';
+  if(inside){
+    s+='<rect width="300" height="176" fill="#1d1a22"/><rect y="118" width="300" height="58" fill="#2a2426"/><path d="M0 118 h300" stroke="#15121a" stroke-width="2"/>'
+      +'<rect x="196" y="28" width="46" height="50" rx="3" fill="#0e1420" stroke="#15121a" stroke-width="3"/><path d="M219 28 v50 M196 53 h46" stroke="#15121a" stroke-width="2"/><circle cx="230" cy="42" r="6" fill="#e8e0d0" opacity=".8"/>'
+      +'<rect x="26" y="40" width="40" height="78" fill="#15121a" opacity=".55"/>'
+      +'<g class="bs-bulb"><path d="M150 0 v34" stroke="#15121a" stroke-width="2"/><circle cx="150" cy="40" r="6" fill="#ffd98a"/><circle cx="150" cy="40" r="26" fill="#ffd98a" opacity=".10"/></g>';
+    for(let i=0;i<7;i++)s+='<path d="M'+(i*46)+' 118 l20 58" stroke="#15121a" stroke-width="1" opacity=".5"/>';
+  }else{
+    s+='<rect width="300" height="176" fill="'+(hot?'#2a1216':'#15121c')+'"/><rect width="300" height="120" fill="'+(hot?'#3a161c':'#1f1c2a')+'"/>';
+    [[0,38,54],[40,30,80],[74,46,44],[150,34,66],[196,42,50],[244,30,84],[276,30,48]].forEach(b=>{s+='<rect x="'+b[0]+'" y="'+(120-b[2])+'" width="'+b[1]+'" height="'+b[2]+'" fill="#100e14"/>';});
+    s+='<circle cx="252" cy="30" r="13" fill="'+(hot?'#ff8a70':'#e8e0d0')+'" opacity=".85"/>';
+    s+='<rect y="118" width="300" height="58" fill="'+(base?'#2a2622':'#241f22')+'"/>';
+    if(base)for(let x=0;x<300;x+=13)s+='<path d="M'+x+' 120 v-20 l6.500 -5 l6.500 5 v20z" fill="'+((x/13)%2?'#6a4a2a':'#7a5a34')+'" stroke="#15121a" stroke-width="1.2"/>';
+    else s+='<path d="M0 150 h300" stroke="#5a5240" stroke-width="3" stroke-dasharray="22 16"/>';
+    if(hot)for(let i=0;i<9;i++)s+='<circle class="bs-ember" style="animation-delay:'+(-(i*0.45)).toFixed(2)+'s" cx="'+(14+i*34)+'" cy="172" r="1.600" fill="#ffb060"/>';
+  }
+  return s+'</svg>';
+}
+// Turn the round's events into per-element animation lists. Times in ms.
+function bsSchedule(q){
+  const n=q.length;const slot=n?clamp(1700/n,170,330):0;
+  const out={me:[],en:{},floats:[],fx:[],stage:[],bar:{},meBar:null,total:n*slot};
+  const E=i=>(out.en[i]=out.en[i]||[]);
+  q.forEach((ev,j)=>{const T=Math.round(j*slot);
+    if(ev.k==='hit'){
+      if(ev.by==='me'){out.me.push(ev.kind==='shot'?'bsKick 220ms ease-out '+T+'ms':'bsDash '+(ev.kind==='heavy'?380:300)+'ms cubic-bezier(.3,.9,.4,1) '+T+'ms');}
+      E(ev.i).push('bsHit 300ms ease-out '+(T+120)+'ms');
+      out.fx.push({i:ev.i,kind:ev.kind||'slash',by:ev.by,t:T+90});
+      out.floats.push({on:ev.i,txt:'-'+ev.d,cls:ev.kind==='heavy'?'big':'',t:T+120});
+      if(out.bar[ev.i]===undefined)out.bar[ev.i]=T+120;
+      if(ev.kind==='heavy')out.stage.push('bsShake 300ms ease-out '+(T+120)+'ms');
+    }else if(ev.k==='block'){out.floats.push({on:ev.i,txt:'BLOCKED',cls:'dim',t:T+120});
+    }else if(ev.k==='miss'){out.me.push('bsDash 300ms cubic-bezier(.3,.9,.4,1) '+T+'ms');E(ev.i).push('bsDodge 300ms ease-out '+(T+80)+'ms');out.floats.push({on:ev.i,txt:'MISS',cls:'dim',t:T+120});
+    }else if(ev.k==='hurt'){
+      if(ev.from>=0)E(ev.from).push('bsLunge 320ms cubic-bezier(.3,.9,.4,1) '+T+'ms');
+      out.me.push('bsHurt 320ms ease-out '+(T+130)+'ms');out.floats.push({on:'me',txt:'-'+ev.d,cls:'hurt'+(ev.big?' big':''),t:T+130});
+      out.fx.push({i:'me',kind:'bite',t:T+110});if(out.meBar===null)out.meBar=T+130;
+      if(ev.big)out.stage.push('bsShake 300ms ease-out '+(T+130)+'ms');out.vig=(out.vig||[]).concat(T+130);
+    }else if(ev.k==='emiss'){if(ev.from>=0)E(ev.from).push('bsLunge 320ms cubic-bezier(.3,.9,.4,1) '+T+'ms');out.me.push('bsDodgeL 300ms ease-out '+(T+100)+'ms');out.floats.push({on:'me',txt:'MISS',cls:'dim',t:T+130});
+    }else if(ev.k==='petblock'){if(ev.from>=0)E(ev.from).push('bsLunge 320ms cubic-bezier(.3,.9,.4,1) '+T+'ms');out.floats.push({on:'me',txt:'BLOCKED',cls:'good',t:T+130});
+    }else if(ev.k==='die'){E(ev.i).push('bsDie 520ms ease-in '+(T+60)+'ms forwards');out.dying=(out.dying||{});out.dying[ev.i]=1;
+    }else if(ev.k==='spawn'){E(ev.i).push('bsPop 380ms cubic-bezier(.2,1.4,.4,1) '+T+'ms both');
+    }else if(ev.k==='heal'){out.floats.push({on:'me',txt:'+'+ev.n,cls:'good',t:T});out.fx.push({i:'me',kind:'heal',t:T});if(out.meBar===null)out.meBar=T;
+    }else if(ev.k==='brace'){out.fx.push({i:'me',kind:'brace',t:T});}
+  });
+  return out;
+}
+function battleStage(){
+  const q=C.fxNew?(C.fxq||[]):[];C.fxNew=false;const P=bsSchedule(q);const t=targetEnemy();
+  const an=list=>list&&list.length?'animation:'+list.join(',')+';':'';
+  const bar=(now,was,delay,cls)=>'<div class="bs-hp '+cls+'"><i style="width:'+now+'%;'+(delay!==undefined&&delay!==null&&was!==now?'--from:'+was+'%;--to:'+now+'%;animation:bsBar 380ms ease-out '+delay+'ms both;':'')+'"></i></div>';
+  const pos={me:[17,10]};
+  let s='<div class="bstage" style="'+an(P.stage)+'">'+bsBackdrop(C.where);
+  if(P.vig)s+=P.vig.map(tm=>'<div class="bs-vig" style="animation-delay:'+tm+'ms"></div>').join('');
+  // them
+  C.enemies.forEach((e,i)=>{const sl=BS_SLOTS[Math.min(i,BS_SLOTS.length-1)];const big=!!(e.warden||e.boss);const size=big?78:(sl[2]?60:50);
+    pos[i]=[sl[0],sl[1]+size*0.6];
+    const gone=e.dead&&!(P.dying&&P.dying[i]);const hpNow=Math.max(0,Math.round(e.hp/e.max*100)),hpWas=Math.max(0,Math.round((e.hp0===undefined?e.hp:e.hp0)/e.max*100));
+    s+='<button class="bs-en'+(e===t&&!e.dead?' tgt':'')+(gone?' gone':'')+(e.enraged?' rage':'')+(e.plate&&!e.cracked?' plate':'')+'" style="left:'+sl[0]+'%;bottom:'+sl[1]+'px;z-index:'+(sl[2]?6:3)+';width:'+size+'px" onclick="C.target='+i+';renderCombat()" aria-label="Target '+esc(e.n)+'">'
+      +(gone?'':bar(hpNow,hpWas,P.bar[i],'en'))
+      +'<span class="bs-act" style="'+an(P.en[i])+'"><span class="bs-idle" style="animation-delay:'+(-(i*0.37)).toFixed(2)+'s">'+ART.zombieSVG(e.k,size)+'</span></span>'
+      +(e.stun>0&&!e.dead?'<span class="bs-stun">\u{1F4AB}</span>':'')+'</button>';});
+  // you
+  const hpNow=Math.max(0,Math.round(S.hp/maxHp()*100)),hpWas=Math.max(0,Math.round((C.hp0===undefined?S.hp:C.hp0)/maxHp()*100));
+  s+='<div class="bs-me" style="left:'+pos.me[0]+'%;bottom:'+pos.me[1]+'px"><span class="bs-act" style="'+an(P.me)+'"><span class="bs-idle">'
+    +ART.avatarSVG(S.av,84,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',mood:S.hp<maxHp()*0.3?'angry':'',alive:true})+'</span></span>'
+    +(C.brace?'<span class="bs-shield on"></span>':'')+'</div>';
+  if(S.pet)s+='<div class="bs-pet"><span class="bs-idle" style="animation-delay:-.8s">'+ART.petSVG(S.pet,30,S.petCoat,{still:true})+'</span></div>';
+  // effects: slashes, tracers, bites, sparkles
+  P.fx.forEach(f=>{
+    if(f.i==='me'){s+='<span class="bs-fx '+f.kind+'" style="left:'+pos.me[0]+'%;bottom:'+(pos.me[1]+34)+'px;animation-delay:'+f.t+'ms"></span>';return;}
+    const p=pos[f.i];if(!p)return;
+    if(f.kind==='shot'&&f.by==='me'){const dx=(p[0]-pos.me[0])*3.1,dy=-(p[1]-(pos.me[1]+44));const len=Math.hypot(dx,dy),a=Math.atan2(dy,dx)*180/Math.PI;
+      s+='<span class="bs-tracer" style="left:calc('+pos.me[0]+'% + 26px);bottom:'+(pos.me[1]+44)+'px;width:'+len.toFixed(0)+'px;--a:'+a.toFixed(1)+'deg;animation-delay:'+(f.t-60)+'ms"></span>'
+        +'<span class="bs-fx muzzle" style="left:calc('+pos.me[0]+'% + 30px);bottom:'+(pos.me[1]+40)+'px;animation-delay:'+(f.t-70)+'ms"></span>';}
+    s+='<span class="bs-fx '+(f.kind==='heavy'?'heavy':f.kind==='shot'?'pop':'slash')+'" style="left:'+p[0]+'%;bottom:'+(p[1]-6)+'px;animation-delay:'+f.t+'ms"></span>';});
+  P.floats.forEach(f=>{const p=f.on==='me'?[pos.me[0],pos.me[1]+92]:[pos[f.on]?pos[f.on][0]:70,(pos[f.on]?pos[f.on][1]:40)+34];
+    s+='<span class="bs-float '+f.cls+'" style="left:'+p[0]+'%;bottom:'+p[1]+'px;animation-delay:'+f.t+'ms">'+esc(f.txt)+'</span>';});
+  // your health, on the stage, so the portrait row below is not needed
+  s+='<div class="bs-hud"><div class="bs-hudrow"><span>You · DR '+dr()+'</span><b>'+S.hp+' / '+maxHp()+'</b></div>'+bar(hpNow,hpWas,P.meBar,'me')+'</div>';
+  return s+'</div>';
+}
 function renderCombat(){
   if(!C)return;const w=eqItem('melee'),g=eqItem('ranged');const t=targetEnemy();
   const ammoN=(g?(S.pack.filter(p=>p.cat==='ammo'&&p.id===g.ammo).reduce((a,b)=>a+(b.qty||0),0)+ammoStock(g.ammo)):0);
@@ -2608,10 +2758,10 @@ function renderCombat(){
   const now=Date.now();const phurt=C.pfx&&now-C.pfx.t<600;const plunge=C.lunge&&now-C.lunge<400;const flash=C.muzzle&&now-C.muzzle<350;
   const SPARK={slash:'💢',heavy:'💥',shot:'✴️'};
   $('#sheet').innerHTML=`<h2>${C.where==='raid'?'Defend the base':C.where==='road'?'On the road':'Inside'} <span class="chip d" style="float:right">round ${C.turn}</span></h2>
-  <div class="pbox${phurt?' hurt':''}"><div class="sp${plunge?' lunge':''}">${ART.avatarSVG(S.av,60,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',mood:S.hp<maxHp()*0.3?'angry':'',alive:true})}${flash?'<span class="muzzle">✳️</span>':''}</div><div><div class="hplab"><span>You · DR ${dr()}</span><span>${S.hp} / ${maxHp()}</span></div><div class="hpbar"><i style="width:${S.hp/maxHp()*100}%"></i></div></div>${phurt?`<span class="dmg">-${C.pfx.d}</span>`:''}</div>
+  ${battleStage()}
   ${C.where==='liveraid'&&typeof squadStrip==='function'?squadStrip():''}
   ${S.buff&&S.buff.fights>0?`<div class="help" style="margin-top:6px;color:var(--amber)">${esc(BUFF_TEXT[S.buff.k]||'')}</div>`:''}
-  <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div class="sp">${ART.zombieSVG(e.k,52)}${hit?`<span class="spark">${SPARK[e.fx.k||'slash']}</span>`:''}</div><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.plate&&!e.cracked?' · <b style="color:var(--steel)">plated - a heavy swing cracks it</b>':''}${e.enraged?' · <b style="color:#ff8a92">enraged</b>':''}${e.caller?' · calls more':''}${e.frenzy?' · frenzies low':''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div>${hit?`<span class="dmg">-${e.fx.d}</span>`:''}</button>`;}).join('')}</div>
+  <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy slim${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.plate&&!e.cracked?' · <b style="color:var(--steel)">plated - a heavy swing cracks it</b>':''}${e.enraged?' · <b style="color:#ff8a92">enraged</b>':''}${e.caller?' · calls more':''}${e.frenzy?' · frenzies low':''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div></button>`;}).join('')}</div>
   <div class="acts">
     <button class="btn r" onclick="attackGuard()">${w?w.e+' '+esc(w.n)+(temperOf(w)?' <span class="chip s">'+esc(temperOf(w).n)+'</span>':''):'👊 Fists'}<small>${w?(wDmg(w)[0]+dmgBonus())+'-'+(wDmg(w)[1]+dmgBonus())+' · '+w.dur+' left':fistDmg()[0]+'-'+fistDmg()[1]+' dmg'}</small></button>
     <button class="btn" onclick="heavyGuard()" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · ${60+sk('bruiser')*12}% hit · costs 2 durability</small></button>
@@ -2674,7 +2824,7 @@ function searchRoom(i){pushSoon();
   if(typeof landmarkPayout==='function')try{landmarkPayout(loc);}catch(e){}
   if(!loc.stronghold&&S.crew.length<8&&Math.random()<0.07){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was hiding in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was hiding in the ${esc(r.n.toLowerCase())}. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(1)}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
   else if(!S.pet&&(Math.random()<0.03||(S.roomsSearched||0)>=40)){petJoin(Math.random()<0.6?'dog':'cat');}
-  else if(S.pet&&(S.pets||[]).length<PET_MAX&&Math.random()<0.012){petJoin(Math.random()<0.5?'dog':'cat');}
+  else if(S.pet&&Math.random()<0.012){petJoin(Math.random()<0.5?'dog':'cat');}
   /* Light Step was a flat -4 per rank against room noise of 18-44, so at rank 3
      a full sweep of a house made 68 noise, a pharmacy 60, a clinic 61 - and a
      wave needs 100. The perk did not reduce waves, it ABOLISHED them: no place
@@ -4688,6 +4838,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.35',d:'Sep 21',t:'Fights happen on a stage now, and no more repeat pets',
+  i:['THE FIGHT SCREEN IS ANIMATED. There is a stage at the top: you on the left, them on the right, and a backdrop for where you are - inside a house, out on the road, at your own fence, or under a red sky for raids and bosses.',
+     'THE ROUND PLAYS OUT IN ORDER. You dash in and slash, the number flies off them and they flinch. Then each of them lunges back at you in turn, you flash red, and your health bar drains when the hit lands, not before. Heavy swings shake the whole stage. Guns get a muzzle flash and a tracer. The dead fall over and stay down.',
+     'IT NEVER SLOWS YOU DOWN. Nothing waits for an animation - tap as fast as you like and the next round simply starts. You can also tap an enemy on the stage to target it.',
+     'NO MORE REPEAT PETS. There are 17 kinds of stray and the limit was 8, so repeats were not just useless, they took the slots a new kind needed. A new stray is now always a kind you do not have, and the limit is all 17.',
+     'IF YOU ALREADY HAVE REPEATS: You tab, Companion, Rehome repeats. Every step a repeat has walked goes to the one you keep, and you get 10 scrap each.']},
  {v:'7.34',d:'Sep 21',t:'Hollow-een is set up: Oct 15 to Nov 2',
   i:['NOTHING CHANGES TODAY. This is the event being put in place so it switches itself on at midnight on October 15 and off after November 2.',
      'THE BONES ONESIE. A skeleton suit, ribs and all. It is in the Hollow-een shop on the Base tab for 120 candy and it is yours forever once bought. It cannot come out of a gumball machine or a loot roll - the event is the only way to get it.',
@@ -6231,7 +6387,7 @@ function bossKill(lastHit){const b=bossState();if(b.claimed)return;b.claimed=tru
   else{const pool=Object.entries(GEAR).filter(([k,v])=>v.r==='rare'||v.r==='epic').map(([k,v])=>({id:k,...v,w:v.r==='epic'?4:6}));const it=wpick(pool,'w');S.gear.push({uid:uid(),id:it.id,...GEAR[it.id]});got.push(it.e+' '+it.n);}
   S.keys++;got.push('🗝️ chest key');S.stock.scrap+=12;got.push('12 scrap');if(Math.random()<0.3){const cs=rollCosmetic();takeItem(cs,null);got.push(cs.n);}
   if(lastHit){S.keys++;S.stock.scrap+=10;got.push('last hit: +1 key, +10 scrap');}
-  if(Math.random()<0.2&&(S.pets||[]).length<PET_MAX){setTimeout(()=>petJoin(Math.random()<0.5?'dog':'cat','rare'),400);got.push('a stray followed you home');}
+  if(Math.random()<0.2){setTimeout(()=>petJoin(Math.random()<0.5?'dog':'cat','rare'),400);got.push('a stray followed you home');}
   {const rg=ROGUE_OF[bossName()];if(rg){const T=trophyGive(rg);if(T)got.push(T.e+' '+T.n);}}
   S.league.score+=150;log(bossName()+' is down. Your share: '+got.join(', ')+'.');
   const html=`<h2>${esc(bossName())} is down</h2><div class="big">${legend?'🌟':'💀'}</div><p>${lastHit?'You landed the last hit. ':''}Your share of the loot:<br><b style="color:var(--bone)">${esc(got.join(' · '))}</b></p><p class="help">${legend?'The legendary chance resets to 6%.':'No legendary this time. Every boss phase you fight raises the chance by 3%. Next kill: '+Math.round(bossChance()*100)+'%.'}${bossInParty()?'':' Fought solo, the next boss has '+Math.round(15*S.bossKills)+'% more HP.'}</p>`;
