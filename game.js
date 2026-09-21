@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.24';
+const VERSION='7.25';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -856,7 +856,25 @@ const INFECT_BASE=0.012, INFECT_PER_STEPS=600;
 function infect(){return (typeof S!=='undefined'&&S&&S.infect)||null;}
 function infectStage(){const f=infect();if(!f)return 0;return Math.min(3,f.stage||1);}
 function infectPenalty(){return [0,0.10,0.18,0.26][infectStage()]||0;}
-function infectChance(){return INFECT_BASE*(DIFF[S.diff||'normal'].infect);}
+// How much of you is actually covered, 0..1. DR 14 across the four slots is
+// about a full kit.
+function armorCover(){
+  const worn=ARMOR_SLOTS.map(k=>eqItem(k)).filter(Boolean);
+  const dr=worn.reduce((t,g)=>t+(g.dr||0),0);
+  return Math.max(0,Math.min(1,dr/14));
+}
+// THE CONSEQUENCE ARMOUR WAS MISSING. Infection used to be a flat 1.2 % per
+// zombie hit whether you were in a riot vest or a t-shirt, so armour's only
+// benefit was HP - and HP is refilled by bandages you find for free. Measured,
+// going with no armour at all cost 24 HP a fight and killed you 0 % of the
+// time, which made it the rational play. Her words: "I feel like that's too OP."
+// Teeth meeting plastic is the thing you cannot heal away afterwards.
+// Fully armoured is UNCHANGED at the old rate; it is being bare that got worse.
+const UNARMOURED_INFECT=4;
+function infectChance(){
+  const base=INFECT_BASE*(DIFF[S.diff||'normal'].infect);
+  return base*(UNARMOURED_INFECT-(UNARMOURED_INFECT-1)*armorCover());
+}
 function infectLabel(){return ['','Infected','Fevered','Failing'][infectStage()]||'';}
 function catchInfection(from){
   if(sk('ironjaw')&&Math.random()<0.25)return;
@@ -2826,7 +2844,19 @@ function gearPower(g){
   if(base.cap)return base.cap*1.5;
   return 5;
 }
-function repairPer(g){return Math.max(1,Math.min(9,Math.round(gearPower(g)/5)));}
+// Her friend: 96 scrap to repair a blue chest piece is too much. Measured, the
+// riot vest was the ONLY thing hitting 5 scrap a point - because gearPower for
+// armour is dr*4 and DR 6 is the highest outside legendaries, so the best
+// non-legendary armour paid the most per point AND had the most points to pay
+// for. Capping ARMOUR at 4 takes the vest from 130 to 104 for a full rebuild
+// and leaves every other piece exactly where it was; weapons are untouched,
+// since nobody has complained about those and they wear on a different clock.
+const ARMOR_PER_CAP=4;
+function repairPer(g){
+  const raw=Math.round(gearPower(g)/5);
+  const armour=(GEAR[g.id]||g||{}).dr!==undefined;
+  return Math.max(1,Math.min(armour?ARMOR_PER_CAP:9,raw));
+}
 function atBench(){return !!((S.base&&S.base.rooms.armory)||roleLvl('engineer'));}
 /* v7.2 - TUNE-UP WAS THE ONE DEAD PERK IN THE GAME. She asked whether it works.
    It did not: sk('tuneup') appeared in exactly zero places, so three skill
@@ -2866,7 +2896,22 @@ function repair(uidv){
   if(!repairMax(g)){toast('Nothing to repair on that');return;}
   if(!repairMissing(g)){toast(g.n+' is already in good shape');return;}
   const c=repairCost(g);
-  if(S.stock.scrap<c){toast('Need '+c+' scrap to fix the '+g.n+'. You have '+fmt(S.stock.scrap)+'.','d');return;}
+  // PARTIAL REPAIR. A full rebuild used to be all or nothing, so a worn rare
+  // piece was a single scary number and you either paid it or walked around
+  // broken. Now whatever you can afford goes in, which is also just what
+  // patching something up actually looks like.
+  if(S.stock.scrap<c){
+    const per=repairPer(g),miss=repairMissing(g);
+    const rate=c/miss;                       // includes the bench/skill discounts
+    const can=Math.floor(S.stock.scrap/rate);
+    if(can<1){toast('Need '+Math.ceil(rate)+' scrap for even one point on the '+g.n+'. You have '+fmt(S.stock.scrap)+'.','d');return;}
+    const spend=Math.max(1,Math.round(can*rate));
+    S.stock.scrap-=Math.min(S.stock.scrap,spend);
+    g.dur=Math.max(0,g.dur||0)+can;if(g.dur>0)delete g.broken;
+    log('Patched the '+g.n+' as far as the scrap went: +'+can+' of '+miss+' for '+spend+' scrap.');
+    toast(g.n+' patched · +'+can+'/'+miss,'a');SFX.play('chest');
+    save();render();return;
+  }
   S.stock.scrap-=c;delete g.broken;g.dur=repairMax(g);
   log('Repaired the '+g.n+' for '+c+' scrap. Back to '+g.dur+' swings.');
   toast(g.n+' repaired · -'+c+' scrap','z');SFX.play('chest');
