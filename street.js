@@ -654,6 +654,7 @@ function raidPayout(tier,here){
   const keys=(tier>=4?2:1)+(here&&tier>=3?1:0);
   const leg=tier>=4?Math.round((tier===5?50:22)*(here?1.4:1)):0;
   return '<div class="kv" style="margin-top:8px">'
+    +((typeof nightLine==='function'&&nightLine())?'<span>Right now</span><b style="color:var(--steel)">'+esc(nightLine())+'</b>':'')
     +'<span>If you win</span><b>'+n+' item'+(n===1?'':'s')+' · '+scrap+'🔩 · '+keys+' key'+(keys===1?'':'s')+' · '+(40*tier)+' XP</b>'
     +(leg?'<span>Legendary chance</span><b style="color:var(--amber)">'+leg+'%</b>':'')
     +'<span>Item quality</span><b>'+(tier>=3?'nothing common':'better than the street')+'</b>'

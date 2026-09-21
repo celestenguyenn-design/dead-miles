@@ -597,3 +597,5 @@ button.room2{width:100%;text-align:left;color:inherit;font:inherit}
 @keyframes bsSpin{to{transform:translateX(-50%) rotate(360deg)}}
 @keyframes bsBulb{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
 @keyframes bsEmber{0%{transform:translateY(0);opacity:0}10%{opacity:.9}100%{transform:translateY(-150px) translateX(14px);opacity:0}}
+.bs-lamp{animation:bsLamp 2.8s ease-in-out infinite}
+@keyframes bsLamp{0%,100%{opacity:1}50%{opacity:.45}}

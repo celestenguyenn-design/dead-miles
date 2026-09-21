@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.36';
+const VERSION='7.37';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -72,12 +72,12 @@ const GEAR={
   // can upgrade." Four armour slots now, each with a common/uncommon/rare rung
   // and one legendary, so there is a ladder in every one of them.
   workgloves:{n:'Work gloves',    e:'🧤',slot:'hands',dr:1,dur:16,w:7,  pts:7, r:'common'},
-  tacgloves: {n:'Tactical gloves',e:'🧤',slot:'hands',dr:2,w:3.5,pts:15,r:'uncommon'},
-  gauntlets: {n:'Welding gauntlets',e:'🧤',slot:'hands',dr:4,w:1.2,pts:26,r:'rare'},
+  tacgloves: {n:'Tactical gloves',e:'🧤',slot:'hands',dr:2,dur:20,w:3.5,pts:15,r:'uncommon'},
+  gauntlets: {n:'Welding gauntlets',e:'🧤',slot:'hands',dr:4,dur:24,w:1.2,pts:26,r:'rare'},
   surefoot:  {n:'Sure Hands',     e:'🤲',slot:'hands',dr:3,w:0,  pts:80,r:'legendary',legend:'Your weapon wears out half as fast'},
-  sneakers:  {n:'Old sneakers',   e:'👟',slot:'feet', dr:1,w:7,  pts:7, r:'common'},
-  workboots: {n:'Work boots',     e:'🥾',slot:'feet', dr:2,w:3.5,pts:15,r:'uncommon'},
-  steeltoes: {n:'Steel toecaps',  e:'🥾',slot:'feet', dr:4,w:1.2,pts:26,r:'rare'},
+  sneakers:  {n:'Old sneakers',   e:'👟',slot:'feet', dr:1,dur:16,w:7,  pts:7, r:'common'},
+  workboots: {n:'Work boots',     e:'🥾',slot:'feet', dr:2,dur:20,w:3.5,pts:15,r:'uncommon'},
+  steeltoes: {n:'Steel toecaps',  e:'🥾',slot:'feet', dr:4,dur:24,w:1.2,pts:26,r:'rare'},
   longhaul:  {n:'Long Haul',      e:'🥾',slot:'feet', dr:3,w:0,  pts:80,r:'legendary',legend:'You always get away clean, and drop nothing running'}
 };
 const LEGEND_IDS=['mercy','lastword','oldreliable','whisper','nightingale','harvest','vigil','saintjude','longwinter','surefoot','longhaul'];
@@ -350,6 +350,22 @@ function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,muster:n
    left, and something already wrecked gets a fifth of the new lifetime back
    rather than being deleted for a rule that did not exist when it broke. */
 const PRE78_DUR={harvest:7,mercy:8,lastword:9,saintjude:10,whisper:12,longwinter:14,oldreliable:20};
+/* v7.37 - GLOVES AND BOOTS NEVER WORE OUT. v6.72 added the hands and feet slots,
+   v7.9 made armour wear, and only Work gloves were ever given a durability - so
+   five of the six ordinary pieces in those slots were free forever while the
+   jacket on the same body paid rent. Found while reading the gear table for the
+   fight simulator; her call: "gloves and boots should wear out as well."
+   Same ladder as the other armour: common 16, uncommon 20, rare 24. The two
+   legendaries (Sure Hands, Long Haul) stay unbreakable, like Nightingale and
+   Vigil - that is the rule she set in v7.8.
+   Gear copies its stats when it is FOUND, so pieces people already own have no
+   `dur` at all; they are brought over at FULL durability. Nobody wakes up to a
+   half-worn boot they never saw wearing. */
+function migrateHandsFeet(){
+  if(!S||!Array.isArray(S.gear))return;
+  for(const g of S.gear){const cat=GEAR[g.id];
+    if(cat&&(cat.slot==='hands'||cat.slot==='feet')&&cat.dur&&g.dur===undefined&&!g.broken)g.dur=durMax(g);}
+}
 function migrateGear(){
   if(!S||!Array.isArray(S.gear))return;
   let changed=0;
@@ -385,7 +401,7 @@ function migrateGear(){
   }
   if(changed)save();
 }
-function ensureState(){if(!S)return;try{migrateGear();}catch(e){}S.bossPity=S.bossPity||0;S.dust=S.dust||0;S.scrolls=S.scrolls||0;S.pins=S.pins||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
+function ensureState(){if(!S)return;try{migrateGear();}catch(e){}try{migrateHandsFeet();}catch(e){}S.bossPity=S.bossPity||0;S.dust=S.dust||0;S.scrolls=S.scrolls||0;S.pins=S.pins||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
   if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};if(S.eq&&S.eq.hands===undefined)S.eq.hands=null;if(S.eq&&S.eq.feet===undefined)S.eq.feet=null;
   // free any slot a downed crew member is still sitting in (they never gave it
@@ -1915,6 +1931,57 @@ function trophySheet(){
     +'<p class="help" style="margin-top:12px">One of each is Bronze. Five of each is Silver, twelve is Gold, and the perk grows each time. The last three sets cannot be found near home at all.</p>'
     +'<button class="btn r wide" style="margin-top:10px" onclick="closeSheet()">Close</button>',true);
 }
+/* ================= THE CODEX (v7.37) =================
+   A page for everything she has met: what it is, what it does, how many she has
+   put down. Things she has not met are a black silhouette and "???", so the page
+   is also a list of what is still out there.
+   Kills per kind were never counted - only a single total - so that count starts
+   now and says so. Two things CAN be recovered honestly and are: a county boss
+   whose trophy is on her shelf has been beaten at least once, and the pets are
+   simply what she owns.
+   THE FOUR NAMED STRAYS ARE A SECRET (v7.36). An unowned one is not a silhouette,
+   it is ABSENT, and the pet total counts a named coat only once she has it. */
+const CODEX_FOES=[
+  ['walker','The slow ones. Harmless one at a time, which is never how you meet them.'],
+  ['runner','Fast: every second round it swings twice. Twice as common after dark.'],
+  ['bloater','Bursts when it dies next to you. Shoot it, or be ready to take the blast.'],
+  ['screamer','Shrieks, and another walker shoves in. Put it down first.'],
+  ['raider','A person. Dodges one swing in five, hits hard, and carries things worth taking.'],
+  ['gunner','A raider with a gun: the hardest single hit of anything ordinary.'],
+  ['boss','A raider crew boss. Tough, dodgy, and always holding a key.'],
+  ['butcher','Something sealed in. It hits harder than anything on the road.'],
+  ['matron','Something sealed in, and it calls others to it.'],
+  ['hollow','Something sealed in. Hard to land a blow on.'],
+  ['cellar','Something sealed in. It bursts when it goes down.'],
+];
+function codex(){return S.codex||(S.codex={seen:{},kills:{},bosses:{},since:VERSION});}
+function codexSee(k){if(k&&ENEMIES[k])codex().seen[k]=1;}
+function codexKill(e){if(!e||!e.k)return;const c=codex();c.seen[e.k]=1;c.kills[e.k]=(c.kills[e.k]||0)+1;}
+function codexBossBeaten(name){const c=codex();return (c.bosses[name]||0)>0||((typeof ROGUE_OF!=='undefined'&&ROGUE_OF[name])?trophyCount(ROGUE_OF[name])>0:false);}
+function codexSheet(){
+  SFX.play('ui');const c=codex();
+  const head=t=>'<h3 style="margin:16px 0 8px;font-family:\'Bebas Neue\';letter-spacing:1px;color:var(--amber);font-size:18px">'+t+'</h3>';
+  const tile=(art,known,title,sub,body)=>'<div class="room2" style="align-items:flex-start'+(known?'':';opacity:.7')+'"><div class="e" style="width:52px;flex:none;line-height:0'+(known?'':';filter:brightness(0) opacity(.55)')+'">'+art+'</div>'
+    +'<div class="t"><b>'+title+'</b>'+(sub?'<span style="display:block;color:var(--bone2)">'+sub+'</span>':'')+'<span style="display:block;margin-top:2px">'+body+'</span></div></div>';
+  const foes=CODEX_FOES.map(([k,d])=>{const known=!!c.seen[k];const e=ENEMIES[k];const n=c.kills[k]||0;
+    return tile(ART.zombieSVG(k,52),known,known?esc(e.n):'???',known?(n+' put down · '+e.hp+' HP · hits for '+e.dmg[0]+'-'+e.dmg[1]):'',known?esc(d):'You have not met this one yet.');}).join('');
+  const metFoes=CODEX_FOES.filter(([k])=>c.seen[k]).length;
+  const bosses=BOSS_NAMES.map(n=>{const beat=codexBossBeaten(n);const g=BOSS_GIMMICK[n];const times=c.bosses[n]||0;
+    return tile(ART.zombieSVG('boss',52),beat,beat?esc(n):'???',beat?(times?times+' time'+(times===1?'':'s')+' brought down':'brought down - their trophy is on your shelf'):'',
+      beat?esc(GIMMICK_TEXT[g]||''):'A county boss you have not helped bring down. A different one holds the county every week.');}).join('');
+  const beaten=BOSS_NAMES.filter(codexBossBeaten).length;
+  const coats=petCoatsAll().filter(([kind,k,v])=>!v.named||petOwns(kind,k));
+  const pets=coats.map(([kind,k,v])=>{const own=petOwns(kind,k);const mine=own?(S.pets||[]).find(x=>x.kind===kind&&x.coat===k):null;
+    return '<div title="'+(own?esc(v.named?mine.name:v.n):'???')+'" style="width:64px;text-align:center;font-size:11px;color:var(--muted)">'
+      +'<div style="line-height:0'+(own?'':';filter:brightness(0) opacity(.5)')+'">'+ART.petSVG(kind,56,k,{still:true})+'</div>'
+      +(own?'<b style="color:var(--bone);font-size:12px">'+esc(mine.name)+'</b><br><span class="rc-'+v.r+'">'+esc(petCoatLabel(v))+'</span>':'<span class="rc-'+v.r+'">'+RAR[v.r].n+'</span>')+'</div>';}).join('');
+  const ownedPets=coats.filter(([kind,k])=>petOwns(kind,k)).length;
+  openSheet('<h2>Codex</h2><p class="help">Everything you have met. A black shape is something still out there.</p>'
+    +head('The dead and the living · '+metFoes+' of '+CODEX_FOES.length+' met')+'<p class="help" style="margin:-4px 0 8px">Kills by kind are counted from v'+esc(c.since||VERSION)+'. Your lifetime total is '+fmt(S.kills||0)+'.</p><div class="stack">'+foes+'</div>'
+    +head('County bosses · '+beaten+' of '+BOSS_NAMES.length+' brought down')+'<div class="stack">'+bosses+'</div>'
+    +head('Strays · '+ownedPets+' of '+coats.length)+'<div style="display:flex;flex-wrap:wrap;gap:8px">'+pets+'</div>'
+    +'<button class="btn r wide" style="margin-top:14px" onclick="closeSheet()">Close</button>',true);
+}
 /* ================= the wall ================= */
 // Motivation, not currency: nothing here gives a reward, it just remembers.
 const ACHV=[
@@ -2218,8 +2285,22 @@ function pushStage(){const loc=S.loc;if(!loc||!loc.stronghold||loc.stage>=3)retu
 
 /* ================= combat ================= */
 let C=null;
+/* v7.37 - NIGHT WAS TWENTY POINTS HARDER AND NOTHING SAID SO. mk() gives every
+   enemy +4% to hit after dark. Measured in v7.35 at a knife-edge cell (L20 mid
+   kit, tier-4 raid, 400 fights each): 36% at night against 55% by day. A rule
+   that large with no sign on it is a trap, not a mechanic. So it is now SAID -
+   on the fight screen and on every raid card - and it PAYS: a fight won after
+   dark gives a quarter more XP and a little scrap. Night becomes a choice. */
+const NIGHT_HIT=0.04,NIGHT_XP=0.25;
+function nightLine(){return isNight()?'\u{1F319} Night: they land '+Math.round(NIGHT_HIT*100)+'% more of their swings. Winning pays +'+Math.round(NIGHT_XP*100)+'% XP and a little scrap.':'';}
+function nightBonus(){ // called once, from a WON fight
+  if(!C||!C.night)return;const xp=Math.round(C.enemies.reduce((a,e)=>a+(e.xp||0),0)*NIGHT_XP),scrap=2+Math.floor(C.enemies.length/2);
+  if(xp>0)addXp(xp);S.stock.scrap+=scrap;log('You won that one in the dark: +'+xp+' XP, +'+scrap+' scrap.');
+}
 function startCombat(enemies,where,job){
   C={enemies,where,job,turn:1,log:[],target:0,brace:false,over:false,fled:false};
+  enemies.forEach(e=>codexSee(e.k));
+  C.night=!!isNight();
   S.combat=true;SFX.play('growl');
   const desc=where==='rival'?'Nadia\'s scouts step out of the dark.':where==='road'?'Something is in the road.':where==='boss'?bossName()+' steps out. Phase '+(S.bossFightsToday)+' of the week\'s hunt.':where==='watch'?'Watch duty. '+(WATCH_JOBS[C.job]?WATCH_JOBS[C.job].n+'.':''):where==='seal'?(S.sealCur?'The door comes off its hinges. '+S.sealCur.n.replace(/^[A-Z]/,c=>c.toLowerCase())+' - and it is awake.':'Something was sealed in here.'):where==='wave'?'The noise brought more.':where==='raid'?'Raiders are at your walls.':where==='liveraid'?((S.raidCur?S.raidCur.n:'Something')+' is here, and it is not alone.'):where==='horde'?'Horde night. They are over the fence.':S.loc&&S.loc.stronghold?['','At the gate.','Into the yard.','The boss trailer. '+bossName()+' is home.'][S.loc.stage+1]:'They were waiting inside '+(S.loc?S.loc.n:'the dark')+'.';
   clog(desc+' '+enemies.length+' hostile'+(enemies.length>1?'s':'')+'.','sys');
@@ -2483,7 +2564,7 @@ function act(kind){
   const ml=roleLvl('medic');if(ml&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+6+ml*3);clog(activeCrew().find(c=>c.role==='medic').name+' patches you: +'+(6+ml*3)+'.','good');}
   if(sk('triage')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('triage')*4);}
   if(eqItem('armor')&&eqItem('armor').id==='nightingale'&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+5);}
-  for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;fxPush({k:'die',i:C.enemies.indexOf(e)});S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);if(sk('transfusion')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('transfusion')*3);clog('You patch up as '+e.n+' drops. +'+(sk('transfusion')*3)+' HP.','good');}clog(e.n+' goes down. +'+e.xp+' XP.','good');
+  for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;fxPush({k:'die',i:C.enemies.indexOf(e)});codexKill(e);S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);if(sk('transfusion')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('transfusion')*3);clog('You patch up as '+e.n+' drops. +'+(sk('transfusion')*3)+' HP.','good');}clog(e.n+' goes down. +'+e.xp+' XP.','good');
     if(e.burst&&!e.shot){hurt(Math.round((e.burst+dr())*(sk('lungs')?0.5:1)),'The bloater bursts and');}
     if(e.human){if(Math.random()<0.5){const g=pick(['pipe','bat','jacket','helmet','crowbar']);S.gear.push({uid:uid(),id:g,...GEAR[g]});clog('It dropped a '+GEAR[g].n+'.','sys');}
       if(Math.random()<0.5){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:3,n:'Rounds (x3)'});clog('You take 3 rounds off the body.','sys');}
@@ -2602,7 +2683,7 @@ function death(){
 function endCombat(won){
   if(!C)return;if(typeof squadStop==='function')squadStop();C.over=true;S.combat=false;buffClear();
   const where=C.where;
-  if(won){SFX.play('win');if(sk('secondwind'))S.hp=Math.min(maxHp(),S.hp+sk('secondwind')*6);
+  if(won){SFX.play('win');nightBonus();if(sk('secondwind'))S.hp=Math.min(maxHp(),S.hp+sk('secondwind')*6);
     log('Cleared '+C.enemies.length+' hostiles'+(where==='enter'&&S.loc?' inside '+S.loc.n:where==='road'?' on the road':'')+'.');
     if(where==='enter'||where==='wave'){if(S.loc.stronghold&&where==='enter'){S.loc.stage++;S.loc.cleared=true;if(S.loc.stage>=3){S.campCleared=weekId();log('Stronghold cleared. The county is quieter for a while.');ctEvent('stronghold',1);}}else{S.loc.cleared=true;rollWanderer(S.loc);}if(where==='enter')ctEvent('places',1);}
     if(where==='raid'){resolveRaidFight(true);}
@@ -2680,6 +2761,27 @@ function renderStuck(){
    The people and zombies are the unchanged art.js sprites. */
 function fxPush(ev){if(!C)return;(C.fxq=C.fxq||[]).push(ev);C.fxNew=true;}
 const BS_SLOTS=[[60,8,1],[81,8,1],[70,50,0],[91,50,0],[49,50,0],[99,46,0]];   // x%, bottom px, front row?
+/* v7.37 - DEFEND YOUR OWN FENCE. A raid or a horde fight happened in front of a
+   generic palisade. It now happens at HER base: her wall level (wire, timber,
+   concrete), her tower with its lamp, her traps in the dirt. And the traps do
+   something you can see: each trap level is a 20% chance that one of them is
+   caught on the way in and starts the fight at half health. (Letting the walls
+   decide already gave traps a 30% chance to blunt the raid; fighting it yourself
+   gave them nothing at all.) */
+function trapCatch(en){
+  const lv=(S.base&&S.base.rooms&&S.base.rooms.traps)||0;if(!lv||!en.length)return null;
+  if(Math.random()>=0.2*Math.min(3,lv))return null;
+  const e=en[en.length>1?1:0];e.hp=Math.max(1,Math.round(e.hp*0.5));e.trapped=true;return e;
+}
+function bsHomeBackdrop(){
+  const r=(S.base&&S.base.rooms)||{};const wl=r.walls||0;let s='';
+  if(r.tower){const h=38+Math.min(3,r.tower)*12;s+='<g transform="translate(104,0)"><path d="M22 120 l4 -'+h+' M46 120 l-4 -'+h+' M24 '+(120-h*0.4)+' l20 -'+(h*0.3)+' M44 '+(120-h*0.4)+' l-20 -'+(h*0.3)+'" stroke="#6a4a2a" stroke-width="3.500" stroke-linecap="round"/><rect x="16" y="'+(120-h-14)+'" width="36" height="16" fill="#7a5a34" stroke="#15121a" stroke-width="1.500"/><path d="M12 '+(120-h-14)+' l22 -14 l22 14z" fill="#3a2a2a" stroke="#15121a" stroke-width="1.500"/><circle class="bs-lamp" cx="52" cy="'+(120-h-6)+'" r="3.500" fill="#ffd166"/><path d="M52 '+(120-h-6)+' L150 172 L96 176z" fill="#ffd166" opacity=".10"/></g>';}
+  if(!wl){for(let x=0;x<300;x+=26)s+='<path d="M'+x+' 120 v-14" stroke="#5a5240" stroke-width="2"/>';s+='<path d="M0 110 h300 M0 115 h300" stroke="#5a5240" stroke-width="1" stroke-dasharray="3 3"/>';}
+  else if(wl>=4){const h=24+(wl-4)*6;s+='<rect x="0" y="'+(120-h)+'" width="300" height="'+h+'" fill="#55555e" stroke="#15121a" stroke-width="1.500"/><path d="M0 '+(124-h)+' h300" stroke="#15121a" opacity=".5"/>';for(let x=40;x<300;x+=60)s+='<path d="M'+x+' '+(120-h)+' v'+h+'" stroke="#15121a" opacity=".35"/>';}
+  else{const h=10+wl*5;for(let x=0;x<300;x+=13)s+='<path d="M'+x+' 120 v-'+h+' l6.500 -5 l6.500 5 v'+h+'z" fill="'+((x/13)%2?'#6a4a2a':'#7a5a34')+'" stroke="#15121a" stroke-width="1.200"/>';}
+  const tl=Math.min(3,r.traps||0);for(let i=0;i<tl*4;i++){const x=150+i*(140/(tl*4));s+='<path d="M'+x.toFixed(0)+' 168 l-4 -8 M'+x.toFixed(0)+' 168 v-10 M'+x.toFixed(0)+' 168 l4 -8" stroke="#b9b2a4" stroke-width="1.800" stroke-linecap="round"/>';}
+  return s;
+}
 function bsBackdrop(where){
   const inside=(where==='enter'||where==='wave'||where==='seal');
   const base=(where==='raid'||where==='horde'),hot=(where==='liveraid'||where==='boss');
@@ -2695,7 +2797,7 @@ function bsBackdrop(where){
     [[0,38,54],[40,30,80],[74,46,44],[150,34,66],[196,42,50],[244,30,84],[276,30,48]].forEach(b=>{s+='<rect x="'+b[0]+'" y="'+(120-b[2])+'" width="'+b[1]+'" height="'+b[2]+'" fill="#100e14"/>';});
     s+='<circle cx="252" cy="30" r="13" fill="'+(hot?'#ff8a70':'#e8e0d0')+'" opacity=".85"/>';
     s+='<rect y="118" width="300" height="58" fill="'+(base?'#2a2622':'#241f22')+'"/>';
-    if(base)for(let x=0;x<300;x+=13)s+='<path d="M'+x+' 120 v-20 l6.500 -5 l6.500 5 v20z" fill="'+((x/13)%2?'#6a4a2a':'#7a5a34')+'" stroke="#15121a" stroke-width="1.2"/>';
+    if(base)s+=bsHomeBackdrop();
     else s+='<path d="M0 150 h300" stroke="#5a5240" stroke-width="3" stroke-dasharray="22 16"/>';
     if(hot)for(let i=0;i<9;i++)s+='<circle class="bs-ember" style="animation-delay:'+(-(i*0.45)).toFixed(2)+'s" cx="'+(14+i*34)+'" cy="172" r="1.600" fill="#ffb060"/>';
   }
@@ -2725,6 +2827,7 @@ function bsSchedule(q){
     }else if(ev.k==='petblock'){if(ev.from>=0)E(ev.from).push('bsLunge 320ms cubic-bezier(.3,.9,.4,1) '+T+'ms');out.floats.push({on:'me',txt:'BLOCKED',cls:'good',t:T+130});
     }else if(ev.k==='die'){E(ev.i).push('bsDie 520ms ease-in '+(T+60)+'ms forwards');out.dying=(out.dying||{});out.dying[ev.i]=1;
     }else if(ev.k==='spawn'){E(ev.i).push('bsPop 380ms cubic-bezier(.2,1.4,.4,1) '+T+'ms both');
+    }else if(ev.k==='trap'){out.floats.push({on:ev.i,txt:'TRAPPED',cls:'good',t:T});E(ev.i).push('bsHit 300ms ease-out '+T+'ms');
     }else if(ev.k==='heal'){out.floats.push({on:'me',txt:'+'+ev.n,cls:'good',t:T});out.fx.push({i:'me',kind:'heal',t:T});if(out.meBar===null)out.meBar=T;
     }else if(ev.k==='brace'){out.fx.push({i:'me',kind:'brace',t:T});}
   });
@@ -2772,7 +2875,7 @@ function renderCombat(){
   const now=Date.now();const phurt=C.pfx&&now-C.pfx.t<600;const plunge=C.lunge&&now-C.lunge<400;const flash=C.muzzle&&now-C.muzzle<350;
   const SPARK={slash:'💢',heavy:'💥',shot:'✴️'};
   $('#sheet').innerHTML=`<h2>${C.where==='raid'?'Defend the base':C.where==='road'?'On the road':'Inside'} <span class="chip d" style="float:right">round ${C.turn}</span></h2>
-  ${battleStage()}
+  ${battleStage()}${C.night?`<div class="help" style="margin-top:6px;color:var(--steel)">${esc(nightLine())}</div>`:''}
   ${C.where==='liveraid'&&typeof squadStrip==='function'?squadStrip():''}
   ${S.buff&&S.buff.fights>0?`<div class="help" style="margin-top:6px;color:var(--amber)">${esc(BUFF_TEXT[S.buff.k]||'')}</div>`:''}
   <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy slim${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.plate&&!e.cracked?' · <b style="color:var(--steel)">plated - a heavy swing cracks it</b>':''}${e.enraged?' · <b style="color:#ff8a92">enraged</b>':''}${e.caller?' · calls more':''}${e.frenzy?' · frenzies low':''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div></button>`;}).join('')}</div>
@@ -3712,7 +3815,7 @@ function resolveHorde(fought,won){const h=hordeState();if(!h)return;const power=
   log(repelled?(fought?'You held the walls against horde night '+(h.n+1)+' yourself. +25 scrap, +1 key.':'Horde night '+(h.n+1)+': '+def+' defense against '+power+'. The walls held.'):'Horde night '+(h.n+1)+' broke through ('+power+' vs '+def+') and took '+Object.entries(stolen).map(([k,v])=>v+' '+k).join(', ')+'.');
   toast(repelled?'Horde repelled':'The horde broke in','d');if(!repelled)SFX.play('hurt');else SFX.play('win');
   h.n++;h.next=hordeAt(h.next);h.pending=false;save();render();}
-function fightHorde(){gearCheck(()=>{const h=hordeState();const n=Math.min(6,4+Math.floor(h.n/2));const en=[];for(let i=0;i<n;i++)en.push(mk(i===n-1?'bloater':i%3===2?'runner':i===1&&h.n>=2?'screamer':'walker'));startCombat(en,'horde');});}
+function fightHorde(){gearCheck(()=>{const h=hordeState();const n=Math.min(6,4+Math.floor(h.n/2));const en=[];for(let i=0;i<n;i++)en.push(mk(i===n-1?'bloater':i%3===2?'runner':i===1&&h.n>=2?'screamer':'walker'));const tc=trapCatch(en);startCombat(en,'horde');if(tc){clog('A trap snaps shut in the dark. '+tc.n+' comes over the fence dragging a leg.','good');fxPush({k:'trap',i:en.indexOf(tc)});renderCombat();}});}
 function hordeTick(){const h=hordeState();if(!h)return;if(Date.now()<h.next)return;
   if(document.visibilityState==='visible'&&!S.combat&&!S.loc&&!$('#modal').classList.contains('on')){h.pending=true;save();
     openSheet(`<h2>Horde night</h2><div class="big">${ART.zombieSVG('walker',60)}${ART.zombieSVG('runner',60)}${ART.zombieSVG('bloater',60)}</div><p>Day ${7*(h.n+1)}. They come every seven days and they come all at once. Your walls: <b>${hordeDefense()}</b> vs the horde's <b>${hordePower()}</b>. Fight at the gate, or let the walls decide. Lose and they take the stockpile.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveHorde(false)">Let the walls decide</button><button class="btn r" onclick="closeSheet();fightHorde()">Fight at the gate</button></div>`);}
@@ -3724,7 +3827,7 @@ function raidTick(){
   if(now.getHours()>=p.hour){ if(document.visibilityState==='visible'&&!S.combat&&!S.loc&&!$('#modal').classList.contains('on')){openSheet(`<h2>Raiders at the walls</h2><div class="big">${ART.zombieSVG('raider',70)}${ART.zombieSVG('gunner',70)}</div><p>A crew of ${p.power>25?'four':p.power>18?'three':'two'} is coming over the fence. Your defenses: ${defense()} vs their ${p.power}. Fight them yourself, or let the walls decide.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveRaid(${p.power},${p.hour},'${p.date}');S.flags.lastRaidCheck='${p.date}';save();render()">Let the walls hold</button><button class="btn d" onclick="closeSheet();fightRaid()">Fight</button></div>`,true);}
     else if(document.visibilityState!=='visible'){resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;save();}}
 }
-function fightRaid(){gearCheck(()=>{const p=S.raidPending;const n=p.power>25?4:p.power>18?3:2;const en=[];for(let i=0;i<n;i++)en.push(mk(i===0&&p.power>22?'gunner':'raider'));startCombat(en,'raid');});}
+function fightRaid(){gearCheck(()=>{const p=S.raidPending;const n=p.power>25?4:p.power>18?3:2;const en=[];for(let i=0;i<n;i++)en.push(mk(i===0&&p.power>22?'gunner':'raider'));const tc=trapCatch(en);startCombat(en,'raid');if(tc){clog('One of them put a foot in a trap on the way over. '+tc.n+' starts half dead.','good');fxPush({k:'trap',i:en.indexOf(tc)});renderCombat();}});}
 
 /* ================= league ================= */
 function rivalScore(r,week,now,tier){const start=new Date(week+'T00:00:00');const rng=mulberry(hash(week+r.id));const mult=TIERS[tier].mult;let total=0;
@@ -4852,6 +4955,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.37',d:'Sep 21',t:'A codex, your own fence, and night that tells you it is night',
+  i:['CODEX (You, Your record, Codex). Every kind of thing you have met: what it does and how many you have put down. Anything you have not met yet is a black shape and three question marks. County bosses you have already beaten are filled in from your trophy shelf. Kills by kind start counting from today.',
+     'RAIDS AND HORDE NIGHT NOW HAPPEN AT YOUR BASE. The fight is drawn in front of YOUR walls - wire, timber or concrete - with your watchtower and its lamp, and your traps in the dirt.',
+     'TRAPS DO SOMETHING WHEN YOU FIGHT. Each trap level is a 20% chance that one of them is caught on the way in and starts the fight at half health. Before, traps only helped if you let the walls decide.',
+     'NIGHT IS HARDER, AND NOW IT SAYS SO. After dark they land 4% more of their swings - measured, that is nearly twenty points off your odds in a close raid. The fight screen and raid cards now tell you, and a fight won in the dark pays 25% more XP and a little scrap.',
+     'GLOVES AND BOOTS WEAR OUT like the rest of your armour (they never did). Anything you already own starts at full. Sure Hands and Long Haul still never break.']},
  {v:'7.36',d:'Sep 21',t:'A quiet one',
   i:['Nothing you need to do. A few things were tidied up behind the scenes.']},
  {v:'7.35',d:'Sep 21',t:'Fights happen on a stage now, and no more repeat pets',
@@ -6397,7 +6506,7 @@ function bossApply(r){const b=bossState();b.srv=true;b.hp=r.hp;b.max=r.max;b.v=r
   b.hits=r.hits||{};b.killer=r.killer||null;const me=O().handle;if(b.hits[me])b.my=Math.max(b.my,b.hits[me]);
   if(b.hp<=0&&!b.killed){b.killed=true;if(b.my>0)bossKill(b.killer===me);else log(bossName()+' went down this week, but you never hit it. No loot.');}}
 async function bossSync(){if(!(S.party&&S.party.code&&O().ok))return;const o=O();try{const r=await rpc('boss_hit',{p_handle:o.handle,p_token:o.token,p_code:S.party.code,p_week:weekId(),p_dmg:0,p_members:bossMembers()});if(r&&!r.error){bossApply(r);save();renderBoss();}}catch(e){}}
-function bossKill(lastHit){const b=bossState();if(b.claimed)return;b.claimed=true;S.bossKills=(S.bossKills||0)+1;S.bossKilled=weekId();ctEvent('bounty',1);
+function bossKill(lastHit){const b=bossState();if(b.claimed)return;b.claimed=true;S.bossKills=(S.bossKills||0)+1;{const cx=codex();cx.bosses[bossName()]=(cx.bosses[bossName()]||0)+1;}S.bossKilled=weekId();ctEvent('bounty',1);
   const got=[];const chance=bossChance()+(lastHit?0.15:0);let legend=false;
   if(Math.random()<chance){legend=true;const id=pick(LEGEND_IDS);S.gear.push({uid:uid(),id,...GEAR[id]});got.push('LEGENDARY '+GEAR[id].n);S.bossPity=0;SFX.play('legend');}
   else{const pool=Object.entries(GEAR).filter(([k,v])=>v.r==='rare'||v.r==='epic').map(([k,v])=>({id:k,...v,w:v.r==='epic'?4:6}));const it=wpick(pool,'w');S.gear.push({uid:uid(),id:it.id,...GEAR[it.id]});got.push(it.e+' '+it.n);}
