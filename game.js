@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.30';
+const VERSION='7.31';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1081,6 +1081,7 @@ function makeLoc(force,nameOverride,far){
   const rooms=type.rooms.map(r=>({n:r.n,noise:r.noise,cats:r.cats,shelf:r.shelf,gear:r.gear||0,keyish:!!r.keyish,stage:r.stage||0,done:false,items:null,peek:null}));
   const loc={t:type.t,e:type.e,n:nameOverride||pick(type.n),rooms,noise:0,found:[],cleared:false,wave:0,threat:type.threat,stronghold:!!type.stronghold,stage:0,far:(far===undefined?1:far)};
   for(const r of rooms)r.items=rollRoom(r,loc);
+  if(loc.far===3&&!loc.stronghold&&rooms.length&&Math.random()<0.15){const id=pick(DEEP_TROPHIES);pick(rooms).items.push({id,n:ITEMS[id].n,e:ITEMS[id].e,pts:ITEMS[id].pts,cat:'shelf',r:ITEMS[id].r});}
   // A SEALED ROOM (v6.77). Rare on purpose - about 1 place in 40 - and never in
   // a stronghold, which already has its own boss at the end. It is not searched,
   // it is BROKEN INTO, and something is still in there.
@@ -1740,58 +1741,117 @@ function renderGacha(){if(offscreen('#gachaBody'))return;
 // long grind - and each one pays a SMALL permanent perk. Small on purpose: this
 // is a third progression system next to levels and gear, and it must not become
 // the one that matters most.
+/* v7.31 - "EVERYONE HAS ALREADY UNLOCKED ALL OF IT."
+   The comment above says trophies are deliberately rare. Measured over 1,500
+   generated places per band, they are not: 0.29 a place in the home block, 0.51
+   nearby, 0.95 deep - a trophy every other house, and even the rarest kind about
+   once in a hundred places. Her friends loot a lot of houses. Of course they
+   finished.
+   Cutting the drop rate now would do nothing for people who are already done, so
+   the room gets DEEPER instead of stingier:
+     1. Every set has three tiers. One of each is Bronze (what everyone has).
+        Five of each is Silver, twelve is Gold, and the perk grows x1.5 then x2.
+        The duplicates already sitting on shelves count from the first load.
+        (I first proposed 10 and 25. Two sets hold trophies that only a weekly
+        boss drops, and 25 of those is half a year. 5 and 12 it is.)
+     2. Three new sets you earn by WHERE YOU GO, not by luck: one trophy from
+        each landmark, four that only turn up in the Deep band, and one from
+        each county boss. These cannot be farmed from the home block at all. */
+const TROPHY_TIERS=[1,5,12], TROPHY_MULT=[0,1,1.5,2], TROPHY_TIER_N=['','Bronze','Silver','Gold'];
+const TROPHY_TIER_C=['var(--line)','#b07a4a','#b9c2cc','#e6a530'];
+const tPct=(x)=>Math.round(x*100);
 const TROPHY_SETS=[
   {id:'home', n:'Home Comforts', e:'🏠', items:['teddy','globe','vinyl','polaroid'],
-   perk:'+2 HP every morning', apply:{morningHp:2}},
+   perk:m=>'+'+Math.round(2*m)+' HP every morning', apply:{morningHp:2}},
   {id:'law',  n:'The Law',       e:'⭐', items:['badge','dogtag','wanted','handcuffs'],
-   perk:'+8% damage to raiders and gunners', apply:{vsHuman:0.08}},
+   perk:m=>'+'+tPct(0.08*m)+'% damage to raiders and gunners', apply:{vsHuman:0.08}},
   {id:'rec',  n:'The Rec Room',  e:'🕹️', items:['comic','cards','dice','cart'],
-   perk:'+6% XP from everything', apply:{xp:0.06}},
+   perk:m=>'+'+tPct(0.06*m)+'% XP from everything', apply:{xp:0.06}},
   {id:'care', n:'The Clinic',    e:'🩺', items:['steth','xray','pills','thermo'],
-   perk:'Medkits heal 8 more', apply:{med:8}},
+   perk:m=>'Medkits heal '+Math.round(8*m)+' more', apply:{med:8}},
   {id:'road', n:'The Road',      e:'🗺️', items:['plate','sign','atlas','cruiser'],
-   perk:'Places are 4% closer together', apply:{dist:0.04}},
+   perk:m=>'Places are '+tPct(0.04*m)+'% closer together', apply:{dist:0.04}},
   {id:'odd',  n:'Oddities',      e:'☄️', items:['skull','jar','meteor','globe'],
-   perk:'+8% chance at rare loot', apply:{rare:0.08}},
+   perk:m=>'+'+tPct(0.08*m)+'% chance at rare loot', apply:{rare:0.08}},
+  // --- earned by where you go ---
+  {id:'marks',n:'Landmarks',     e:'🧭', items:['lm_depot','lm_ward','lm_armoury','lm_water','lm_yard'], how:'One from each landmark, every time you clear it. Landmarks are always a real walk from your base pin.',
+   perk:m=>'Field caches pay '+tPct(0.15*m)+'% more scrap', apply:{cache:0.15}},
+  {id:'deep', n:'Out Past Everything', e:'🥾', items:['dp_compass','dp_lantern','dp_boots','dp_flare'], how:'Only in the Deep band - more than 2.5 km from your base pin.',
+   perk:m=>'+'+tPct(0.04*m)+'% XP from everything', apply:{xp:0.04}},
+  {id:'rogues',n:"Rogues' Gallery", e:'💀', distinct:[3,6,10], how:'One from each county boss you help bring down. A different boss every week.',
+   items:['rg_reyes','rg_ash','rg_butcher','rg_tully','rg_wasp','rg_cole','rg_ghost','rg_sal','rg_marsh','rg_vance'],
+   perk:m=>'+'+tPct(0.05*m)+'% damage to raid and county bosses', apply:{bossDmg:0.05}},
 ];
+// Weight 0: none of these can come out of a loot table, a gumball or a cat's mouth.
+Object.assign(ITEMS,{
+  lm_depot:{n:'Signalman\'s lantern',e:'🚦',pts:30,cat:'shelf',w:0,r:'epic'},lm_ward:{n:'Ward 6 door plate',e:'🚪',pts:30,cat:'shelf',w:0,r:'epic'},
+  lm_armoury:{n:'Quartermaster\'s ledger',e:'📒',pts:30,cat:'shelf',w:0,r:'epic'},lm_water:{n:'Tower valve wheel',e:'☸️',pts:30,cat:'shelf',w:0,r:'epic'},
+  lm_yard:{n:'Crusher control key',e:'🗝️',pts:30,cat:'shelf',w:0,r:'epic'},
+  dp_compass:{n:'Brass compass',e:'🧭',pts:34,cat:'shelf',w:0,r:'epic'},dp_lantern:{n:'Storm lantern',e:'🏮',pts:34,cat:'shelf',w:0,r:'epic'},
+  dp_boots:{n:'Walked-through boots',e:'🥾',pts:34,cat:'shelf',w:0,r:'epic'},dp_flare:{n:'Unfired flare',e:'🧨',pts:34,cat:'shelf',w:0,r:'epic'},
+  rg_reyes:{n:'Mad Dog\'s collar',e:'📿',pts:40,cat:'shelf',w:0,r:'legendary'},rg_ash:{n:'Sister Ash\'s rosary',e:'🕯️',pts:40,cat:'shelf',w:0,r:'legendary'},
+  rg_butcher:{n:'The Butcher\'s hook',e:'🪝',pts:40,cat:'shelf',w:0,r:'legendary'},rg_tully:{n:'Tully\'s other tooth',e:'🦷',pts:40,cat:'shelf',w:0,r:'legendary'},
+  rg_wasp:{n:'Queen Wasp\'s crown',e:'👑',pts:40,cat:'shelf',w:0,r:'legendary'},rg_cole:{n:'Preacher Cole\'s bible',e:'📕',pts:40,cat:'shelf',w:0,r:'legendary'},
+  rg_ghost:{n:'Delacroix\'s mask',e:'🎭',pts:40,cat:'shelf',w:0,r:'legendary'},rg_sal:{n:'Big Sal\'s ring',e:'💍',pts:40,cat:'shelf',w:0,r:'legendary'},
+  rg_marsh:{n:'The Widow\'s veil',e:'🕸️',pts:40,cat:'shelf',w:0,r:'legendary'},rg_vance:{n:'Cutter Vance\'s razor',e:'🪒',pts:40,cat:'shelf',w:0,r:'legendary'},
+});
+const ROGUE_OF={'Mad Dog Reyes':'rg_reyes','Sister Ash':'rg_ash','The Butcher of Elm St':'rg_butcher','Two-Tooth Tully':'rg_tully','Queen Wasp':'rg_wasp','Preacher Cole':'rg_cole','Ghost Delacroix':'rg_ghost','Big Sal':'rg_sal','The Widow Marsh':'rg_marsh','Cutter Vance':'rg_vance'};
+const DEEP_TROPHIES=['dp_compass','dp_lantern','dp_boots','dp_flare'];
 function trophyCount(id){return (S.shelf||[]).filter(x=>x.id===id).length;}
-function setDone(set){return set.items.every(i=>trophyCount(i)>0);}
+function trophyGive(id){const T=ITEMS[id];if(!T)return null;S.shelf=S.shelf||[];S.shelf.push({id,n:T.n,e:T.e});checkSets();return T;}
+// 0 none · 1 Bronze · 2 Silver · 3 Gold
+function setTier(st){
+  if(st.distinct){const n=st.items.filter(i=>trophyCount(i)>0).length;return st.distinct.filter(t=>n>=t).length;}
+  const low=Math.min(...st.items.map(trophyCount));return TROPHY_TIERS.filter(t=>low>=t).length;
+}
+function setDone(set){return setTier(set)>=1;}
 function setsDone(){return TROPHY_SETS.filter(setDone);}
-function setPerk(key){return setsDone().reduce((a,s)=>a+((s.apply&&s.apply[key])||0),0);}
-// Announce a set the moment it completes, once.
+function setPerk(key){return TROPHY_SETS.reduce((a,s)=>a+(((s.apply&&s.apply[key])||0)*TROPHY_MULT[setTier(s)]),0);}
+// Announce a tier the moment it is reached, once. A save from before tiers knows
+// only "this set is complete" - that is Bronze, and must not be announced again.
 function checkSets(){
-  if(!S.setsSeen)S.setsSeen=[];
+  if(!S.setsSeen)S.setsSeen=[];if(!S.setTiers)S.setTiers={};
+  for(const id of S.setsSeen)if(!S.setTiers[id])S.setTiers[id]=1;
   for(const st of TROPHY_SETS){
-    if(S.setsSeen.includes(st.id))continue;
-    if(!setDone(st))continue;
-    S.setsSeen.push(st.id);
-    log('Set complete: '+st.n+'. '+st.perk+'.');
-    toast(st.e+' '+st.n+' complete · '+st.perk,'l');SFX.play('legend');save();
+    const t=setTier(st),was=S.setTiers[st.id]||0;if(t<=was)continue;
+    S.setTiers[st.id]=t;if(!S.setsSeen.includes(st.id))S.setsSeen.push(st.id);
+    const line=st.perk(TROPHY_MULT[t]);
+    log(TROPHY_TIER_N[t]+' set: '+st.n+'. '+line+'.');
+    toast(st.e+' '+st.n+' · '+TROPHY_TIER_N[t]+' · '+line,'l');SFX.play('legend');save();
   }
 }
 function trophySheet(){
   const all=Object.entries(ITEMS).filter(([k,v])=>v.cat==='shelf');
-  const inSet={};TROPHY_SETS.forEach(st=>st.items.forEach(i=>{inSet[i]=inSet[i]||[];inSet[i].push(st.e);}));
+  const inSet={};TROPHY_SETS.forEach(st=>st.items.forEach(i=>{inSet[i]=1;}));
   const found=(S.shelf||[]).length, kinds=all.filter(([k])=>trophyCount(k)>0).length;
+  const tiers=TROPHY_SETS.map(setTier);const cnt=t=>tiers.filter(x=>x>=t).length;
+  const tile=(i)=>{const it=ITEMS[i];const n=trophyCount(i);
+    return '<div title="'+esc(it?it.n:i)+'" style="position:relative;width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;'
+      +'background:'+(n?'rgba(255,255,255,.07)':'rgba(0,0,0,.25)')+';border:1px solid var(--line);'+(n?'':'filter:grayscale(1);opacity:.32')+'">'
+      +(n?it.e:'❔')+(n?'<b style="position:absolute;right:2px;bottom:0;font-size:10px;color:var(--amber)">'+n+'</b>':'')+'</div>';};
   const card=st=>{
-    const have=st.items.filter(i=>trophyCount(i)>0).length;const done=have===st.items.length;
-    return '<div style="margin:10px 0;padding:10px 12px;border-radius:10px;background:'+(done?'rgba(127,191,77,.12)':'rgba(255,255,255,.04)')
-      +';border-left:4px solid '+(done?'var(--rot)':'var(--line)')+'">'
-      +'<div style="font-weight:800;color:var(--bone)">'+st.e+' '+esc(st.n)+' <span class="help">'+have+'/'+st.items.length+'</span></div>'
-      +'<div class="help" style="margin:2px 0 6px;color:'+(done?'var(--rot)':'var(--muted)')+'">'+(done?'✓ ':'')+esc(st.perk)+'</div>'
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+st.items.map(i=>{
-          const it=ITEMS[i];const n=trophyCount(i);
-          return '<div title="'+esc(it?it.n:i)+'" style="width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;'
-            +'background:'+(n?'rgba(255,255,255,.07)':'rgba(0,0,0,.25)')+';border:1px solid var(--line);'+(n?'':'filter:grayscale(1);opacity:.32')+'">'
-            +(n?it.e:'❔')+(n>1?'<b style="font-size:9px;position:relative;top:8px;left:-6px;color:var(--amber)">'+n+'</b>':'')+'</div>';}).join('')
-      +'</div></div>';};
+    const t=setTier(st);const have=st.items.filter(i=>trophyCount(i)>0).length;
+    let next='';
+    if(t<3){
+      if(st.distinct){const need=st.distinct[t];next='Next: '+TROPHY_TIER_N[t+1]+' at '+need+' different ones - you have '+have+'.';}
+      else{const need=TROPHY_TIERS[t];const short=st.items.filter(i=>trophyCount(i)<need).map(i=>(ITEMS[i]?ITEMS[i].e:'')+' '+(need-trophyCount(i))+' more');
+        next='Next: '+TROPHY_TIER_N[t+1]+' at '+need+' of each'+(t?' · still need '+short.join(', '):'')+'.';}
+    }
+    return '<div style="margin:10px 0;padding:10px 12px;border-radius:10px;background:'+(t?'rgba(255,255,255,.05)':'rgba(255,255,255,.03)')
+      +';border-left:4px solid '+TROPHY_TIER_C[t]+'">'
+      +'<div style="font-weight:800;color:var(--bone)">'+st.e+' '+esc(st.n)+' <span class="help">'+have+'/'+st.items.length+'</span>'
+      +(t?' <span class="chip" style="border-color:'+TROPHY_TIER_C[t]+';color:'+TROPHY_TIER_C[t]+'">'+TROPHY_TIER_N[t]+'</span>':'')+'</div>'
+      +'<div class="help" style="margin:2px 0 4px;color:'+(t?'var(--rot)':'var(--muted)')+'">'+(t?'✓ '+esc(st.perk(TROPHY_MULT[t])):esc(st.perk(1)))+'</div>'
+      +(st.how?'<div class="help" style="margin:0 0 6px">'+esc(st.how)+'</div>':'')
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+st.items.map(tile).join('')+'</div>'
+      +(next?'<div class="help" style="margin-top:6px">'+esc(next)+'</div>':'<div class="help" style="margin-top:6px;color:var(--amber)">Gold. Nothing left to find here.</div>')
+      +'</div>';};
   const loose=all.filter(([k])=>!inSet[k]);
   openSheet('<h2>Trophy room</h2>'
-    +'<p class="help">'+kinds+' of '+all.length+' kinds found · '+found+' on the shelf · '+setsDone().length+' of '+TROPHY_SETS.length+' sets complete</p>'
+    +'<p class="help">'+kinds+' of '+all.length+' kinds found · '+found+' on the shelf · '+cnt(1)+' of '+TROPHY_SETS.length+' sets at Bronze · '+cnt(2)+' Silver · '+cnt(3)+' Gold</p>'
     +TROPHY_SETS.map(card).join('')
-    +(loose.length?'<div class="section-label" style="margin-top:12px">Not in a set</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'
-      +loose.map(([k,it])=>{const n=trophyCount(k);return '<div title="'+esc(it.n)+'" style="width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;background:'+(n?'rgba(255,255,255,.07)':'rgba(0,0,0,.25)')+';border:1px solid var(--line);'+(n?'':'filter:grayscale(1);opacity:.32')+'">'+(n?it.e:'❔')+'</div>';}).join('')+'</div>':'')
-    +'<p class="help" style="margin-top:12px">Trophies are rare on purpose. A cat brings them back more often than you find them.</p>'
+    +(loose.length?'<div class="section-label" style="margin-top:12px">Not in a set</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+loose.map(([k])=>tile(k)).join('')+'</div>':'')
+    +'<p class="help" style="margin-top:12px">One of each is Bronze. Five of each is Silver, twelve is Gold, and the perk grows each time. The last three sets cannot be found near home at all.</p>'
     +'<button class="btn r wide" style="margin-top:10px" onclick="closeSheet()">Close</button>',true);
 }
 /* ================= the wall ================= */
@@ -2085,7 +2145,7 @@ function hurt(n,src){let d=Math.max(1,Math.round((n-dr())*(1-drSoak())));
   wearArmor();
   S.hp-=d;C.pfx={d,t:Date.now()};clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
 function dealTo(t,d,label,kind){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));
-  if(t.warden&&sk('raidvet'))d=Math.round(d*(1+0.05*sk('raidvet')));
+  if(t.warden&&(sk('raidvet')||setPerk('bossDmg')))d=Math.round(d*(1+0.05*sk('raidvet')+setPerk('bossDmg')));
   if(t.plate&&!t.cracked){
     if(kind==='heavy'){t.cracked=true;clog('The heavy swing splits '+t.n+"'s plating wide open.",'good');
       if(sk('shatter')&&Math.random()<0.5*sk('shatter')){t.stun=1;clog('Shatter: '+t.n+' goes down hard and loses its next turn.','good');}}
@@ -6060,6 +6120,7 @@ function bossKill(lastHit){const b=bossState();if(b.claimed)return;b.claimed=tru
   S.keys++;got.push('🗝️ chest key');S.stock.scrap+=12;got.push('12 scrap');if(Math.random()<0.3){const cs=rollCosmetic();takeItem(cs,null);got.push(cs.n);}
   if(lastHit){S.keys++;S.stock.scrap+=10;got.push('last hit: +1 key, +10 scrap');}
   if(Math.random()<0.2&&(S.pets||[]).length<PET_MAX){setTimeout(()=>petJoin(Math.random()<0.5?'dog':'cat','rare'),400);got.push('a stray followed you home');}
+  {const rg=ROGUE_OF[bossName()];if(rg){const T=trophyGive(rg);if(T)got.push(T.e+' '+T.n);}}
   S.league.score+=150;log(bossName()+' is down. Your share: '+got.join(', ')+'.');
   const html=`<h2>${esc(bossName())} is down</h2><div class="big">${legend?'🌟':'💀'}</div><p>${lastHit?'You landed the last hit. ':''}Your share of the loot:<br><b style="color:var(--bone)">${esc(got.join(' · '))}</b></p><p class="help">${legend?'The legendary chance resets to 6%.':'No legendary this time. Every boss phase you fight raises the chance by 3%. Next kill: '+Math.round(bossChance()*100)+'%.'}${bossInParty()?'':' Fought solo, the next boss has '+Math.round(15*S.bossKills)+'% more HP.'}</p>`;
   if(C&&C.where==='boss'&&!C.summaryShown)C.killHtml=html;else openSheet(html+`<button class="btn r wide" onclick="closeSheet()">Take it</button>`);}

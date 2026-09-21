@@ -427,6 +427,7 @@ function landmarkPayout(loc){
   const lm=LANDMARKS.find(x=>x.id===loc.landmark);if(!lm)return;
   loc.lmPaid=true;const g=lm.give;const got=[];
   if(typeof life==='function')life().landmarks++;
+  if(typeof trophyGive==='function'){const T=trophyGive('lm_'+lm.id);if(T)got.push(T.e+' '+T.n);}
   if(g.scrap){const n=rint(g.scrap[0],g.scrap[1]);S.stock.scrap+=n;got.push(n+' scrap');}
   if(g.key){S.keys+=g.key;got.push(g.key+' chest key'+(g.key===1?'':'s'));}
   if(g.parts){const n=rint(g.parts[0],g.parts[1]);S.parts=(S.parts||0)+n;got.push(n+' parts');}
@@ -956,7 +957,7 @@ function cacheCollect(poiId){
   if(ks.length>400)ks.sort((a,b)=>S.caches[a]-S.caches[b]).slice(0,ks.length-400).forEach(k=>delete S.caches[k]);
   const t=poiTierOf(p);
   const ch=(typeof sk==='function')?sk('cachehunter'):0;
-  const scrap=Math.round((8+rint(0,7)+Math.round((t.k-1)*6))*(1+0.3*ch));
+  const scrap=Math.round((8+rint(0,7)+Math.round((t.k-1)*6))*(1+0.3*ch+((typeof setPerk==='function')?setPerk('cache'):0)));
   const parts=Math.random()<0.45+0.15*ch?1:0;
   S.stock.scrap+=scrap;if(parts)S.parts=(S.parts||0)+parts;
   if(!S.keeps)S.keeps={};
