@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.39';
+const VERSION='7.40';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -59,12 +59,12 @@ const GEAR={
   lastword:{n:'The Last Word',e:'⚾',slot:'melee',dmg:[16,24],dur:80,w:0,pts:80,r:'legendary',norepair:true,legend:'30% chance a hit knocks the enemy out of its next turn'},
   oldreliable:{n:'Old Reliable',e:'🔧',slot:'melee',dmg:[16,24],dur:30,w:0,pts:70,r:'legendary',legend:'The only legendary that can be rebuilt. Every other one is finite - this one comes back, for the biggest bill in the county'},
   whisper:{n:'Whisper',e:'🔫',slot:'ranged',dmg:[24,32],dur:90,ammo:'ammo',w:0,pts:85,r:'legendary',norepair:true,legend:'Makes no noise'},
-  nightingale:{n:'Nightingale',e:'🦺',slot:'armor',dr:4,w:0,pts:85,r:'legendary',legend:'Heals 5 HP every combat round'},
+  nightingale:{n:'Nightingale',e:'🦺',slot:'armor',dr:4,dur:40,w:0,pts:85,r:'legendary',legend:'Heals 5 HP every combat round'},
   // Four more legendaries. Five was a small pile for people who walk every day,
   // and every one of these is a different REASON to swap rather than a bigger
   // number - the point is a choice, not a ladder.
   harvest:{n:'The Harvest',e:'🌾',slot:'melee',dmg:[20,26],dur:70,w:0,pts:82,r:'legendary',norepair:true,legend:'Hits every enemy in the room for half damage'},
-  vigil:{n:'Vigil',e:'🕯️',slot:'armor',dr:5,w:0,pts:88,r:'legendary',legend:'The first hit of every fight cannot take more than 5 HP'},
+  vigil:{n:'Vigil',e:'🕯️',slot:'armor',dr:5,dur:40,w:0,pts:88,r:'legendary',legend:'The first hit of every fight cannot take more than 5 HP'},
   saintjude:{n:'Saint Jude',e:'📿',slot:'melee',dmg:[14,30],dur:85,w:0,pts:84,r:'legendary',norepair:true,legend:'The worse your health, the harder it swings'},
   longwinter:{n:'Long Winter',e:'❄️',slot:'ranged',dmg:[20,28],dur:100,ammo:'ammo',w:0,pts:86,r:'legendary',norepair:true,legend:'Every hit slows the target - it loses one turn in three'},
   // HANDS and FEET (v6.72). Her ask: "we only have like 3 types of armor ...
@@ -74,11 +74,11 @@ const GEAR={
   workgloves:{n:'Work gloves',    e:'🧤',slot:'hands',dr:1,dur:16,w:7,  pts:7, r:'common'},
   tacgloves: {n:'Tactical gloves',e:'🧤',slot:'hands',dr:2,dur:20,w:3.5,pts:15,r:'uncommon'},
   gauntlets: {n:'Welding gauntlets',e:'🧤',slot:'hands',dr:4,dur:24,w:1.2,pts:26,r:'rare'},
-  surefoot:  {n:'Sure Hands',     e:'🤲',slot:'hands',dr:3,w:0,  pts:80,r:'legendary',legend:'Your weapon wears out half as fast'},
+  surefoot:  {n:'Sure Hands',     e:'🤲',slot:'hands',dr:3,dur:36,w:0,  pts:80,r:'legendary',legend:'Your weapon wears out half as fast'},
   sneakers:  {n:'Old sneakers',   e:'👟',slot:'feet', dr:1,dur:16,w:7,  pts:7, r:'common'},
   workboots: {n:'Work boots',     e:'🥾',slot:'feet', dr:2,dur:20,w:3.5,pts:15,r:'uncommon'},
   steeltoes: {n:'Steel toecaps',  e:'🥾',slot:'feet', dr:4,dur:24,w:1.2,pts:26,r:'rare'},
-  longhaul:  {n:'Long Haul',      e:'🥾',slot:'feet', dr:3,w:0,  pts:80,r:'legendary',legend:'You always get away clean, and drop nothing running'}
+  longhaul:  {n:'Long Haul',      e:'🥾',slot:'feet', dr:3,dur:36,w:0,  pts:80,r:'legendary',legend:'You always get away clean, and drop nothing running'}
 };
 const LEGEND_IDS=['mercy','lastword','oldreliable','whisper','nightingale','harvest','vigil','saintjude','longwinter','surefoot','longhaul'];
 const CAT_LABEL={food:'Food',water:'Water',drink:'Drink',snack:'Snack',meds:'Meds',scrap:'Scrap',ammo:'Rounds',shells:'Shells',bolts:'Bolts',shelf:'Trophy',key:'Key',chest:'Chest',gear:'Gear',cosmetic:'Cosmetic',candy:'Candy'};
@@ -361,10 +361,10 @@ const PRE78_DUR={harvest:7,mercy:8,lastword:9,saintjude:10,whisper:12,longwinter
    Gear copies its stats when it is FOUND, so pieces people already own have no
    `dur` at all; they are brought over at FULL durability. Nobody wakes up to a
    half-worn boot they never saw wearing. */
-function migrateHandsFeet(){
+function migrateHandsFeet(){   // v7.40: every armour slot, so the legendary pieces come over too
   if(!S||!Array.isArray(S.gear))return;
   for(const g of S.gear){const cat=GEAR[g.id];
-    if(cat&&(cat.slot==='hands'||cat.slot==='feet')&&cat.dur&&g.dur===undefined&&!g.broken)g.dur=durMax(g);}
+    if(cat&&ARMOR_SLOTS.indexOf(cat.slot)>=0&&cat.dur&&g.dur===undefined&&!g.broken)g.dur=durMax(g);}
 }
 function migrateGear(){
   if(!S||!Array.isArray(S.gear))return;
@@ -1967,7 +1967,7 @@ function codexSheet(){
     return tile(ART.zombieSVG(k,52),known,known?esc(e.n):'???',known?(n+' put down · '+e.hp+' HP · hits for '+e.dmg[0]+'-'+e.dmg[1]):'',known?esc(d):'You have not met this one yet.');}).join('');
   const metFoes=CODEX_FOES.filter(([k])=>c.seen[k]).length;
   const bosses=BOSS_NAMES.map(n=>{const beat=codexBossBeaten(n);const g=BOSS_GIMMICK[n];const times=c.bosses[n]||0;
-    return tile(ART.zombieSVG('boss',52),beat,beat?esc(n):'???',beat?(times?times+' time'+(times===1?'':'s')+' brought down':'brought down - their trophy is on your shelf'):'',
+    return tile(foeSVG({n:n,k:'boss'},52),beat,beat?esc(n):'???',beat?(times?times+' time'+(times===1?'':'s')+' brought down':'brought down - their trophy is on your shelf'):'',
       beat?esc(GIMMICK_TEXT[g]||''):'A county boss you have not helped bring down. A different one holds the county every week.');}).join('');
   const beaten=BOSS_NAMES.filter(codexBossBeaten).length;
   const coats=petCoatsAll().filter(([kind,k,v])=>!v.named||petOwns(kind,k));
@@ -2321,8 +2321,12 @@ function targetEnemy(){let t=C.enemies[C.target];if(!t||t.dead){const a=alive();
    spreads the damage instead of burning four points a hit. At zero it wrecks
    and unequips like any other gear - your damage reduction visibly drops, which
    is the pressure to go and pay for it.
-   Nightingale and Vigil keep no durability at all: they are the legendaries
-   that never break, which is the distinction she drew in v7.8. */
+   v7.40 - LEGENDARY ARMOUR WEARS TOO, AND CAN ALWAYS BE REPAIRED. Nightingale and
+   Vigil had no durability at all, read from her v7.8 line as "the ones that never
+   break". She has now said it plainly: "the legendary pieces should be repairable
+   but not unbreakable." So all four legendary armour pieces (Nightingale, Vigil,
+   Sure Hands, Long Haul) wear like anything else, last far longer than a rare
+   piece (40 / 36 against 24-26), and are repaired rather than lost. */
 // No piece of armour may lose more than this in a SINGLE fight, however long the
 // fight runs. v7.9 charged one point per hit taken with no ceiling, which is fine
 // for a street fight (measured: 3.3 hits, so ~3 points across the set) and
@@ -2651,7 +2655,7 @@ function enemyPhase(){
     if(e.scream&&Math.random()<e.scream){const w=mk('walker');C.enemies.push(w);fxPush({k:'spawn',i:C.enemies.length-1});clog('The screamer shrieks. Another walker shoves in.','hit');continue;}
     if(e.g){
       if(e.g==='reinforce'&&!e.called&&e.hp<e.max/2){e.called=true;C.enemies.push(mk('raider'));fxPush({k:'spawn',i:C.enemies.length-1});clog(e.n+' whistles. Another raider drops off the trailer.','hit');}
-      if(e.g==='heal'&&e.hp<e.max){e.hp=Math.min(e.max,e.hp+10);clog(e.n+' mutters a prayer and stands straighter. +10.','');}
+      if(e.g==='heal'&&e.hp<e.max){e.hp=Math.min(e.max,e.hp+10);fxPush({k:'eheal',i:C.enemies.indexOf(e),n:10});clog(e.n+' mutters a prayer and stands straighter. +10.','');}
       if(e.g==='flee'&&e.hp<e.max/4){e.dead=true;e.hp=0;e.fled=true;clog(e.n+' vaults the fence and is gone. The bounty walks with him, but he dropped his bag.','sys');S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:6});S.keys++;continue;}
       if(e.g==='slow'&&C.turn%2===1){clog(e.n+' winds up.','');continue;}
     }
@@ -2790,6 +2794,7 @@ function renderStuck(){
    slowed down - the next act() simply rebuilds the stage.
    A render with no new events (tapping a target, a squad poll) plays nothing.
    The people and zombies are the unchanged art.js sprites. */
+function foeSVG(e,size){return (e&&typeof ART.bossSVG==='function'&&ART.BOSS_LOOKS&&ART.BOSS_LOOKS[e.n])?ART.bossSVG(e.n,size):ART.zombieSVG(e.k,size);}
 function fxPush(ev){if(!C)return;(C.fxq=C.fxq||[]).push(ev);C.fxNew=true;}
 const BS_SLOTS=[[60,8,1],[81,8,1],[70,50,0],[91,50,0],[49,50,0],[99,46,0]];   // x%, bottom px, front row?
 /* v7.37 - DEFEND YOUR OWN FENCE. A raid or a horde fight happened in front of a
@@ -2862,6 +2867,7 @@ function bsSchedule(q,crew){
     }else if(ev.k==='crewhurt'){const ci=crew.findIndex(c=>c.id===ev.who);if(ev.from>=0)E(ev.from).push('bsLunge 320ms cubic-bezier(.3,.9,.4,1) '+T+'ms');if(ci>=0){CR(ci).push('bsHurt 320ms ease-out '+(T+130)+'ms');out.floats.push({on:'c'+ci,txt:'-'+ev.d,cls:'hurt',t:T+130});}
     }else if(ev.k==='die'){E(ev.i).push('bsDie 520ms ease-in '+(T+60)+'ms forwards');out.dying=(out.dying||{});out.dying[ev.i]=1;
     }else if(ev.k==='spawn'){E(ev.i).push('bsPop 380ms cubic-bezier(.2,1.4,.4,1) '+T+'ms both');
+    }else if(ev.k==='eheal'){out.floats.push({on:ev.i,txt:'+'+ev.n,cls:'good',t:T});out.fx.push({i:ev.i,kind:'ehealfx',t:T});if(out.bar[ev.i]===undefined)out.bar[ev.i]=T+60;
     }else if(ev.k==='trap'){out.floats.push({on:ev.i,txt:'TRAPPED',cls:'good',t:T});E(ev.i).push('bsHit 300ms ease-out '+T+'ms');
     }else if(ev.k==='heal'){if(ev.by){const ci=crewOf(ev.by);if(ci>=0)CR(ci).push('bsCast 420ms ease-out '+T+'ms');}out.floats.push({on:'me',txt:'+'+ev.n,cls:'good',t:T+(ev.by?120:0)});out.fx.push({i:'me',kind:'heal',t:T});if(out.meBar===null)out.meBar=T;
     }else if(ev.k==='brace'){out.fx.push({i:'me',kind:'brace',t:T});}
@@ -2884,10 +2890,12 @@ function battleStage(){
   C.enemies.forEach((e,i)=>{const sl=BS_SLOTS[slotOf[i]];const big=!!(e.warden||e.boss);const size=big?78:(sl[2]?60:50);
     pos[i]=[sl[0],sl[1]+size*0.6];
     const gone=e.dead&&!(P.dying&&P.dying[i]);const hpNow=Math.max(0,Math.round(e.hp/e.max*100)),hpWas=Math.max(0,Math.round((e.hp0===undefined?e.hp:e.hp0)/e.max*100));
-    s+='<button class="bs-en'+(e===t&&!e.dead?' tgt':'')+(gone?' gone':'')+(e.enraged?' rage':'')+(e.plate&&!e.cracked?' plate':'')+'" style="left:'+sl[0]+'%;bottom:'+sl[1]+'px;z-index:'+(sl[2]?6:3)+';width:'+size+'px" onclick="C.target='+i+';renderCombat()" aria-label="Target '+esc(e.n)+'">'
+    s+='<button class="bs-en'+(e===t&&!e.dead?' tgt':'')+(gone?' gone':'')+(e.enraged?' rage':'')+(e.plate&&!e.cracked?' plate':'')+(e.shield>0?' shielded':'')+'" style="left:'+sl[0]+'%;bottom:'+sl[1]+'px;z-index:'+(sl[2]?6:3)+';width:'+size+'px" onclick="C.target='+i+';renderCombat()" aria-label="Target '+esc(e.n)+'">'
       +(gone?'':bar(hpNow,hpWas,P.bar[i],'en'))
-      +'<span class="bs-act" style="'+an(P.en[i])+'"><span class="bs-idle" style="animation-delay:'+(-(i*0.37)).toFixed(2)+'s">'+ART.zombieSVG(e.k,size)+'</span></span>'
-      +(e.stun>0&&!e.dead?'<span class="bs-stun">\u{1F4AB}</span>':'')+'</button>';});
+      +'<span class="bs-act" style="'+an(P.en[i])+'"><span class="bs-idle" style="animation-delay:'+(-(i*0.37)).toFixed(2)+'s">'+foeSVG(e,size)+'</span></span>'
+      +(e.stun>0&&!e.dead?'<span class="bs-stun">\u{1F4AB}</span>':'')
+      // Big Sal only moves every other round. Say which kind of round is coming.
+      +(e.g==='slow'&&!e.dead&&!(e.stun>0)?'<span class="bs-tell'+(C.turn%2===0?' hot':'')+'">'+(C.turn%2===0?'SWINGS NOW':'winding up')+'</span>':'')+'</button>';});
   // your crew, behind you. They have always fought every round; now you can see it.
   const CSLOT=[[4,58,46],[31,62,46],[17,104,38]];
   crew.forEach((c,ci)=>{const sl=CSLOT[ci];pos['c'+ci]=[sl[0],sl[1]+sl[2]*0.62];const down=c.hp!==undefined&&c.hp<=0;
@@ -2906,7 +2914,7 @@ function battleStage(){
     if(f.kind==='shot'&&f.src&&pos[f.src]){const o=f.src==='me'?[pos.me[0],pos.me[1]+44]:[pos[f.src][0],pos[f.src][1]+4];const dx=(p[0]-o[0])*3.1,dy=-(p[1]-o[1]);const len=Math.hypot(dx,dy),a=Math.atan2(dy,dx)*180/Math.PI;
       s+='<span class="bs-tracer" style="left:calc('+o[0]+'% + 22px);bottom:'+o[1]+'px;width:'+len.toFixed(0)+'px;--a:'+a.toFixed(1)+'deg;animation-delay:'+(f.t-60)+'ms"></span>'
         +'<span class="bs-fx muzzle" style="left:calc('+o[0]+'% + 26px);bottom:'+(o[1]-2)+'px;animation-delay:'+(f.t-70)+'ms"></span>';}
-    s+='<span class="bs-fx '+(f.kind==='heavy'?'heavy':f.kind==='shot'?'pop':'slash')+'" style="left:'+p[0]+'%;bottom:'+(p[1]-6)+'px;animation-delay:'+f.t+'ms"></span>';});
+    s+='<span class="bs-fx '+(f.kind==='ehealfx'?'heal':f.kind==='heavy'?'heavy':f.kind==='shot'?'pop':'slash')+'" style="left:'+p[0]+'%;bottom:'+(p[1]-6)+'px;animation-delay:'+f.t+'ms"></span>';});
   P.floats.forEach(f=>{const p=f.on==='me'?[pos.me[0],pos.me[1]+92]:String(f.on).charAt(0)==='c'?[pos[f.on][0],pos[f.on][1]+40]:[pos[f.on]?pos[f.on][0]:70,(pos[f.on]?pos[f.on][1]:40)+34];
     s+='<span class="bs-float '+f.cls+'" style="left:'+p[0]+'%;bottom:'+p[1]+'px;animation-delay:'+f.t+'ms">'+esc(f.txt)+'</span>';});
   // your health, on the stage, so the portrait row below is not needed
@@ -5000,6 +5008,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.40',d:'Sep 21',t:'Every county boss has a face, and legendary armour wears',
+  i:['TEN BOSSES, TEN FACES. They were all the same masked raider. Now Sister Ash carries her riot shield, Preacher Cole has the hat and the book, Big Sal is as wide as a door with a sledgehammer, the Widow Marsh has her veil and a green vial, Queen Wasp wears stripes and a crown - each one built around the trick they already had. They show in the fight and in the Codex.',
+     'YOU CAN SEE THEIR TRICKS COMING. A shield shimmers until you break it. Preacher Cole visibly prays his health back. And Big Sal, who only moves every other round, now says whether he is winding up or about to swing - which is exactly when Counter is worth pressing.',
+     'LEGENDARY ARMOUR WEARS OUT NOW, AND CAN ALWAYS BE REPAIRED. Nightingale, Vigil, Sure Hands and Long Haul were unbreakable. They now wear like everything else - but last far longer than a rare piece (40 and 36 against 24 to 26) and are repaired, never lost. The ones you own start at full.']},
  {v:'7.39',d:'Sep 21',t:'Brace is gone. Counter is what it should have been',
   i:['NOBODY PRESSED BRACE, and you were right not to: it halved the damage for a round and did nothing else, so patching up or swinging was always the better turn.',
      'COUNTER takes its place. You still take half damage that round - but EVERYONE who lands a hit on you gets struck back, each for 45% of a normal swing. It can miss or be dodged like any swing, and it costs one point of weapon wear for the round.',

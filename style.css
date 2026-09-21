@@ -612,3 +612,10 @@ button.room2{width:100%;text-align:left;color:inherit;font:inherit}
 /* the health panel sits top-RIGHT: the top-left is where the crew stand */
 .bs-hud{left:auto;right:8px;width:44%}
 .bs-hud{padding:4px 7px 5px}.bs-hudrow{margin-bottom:3px}.bs-hp.me{height:7px}
+/* v7.40 - boss tells */
+.bs-en.shielded::after,.bs-en.shielded.tgt::after{box-shadow:0 0 10px rgba(143,179,201,.9)}
+.bs-en.shielded svg{filter:drop-shadow(0 0 6px #8fb3c9) drop-shadow(0 3px 2px rgba(0,0,0,.45));animation:bsShield 1.6s ease-in-out infinite}
+.bs-tell{position:absolute;left:50%;top:-24px;transform:translateX(-50%);font:700 9px/1 'Barlow',system-ui,sans-serif;letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;padding:3px 5px;border-radius:4px;background:rgba(12,12,18,.8);color:var(--bone2);border:1px solid rgba(255,255,255,.12);z-index:3}
+.bs-tell.hot{color:#15121a;background:var(--amber);border-color:var(--amber);animation:bsTell .6s ease-in-out infinite}
+@keyframes bsTell{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,3px)}}
+@keyframes bsShield{0%,100%{filter:drop-shadow(0 0 3px #8fb3c9) drop-shadow(0 3px 2px rgba(0,0,0,.45))}50%{filter:drop-shadow(0 0 9px #cfe6f2) drop-shadow(0 3px 2px rgba(0,0,0,.45))}}

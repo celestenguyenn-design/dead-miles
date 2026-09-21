@@ -513,5 +513,71 @@ function petSVG(kind,size,coat,opts){
 const imgCache=new Map();
 function spriteImg(svg){let i=imgCache.get(svg);if(i)return i;i=new Image();i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);imgCache.set(svg,i);if(imgCache.size>60){const k=imgCache.keys().next().value;imgCache.delete(k);}return i;}
 function randomAv(){return {skin:Math.floor(Math.random()*SKINS.length),hair:HAIR_STYLES[Math.floor(Math.random()*HAIR_STYLES.length)],hairColor:Math.floor(Math.random()*HAIR_COLORS.length),eyes:EYES[Math.floor(Math.random()*EYES.length)],top:'hoodie',topColor:Math.floor(Math.random()*TOP_COLORS.length),hat:'',acc:'',beard:Math.random()<0.28?BEARD_KEYS[1+Math.floor(Math.random()*(BEARD_KEYS.length-1))]:''};}
-return {gachaSVG,BEARDS,BEARD_KEYS,beard,BUILDS,setBuild,SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,CAT_COATS,DOG_COATS,randomCoat,coatInfo,avatarSVG,setStyle,bodyParts,zombieSVG,petSVG,spriteImg,randomAv};
+/* v7.40 - COUNTY BOSSES GET A FACE EACH. All ten were the same masked raider.
+   One new function beside zombieSVG(); nothing that existed is edited. */
+const BOSS_LOOKS={
+  'Mad Dog Reyes':      {skin:'#c68a5d',coat:'#5a3a24',trim:'#2a1b14',kind:'dog'},
+  'Sister Ash':         {skin:'#cfc9c0',coat:'#1e1e26',trim:'#e8e0d0',kind:'nun'},
+  'The Butcher of Elm St':{skin:'#e0a97e',coat:'#e8e0d0',trim:'#8a2a2a',kind:'butcher'},
+  'Two-Tooth Tully':    {skin:'#e0a97e',coat:'#4a5a3a',trim:'#2a2a20',kind:'tully'},
+  'Queen Wasp':         {skin:'#c68a5d',coat:'#e6b830',trim:'#1e1e26',kind:'wasp'},
+  'Preacher Cole':      {skin:'#9a6543',coat:'#15151a',trim:'#e8e0d0',kind:'preacher'},
+  'Ghost Delacroix':    {skin:'#e8e8ee',coat:'#8a8a96',trim:'#55555e',kind:'ghost'},
+  'Big Sal':            {skin:'#e0a97e',coat:'#3a4a5a',trim:'#1e2a36',kind:'sal'},
+  'The Widow Marsh':    {skin:'#d8cfc4',coat:'#16121a',trim:'#3a2a3a',kind:'widow'},
+  'Cutter Vance':       {skin:'#c68a5d',coat:'#5a1a1e',trim:'#e8e0d0',kind:'vance'},
+  'The Gourd King':     {skin:'#e8822a',coat:'#2a3a1e',trim:'#e6a530',kind:'gourd'},
+};
+function bossSVG(name,size){
+  const L=BOSS_LOOKS[name];if(!L)return zombieSVG('boss',size);
+  const w=size||100,h=Math.round((size||100)*1.3),k=L.kind,O='stroke="#15121a" stroke-width="1.6" stroke-linejoin="round"';
+  const wide=k==='sal';
+  let s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 130" width="'+w+'" height="'+h+'" aria-hidden="true">';
+  // legs + boots (the same frame everyone stands on)
+  s+='<rect x="36" y="100" width="11" height="22" rx="5" fill="#2a2a30"/><rect x="53" y="100" width="11" height="22" rx="5" fill="#2a2a30"/><rect x="34" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/><rect x="51" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/>';
+  // behind-the-body props
+  if(k==='tully')s+='<path d="M70 74 q22 -4 22 18 q0 16 -16 16 q-10 0 -10 -12z" fill="#8a7a5a" '+O+'/><path d="M72 76 q6 -6 12 -2" stroke="#15121a" stroke-width="2" fill="none"/>';
+  if(k==='ghost')s+='<path d="M22 76 q-8 30 -2 46 q10 -6 14 2 q6 -8 16 -2 q10 -6 16 2 q4 -8 14 -2 q6 -16 -2 -46z" fill="'+L.coat+'" opacity=".9" '+O+'/>';
+  if(k==='widow')s+='<path d="M24 78 q-6 28 -4 44 h60 q2 -16 -4 -44z" fill="'+L.coat+'" '+O+'/>';
+  // body
+  if(wide)s+='<rect x="22" y="76" width="56" height="34" rx="12" fill="'+L.coat+'" '+O+'/><path d="M50 78 v30" stroke="'+L.trim+'" stroke-width="2"/>';
+  else if(k!=='ghost'&&k!=='widow')s+='<rect x="30" y="78" width="40" height="30" rx="9" fill="'+L.coat+'" '+O+'/>';
+  if(k==='butcher')s+='<path d="M34 80 h32 v26 q-16 6 -32 0z" fill="#f4f0ea" '+O+'/><path d="M40 90 q4 6 2 12 M56 86 q5 3 3 9" stroke="#a32a2a" stroke-width="3" stroke-linecap="round"/><circle cx="48" cy="98" r="2.500" fill="#a32a2a"/>';
+  if(k==='wasp')s+='<path d="M30 86 h40 M30 94 h40 M31 102 h38" stroke="'+L.trim+'" stroke-width="4"/>';
+  if(k==='preacher')s+='<path d="M44 78 h12 v6 h-12z" fill="'+L.trim+'"/><path d="M50 86 v16 M45 91 h10" stroke="'+L.trim+'" stroke-width="2.200"/>';
+  if(k==='dog')s+='<path d="M30 84 h40" stroke="'+L.trim+'" stroke-width="5"/><path d="M34 84 l2 -5 l2 5 M44 84 l2 -5 l2 5 M54 84 l2 -5 l2 5 M64 84 l2 -5 l2 5" fill="#bbb" stroke="#bbb" stroke-width="1"/>';
+  if(k==='vance')s+='<path d="M30 80 l40 26 M70 80 l-40 26" stroke="'+L.trim+'" stroke-width="2" opacity=".55"/>';
+  if(k==='gourd')s+='<path d="M30 84 q20 10 40 0" stroke="'+L.trim+'" stroke-width="3" fill="none"/><path d="M40 78 q-6 -6 -14 -2 M60 78 q6 -6 14 -2" stroke="#5a8a3a" stroke-width="3" fill="none" stroke-linecap="round"/>';
+  // arms
+  const ax=wide?[12,77]:[21,68];
+  s+='<rect x="'+ax[0]+'" y="82" width="11" height="22" rx="5" fill="'+(k==='ghost'||k==='widow'?L.coat:L.skin)+'"/><rect x="'+ax[1]+'" y="82" width="11" height="22" rx="5" fill="'+(k==='ghost'||k==='widow'?L.coat:L.skin)+'"/>';
+  // what they carry
+  if(k==='dog')s+='<path d="M80 104 q10 -8 8 -22 q-2 -8 6 -10" stroke="#9a9aa2" stroke-width="3" fill="none" stroke-dasharray="4 3" stroke-linecap="round"/>';
+  if(k==='nun')s+='<path d="M4 74 h24 q4 0 4 4 v26 q0 10 -16 14 q-16 -4 -16 -14 v-26 q0 -4 4 -4z" fill="#3a4a5a" '+O+'/><path d="M8 80 h16 v6 h-16z" fill="#0e1420" opacity=".8"/><path d="M16 92 v18 M9 100 h14" stroke="#e8e0d0" stroke-width="2.500"/>';
+  if(k==='butcher')s+='<path d="M78 102 l10 -26" stroke="#5a3a1a" stroke-width="4.500" stroke-linecap="round"/><path d="M82 78 l14 -10 l4 14 l-12 8z" fill="#c8c8d0" '+O+'/><path d="M92 72 l4 10" stroke="#a32a2a" stroke-width="2.500"/>';
+  if(k==='wasp')s+='<path d="M80 102 l12 -30 M18 102 l-10 -28" stroke="#c8c8d0" stroke-width="2.600" stroke-linecap="round"/>';
+  if(k==='preacher')s+='<rect x="74" y="88" width="18" height="22" rx="2" fill="#5a1a1e" '+O+'/><path d="M83 93 v10 M79 97 h8" stroke="#e6a530" stroke-width="1.800"/>';
+  if(k==='sal')s+='<path d="M84 104 l8 -40" stroke="#5a3a1a" stroke-width="5.500" stroke-linecap="round"/><rect x="80" y="50" width="26" height="16" rx="3" fill="#6a6a74" '+O+'/>';
+  if(k==='widow')s+='<path d="M80 96 v-10 h6 v10 q4 4 4 10 q0 6 -7 6 q-7 0 -7 -6 q0 -6 4 -10z" fill="#5ad07a" opacity=".9" '+O+'/>';
+  if(k==='vance')s+='<path d="M80 102 l10 -22 M18 102 l-10 -22" stroke="#c8c8d0" stroke-width="3" stroke-linecap="round"/><path d="M90 80 l4 -10 M8 80 l-4 -10" stroke="#e8e0d0" stroke-width="2"/>';
+  if(k==='gourd')s+='<path d="M82 104 l6 -44" stroke="#5a3a1a" stroke-width="4" stroke-linecap="round"/><path d="M82 60 q6 -12 14 -4 q-2 8 -12 8z" fill="#e6a530" '+O+'/>';
+  // head
+  if(k==='gourd')s+='<path d="M12 50 q0 -40 38 -40 q38 0 38 40 v6 q0 26 -38 26 q-38 0 -38 -26z" fill="'+L.skin+'" '+O+'/><path d="M30 14 q-10 30 0 66 M50 10 v72 M70 14 q10 30 0 66" stroke="#b85a14" stroke-width="2" fill="none" opacity=".7"/><path d="M46 12 q-2 -10 6 -12 l4 3 q-5 3 -3 10z" fill="#5a8a3a"/>';
+  else s+='<path d="M12 50 q0 -40 38 -40 q38 0 38 40 v6 q0 26 -38 26 q-38 0 -38 -26z" fill="'+L.skin+'"/>';
+  // face
+  const eyesAngry='<ellipse cx="35" cy="52" rx="8" ry="8" fill="#fff"/><ellipse cx="65" cy="52" rx="8" ry="8" fill="#fff"/><circle cx="36" cy="54" r="4" fill="#1a1020"/><circle cx="64" cy="54" r="4" fill="#1a1020"/><path d="M25 42 l18 6 M75 42 l-18 6" stroke="#1a1020" stroke-width="3.500" stroke-linecap="round"/>';
+  if(k==='dog')s+=eyesAngry+'<path d="M28 60 q22 -8 44 0 v10 q-22 14 -44 0z" fill="'+L.trim+'" '+O+'/><path d="M34 66 l3 5 l3 -5 l3 5 l3 -5 l3 5 l3 -5 l3 5 l3 -5 l3 5 l3 -5" stroke="#e8e0d0" stroke-width="2" fill="none"/><path d="M10 40 q40 -16 80 0 v-8 q-40 -22 -80 0z" fill="#c22b3a"/>';
+  if(k==='nun')s+='<path d="M8 58 q-2 -52 42 -52 q44 0 42 52 l-8 22 q-2 -40 -34 -40 q-32 0 -34 40z" fill="#15151a" '+O+'/><path d="M18 40 q32 -16 64 0 v-8 q-32 -14 -64 0z" fill="#f4f0ea"/><ellipse cx="36" cy="54" rx="6" ry="7" fill="#1a1020"/><ellipse cx="64" cy="54" rx="6" ry="7" fill="#1a1020"/><path d="M30 44 q6 -3 12 0 M58 44 q6 -3 12 0" stroke="#55555e" stroke-width="2"/><path d="M42 70 h16" stroke="#1a1020" stroke-width="2.500" stroke-linecap="round"/><path d="M28 60 l4 10 M72 60 l-4 10" stroke="#55555e" stroke-width="2" opacity=".6"/>';
+  if(k==='butcher')s+=eyesAngry+'<path d="M38 68 q12 8 24 0" stroke="#1a1020" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M16 30 q34 -22 68 0 v-10 q-34 -18 -68 0z" fill="#f4f0ea" '+O+'/><path d="M30 14 q20 -12 40 0 v8 h-40z" fill="#f4f0ea" '+O+'/><circle cx="72" cy="62" r="3" fill="#a32a2a"/>';
+  if(k==='tully')s+='<ellipse cx="35" cy="52" rx="8" ry="7" fill="#fff"/><ellipse cx="65" cy="52" rx="8" ry="7" fill="#fff"/><circle cx="37" cy="53" r="3.500" fill="#1a1020"/><circle cx="67" cy="53" r="3.500" fill="#1a1020"/><path d="M26 44 q8 -5 16 -1 M58 43 q8 -4 16 1" stroke="#1a1020" stroke-width="3" stroke-linecap="round"/><path d="M32 64 q18 16 36 0 q-18 6 -36 0z" fill="#3a0a10"/><rect x="42" y="65" width="6" height="7" rx="1" fill="#f4f0ea"/><rect x="54" y="65" width="6" height="7" rx="1" fill="#f4f0ea"/><path d="M10 40 q40 -18 80 0 l6 4 q-46 -14 -92 0z" fill="'+L.trim+'"/><path d="M16 38 q34 -30 68 0z" fill="#5a5a44" '+O+'/>';
+  if(k==='wasp')s+='<rect x="22" y="44" width="56" height="18" rx="9" fill="#1e1e26" '+O+'/><circle cx="36" cy="53" r="7" fill="#e6b830"/><circle cx="64" cy="53" r="7" fill="#e6b830"/><circle cx="36" cy="53" r="3" fill="#1a1020"/><circle cx="64" cy="53" r="3" fill="#1a1020"/><path d="M40 70 q10 -5 20 0" stroke="#1a1020" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M24 22 l6 -16 l8 12 l12 -16 l12 16 l8 -12 l6 16z" fill="#e6a530" '+O+'/><circle cx="50" cy="6" r="3" fill="#c22b3a"/>';
+  if(k==='preacher')s+=eyesAngry+'<path d="M40 70 h20" stroke="#1a1020" stroke-width="3" stroke-linecap="round"/><ellipse cx="50" cy="30" rx="48" ry="7" fill="#15151a" '+O+'/><path d="M26 30 q0 -24 24 -24 q24 0 24 24z" fill="#15151a" '+O+'/><path d="M26 27 h48" stroke="#5a1a1e" stroke-width="4"/><path d="M38 80 q12 8 24 0" stroke="#e8e0d0" stroke-width="5" fill="none"/>';
+  if(k==='ghost')s+='<path d="M10 56 q-4 -52 40 -52 q44 0 40 52 q-6 -34 -40 -34 q-34 0 -40 34z" fill="'+L.coat+'" '+O+'/><ellipse cx="36" cy="54" rx="8" ry="11" fill="#15121a"/><ellipse cx="64" cy="54" rx="8" ry="11" fill="#15121a"/><ellipse cx="50" cy="72" rx="5" ry="7" fill="#15121a"/>';
+  if(k==='sal')s+=eyesAngry+'<path d="M36 70 q14 -8 28 0" stroke="#1a1020" stroke-width="3.500" fill="none" stroke-linecap="round"/><path d="M30 76 q20 10 40 0" stroke="#7a5a44" stroke-width="6" fill="none" opacity=".5"/><path d="M22 34 q6 -4 10 0 M68 34 q6 -4 10 0" stroke="#b07a5a" stroke-width="2" fill="none"/>';
+  if(k==='widow')s+='<ellipse cx="36" cy="54" rx="6" ry="6" fill="#1a1020"/><ellipse cx="64" cy="54" rx="6" ry="6" fill="#1a1020"/><circle cx="37" cy="53" r="1.600" fill="#5ad07a"/><circle cx="65" cy="53" r="1.600" fill="#5ad07a"/><path d="M42 70 q8 -3 16 0" stroke="#5a1a2a" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M8 60 q-4 -56 42 -56 q46 0 42 56 v24 q-10 -50 -42 -50 q-32 0 -42 50z" fill="'+L.coat+'" '+O+'/><path d="M14 46 q36 -14 72 0 v30 q-36 12 -72 0z" fill="#16121a" opacity=".38"/><path d="M20 50 h60 M20 58 h60 M20 66 h60 M32 44 v30 M44 42 v34 M56 42 v34 M68 44 v30" stroke="#16121a" stroke-width=".8" opacity=".5"/>';
+  if(k==='vance')s+='<path d="M16 50 q0 -34 34 -34 q34 0 34 34 v10 q-4 16 -34 16 q-30 0 -34 -16z" fill="#e8e0d0" '+O+'/><ellipse cx="36" cy="52" rx="7" ry="5" fill="#15121a"/><ellipse cx="64" cy="52" rx="7" ry="5" fill="#15121a"/><circle cx="36" cy="52" r="2" fill="#c22b3a"/><circle cx="64" cy="52" r="2" fill="#c22b3a"/><path d="M40 66 v8 M46 66 v8 M52 66 v8 M58 66 v8" stroke="#15121a" stroke-width="2.200"/><path d="M22 30 l20 16 M78 28 l-16 20 M30 70 l10 -8" stroke="#a32a2a" stroke-width="2.500" stroke-linecap="round"/>';
+  if(k==='gourd')s+='<path d="M28 46 l10 -12 l10 12z M52 46 l10 -12 l10 12z" fill="#3a1605"/><path d="M46 56 l4 -6 l4 6z" fill="#3a1605"/><path d="M26 62 l6 6 l6 -6 l6 6 l6 -6 l6 6 l6 -6 l6 6 l6 -6 v6 q-24 16 -48 0z" fill="#3a1605"/><path d="M26 16 l6 -12 l8 10 l10 -14 l10 14 l8 -10 l6 12z" fill="#e6a530" '+O+'/>';
+  return s+'</svg>';
+}
+return {bossSVG,BOSS_LOOKS,gachaSVG,BEARDS,BEARD_KEYS,beard,BUILDS,setBuild,SKINS,HAIR_COLORS,HAIR_STYLES,HAIR_SHOP,EYES,EYES_SHOP,TOP_COLORS,HATS,TOPS,ACCS,CAT_COATS,DOG_COATS,randomCoat,coatInfo,avatarSVG,setStyle,bodyParts,zombieSVG,petSVG,spriteImg,randomAv};
 })();
