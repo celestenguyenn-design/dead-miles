@@ -426,6 +426,7 @@ function landmarkPayout(loc){
   if(loc.rooms.some(r=>!r.done))return;
   const lm=LANDMARKS.find(x=>x.id===loc.landmark);if(!lm)return;
   loc.lmPaid=true;const g=lm.give;const got=[];
+  if(typeof life==='function')life().landmarks++;
   if(g.scrap){const n=rint(g.scrap[0],g.scrap[1]);S.stock.scrap+=n;got.push(n+' scrap');}
   if(g.key){S.keys+=g.key;got.push(g.key+' chest key'+(g.key===1?'':'s'));}
   if(g.parts){const n=rint(g.parts[0],g.parts[1]);S.parts=(S.parts||0)+n;got.push(n+' parts');}
@@ -451,6 +452,8 @@ function tapPoi(id){
   const loc=makeLoc(p.t,lm?lm.n:p.n,tier?tier.k:1);loc.geo=id;loc.e=lm?lm.e:p.e;
   if(lm)loc.landmark=lm.id;
   S.loc=loc;streetState().visits++;
+  // stats: how far from the base pin she has actually got to. No pin, no distance.
+  if(S.base&&S.base.geo&&typeof lifeFar==='function')lifeFar(geoDist(p,S.base.geo),tier?tier.k:-1);
   log('Reached '+(lm?lm.n+' ('+p.n+')':p.n)+' \u00b7 '+(tier?tier.n:'')+'. '+(tier?tier.d:''));
   if(lm)toast(lm.e+' '+lm.n,'l');
   SFX.play(lm?'rare':'arrive');save();render();$('#locCard').scrollIntoView({behavior:'smooth'});
@@ -840,6 +843,7 @@ function liveRaidAfter(won){
     save();render();pushPlayer();return;
   }
   S.raidsDone[cur.id]=Date.now();
+  if(typeof life==='function'){const L=life();L.raids++;if(cur.tier>L.raidBest)L.raidBest=cur.tier;}
   // trim old entries so the save does not grow forever
   const keys=Object.keys(S.raidsDone);if(keys.length>60)keys.sort((a,b)=>S.raidsDone[a]-S.raidsDone[b]).slice(0,keys.length-60).forEach(k=>delete S.raidsDone[k]);
   // Raid loot uses the game's own tables, just weighted hard toward gear and

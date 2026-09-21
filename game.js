@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.25';
+const VERSION='7.26';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1428,6 +1428,80 @@ function recapSheet(r){SFX.play('week');
     +(r.streak?row('Day streak',fmt(r.streak)):'')
     +'</div>'
     +'<button class="btn r wide" style="margin-top:12px" onclick="closeSheet()">Next week, then</button>',true);
+}
+/* ================= STATS (v7.26) =================
+   The game was generating all of this and showing none of it. A walking game
+   with no record of the walking does not feel like progress.
+   Almost everything here is read from counters that already existed (steps
+   history, kills, places, keepsakes, streak, boss kills). Three things were
+   never counted anywhere - furthest place reached from the base pin, raids won,
+   landmarks cleared - so S.life starts counting them NOW, and the sheet says
+   "since v7.26" next to them rather than showing a zero that reads like she
+   never did it. A stat that lies about the past is worse than a missing one. */
+const STRIDE_M=0.75;                         // metres per step; shown as "about"
+function life(){return S.life||(S.life={farM:0,farK:-1,raids:0,raidBest:0,landmarks:0,since:VERSION});}
+function lifeFar(m,k){if(m==null||!isFinite(m))return;const L=life();if(m>L.farM)L.farM=Math.round(m);if(k>L.farK)L.farK=k;}
+// The last `n` calendar days, oldest first, with a hole (null) for any day the
+// game has no record of - hist only holds days she opened it.
+function statDays(n){
+  const by={};for(const h of ((S.steps&&S.steps.hist)||[]))by[h.d]=h.n;
+  by[S.steps.date]=S.steps.today||0;
+  const out=[];const d=new Date();d.setHours(12,0,0,0);
+  for(let i=n-1;i>=0;i--){const x=new Date(d);x.setDate(d.getDate()-i);const k=todayStr(x);out.push({d:k,n:(k in by)?by[k]:null});}
+  return out;
+}
+function statsData(){
+  const days=statDays(30);const known=days.filter(x=>x.n!==null);
+  const sum=known.reduce((a,x)=>a+x.n,0);
+  const best=known.reduce((b,x)=>(!b||x.n>b.n)?x:b,null);
+  const L=life();
+  return {days,known:known.length,sum,avg:known.length?Math.round(sum/known.length):0,best,
+    goalDays:known.filter(x=>x.n>=S.goal).length,
+    total:S.steps.total||0,km:(S.steps.total||0)*STRIDE_M/1000,
+    keepKinds:Object.keys(S.keeps||{}).length,keepAll:(typeof KEEPSAKES!=='undefined')?KEEPSAKES.length:8,
+    farM:L.farM,farK:L.farK,raids:L.raids,raidBest:L.raidBest,landmarks:L.landmarks,since:L.since||VERSION};
+}
+function statsChart(days){
+  const max=Math.max(S.goal||1,...days.map(x=>x.n||0));const W=300,H=90,bw=W/days.length;
+  const gy=H-Math.round((S.goal/max)*H);
+  const bars=days.map((x,i)=>{
+    if(x.n===null)return '<rect x="'+(i*bw+1).toFixed(1)+'" y="'+(H-2)+'" width="'+(bw-2).toFixed(1)+'" height="2" fill="#4a463f"/>';
+    const h=Math.max(2,Math.round((x.n/max)*H));const today=i===days.length-1;
+    return '<rect x="'+(i*bw+1).toFixed(1)+'" y="'+(H-h)+'" width="'+(bw-2).toFixed(1)+'" height="'+h+'" rx="1.5" fill="'+(today?'#e6a530':x.n>=S.goal?'#7fbf4d':'#4e8a2a')+'"><title>'+x.d+': '+fmt(x.n)+'</title></rect>';
+  }).join('');
+  return '<svg viewBox="0 0 '+W+' '+(H+2)+'" style="width:100%;height:auto;display:block;margin-top:10px" role="img" aria-label="Steps per day, last 30 days">'
+    +'<line x1="0" x2="'+W+'" y1="'+gy+'" y2="'+gy+'" stroke="#e8e0d0" stroke-opacity=".35" stroke-dasharray="3 3"/>'+bars+'</svg>'
+    +'<div class="row" style="justify-content:space-between;font-size:12px;color:var(--muted)"><span>'+days[0].d.slice(5)+'</span><span>dashed line = your goal of '+fmt(S.goal)+'</span><span>today</span></div>';
+}
+function statsSheet(){
+  SFX.play('ui');const d=statsData();
+  const row=(label,val,sub)=>'<div class="kv" style="grid-template-columns:1fr auto"><span>'+label+'</span><b>'+val+'</b></div>'+(sub?'<div class="help" style="margin:-4px 0 6px">'+sub+'</div>':'');
+  const head=t=>'<h3 style="margin:14px 0 6px;font-family:\'Bebas Neue\';letter-spacing:1px;color:var(--amber);font-size:18px">'+t+'</h3>';
+  const tierName=d.farK>=0&&FAR_TIERS[d.farK]?FAR_TIERS[d.farK].n:'';
+  const noPin=!(S.base&&S.base.geo);
+  openSheet('<h2>Your stats</h2>'
+    +'<div class="big" style="font-family:\'Bebas Neue\';font-size:46px;color:var(--rot);line-height:1">'+fmt(d.total)+'</div>'
+    +'<p class="help" style="margin-top:-4px">lifetime steps · about '+(d.km>=100?fmt(Math.round(d.km)):d.km.toFixed(1))+' km on foot</p>'
+    +statsChart(d.days)
+    +head('Last 30 days')
+    +row('Steps',fmt(d.sum),d.known<30?'The game has a record of '+d.known+' of the last 30 days. A day only counts once it has been opened or synced.':'')
+    +row('Average day',fmt(d.avg))
+    +(d.best?row('Best day',fmt(d.best.n),d.best.d):'')
+    +row('Days you hit your goal',d.goalDays+' of '+d.known)
+    +row('Day streak',fmt(S.streak.days)+' · best '+fmt(Math.max(S.streakBest||0,S.streak.days)))
+    +head('The county')
+    +row('Hostiles put down',fmt(S.kills||0))
+    +row('Places cleared',fmt(S.walk.houses||0))
+    +row('County bosses killed',fmt(S.bossKills||0))
+    +row('Keepsakes',d.keepKinds+' of '+d.keepAll+' kinds',(S.keepsTotal||0)+' picked up from field caches in all.')
+    +row('Legendaries owned',fmt(legendCount()))
+    +row('Level',fmt(S.lvl),(S.weeks||[]).length+' full week'+((S.weeks||[]).length===1?'':'s')+' played.')
+    +head('Out there · counted since v'+esc(d.since))
+    +row('Furthest place reached',d.farM?(d.farM>=1000?(d.farM/1000).toFixed(2)+' km':d.farM+' m')+' from base':'-',
+        (noPin&&!d.farM)?'<b style="color:var(--amber)">No base pin set.</b> Distance is measured from your base pin, so this cannot count until you drop one on the map.':(tierName?'Deepest band: '+esc(tierName)+'.':'Reach a place from the live map and it shows up here.'))
+    +row('Raids won',fmt(d.raids),d.raidBest?'Hardest one: tier '+d.raidBest+'.':'')
+    +row('Landmarks cleared',fmt(d.landmarks))
+    +'<button class="btn r wide" style="margin-top:12px" onclick="closeSheet()">Back</button>',true);
 }
 function closeWeek(){
   const r=buildRecap();
