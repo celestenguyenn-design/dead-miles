@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.32';
+const VERSION='7.33';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3557,7 +3557,7 @@ function hordeCountdown(){const h=hordeState();if(!h)return '';const ms=h.next-D
 function raidTick(){
   if(!S.raidPending)return;const p=S.raidPending;const now=new Date();
   if(todayStr()!==p.date){resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=todayStr();save();return;}
-  if(now.getHours()>=p.hour){ if(document.visibilityState==='visible'&&!S.combat&&!S.loc&&!$('#modal').classList.contains('on')){openSheet(`<h2>Raiders at the walls</h2><div class="big">${ART.zombieSVG('raider',70)}${ART.zombieSVG('gunner',70)}</div><p>A crew of ${p.power>25?'six':p.power>18?'four':'three'} is coming over the fence. Your defenses: ${defense()} vs their ${p.power}. Fight them yourself, or let the walls decide.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveRaid(${p.power},${p.hour},'${p.date}');S.flags.lastRaidCheck='${p.date}';save();render()">Let the walls hold</button><button class="btn d" onclick="closeSheet();fightRaid()">Fight</button></div>`,true);}
+  if(now.getHours()>=p.hour){ if(document.visibilityState==='visible'&&!S.combat&&!S.loc&&!$('#modal').classList.contains('on')){openSheet(`<h2>Raiders at the walls</h2><div class="big">${ART.zombieSVG('raider',70)}${ART.zombieSVG('gunner',70)}</div><p>A crew of ${p.power>25?'four':p.power>18?'three':'two'} is coming over the fence. Your defenses: ${defense()} vs their ${p.power}. Fight them yourself, or let the walls decide.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveRaid(${p.power},${p.hour},'${p.date}');S.flags.lastRaidCheck='${p.date}';save();render()">Let the walls hold</button><button class="btn d" onclick="closeSheet();fightRaid()">Fight</button></div>`,true);}
     else if(document.visibilityState!=='visible'){resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;save();}}
 }
 function fightRaid(){gearCheck(()=>{const p=S.raidPending;const n=p.power>25?4:p.power>18?3:2;const en=[];for(let i=0;i<n;i++)en.push(mk(i===0&&p.power>22?'gunner':'raider'));startCombat(en,'raid');});}
@@ -4529,6 +4529,13 @@ function bsShadow(x,y,rx){return '<ellipse cx="'+x+'" cy="'+y+'" rx="'+rx+'" ry=
 function bsSprite(svg,x,y,w,anim){const h=Math.round(w*1.3);
   return '<g transform="translate('+(x-w/2)+','+(y-h)+')"><g>'+(anim||'')+svg+'</g></g>';}
 function bsAnim(on,tag){return on?tag:'';}
+// Someone walking a beat: out, stand a moment, back, stand. The small up-down in
+// the path is the step - without it a sprite sliding sideways reads as ice.
+const BS_BEATS=[[46,4],[-38,-3],[30,6]];
+function bsWalk(i){const b=BS_BEATS[i%BS_BEATS.length],x=b[0],y=b[1];const pts=[];const N=8;
+  for(let k=0;k<=N;k++)pts.push(((x*k/N).toFixed(1))+' '+((y*k/N)-(k%2?2.4:0)).toFixed(1));
+  const out=pts.slice(),back=pts.slice().reverse();const seq=out.concat([x+' '+y,x+' '+y],back,['0 0','0 0']);
+  return '<animateTransform attributeName="transform" type="translate" values="'+seq.join(';')+'" dur="'+(9+i*2.5)+'s" begin="'+(i*1.7)+'s" repeatCount="indefinite"/>';}
 // Level 0 = a run of wire, 1-3 = a timber palisade getting taller, 4+ = concrete.
 function bsWall(x1,y1,x2,y2,lv,night,k){
   let s='';k=k||1;const n=Math.max(6,Math.round(Math.hypot(x2-x1,y2-y1)/13));
@@ -4564,7 +4571,8 @@ function baseScene(st){st=st||S;if(!st.base)return '';
   if(night){s+='<circle cx="318" cy="38" r="17" fill="#e8e0d0" opacity=".9"/><circle cx="325" cy="33" r="15" fill="#0b0b11"/>';
     [[40,30],[96,18],[150,44],[214,22],[262,50],[356,70],[20,66]].forEach((p,i)=>{s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="1.1" fill="#e8e0d0">'+bsAnim(A,'<animate attributeName="opacity" values="1;.25;1" dur="'+(2.4+i*0.7).toFixed(1)+'s" repeatCount="indefinite"/>')+'</circle>';});}
   else{s+='<circle cx="318" cy="52" r="20" fill="#d9c9a6" opacity=".8"/>';
-    [[-60,40,26],[-160,66,20]].forEach((c,i)=>{s+='<g opacity=".35"><ellipse cx="'+c[0]+'" cy="'+c[1]+'" rx="'+c[2]*1.6+'" ry="'+c[2]*0.5+'" fill="#3c3237"/>'+bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 0;520 0" dur="'+(70+i*34)+'s" repeatCount="indefinite"/>')+'</g>';});}
+    [[-60,40,26],[-160,66,20]].forEach((c,i)=>{s+='<g opacity=".55"><ellipse cx="'+c[0]+'" cy="'+c[1]+'" rx="'+c[2]*1.6+'" ry="'+c[2]*0.5+'" fill="#8a7a84"/><ellipse cx="'+(c[0]+18)+'" cy="'+(c[1]-6)+'" rx="'+c[2]+'" ry="'+c[2]*0.4+'" fill="#8a7a84"/>'+bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 0;560 0" dur="'+(38+i*17)+'s" repeatCount="indefinite"/>')+'</g>';});
+    if(A)[[-20,58,19],[-44,70,23]].forEach((b,i)=>{s+='<g><animateTransform attributeName="transform" type="translate" values="0 0;460 -26" dur="'+b[2]+'s" begin="'+(i*3)+'s" repeatCount="indefinite"/><path fill="none" stroke="#15121a" stroke-width="1.8" stroke-linecap="round" d="M'+b[0]+' '+b[1]+' q4 -5 8 0 q4 -5 8 0"><animate attributeName="d" values="M'+b[0]+' '+b[1]+' q4 -5 8 0 q4 -5 8 0;M'+b[0]+' '+b[1]+' q4 3 8 0 q4 3 8 0;M'+b[0]+' '+b[1]+' q4 -5 8 0 q4 -5 8 0" dur="0.550s" repeatCount="indefinite"/></path></g>';});}
   [[0,40,48],[44,30,70],[78,50,40],[132,36,62],[236,44,52],[284,30,76],[318,40,44],[360,30,60]].forEach(b=>{s+='<rect x="'+b[0]+'" y="'+(112-b[2])+'" width="'+b[1]+'" height="'+b[2]+'" fill="#17151a"/>';});
   // ground: the street outside, the yard inside
   s+='<rect y="108" width="'+W+'" height="'+(H-108)+'" fill="'+(night?'#1c1a1d':'#2b2528')+'"/>';
@@ -4575,7 +4583,7 @@ function baseScene(st){st=st||S;if(!st.base)return '';
   const lit=R('generator')>0;
   s+=bsShadow(196,172,74);
   s+='<path d="M252 92 v-20 h12 v26z" fill="#3a2a2a" '+bsO(2)+'/>';
-  if(A&&(lit||night))for(let i=0;i<3;i++)s+='<circle cx="258" cy="68" r="4" fill="#b9b2a4" opacity="0"><animate attributeName="cy" values="68;30" dur="4.200s" begin="'+(i*1.4)+'s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;.35;0" dur="4.200s" begin="'+(i*1.4)+'s" repeatCount="indefinite"/><animate attributeName="r" values="3;8" dur="4.200s" begin="'+(i*1.4)+'s" repeatCount="indefinite"/></circle>';
+  if(A)for(let i=0;i<3;i++)s+='<circle cx="258" cy="68" r="4" fill="#d8d2c6" opacity="0"><animate attributeName="cy" values="68;22" dur="3.600s" begin="'+(i*1.2)+'s" repeatCount="indefinite"/><animate attributeName="cx" values="258;272" dur="3.600s" begin="'+(i*1.2)+'s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;.6;0" dur="3.600s" begin="'+(i*1.2)+'s" repeatCount="indefinite"/><animate attributeName="r" values="3;9" dur="3.600s" begin="'+(i*1.2)+'s" repeatCount="indefinite"/></circle>';
   s+='<path d="M128 170 V112 L196 84 L264 112 V170 Z" fill="'+col+'" '+bsO(2.4)+'/>';
   s+='<path d="M120 114 L196 78 L272 114 L264 120 L196 90 L128 120 Z" fill="#3a2a2a" '+bsO(2.4)+'/>';
   [[142,126],[228,126]].forEach((w,i)=>{
@@ -4583,6 +4591,7 @@ function baseScene(st){st=st||S;if(!st.base)return '';
     if(lit&&night)s+='<circle cx="'+(w[0]+11)+'" cy="'+(w[1]+10)+'" r="30" fill="url(#bsGlow)"/>';});
   s+='<rect x="184" y="136" width="24" height="34" rx="2" fill="#2a1c18" '+bsO(2)+'/><circle cx="203" cy="154" r="1.8" fill="#c9a04a"/>';
   s+='<text x="196" y="108" text-anchor="middle" font-size="13">'+(st.base.e||'')+'</text>';
+  s+='<path d="M196 80 V50" stroke="#3a2a2a" stroke-width="2.5" stroke-linecap="round"/><path fill="#c22b3a" '+bsO(1.4)+' d="M196 51 q8 -4 14 1 q6 5 12 1 v12 q-6 4 -12 -1 q-6 -5 -14 -1z">'+bsAnim(A,'<animate attributeName="d" values="M196 51 q8 -4 14 1 q6 5 12 1 v12 q-6 4 -12 -1 q-6 -5 -14 -1z;M196 51 q8 5 14 1 q6 -5 12 2 v12 q-6 -6 -12 -2 q-6 5 -14 -1z;M196 51 q8 -4 14 1 q6 5 12 1 v12 q-6 4 -12 -1 q-6 -5 -14 -1z" dur="1.300s" repeatCount="indefinite"/>')+'</path>';
   // the last few trophies, on a plank by the door - so a visit shows them off
   const tro=(st.shelf||[]).slice(-3);if(tro.length){s+='<rect x="166" y="131" width="60" height="2.500" fill="#7a6a5a"/>';tro.forEach((it,i)=>{s+='<text x="'+(172+i*19)+'" y="130" font-size="9">'+it.e+'</text>';});}
   if(R('radio'))s+='<path d="M236 100 V58 M226 68 h20 M230 78 h12" stroke="#b9b2a4" stroke-width="2.2" fill="none"/><circle cx="236" cy="56" r="3" fill="#c22b3a">'+bsAnim(A,'<animate attributeName="opacity" values="1;.2;1" dur="1.6s" repeatCount="indefinite"/>')+'</circle>';
@@ -4596,12 +4605,12 @@ function baseScene(st){st=st||S;if(!st.base)return '';
     s+='<circle cx="'+(x+14)+'" cy="'+ly+'" r="4" fill="#ffd166" '+bsO(1.4)+'>'+bsAnim(A,'<animate attributeName="opacity" values="1;.5;1" dur="2.8s" repeatCount="indefinite"/>')+'</circle>';}
   for(let i=0;i<Math.min(2,R('barrel'));i++){const px=116-i*19;s+=bsShadow(px,172,9)+'<rect x="'+(px-8)+'" y="150" width="16" height="22" rx="3" fill="#3a6a9a" '+bsO(2)+'/><path d="M'+(px-8)+' 157 h16 M'+(px-8)+' 165 h16" stroke="'+BS_OUT+'" stroke-width="1.4"/>';}
   if(R('generator')){s+='<path d="M300 196 Q280 182 264 164" stroke="'+BS_OUT+'" stroke-width="2.5" fill="none"/>'+bsShadow(312,206,18);
-    s+='<g>'+bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 0;0.600 -0.500;-0.500 0.400;0 0" dur="0.220s" repeatCount="indefinite"/>')
+    s+='<g>'+bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 0;1.600 -1.200;-1.400 1;0 0" dur="0.260s" repeatCount="indefinite"/>')
       +'<rect x="296" y="186" width="32" height="20" rx="3" fill="#c9a04a" '+bsO(2)+'/><rect x="300" y="190" width="10" height="8" fill="#3a3a44" '+bsO(1.2)+'/><path d="M316 190 l-3 6 h5 l-3 6" stroke="'+BS_OUT+'" stroke-width="1.6" fill="none"/>'
       +(R('generator')>1?'<rect x="330" y="190" width="14" height="16" rx="2" fill="#8a3a2a" '+bsO(2)+'/>':'')+'</g>';
     if(A)for(let i=0;i<2;i++)s+='<circle cx="326" cy="184" r="2" fill="#8a8a90" opacity="0"><animate attributeName="cy" values="184;162" dur="1.800s" begin="'+(i*0.9)+'s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;.5;0" dur="1.800s" begin="'+(i*0.9)+'s" repeatCount="indefinite"/></circle>';}
   for(let i=0;i<Math.min(3,R('garden'));i++){const x=44+i*3,y=186+i*15;s+='<path d="M'+x+' '+y+' h70 l4 12 h-78z" fill="#3a2a1c" '+bsO(2)+'/>';
-    for(let k=0;k<6;k++){const px=x+6+k*11;s+='<g>'+bsAnim(A,'<animateTransform attributeName="transform" type="rotate" values="-5 '+px+' '+(y+8)+';5 '+px+' '+(y+8)+';-5 '+px+' '+(y+8)+'" dur="'+(2.6+((k+i)%3)*0.5).toFixed(1)+'s" repeatCount="indefinite"/>')+'<path d="M'+px+' '+(y+8)+' v-7 M'+px+' '+(y+3)+' q-5 -4 -6 -1 M'+px+' '+(y+3)+' q5 -4 6 -1" stroke="#7fbf4d" stroke-width="2" fill="none" stroke-linecap="round"/></g>';}}
+    for(let k=0;k<6;k++){const px=x+6+k*11;s+='<g>'+bsAnim(A,'<animateTransform attributeName="transform" type="rotate" values="-14 '+px+' '+(y+8)+';14 '+px+' '+(y+8)+';-14 '+px+' '+(y+8)+'" dur="'+(1.8+((k+i)%3)*0.4).toFixed(1)+'s" repeatCount="indefinite"/>')+'<path d="M'+px+' '+(y+8)+' v-7 M'+px+' '+(y+3)+' q-5 -4 -6 -1 M'+px+' '+(y+3)+' q5 -4 6 -1" stroke="#7fbf4d" stroke-width="2" fill="none" stroke-linecap="round"/></g>';}}
   if(R('workshop'))s+=bsShadow(250,216,22)+'<rect x="228" y="200" width="44" height="7" fill="#7a5a34" '+bsO(2)+'/><path d="M232 207 v10 M268 207 v10" stroke="#6a4a2a" stroke-width="3.5"/><path d="M238 199 h16 l4 -5 h-16z" fill="#b9b2a4" '+bsO(1.4)+'/>';
   if(R('forge')){s+='<g transform="translate(-4,-12)"><circle cx="296" cy="232" r="24" fill="url(#bsFire)">'+bsAnim(A,'<animate attributeName="r" values="20;27;22;26;20" dur="1.100s" repeatCount="indefinite"/>')+'</circle>'+bsShadow(296,240,16)
     +'<path d="M284 240 h24 v-8 h-6 v-6 h10 v-5 h-32 v5 h10 v6 h-6z" fill="#3a3a44" '+bsO(2)+'/><path d="M292 219 q4 -10 8 0" fill="#ff8a3a" '+bsO(1.2)+'>'+bsAnim(A,'<animate attributeName="d" values="M292 219 q4 -10 8 0;M292 219 q4 -14 8 0;M292 219 q4 -8 8 0;M292 219 q4 -10 8 0" dur="0.800s" repeatCount="indefinite"/>')+'</path>';
@@ -4611,13 +4620,21 @@ function baseScene(st){st=st||S;if(!st.base)return '';
   if(R('clinic'))s+=bsShadow(146,222,24)+'<path d="M122 222 l24 -30 l24 30z" fill="#e8e0d0" '+bsO(2)+'/><path d="M146 203 v12 M140 209 h12" stroke="#c22b3a" stroke-width="4"/>';
   if(R('vault'))s+='<ellipse cx="206" cy="236" rx="15" ry="5" fill="#3a3a44" '+bsO(2)+'/><path d="M199 236 h14 M206 233 v6" stroke="#8a8a90" stroke-width="2"/>';
   if(R('kennel'))s+=bsShadow(338,232,15)+'<path d="M324 232 v-14 l14 -11 l14 11 v14z" fill="#8a3a2a" '+bsO(2)+'/><path d="M332 232 v-9 a6 6 0 0 1 12 0 v9z" fill="'+BS_OUT+'"/>';
+  // the campfire. Every base has one, so there is always something moving.
+  s+='<g transform="translate(124,-7)">';
+  if(night)s+='<circle cx="150" cy="240" r="34" fill="url(#bsFire)">'+bsAnim(A,'<animate attributeName="r" values="28;38;30;36;28" dur="1.400s" repeatCount="indefinite"/>')+'</circle>';
+  s+=bsShadow(150,246,13)+'<path d="M139 246 l22 -6 M139 240 l22 6" stroke="#5a3a1a" stroke-width="4" stroke-linecap="round"/>';
+  s+='<path fill="#ff8a3a" '+bsO(1.2)+' d="M150 244 q-10 -8 -3 -18 q2 6 5 3 q-1 -8 4 -13 q7 10 4 18 q4 -2 3 -6 q6 10 -3 16z">'+bsAnim(A,'<animate attributeName="d" values="M150 244 q-10 -8 -3 -18 q2 6 5 3 q-1 -8 4 -13 q7 10 4 18 q4 -2 3 -6 q6 10 -3 16z;M150 244 q-11 -7 -6 -16 q3 5 6 1 q-3 -9 5 -17 q5 11 3 19 q5 -3 5 -8 q5 12 -4 21z;M150 244 q-9 -9 -1 -19 q1 7 4 4 q0 -7 2 -11 q8 9 5 16 q3 -1 2 -5 q7 9 -2 15z;M150 244 q-10 -8 -3 -18 q2 6 5 3 q-1 -8 4 -13 q7 10 4 18 q4 -2 3 -6 q6 10 -3 16z" dur="0.700s" repeatCount="indefinite"/>')+'</path>';
+  s+='<path fill="#ffd166" d="M150 243 q-5 -5 -1 -10 q4 4 3 10z"/>';
+  if(A)for(let i=0;i<3;i++)s+='<circle cx="'+(146+i*4)+'" cy="224" r="1.300" fill="#ffd166" opacity="0"><animate attributeName="cy" values="224;196" dur="1.600s" begin="'+(i*0.55)+'s" repeatCount="indefinite"/><animate attributeName="cx" values="'+(146+i*4)+';'+(142+i*7)+'" dur="1.600s" begin="'+(i*0.55)+'s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;0" dur="1.600s" begin="'+(i*0.55)+'s" repeatCount="indefinite"/></circle>';
+  s+='</g>';
   // who lives here - the real sprites, breathing and blinking
   const crew=(mine?activeCrew():((st.active||[]).map(id=>(st.crew||[]).find(c=>c.id===id)).filter(Boolean))).slice(0,3);
   const spots=[[176,214,40],[268,190,36],[150,180,34]];
   crew.forEach((c,i)=>{const p=spots[i];
-    s+=bsShadow(p[0],p[1],p[2]*0.32)+bsSprite(ART.avatarSVG(c.av,p[2],{alive:A,phase:i+1}),p[0],p[1],p[2],bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 0;'+(i%2?-7:8)+' 0;0 0" dur="'+(11+i*3)+'s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1" keyTimes="0;0.5;1"/>'));});
-  s+=bsShadow(212,226,15)+bsSprite(ART.avatarSVG(st.av,46,{alive:A,weapon:th.horde===2?'melee':''}),212,226,46);
-  if(st.pet)s+=bsShadow(240,233,9)+bsSprite(ART.petSVG(st.pet,26,st.petCoat,{still:true}),240,234,26,bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 0;0 -3;0 0;0 0" keyTimes="0;0.12;0.24;1" dur="2.600s" repeatCount="indefinite"/>'));
+    s+=bsShadow(p[0],p[1],p[2]*0.32)+bsSprite(ART.avatarSVG(c.av,p[2],{alive:A,phase:i+1}),p[0],p[1],p[2],bsAnim(A,bsWalk(i)));});
+  s+=bsShadow(212,226,15)+bsSprite(ART.avatarSVG(st.av,46,{alive:A,weapon:th.horde===2?'melee':''}),212,226,46,bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 0;0 -3.500;0 0;3 0;3 -3.500;3 0;0 0" keyTimes="0;0.08;0.16;0.5;0.58;0.66;1" dur="4.200s" repeatCount="indefinite"/>'));
+  if(st.pet)s+=bsShadow(240,233,9)+bsSprite(ART.petSVG(st.pet,26,st.petCoat,{still:true}),240,234,26,bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 0;-14 -6;-28 0;-42 -6;-56 0;-56 0;-42 -6;-28 0;-14 -6;0 0;0 0" dur="5.200s" repeatCount="indefinite"/>'));
   // walls over the yard edge, then whatever is outside them
   s+=bsWall(50,124,24,250,R('walls'),night)+bsWall(340,124,366,250,R('walls'),night);
   const sway=(i,cx,cy)=>bsAnim(A,'<animateTransform attributeName="transform" type="rotate" values="-4 '+cx+' '+cy+';4 '+cx+' '+cy+';-4 '+cx+' '+cy+'" dur="'+(1.9+(i%4)*0.45).toFixed(2)+'s" repeatCount="indefinite"/>');
@@ -4671,6 +4688,19 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.33',d:'Sep 21',t:'Catching you up: everything since the upgrade ladder',
+  i:['THIS SCREEN WENT QUIET FOR TWENTY VERSIONS. The list that feeds it stopped at 7.12, so the game had nothing to show you even though a lot changed. Here it all is, newest first.',
+     'YOUR BASE IS DRAWN NOW (Base tab). Walls go from wire to timber to concrete, the tower grows, the garden, barrels, generator, forge and the rest all appear as you build them. Your crew walk the yard, the dog runs about, there is a campfire. Within a day of horde night they gather outside; within two hours they are at the fence.',
+     'SKILLS GO DEEPER. Rank 1 of a skill costs 1 point, rank 2 costs 2, rank 3 costs 3. Most skills have more ranks now, and there are ten new ones from level 15. Everything you already owned is kept. Resetting skills now warns you first, because buying old ranks back costs more.',
+     'TROPHY ROOM HAS TIERS. One of each is Bronze (what you had). Five of each is Silver, twelve is Gold, and the perk grows. Three new sets cannot be found near home at all: one trophy from each landmark, four from the Deep band, and one from each county boss.',
+     'RIVALS REMEMBER YOU. Trade with Maya and her prices improve. Theo keeps score, trains if you keep beating him, and will race for scrap. Beat Nadia five times and her scouts let you past. It is all on their leaderboard rows, and they now turn up at map places too.',
+     'BATCH SALVAGE (Pack, Gear). Tick the rarities, see what goes, press once. It keeps your best three spare weapons unless you tell it not to. The old salvage-all button had never actually been visible to anyone.',
+     'STATS (You, Your record, Stats): thirty days of steps, lifetime kilometres, kills, places, streak. The You tab also has jump buttons at the top so Skills and Crew are one tap away.',
+     'RAIDS ON THE MAP COUNT PROPERLY. Damage you do to a big raid now moves its shared health bar by the share you actually took off it, and a friend fighting beside you really does wear your boss down. Losing a long fight also pays what it should.',
+     'COUNTY BOSS IN A PARTY is sized by who actually fights it, so a friend who never opens the game no longer makes it unkillable.',
+     'WALKING PAYS. Places further from your base pin hold better loot, landmarks tell you what is in them before you go, field caches give keepsakes, and the map loads the next block while you are still walking through this one. None of it works without a base pin - set one on the map.',
+     'ARMOUR MATTERS. It no longer falls apart in one horde, it lowers your chance of infection, and you can repair a piece part-way with whatever scrap you have.',
+     'ALSO: walk mode counts steps with the phone in your hand or a bag (it used to count nothing unless it was in a pocket); a party raid now waits for everyone to press Ready; wanderers are actually drawn when they turn up.']},
  {v:'7.12',d:'Sep 20',t:'The upgrade ladder: +7, and it can go wrong',
   i:['UPGRADES USED TO BE A SHOP. Pay scrap, get +1, three times, done. Now the ceiling is <b>+7</b> and everything past +3 is a gamble you can see before you take it.',
      '<b>+1 to +3 are still guaranteed</b> - nothing you already own got more dangerous. Then: +4 is 70/30, +5 is 50/40/10, +6 is 35/50/15, +7 is 25/55/20 (works / slips back / destroyed). You pay the scrap and parts either way, and the odds are printed on the bench before you commit.',
@@ -5208,6 +5238,8 @@ function newsHtml(list,title){
     +'<ul style="margin:0;padding-left:20px">'+n.i.map(x=>'<li style="margin:5px 0">'+esc(x)+'</li>').join('')+'</ul></div>').join('');
 }
 function newsSheet(){openSheet(newsHtml(NEWS,"What's new")+'<button class="btn r wide" onclick="closeSheet()">Close</button>',true);}
+// A version with no entry here shows players NOTHING - which is how 7.13 to 7.32 shipped silently.
+function newsBehind(){return cmpVer(NEWS[0].v,VERSION)<0;}
 function newsCheck(){
   if(!S||!S.onboarded)return;
   if($('#modal').classList.contains('on')){setTimeout(newsCheck,1500);return;}
