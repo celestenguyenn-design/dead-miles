@@ -955,8 +955,9 @@ function cacheCollect(poiId){
   const ks=Object.keys(S.caches);
   if(ks.length>400)ks.sort((a,b)=>S.caches[a]-S.caches[b]).slice(0,ks.length-400).forEach(k=>delete S.caches[k]);
   const t=poiTierOf(p);
-  const scrap=8+rint(0,7)+Math.round((t.k-1)*6);
-  const parts=Math.random()<0.45?1:0;
+  const ch=(typeof sk==='function')?sk('cachehunter'):0;
+  const scrap=Math.round((8+rint(0,7)+Math.round((t.k-1)*6))*(1+0.3*ch));
+  const parts=Math.random()<0.45+0.15*ch?1:0;
   S.stock.scrap+=scrap;if(parts)S.parts=(S.parts||0)+parts;
   if(!S.keeps)S.keeps={};
   const first=!S.keeps[c.keep.id];

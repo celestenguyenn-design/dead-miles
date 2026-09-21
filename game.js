@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.29';
+const VERSION='7.30';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -873,7 +873,7 @@ function armorCover(){
 const UNARMOURED_INFECT=4;
 function infectChance(){
   const base=INFECT_BASE*(DIFF[S.diff||'normal'].infect);
-  return base*(UNARMOURED_INFECT-(UNARMOURED_INFECT-1)*armorCover());
+  return base*(UNARMOURED_INFECT-(UNARMOURED_INFECT-1)*armorCover())*(1-0.2*sk('antiseptic'));
 }
 function infectLabel(){return ['','Infected','Fevered','Failing'][infectStage()]||'';}
 function catchInfection(from){
@@ -920,12 +920,78 @@ function hurtCrew(c,n){c.hp=Math.max(0,(c.hp===undefined?crewMax(c):c.hp)-n);
     SFX.play('hurt');}
   else clog(c.name+' takes '+n+'.','hit');}
 function healCrew(id){const c=S.crew.find(x=>x.id===id);if(!c)return;if(c.hp>=crewMax(c)){toast(c.name+' is fine');return;}if(medsTotal()<1){toast('No meds in the stash');return;}medsTake(MED_ORDER.find(id=>medsHeld(id)>0));c.hp=crewMax(c);log('Patched up '+c.name+'.');toast(c.name+' is back on their feet','a');SFX.play('win');save();render();}
+/* ================= SKILLS GO DEEPER (v7.30) =================
+   Her words: "people are running out of skill upgrades, so we have to make it
+   progressive - one point for the first level, then two, then three - add more
+   levels to the skills we have, and add more skills." One build could spend 46-52
+   points in total and a point arrives every level, so everything was maxed around
+   level 50 and every level after that paid nothing.
+   THREE CHANGES:
+   1. PROGRESSIVE COST. Rank N of a skill costs N points. Her call on migration:
+      "keep the rankings and start fresh now" - every rank already owned stays, at
+      the flat price it was bought for, and only ranks bought from here cost more.
+      S.skillPaid remembers what each skill really cost, so a reset refunds exactly
+      what was paid and not a point more or less.
+   2. HIGHER CAPS, SET BY HAND. A blanket "+2 ranks" was the obvious build and it
+      is wrong: Steady would block 110%, Iron Grip would never wear at 125%,
+      Lockpick 150%, Field Surgeon would keep 100% of the pack on death, Clotting
+      would make bleed do nothing. Every cap below was chosen so no chance reaches
+      certainty and no reduction reaches zero. Skills that are ON/OFF keep one rank.
+   3. TEN NEW SKILLS at level 15-22, each one line of real effect, wired where the
+      thing it changes actually happens. */
+const SKILL_CAP={
+  greenthumb:4,earlyriser:4,harvest:4, efficient:5,fortify:5,tinkerer:5, comfortfood:5,sharpknife:5,
+  axeman:5,thickskin:5, framing:5,trapmaker:5,boards:5, tuneup:5,juryrig:4,gennie:3,
+  metaknowledge:5,speedrunner:4,lore:4,rng:4,
+  heavyhands:5,secondwind:5,bruiser:3,cleave:4,intimidate:4,rampage:5,
+  steadyaim:5,scrounger:5,headshot:5,doubletap:5,ammosense:4,
+  deeppockets:5,eagleeye:5,lightstep:5,haggler:4,appraiser:4,packrat:5,shadow:4,
+  fielddressing:5,tough:5,triage:4,adrenaline:4,clotting:3,transfusion:5,
+  longhaul:4,pathfinder:4,scrapper:4,trader:3,nightowl:4,marathoner:5,survivalist:5,
+};
+SKILLS.general.push(
+  {id:'quartermaster',n:'Quartermaster',max:3,req:15,d:r=>'A hit is '+(10*r)+'% less likely to wear your armour'},
+  {id:'raidvet',n:'Raid Veteran',max:3,req:20,d:r=>'+'+(5*r)+'% damage to raid bosses and county bosses'});
+SKILLS.brawler.push(
+  {id:'shatter',n:'Shatter',max:2,req:18,d:r=>'The heavy swing that cracks plating has a '+(50*r)+'% chance to knock it flat for a turn'},
+  {id:'bloodied',n:'Bloodied',max:3,req:22,d:r=>'+'+(3*r)+' melee damage while you are under half health'});
+SKILLS.marksman.push(
+  {id:'piercing',n:'Armour Piercing',max:3,req:18,d:r=>'Plating stops '+(55-15*r)+'% of your shots instead of 55%'},
+  {id:'gunsmith',n:'Gunsmith',max:3,req:22,d:r=>(20*r)+'% chance a shot does not wear the gun'});
+SKILLS.scavenger.push(
+  {id:'cachehunter',n:'Cache Hunter',max:3,req:18,d:r=>'Field caches pay '+(30*r)+'% more scrap, and parts more often'},
+  {id:'stripdown',n:'Strip It Down',max:2,req:22,d:r=>'+'+r+' part from every piece you salvage'});
+SKILLS.medic.push(
+  {id:'combatmedic',n:'Combat Medic',max:1,req:18,d:r=>'One more patch-up in every fight'},
+  {id:'antiseptic',n:'Antiseptic',max:3,req:22,d:r=>'A bite is '+(20*r)+'% less likely to infect you'});
+for(const k in SKILLS)for(const d of SKILLS[k]){d.base=d.max;if(SKILL_CAP[d.id])d.max=SKILL_CAP[d.id];}
+// Rank N costs N points.
+function skillCost(id){return sk(id)+1;}
+// What a skill has really cost. Ranks from before v7.30 were one point each.
+function skillPaid(id){const p=S.skillPaid&&S.skillPaid[id];return (p===undefined)?sk(id):p;}
+function partYield(g){const y=PART_YIELD[g.r||'common'];return (y||1)+sk('stripdown');}
 function skillList(){return (SKILLS[S.cls]||[]).concat(SKILLS[S.bg]||[]).concat(SKILLS.general);}
 const bg=(id)=>S&&S.bg===id;
 function dmgBonus(){let d=sk('heavyhands')*2+sk('axeman')*2+sk('sharpknife')-(bg('gamer')?1:0);
-  if(setPerk('vsHuman')&&C){const t=C.enemies[C.target];if(t&&t.human)d+=Math.max(1,Math.round((t.max||20)*setPerk('vsHuman')*0.5));}if(sk('rampage')&&C)d+=sk('rampage')*2*C.enemies.filter(e=>e.dead).length;return d;}
-function learn(id){const def=skillList().find(s=>s.id===id);if(!def||S.sp<1||sk(id)>=def.max)return;if(def.req&&S.lvl<def.req){toast(def.n+' unlocks at level '+def.req);return;}S.skills[id]=sk(id)+1;S.sp--;SFX.play('ui');log('Learned '+def.n+' '+S.skills[id]+'.');save();render();}
-function respec(){if(S.stock.scrap<15){toast('Need 15 scrap');return;}S.stock.scrap-=15;S.sp+=Object.values(S.skills).reduce((a,b)=>a+b,0);S.skills={};toast('Skills reset');save();render();}
+  if(setPerk('vsHuman')&&C){const t=C.enemies[C.target];if(t&&t.human)d+=Math.max(1,Math.round((t.max||20)*setPerk('vsHuman')*0.5));}if(sk('rampage')&&C)d+=sk('rampage')*2*C.enemies.filter(e=>e.dead).length;if(sk('bloodied')&&S.hp<maxHp()/2)d+=3*sk('bloodied');return d;}
+function learn(id){const def=skillList().find(s=>s.id===id);if(!def||sk(id)>=def.max)return;if(def.req&&S.lvl<def.req){toast(def.n+' unlocks at level '+def.req);return;}
+  const cost=skillCost(id);if(S.sp<cost){toast('Rank '+cost+' of '+def.n+' costs '+cost+' points - you have '+S.sp,'d');return;}
+  if(!S.skillPaid)S.skillPaid={};S.skillPaid[id]=skillPaid(id)+cost;S.skills[id]=sk(id)+1;S.sp-=cost;SFX.play('ui');log('Learned '+def.n+' '+S.skills[id]+'.');save();render();}
+function respecRefund(){return Object.keys(S.skills||{}).reduce((a,id)=>a+skillPaid(id),0);}
+function respecRebuy(){return Object.values(S.skills||{}).reduce((a,r)=>a+r*(r+1)/2,0);}
+// A reset used to be harmless. With rising prices it can COST ranks: points spent
+// at the old flat price come back one each, and buying the same ranks again costs
+// 1+2+3. So it says exactly that, with her numbers, before it does anything.
+function respec(){
+  const back=respecRefund(),again=respecRebuy(),poor=S.stock.scrap<15;
+  if(!back){toast('No skills learned yet');return;}
+  openSheet('<h2>Reset skills</h2>'
+    +'<div class="kv" style="grid-template-columns:1fr auto"><span>Points you get back</span><b>'+back+'</b><span>What this same build costs to buy again</span><b>'+again+'</b><span>Price</span><b>15 scrap</b></div>'
+    +(again>back?'<p class="help" style="color:var(--amber);margin-top:8px"><b>You would come out '+(again-back)+' point'+(again-back===1?'':'s')+' short.</b> Ranks you bought before the prices rose cost 1 point each; buying them again costs 1, then 2, then 3. You keep every point - you just cannot rebuild all of this with them.</p>':'<p class="help" style="margin-top:8px">You get back exactly what you spent.</p>')
+    +'<button class="btn r wide'+(poor?' off':'')+'" style="margin-top:12px" '+(poor?'disabled ':'')+'onclick="respecGo()">'+(poor?'Need 15 scrap':'Reset and get '+back+' points back')+'</button>'
+    +'<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet()">Keep my skills</button>',true);
+}
+function respecGo(){if(S.stock.scrap<15)return;S.stock.scrap-=15;S.sp+=respecRefund();S.skills={};S.skillPaid={};toast('Skills reset','z');save();closeSheet();render();}
 
 /* ================= weather (real sky over New York) ================= */
 const WX_CODES=(c)=>c===0?'clear':c<=3?'cloudy':(c===45||c===48)?'fog':(c>=51&&c<=67)||(c>=80&&c<=82)?'rain':(c>=71&&c<=77)||c===85||c===86?'snow':c>=95?'storm':'cloudy';
@@ -2002,7 +2068,7 @@ function wearArmor(){
     if(!open.length)return;                        // this fight has taken all it can
     var g=pick(open);
   }else var g=pick(worn);
-  if(Math.random()>=ARMOR_WEAR_CHANCE)return;      // it held
+  if(Math.random()>=ARMOR_WEAR_CHANCE*(1-0.1*sk('quartermaster')))return;      // it held
   if(Math.random()<sk('irongrip')*0.25)return;     // the same save a weapon gets
   if(C)C.armWear[g.uid]=(C.armWear[g.uid]||0)+1;
   g.dur--;
@@ -2019,9 +2085,11 @@ function hurt(n,src){let d=Math.max(1,Math.round((n-dr())*(1-drSoak())));
   wearArmor();
   S.hp-=d;C.pfx={d,t:Date.now()};clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
 function dealTo(t,d,label,kind){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));
+  if(t.warden&&sk('raidvet'))d=Math.round(d*(1+0.05*sk('raidvet')));
   if(t.plate&&!t.cracked){
-    if(kind==='heavy'){t.cracked=true;clog('The heavy swing splits '+t.n+"'s plating wide open.",'good');}
-    else{const soak=Math.round(d*0.55);d=Math.max(1,d-soak);clog('Most of that glanced off the plating.','');}
+    if(kind==='heavy'){t.cracked=true;clog('The heavy swing splits '+t.n+"'s plating wide open.",'good');
+      if(sk('shatter')&&Math.random()<0.5*sk('shatter')){t.stun=1;clog('Shatter: '+t.n+' goes down hard and loses its next turn.','good');}}
+    else{const soak=Math.round(d*(0.55-(kind==='shot'?0.15*sk('piercing'):0)));d=Math.max(1,d-soak);clog('Most of that glanced off the plating.','');}
   }if(t.shield>0){const s=Math.min(t.shield,d);t.shield-=s;d-=s;clog('The shield soaks '+s+'.'+(t.shield<=0?' It cracks apart.':''),'');if(d<=0){t.fx={d:0,t:Date.now()};C.lunge=Date.now();return;}}t.hp-=d;t.fx={d,t:Date.now(),k:kind||'slash'};C.lunge=Date.now();if(t.warden)C.myDealt=(C.myDealt||0)+d;clog(label+' for '+d+'.','you');if(t.wanted)ctEvent('boss',d);}
 // Weapons she can actually put in her hand right now: melee, not wrecked, not
 // the one already equipped.
@@ -2160,7 +2228,7 @@ function act(kind){
     }
     // Guns wear like everything else now. Irongrip and jury-rig apply the same
     // way they do to a melee weapon.
-    if(g.dur!==undefined&&!(Math.random()<sk('irongrip')*0.25)){
+    if(g.dur!==undefined&&!(Math.random()<sk('irongrip')*0.25)&&!(Math.random()<sk('gunsmith')*0.2)){
       g.dur--;
       if(g.dur<=0&&Math.random()<sk('juryrig')*0.2){g.dur=1;clog('You clear a jam and keep the '+g.n+' running.','good');}
       if(g.dur>0&&g.dur<=3)clog(g.n+': '+g.dur+' shot'+(g.dur===1?'':'s')+' before it needs work.','hit');
@@ -2172,7 +2240,7 @@ function act(kind){
     // Unlimited patch-ups meant ten meds were 400 extra HP and no boss could
     // ever out-damage a pack. Two a fight (three with Field Dressing) turns
     // "do I have meds" into "when do I spend one".
-    const cap=diff().meds+(sk('fielddressing')?1:0);
+    const cap=diff().meds+(sk('fielddressing')?1:0)+sk('combatmedic');
     if((C.meds||0)>=cap){toast('You can only patch up '+cap+' times in one fight','d');return;}
     C.meds=(C.meds||0)+1;
     // Reach for the strongest thing on her, pack first, then the stash - the
@@ -3007,13 +3075,13 @@ function salvageValue(g){const ws=S.base&&S.base.rooms.workshop||0;return Math.r
 function spareGear(){return S.gear.filter(g=>S.eq[g.slot]!==g.uid&&(g.r==='common'||g.r==='uncommon'||!g.r));}
 function salvage(uidv){const g=S.gear.find(x=>x.uid===uidv);if(!g)return;const v=salvageValue(g);
   if(g.r==='legendary'||g.r==='epic'){if(!confirm('Break down your '+g.n+' ('+RAR[g.r].n+') for '+v+' scrap? It is gone for good.'))return;}
-  const pp=PART_YIELD[g.r||'common']||1;
+  const pp=partYield(g);
   S.gear=S.gear.filter(x=>x.uid!==uidv);for(const k in S.eq)if(S.eq[k]===uidv)S.eq[k]=null;
   S.stock.scrap+=v;S.parts=(S.parts||0)+pp;
   log('Salvaged the '+g.n+' for '+v+' scrap and '+pp+' part'+(pp===1?'':'s')+'.');
   toast('+'+v+' scrap · +'+pp+' parts','a');SFX.play('salvage');save();render();}
 function salvageAll(){const sp=spareGear();if(!sp.length)return;let v=0,pp=0;
-  for(const g of sp){v+=salvageValue(g);pp+=PART_YIELD[g.r||'common']||1;}
+  for(const g of sp){v+=salvageValue(g);pp+=partYield(g);}
   const ids=new Set(sp.map(g=>g.uid));S.gear=S.gear.filter(g=>!ids.has(g.uid));
   S.stock.scrap+=v;S.parts=(S.parts||0)+pp;
   log('Salvaged '+sp.length+' spare pieces for '+v+' scrap and '+pp+' parts.');
@@ -3057,7 +3125,7 @@ function batchSheet(){
       +'<span>'+(all.length?all.length+' spare piece'+(all.length===1?'':'s')+' · '+v+'🔩':'nothing spare')+(heldBack?' · '+heldBack+' kept as spare weapon'+(heldBack===1?'':'s'):'')+'</span></div></button>';
   }).join('');
   const picks=batchPicks();
-  const v=picks.reduce((t,g)=>t+salvageValue(g),0),pp=picks.reduce((t,g)=>t+(PART_YIELD[g.r||'common']||1),0);
+  const v=picks.reduce((t,g)=>t+salvageValue(g),0),pp=picks.reduce((t,g)=>t+partYield(g),0);
   const epics=picks.filter(g=>g.r==='epic').length;
   const names=picks.slice().sort((a,b)=>RAR[b.r||'common'].w-RAR[a.r||'common'].w).map(g=>'<span class="chip" style="border-left:3px solid '+RAR[g.r||'common'].c+'">'+g.e+' '+esc(g.n)+'</span>').join(' ');
   openSheet('<h2>Batch salvage</h2>'
@@ -3073,7 +3141,7 @@ function batchSheet(){
 }
 function batchGo(){
   const picks=batchPicks();if(!picks.length)return;
-  let v=0,pp=0;for(const g of picks){v+=salvageValue(g);pp+=PART_YIELD[g.r||'common']||1;}
+  let v=0,pp=0;for(const g of picks){v+=salvageValue(g);pp+=partYield(g);}
   const ids=new Set(picks.map(g=>g.uid));S.gear=S.gear.filter(g=>!ids.has(g.uid));
   S.stock.scrap+=v;S.parts=(S.parts||0)+pp;
   log('Batch salvage: '+picks.length+' piece'+(picks.length===1?'':'s')+' broken down for '+v+' scrap and '+pp+' parts.');
@@ -4218,9 +4286,9 @@ function render(){
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',alive:true});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
   $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):fistDmg()[0]+'-'+fistDmg()[1]} ${eqItem('melee')?'+'+(S.lvl-1):''}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
   $('#cosmeticCount').textContent=S.cosmetics.length+' looks unlocked';
-  $('#spSub').textContent=S.sp+' point'+(S.sp===1?'':'s')+' to spend';$('#youAlert').hidden=!S.sp;$('#clsDesc').textContent=(CLASSES[S.cls]?CLASSES[S.cls].e+' '+CLASSES[S.cls].n:'')+(S.bg&&BACKGROUNDS[S.bg]?' · '+BACKGROUNDS[S.bg].e+' '+BACKGROUNDS[S.bg].n+' background':'')+'. One point per level and per county milestone. General skills are open to every class.';
+  $('#spSub').textContent=S.sp+' point'+(S.sp===1?'':'s')+' to spend';$('#youAlert').hidden=!skillList().some(x=>(!x.req||S.lvl>=x.req)&&sk(x.id)<x.max&&S.sp>=sk(x.id)+1);$('#clsDesc').textContent=(CLASSES[S.cls]?CLASSES[S.cls].e+' '+CLASSES[S.cls].n:'')+(S.bg&&BACKGROUNDS[S.bg]?' · '+BACKGROUNDS[S.bg].e+' '+BACKGROUNDS[S.bg].n+' background':'')+'. One point per level and per county milestone. Rank 1 of a skill costs 1 point, rank 2 costs 2, rank 3 costs 3, and so on. General skills are open to every class.';
   const skAll=skillList();const skOpen=skAll.filter(s=>!s.req||S.lvl>=s.req);const skLocked=skAll.filter(s=>s.req&&S.lvl<s.req).sort((a,b)=>a.req-b.req);
-  const skRow=(s,locked)=>{const r=sk(s.id);const can=!locked&&S.sp>0&&r<s.max;return `<div class="skill${r>=s.max?' max':''}${locked?' locked':''}"><div><b>${s.n} ${SKILLS.general.includes(s)?'<span class="chip" style="font-size:10px">general</span>':''}${locked?'<span class="chip a" style="font-size:10px">level '+s.req+'</span>':''}</b><span>${s.d(Math.max(1,r))}${r?' · now: '+s.d(r):''}</span><div class="pips">${Array.from({length:s.max},(_,i)=>`<i class="${i<r?'on':''}"></i>`).join('')}</div></div><button class="btn sm ${can?'a':''}" onclick="learn('${s.id}')" ${can?'':'disabled'}>${locked?'🔒':r>=s.max?'Max':'+'}</button></div>`;};
+  const skRow=(s,locked)=>{const r=sk(s.id);const cost=r+1;const can=!locked&&S.sp>=cost&&r<s.max;return `<div class="skill${r>=s.max?' max':''}${locked?' locked':''}"><div><b>${s.n} ${SKILLS.general.includes(s)?'<span class="chip" style="font-size:10px">general</span>':''}${locked?'<span class="chip a" style="font-size:10px">level '+s.req+'</span>':''}</b><span>${r>=s.max?s.d(r):(r?'Now: '+s.d(r)+' · next: '+s.d(r+1):s.d(1))}</span><div class="pips">${Array.from({length:s.max},(_,i)=>`<i class="${i<r?'on':''}"></i>`).join('')}</div></div><button class="btn sm ${can?'a':''}" onclick="learn('${s.id}')" ${can?'':'disabled'}>${locked?'🔒':r>=s.max?'Max':(S.sp>=cost?'Learn · '+cost:'Needs '+cost)}</button></div>`;};
   const spent=Object.values(S.skills||{}).reduce((a,b)=>a+b,0);const total=skAll.reduce((a,s)=>a+s.max,0);
   $('#skills').innerHTML=skOpen.map(s=>skRow(s,false)).join('')+(skLocked.length?`<div class="section-label" style="margin-top:12px">Locked · keep levelling</div>`+skLocked.map(s=>skRow(s,true)).join(''):'')+`<p class="help" style="margin-top:10px">${spent} of ${total} ranks learned${skLocked.length?' · next unlock at level '+skLocked[0].req:''}.</p>`;
   {const down=S.crew.filter(c=>c.hp!==undefined&&c.hp<=0).length;
@@ -5824,7 +5892,7 @@ function onboard(){
 function giveBgKit(id){if(S.bgKit)return;S.bgKit=true;const k=id;
   if(k==='farmer'){S.stock.food+=3;S.stock.water+=3;}else if(k==='engineer'){S.stock.scrap+=15;}else if(k==='chef'){S.stock.food+=3;if(S.pack.length<capacity())S.pack.push({id:'jerky',...ITEMS.jerky,uid:uid()});}
   else if(k==='firefighter'){const g={uid:uid(),id:'axe',...GEAR.axe};S.gear.push(g);if(!S.eq.melee)S.eq.melee=g.uid;}else if(k==='carpenter'){S.stock.scrap+=20;}else if(k==='mechanic'){const g={uid:uid(),id:'crowbar',...GEAR.crowbar};S.gear.push(g);if(!S.eq.melee)S.eq.melee=g.uid;S.stock.scrap+=10;}else if(k==='gamer'){S.sp+=1;}}
-function setBackground(id,first){const old=S.bg;if(!BACKGROUNDS[id])return;if(old&&old!==id){for(const s of SKILLS[old]||[]){S.sp+=sk(s.id);delete S.skills[s.id];}}S.bg=id;if(first){S.sp+=1;giveBgKit(id);}
+function setBackground(id,first){const old=S.bg;if(!BACKGROUNDS[id])return;if(old&&old!==id){for(const s of SKILLS[old]||[]){S.sp+=skillPaid(s.id);delete S.skills[s.id];if(S.skillPaid)delete S.skillPaid[s.id];}}S.bg=id;if(first){S.sp+=1;giveBgKit(id);}
   S.hp=Math.min(S.hp,maxHp());log('Background: '+BACKGROUNDS[id].n+'.');save();render();pushPlayer();}
 function bgGrid(sel){return `<div class="starter">${Object.entries(BACKGROUNDS).map(([k,c])=>`<button class="${k===sel?'on':''}" data-bg="${k}"><span class="av">${c.e}</span><b>${c.n}</b><span class="help">${c.d}</span></button>`).join('')}</div>`;}
 function bgSheet(first){let sel=S.bg||'farmer';const draw=()=>{$('#sheet').innerHTML=`<h2>${first?'What were you before?':'Change background'}</h2><p>${first?'Your class is how you fight. Your background is what you did before the county fell: a bonus, a starter gift, and three extra skills. Plus a skill point for choosing.':'Costs 30 scrap. Points spent on your old background come back to you. No new gift.'}</p>${bgGrid(sel)}<button class="btn r wide" style="margin-top:12px" id="bgGo">${first?'That was me':'Change (30 scrap)'}</button>${first?'':'<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet()">Never mind</button>'}`;
