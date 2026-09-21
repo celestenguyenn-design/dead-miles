@@ -512,3 +512,9 @@ a{color:var(--amber)}
 .poi.cache{box-shadow:0 0 0 3px rgba(127,191,77,.9),0 0 18px rgba(127,191,77,.6);border-color:var(--rot);z-index:520}
 .poi.cache::after{content:'';position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(127,191,77,.4);animation:cacheping 2.2s ease-out infinite}
 @keyframes cacheping{0%{transform:scale(.85);opacity:.9}100%{transform:scale(1.35);opacity:0}}
+/* v7.28 - jump row on the You tab, and a ticked state for list buttons */
+.jumprow{display:flex;gap:8px;overflow-x:auto;padding:0 0 10px;-webkit-overflow-scrolling:touch}
+.jumprow .chip{padding:10px 14px;font-size:14px;white-space:nowrap;cursor:pointer;min-height:40px}
+#youSkills,#youCrew,#petCard,#youBoutique{scroll-margin-top:8px}
+.room2.on{border-color:var(--amber);background:rgba(230,165,48,.08)}
+button.room2{width:100%;text-align:left;color:inherit;font:inherit}

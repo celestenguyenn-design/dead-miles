@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.27';
+const VERSION='7.28';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3018,6 +3018,70 @@ function salvageAll(){const sp=spareGear();if(!sp.length)return;let v=0,pp=0;
   S.stock.scrap+=v;S.parts=(S.parts||0)+pp;
   log('Salvaged '+sp.length+' spare pieces for '+v+' scrap and '+pp+' parts.');
   toast('+'+v+' scrap · +'+pp+' parts','a');SFX.play('salvage');save();render();}
+/* ================= BATCH SALVAGE (v7.28) =================
+   Her ask: "a batch salvage - salvage all the white, blue, etc." The old button
+   did commons and uncommons in one fixed lump and nothing else, so clearing a
+   full gear list of rares meant tapping each one.
+   Pick the rarities, see exactly what goes and what it pays, press once.
+   What it will NEVER take, whatever is ticked:
+     - anything equipped
+     - anything you have upgraded (you paid for that)
+     - legendaries (one at a time, on purpose, from the item itself)
+   And one guard that is ON by default and can be turned off: it keeps your best
+   three spare melee weapons. Weapons last 5-10 swings, and the v7.26 simulation
+   put a level-10 mid kit at 0% on a tier-4 raid with one weapon and 90% with
+   three spares - so "salvage everything I am not holding" quietly deletes the
+   thing that wins long fights. */
+const BATCH_RARS=['common','uncommon','rare','epic'];
+let BATCH={common:true,uncommon:true,rare:false,epic:false,keepSpares:true};
+const BATCH_KEEP=3;
+function batchKept(){
+  if(!BATCH.keepSpares)return new Set();
+  const spares=S.gear.filter(g=>g.slot==='melee'&&S.eq.melee!==g.uid&&!g.broken&&(g.dur===undefined||g.dur>0))
+    .sort((a,b)=>gearPower(b)-gearPower(a)).slice(0,BATCH_KEEP);
+  return new Set(spares.map(g=>g.uid));
+}
+function batchProtected(g,kept){return S.eq[g.slot]===g.uid||(g.up||0)>0||g.r==='legendary'||kept.has(g.uid);}
+function batchPicks(){
+  const kept=batchKept();
+  return S.gear.filter(g=>BATCH[g.r||'common']&&BATCH_RARS.includes(g.r||'common')&&!batchProtected(g,kept));
+}
+function batchToggle(k){BATCH[k]=!BATCH[k];SFX.play('ui');batchSheet();}
+function batchSheet(){
+  const kept=batchKept();
+  const rows=BATCH_RARS.map(r=>{
+    const all=S.gear.filter(g=>(g.r||'common')===r&&!batchProtected(g,kept));
+    const v=all.reduce((t,g)=>t+salvageValue(g),0);const heldBack=S.gear.filter(g=>(g.r||'common')===r&&kept.has(g.uid)).length;
+    return '<button class="room2'+(BATCH[r]?' on':'')+'" style="border-left:4px solid '+RAR[r].c+(all.length?'':';opacity:.45')+'" onclick="batchToggle(\''+r+'\')"'+(all.length?'':' disabled')+'>'
+      +'<div class="e">'+(BATCH[r]&&all.length?'☑️':'⬜')+'</div><div class="t"><b class="rc-'+r+'">'+RAR[r].n+'</b>'
+      +'<span>'+(all.length?all.length+' spare piece'+(all.length===1?'':'s')+' · '+v+'🔩':'nothing spare')+(heldBack?' · '+heldBack+' kept as spare weapon'+(heldBack===1?'':'s'):'')+'</span></div></button>';
+  }).join('');
+  const picks=batchPicks();
+  const v=picks.reduce((t,g)=>t+salvageValue(g),0),pp=picks.reduce((t,g)=>t+(PART_YIELD[g.r||'common']||1),0);
+  const epics=picks.filter(g=>g.r==='epic').length;
+  const names=picks.slice().sort((a,b)=>RAR[b.r||'common'].w-RAR[a.r||'common'].w).map(g=>'<span class="chip" style="border-left:3px solid '+RAR[g.r||'common'].c+'">'+g.e+' '+esc(g.n)+'</span>').join(' ');
+  openSheet('<h2>Batch salvage</h2>'
+    +'<p class="help">Tick the rarities to break down. Equipped gear, anything you have upgraded, and legendaries are never touched.</p>'
+    +'<div class="stack" style="margin-top:8px">'+rows+'</div>'
+    +'<button class="room2'+(BATCH.keepSpares?' on':'')+'" style="margin-top:8px" onclick="batchToggle(\'keepSpares\')"><div class="e">'+(BATCH.keepSpares?'☑️':'⬜')+'</div>'
+    +'<div class="t"><b>Keep my best '+BATCH_KEEP+' spare weapons</b><span>Weapons last 5-10 swings. Spares are what win a long raid'+(kept.size?' · keeping '+kept.size:'')+'.</span></div></button>'
+    +(picks.length?'<div style="margin-top:10px;max-height:120px;overflow:auto">'+names+'</div>':'')
+    +(epics?'<p class="help" style="color:var(--blood);margin-top:8px"><b>This includes '+epics+' epic piece'+(epics===1?'':'s')+'.</b> They are gone for good.</p>':'')
+    +'<button class="btn r wide'+(picks.length?'':' off')+'" style="margin-top:12px" '+(picks.length?'':'disabled ')+'onclick="batchGo()">'
+    +(picks.length?'Salvage '+picks.length+' piece'+(picks.length===1?'':'s')+' for '+v+'🔩 + '+pp+' parts':'Nothing ticked to salvage')+'</button>'
+    +'<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet()">Never mind</button>',true);
+}
+function batchGo(){
+  const picks=batchPicks();if(!picks.length)return;
+  let v=0,pp=0;for(const g of picks){v+=salvageValue(g);pp+=PART_YIELD[g.r||'common']||1;}
+  const ids=new Set(picks.map(g=>g.uid));S.gear=S.gear.filter(g=>!ids.has(g.uid));
+  S.stock.scrap+=v;S.parts=(S.parts||0)+pp;
+  log('Batch salvage: '+picks.length+' piece'+(picks.length===1?'':'s')+' broken down for '+v+' scrap and '+pp+' parts.');
+  toast('+'+v+' scrap · +'+pp+' parts','a');SFX.play('salvage');save();closeSheet();render();
+}
+function youJump(id){const el=document.getElementById(id);if(!el)return;SFX.play('ui');
+  const calm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({behavior:calm?'auto':'smooth',block:'start'});}
 /* ================= THE UPGRADE LADDER (v7.12) =================
    Her design, in her words: "attempting upgrades or fails should be like
    MapleStory. Either it downgrades or breaks. Have a reroll system somehow."
@@ -4139,7 +4203,7 @@ function render(){
   const spare=spareGear();
   $('#gearTabs').innerHTML=[['all','All',S.gear.length],['weapons','Weapons',S.gear.filter(GT.weapons).length],['armor','Armor',S.gear.filter(GT.armor).length],['bags','Bags',S.gear.filter(GT.bags).length]].map(([k,n,c])=>`<button class="${GEAR_TAB===k?'on':''}" onclick="gearTab('${k}')">${n} ${c}</button>`).join('');
   $('#gearSub').textContent=S.gear.length+' pieces · '+partsHave()+' parts';
-  $('#salvageAll').style.display=spare.length<2?'none':'';$('#salvageAll').textContent='Salvage '+spare.length+' spare common/uncommon for '+spare.reduce((t,x)=>t+salvageValue(x),0)+'🔩';
+  {const loose=S.gear.filter(g=>S.eq[g.slot]!==g.uid&&g.r!=='legendary').length;/* This button shipped with the `hidden` attribute and the old code only ever set style.display - and the stylesheet has [hidden]{display:none!important}. So the salvage-all button has NEVER been visible. Set the attribute, not the style. */$('#salvageAll').hidden=loose<2;$('#salvageAll').style.display='';$('#salvageAll').textContent='Batch salvage · pick rarities ('+loose+' spare)';}
   const broke=S.gear.filter(g=>repairMax(g)&&repairMissing(g));
   const ra=$('#repairAll');
   if(ra){
