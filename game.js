@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.37';
+const VERSION='7.38';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2369,7 +2369,7 @@ function dealTo(t,d,label,kind){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));
     if(kind==='heavy'){t.cracked=true;clog('The heavy swing splits '+t.n+"'s plating wide open.",'good');
       if(sk('shatter')&&Math.random()<0.5*sk('shatter')){t.stun=1;clog('Shatter: '+t.n+' goes down hard and loses its next turn.','good');}}
     else{const soak=Math.round(d*(0.55-(kind==='shot'?0.15*sk('piercing'):0)));d=Math.max(1,d-soak);clog('Most of that glanced off the plating.','');}
-  }if(t.shield>0){const s=Math.min(t.shield,d);t.shield-=s;d-=s;clog('The shield soaks '+s+'.'+(t.shield<=0?' It cracks apart.':''),'');if(d<=0){t.fx={d:0,t:Date.now()};C.lunge=Date.now();fxPush({k:'block',i:C.enemies.indexOf(t)});return;}}t.hp-=d;t.fx={d,t:Date.now(),k:kind||'slash'};fxPush({k:'hit',i:C.enemies.indexOf(t),d,kind:kind||'slash',by:/^(You |Heavy swing|The )/.test(label||'')?'me':'ally'});C.lunge=Date.now();if(t.warden)C.myDealt=(C.myDealt||0)+d;clog(label+' for '+d+'.','you');if(t.wanted)ctEvent('boss',d);}
+  }if(t.shield>0){const s=Math.min(t.shield,d);t.shield-=s;d-=s;clog('The shield soaks '+s+'.'+(t.shield<=0?' It cracks apart.':''),'');if(d<=0){t.fx={d:0,t:Date.now()};C.lunge=Date.now();fxPush({k:'block',i:C.enemies.indexOf(t)});return;}}t.hp-=d;t.fx={d,t:Date.now(),k:kind||'slash'};fxPush({k:'hit',i:C.enemies.indexOf(t),d,kind:(C.fxBy==='crew:hunter'?'shot':(kind||'slash')),by:C.fxBy||(/^(You |Heavy swing|The )/.test(label||'')?'me':'ally')});C.lunge=Date.now();if(t.warden)C.myDealt=(C.myDealt||0)+d;clog(label+' for '+d+'.','you');if(t.wanted)ctEvent('boss',d);}
 // Weapons she can actually put in her hand right now: melee, not wrecked, not
 // the one already equipped.
 function swapOptions(){return S.gear.filter(g=>g.slot==='melee'&&!g.broken&&(g.dur===undefined||g.dur>0)&&S.eq.melee!==g.uid);}
@@ -2559,9 +2559,9 @@ function act(kind){
     else clog('You stumble. They close in.','hit');
   }
   const a=alive();
-  if(a.length){const bl=roleLvl('brawler');if(bl){const tt=targetEnemy();dealTo(tt,rint(9+bl*2,15+bl*3),activeCrew().find(c=>c.role==='brawler').name+' punches '+tt.n);}
-    const hl=roleLvl('hunter');if(hl&&(S.pack.some(p=>p.cat==='ammo')||ammoTotal()>0)){const tt=targetEnemy();dealTo(tt,10+hl*3,activeCrew().find(c=>c.role==='hunter').name+' fires');}}
-  const ml=roleLvl('medic');if(ml&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+6+ml*3);clog(activeCrew().find(c=>c.role==='medic').name+' patches you: +'+(6+ml*3)+'.','good');}
+  if(a.length){const bl=roleLvl('brawler');if(bl){const tt=targetEnemy();C.fxBy='crew:brawler';dealTo(tt,rint(9+bl*2,15+bl*3),activeCrew().find(c=>c.role==='brawler').name+' punches '+tt.n);C.fxBy=null;}
+    const hl=roleLvl('hunter');if(hl&&(S.pack.some(p=>p.cat==='ammo')||ammoTotal()>0)){const tt=targetEnemy();if(tt){C.fxBy='crew:hunter';dealTo(tt,10+hl*3,activeCrew().find(c=>c.role==='hunter').name+' fires');C.fxBy=null;}}}
+  const ml=roleLvl('medic');if(ml&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+6+ml*3);fxPush({k:'heal',n:6+ml*3,by:'crew:medic'});clog(activeCrew().find(c=>c.role==='medic').name+' patches you: +'+(6+ml*3)+'.','good');}
   if(sk('triage')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('triage')*4);}
   if(eqItem('armor')&&eqItem('armor').id==='nightingale'&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+5);}
   for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;fxPush({k:'die',i:C.enemies.indexOf(e)});codexKill(e);S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);if(sk('transfusion')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('transfusion')*3);clog('You patch up as '+e.n+' drops. +'+(sk('transfusion')*3)+' HP.','good');}clog(e.n+' goes down. +'+e.xp+' XP.','good');
@@ -2639,7 +2639,7 @@ function enemyPhase(){
     const swings=(e.fast&&C.turn%2===0?2:1)+(frenzied?1:0);
     for(let i=0;i<swings;i++){if(Math.random()<e.hit-sk('adrenaline')*0.06-(e.human?sk('intimidate')*0.08:0)){let d=rint(e.dmg[0],e.dmg[1]);if(e.g==='crit'&&Math.random()<0.2){d*=2;clog('A brutal swing.','hit');}
       if(C.duck)continue;                      // it is swinging at her squadmate, not at her
-      const guards=activeCrew();if(guards.length&&Math.random()<0.3){const gc=pick(guards);clog(e.n+' turns on '+gc.name+'.','hit');hurtCrew(gc,Math.max(1,d-2));continue;}
+      const guards=activeCrew();if(guards.length&&Math.random()<0.3){const gc=pick(guards);clog(e.n+' turns on '+gc.name+'.','hit');fxPush({k:'crewhurt',from:C.actor,who:gc.id,d:Math.max(1,d-2)});hurtCrew(gc,Math.max(1,d-2));continue;}
       if(!e.human&&Math.random()<infectChance())catchInfection(e.n);
       hurt(d,e.n);
         if(e.g==='bleed'){C.bleed=Math.max(1,3-sk('clotting'));}if(e.g==='poison'){C.poison=Math.max(1,3-sk('clotting'));}
@@ -2804,15 +2804,18 @@ function bsBackdrop(where){
   return s+'</svg>';
 }
 // Turn the round's events into per-element animation lists. Times in ms.
-function bsSchedule(q){
-  const n=q.length;const slot=n?clamp(1700/n,170,330):0;
-  const out={me:[],en:{},floats:[],fx:[],stage:[],bar:{},meBar:null,total:n*slot};
+function bsSchedule(q,crew){
+  crew=crew||[];const n=q.length;const slot=n?clamp(1700/n,170,330):0;
+  const out={me:[],en:{},cr:{},pet:[],floats:[],fx:[],stage:[],bar:{},meBar:null,total:n*slot};
+  const CR=i=>(out.cr[i]=out.cr[i]||[]);const crewOf=by=>{const role=String(by||'').split(':')[1];return crew.findIndex(c=>c.role===role);};
   const E=i=>(out.en[i]=out.en[i]||[]);
   q.forEach((ev,j)=>{const T=Math.round(j*slot);
     if(ev.k==='hit'){
+      const ci=String(ev.by||'').indexOf('crew:')===0?crewOf(ev.by):-1;
+      if(ci>=0)CR(ci).push(ev.kind==='shot'?'bsKick 220ms ease-out '+T+'ms':'bsDashS 300ms cubic-bezier(.3,.9,.4,1) '+T+'ms');
       if(ev.by==='me'){out.me.push(ev.kind==='shot'?'bsKick 220ms ease-out '+T+'ms':'bsDash '+(ev.kind==='heavy'?380:300)+'ms cubic-bezier(.3,.9,.4,1) '+T+'ms');}
       E(ev.i).push('bsHit 300ms ease-out '+(T+120)+'ms');
-      out.fx.push({i:ev.i,kind:ev.kind||'slash',by:ev.by,t:T+90});
+      out.fx.push({i:ev.i,kind:ev.kind||'slash',by:ev.by,src:ci>=0?'c'+ci:(ev.by==='me'?'me':null),t:T+90});
       out.floats.push({on:ev.i,txt:'-'+ev.d,cls:ev.kind==='heavy'?'big':'',t:T+120});
       if(out.bar[ev.i]===undefined)out.bar[ev.i]=T+120;
       if(ev.kind==='heavy')out.stage.push('bsShake 300ms ease-out '+(T+120)+'ms');
@@ -2824,45 +2827,56 @@ function bsSchedule(q){
       out.fx.push({i:'me',kind:'bite',t:T+110});if(out.meBar===null)out.meBar=T+130;
       if(ev.big)out.stage.push('bsShake 300ms ease-out '+(T+130)+'ms');out.vig=(out.vig||[]).concat(T+130);
     }else if(ev.k==='emiss'){if(ev.from>=0)E(ev.from).push('bsLunge 320ms cubic-bezier(.3,.9,.4,1) '+T+'ms');out.me.push('bsDodgeL 300ms ease-out '+(T+100)+'ms');out.floats.push({on:'me',txt:'MISS',cls:'dim',t:T+130});
-    }else if(ev.k==='petblock'){if(ev.from>=0)E(ev.from).push('bsLunge 320ms cubic-bezier(.3,.9,.4,1) '+T+'ms');out.floats.push({on:'me',txt:'BLOCKED',cls:'good',t:T+130});
+    }else if(ev.k==='petblock'){if(ev.from>=0)E(ev.from).push('bsLunge 320ms cubic-bezier(.3,.9,.4,1) '+T+'ms');out.pet.push('bsLeap 420ms cubic-bezier(.3,.9,.4,1) '+(T+20)+'ms');out.floats.push({on:'me',txt:'BLOCKED',cls:'good',t:T+130});
+    }else if(ev.k==='crewhurt'){const ci=crew.findIndex(c=>c.id===ev.who);if(ev.from>=0)E(ev.from).push('bsLunge 320ms cubic-bezier(.3,.9,.4,1) '+T+'ms');if(ci>=0){CR(ci).push('bsHurt 320ms ease-out '+(T+130)+'ms');out.floats.push({on:'c'+ci,txt:'-'+ev.d,cls:'hurt',t:T+130});}
     }else if(ev.k==='die'){E(ev.i).push('bsDie 520ms ease-in '+(T+60)+'ms forwards');out.dying=(out.dying||{});out.dying[ev.i]=1;
     }else if(ev.k==='spawn'){E(ev.i).push('bsPop 380ms cubic-bezier(.2,1.4,.4,1) '+T+'ms both');
     }else if(ev.k==='trap'){out.floats.push({on:ev.i,txt:'TRAPPED',cls:'good',t:T});E(ev.i).push('bsHit 300ms ease-out '+T+'ms');
-    }else if(ev.k==='heal'){out.floats.push({on:'me',txt:'+'+ev.n,cls:'good',t:T});out.fx.push({i:'me',kind:'heal',t:T});if(out.meBar===null)out.meBar=T;
+    }else if(ev.k==='heal'){if(ev.by){const ci=crewOf(ev.by);if(ci>=0)CR(ci).push('bsCast 420ms ease-out '+T+'ms');}out.floats.push({on:'me',txt:'+'+ev.n,cls:'good',t:T+(ev.by?120:0)});out.fx.push({i:'me',kind:'heal',t:T});if(out.meBar===null)out.meBar=T;
     }else if(ev.k==='brace'){out.fx.push({i:'me',kind:'brace',t:T});}
   });
   return out;
 }
 function battleStage(){
-  const q=C.fxNew?(C.fxq||[]):[];C.fxNew=false;const P=bsSchedule(q);const t=targetEnemy();
+  const crew=activeCrew().slice(0,3);
+  const q=C.fxNew?(C.fxq||[]):[];C.fxNew=false;const P=bsSchedule(q,crew);const t=targetEnemy();
   const an=list=>list&&list.length?'animation:'+list.join(',')+';':'';
   const bar=(now,was,delay,cls)=>'<div class="bs-hp '+cls+'"><i style="width:'+now+'%;'+(delay!==undefined&&delay!==null&&was!==now?'--from:'+was+'%;--to:'+now+'%;animation:bsBar 380ms ease-out '+delay+'ms both;':'')+'"></i></div>';
   const pos={me:[17,10]};
   let s='<div class="bstage" style="'+an(P.stage)+'">'+bsBackdrop(C.where);
   if(P.vig)s+=P.vig.map(tm=>'<div class="bs-vig" style="animation-delay:'+tm+'ms"></div>').join('');
   // them
-  C.enemies.forEach((e,i)=>{const sl=BS_SLOTS[Math.min(i,BS_SLOTS.length-1)];const big=!!(e.warden||e.boss);const size=big?78:(sl[2]?60:50);
+  // Big ones stand in the FRONT row: a boss in the back row is tall enough to reach the health panel.
+  const slotOf={},free=[0,1,2,3,4,5];
+  C.enemies.forEach((e,i)=>{if(e.warden||e.boss){const k=free.indexOf(1)>=0?1:free.indexOf(0)>=0?0:free[0];if(k!==undefined){slotOf[i]=k;free.splice(free.indexOf(k),1);}}});
+  C.enemies.forEach((e,i)=>{if(slotOf[i]===undefined){slotOf[i]=free.length?free.shift():5;}});
+  C.enemies.forEach((e,i)=>{const sl=BS_SLOTS[slotOf[i]];const big=!!(e.warden||e.boss);const size=big?78:(sl[2]?60:50);
     pos[i]=[sl[0],sl[1]+size*0.6];
     const gone=e.dead&&!(P.dying&&P.dying[i]);const hpNow=Math.max(0,Math.round(e.hp/e.max*100)),hpWas=Math.max(0,Math.round((e.hp0===undefined?e.hp:e.hp0)/e.max*100));
     s+='<button class="bs-en'+(e===t&&!e.dead?' tgt':'')+(gone?' gone':'')+(e.enraged?' rage':'')+(e.plate&&!e.cracked?' plate':'')+'" style="left:'+sl[0]+'%;bottom:'+sl[1]+'px;z-index:'+(sl[2]?6:3)+';width:'+size+'px" onclick="C.target='+i+';renderCombat()" aria-label="Target '+esc(e.n)+'">'
       +(gone?'':bar(hpNow,hpWas,P.bar[i],'en'))
       +'<span class="bs-act" style="'+an(P.en[i])+'"><span class="bs-idle" style="animation-delay:'+(-(i*0.37)).toFixed(2)+'s">'+ART.zombieSVG(e.k,size)+'</span></span>'
       +(e.stun>0&&!e.dead?'<span class="bs-stun">\u{1F4AB}</span>':'')+'</button>';});
+  // your crew, behind you. They have always fought every round; now you can see it.
+  const CSLOT=[[4,58,46],[31,62,46],[17,104,38]];
+  crew.forEach((c,ci)=>{const sl=CSLOT[ci];pos['c'+ci]=[sl[0],sl[1]+sl[2]*0.62];const down=c.hp!==undefined&&c.hp<=0;
+    s+='<div class="bs-crew'+(down?' gone':'')+'" style="left:'+sl[0]+'%;bottom:'+sl[1]+'px;width:'+sl[2]+'px;z-index:'+(ci===2?2:4)+'" title="'+esc(c.name)+'"><span class="bs-act" style="'+an(P.cr[ci])+'"><span class="bs-idle" style="animation-delay:'+(-(0.5+ci*0.6)).toFixed(1)+'s">'
+      +ART.avatarSVG(c.av,sl[2],{alive:!down,phase:ci+1,mood:down?'dead':'',weapon:c.role==='hunter'?'gun':c.role==='brawler'?'melee':''})+'</span></span></div>';});
   // you
   const hpNow=Math.max(0,Math.round(S.hp/maxHp()*100)),hpWas=Math.max(0,Math.round((C.hp0===undefined?S.hp:C.hp0)/maxHp()*100));
   s+='<div class="bs-me" style="left:'+pos.me[0]+'%;bottom:'+pos.me[1]+'px"><span class="bs-act" style="'+an(P.me)+'"><span class="bs-idle">'
     +ART.avatarSVG(S.av,84,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',mood:S.hp<maxHp()*0.3?'angry':'',alive:true})+'</span></span>'
     +(C.brace?'<span class="bs-shield on"></span>':'')+'</div>';
-  if(S.pet)s+='<div class="bs-pet"><span class="bs-idle" style="animation-delay:-.8s">'+ART.petSVG(S.pet,30,S.petCoat,{still:true})+'</span></div>';
+  if(S.pet)s+='<div class="bs-pet"><span class="bs-act" style="'+an(P.pet)+'"><span class="bs-idle" style="animation-delay:-.8s">'+ART.petSVG(S.pet,32,S.petCoat,{still:true})+'</span></span></div>';
   // effects: slashes, tracers, bites, sparkles
   P.fx.forEach(f=>{
     if(f.i==='me'){s+='<span class="bs-fx '+f.kind+'" style="left:'+pos.me[0]+'%;bottom:'+(pos.me[1]+34)+'px;animation-delay:'+f.t+'ms"></span>';return;}
     const p=pos[f.i];if(!p)return;
-    if(f.kind==='shot'&&f.by==='me'){const dx=(p[0]-pos.me[0])*3.1,dy=-(p[1]-(pos.me[1]+44));const len=Math.hypot(dx,dy),a=Math.atan2(dy,dx)*180/Math.PI;
-      s+='<span class="bs-tracer" style="left:calc('+pos.me[0]+'% + 26px);bottom:'+(pos.me[1]+44)+'px;width:'+len.toFixed(0)+'px;--a:'+a.toFixed(1)+'deg;animation-delay:'+(f.t-60)+'ms"></span>'
-        +'<span class="bs-fx muzzle" style="left:calc('+pos.me[0]+'% + 30px);bottom:'+(pos.me[1]+40)+'px;animation-delay:'+(f.t-70)+'ms"></span>';}
+    if(f.kind==='shot'&&f.src&&pos[f.src]){const o=f.src==='me'?[pos.me[0],pos.me[1]+44]:[pos[f.src][0],pos[f.src][1]+4];const dx=(p[0]-o[0])*3.1,dy=-(p[1]-o[1]);const len=Math.hypot(dx,dy),a=Math.atan2(dy,dx)*180/Math.PI;
+      s+='<span class="bs-tracer" style="left:calc('+o[0]+'% + 22px);bottom:'+o[1]+'px;width:'+len.toFixed(0)+'px;--a:'+a.toFixed(1)+'deg;animation-delay:'+(f.t-60)+'ms"></span>'
+        +'<span class="bs-fx muzzle" style="left:calc('+o[0]+'% + 26px);bottom:'+(o[1]-2)+'px;animation-delay:'+(f.t-70)+'ms"></span>';}
     s+='<span class="bs-fx '+(f.kind==='heavy'?'heavy':f.kind==='shot'?'pop':'slash')+'" style="left:'+p[0]+'%;bottom:'+(p[1]-6)+'px;animation-delay:'+f.t+'ms"></span>';});
-  P.floats.forEach(f=>{const p=f.on==='me'?[pos.me[0],pos.me[1]+92]:[pos[f.on]?pos[f.on][0]:70,(pos[f.on]?pos[f.on][1]:40)+34];
+  P.floats.forEach(f=>{const p=f.on==='me'?[pos.me[0],pos.me[1]+92]:String(f.on).charAt(0)==='c'?[pos[f.on][0],pos[f.on][1]+40]:[pos[f.on]?pos[f.on][0]:70,(pos[f.on]?pos[f.on][1]:40)+34];
     s+='<span class="bs-float '+f.cls+'" style="left:'+p[0]+'%;bottom:'+p[1]+'px;animation-delay:'+f.t+'ms">'+esc(f.txt)+'</span>';});
   // your health, on the stage, so the portrait row below is not needed
   s+='<div class="bs-hud"><div class="bs-hudrow"><span>You · DR '+dr()+'</span><b>'+S.hp+' / '+maxHp()+'</b></div>'+bar(hpNow,hpWas,P.meBar,'me')+'</div>';
@@ -2874,7 +2888,7 @@ function renderCombat(){
   const meds=S.pack.filter(p=>p.cat==='meds').length+medsTotal();
   const now=Date.now();const phurt=C.pfx&&now-C.pfx.t<600;const plunge=C.lunge&&now-C.lunge<400;const flash=C.muzzle&&now-C.muzzle<350;
   const SPARK={slash:'💢',heavy:'💥',shot:'✴️'};
-  $('#sheet').innerHTML=`<h2>${C.where==='raid'?'Defend the base':C.where==='road'?'On the road':'Inside'} <span class="chip d" style="float:right">round ${C.turn}</span></h2>
+  $('#sheet').innerHTML=`<h2>${C.where==='raid'?'Defend the base':C.where==='horde'?'Horde night':C.where==='road'?'On the road':C.where==='boss'?esc(bossName()):C.where==='liveraid'?'Raid':C.where==='rival'?'Rival crew':C.where==='watch'?'Watch duty':'Inside'} <span class="chip d" style="float:right">round ${C.turn}</span></h2>
   ${battleStage()}${C.night?`<div class="help" style="margin-top:6px;color:var(--steel)">${esc(nightLine())}</div>`:''}
   ${C.where==='liveraid'&&typeof squadStrip==='function'?squadStrip():''}
   ${S.buff&&S.buff.fights>0?`<div class="help" style="margin-top:6px;color:var(--amber)">${esc(BUFF_TEXT[S.buff.k]||'')}</div>`:''}
@@ -4955,6 +4969,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.38',d:'Sep 21',t:'Your crew and your pet are in the fight',
+  i:['YOUR CREW STAND BEHIND YOU NOW. They have always fought every round - the brawler throws a punch, the hunter fires, the medic patches you up - but none of it was ever drawn. Now the brawler steps in and swings, the hunter gets a muzzle flash and a tracer from where they stand, and the medic raises a hand as the green lifts off you.',
+     'WHEN SOMETHING TURNS ON A CREW MEMBER you see it lunge at them, and the number comes off them, not you.',
+     'YOUR DOG JUMPS IN FRONT OF THE HIT. When a dog blocks, it leaps across you as the blow lands.',
+     'Nothing about the numbers changed. This is the same fight you were already having, made visible.']},
  {v:'7.37',d:'Sep 21',t:'A codex, your own fence, and night that tells you it is night',
   i:['CODEX (You, Your record, Codex). Every kind of thing you have met: what it does and how many you have put down. Anything you have not met yet is a black shape and three question marks. County bosses you have already beaten are filled in from your trophy shelf. Kills by kind start counting from today.',
      'RAIDS AND HORDE NIGHT NOW HAPPEN AT YOUR BASE. The fight is drawn in front of YOUR walls - wire, timber or concrete - with your watchtower and its lamp, and your traps in the dirt.',

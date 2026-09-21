@@ -599,3 +599,16 @@ button.room2{width:100%;text-align:left;color:inherit;font:inherit}
 @keyframes bsEmber{0%{transform:translateY(0);opacity:0}10%{opacity:.9}100%{transform:translateY(-150px) translateX(14px);opacity:0}}
 .bs-lamp{animation:bsLamp 2.8s ease-in-out infinite}
 @keyframes bsLamp{0%,100%{opacity:1}50%{opacity:.45}}
+/* v7.38 - crew and pet on the battle stage */
+.bs-crew{position:absolute;transform:translateX(-50%);line-height:0}
+.bs-crew svg{display:block;width:100%;height:auto;filter:drop-shadow(0 3px 2px rgba(0,0,0,.45))}
+.bs-crew.gone{opacity:.3;filter:grayscale(.7)}
+.bs-crew.gone .bs-act{transform:rotate(-80deg) translateY(8px)}
+.bs-crew.gone .bs-idle{animation:none}
+.bs-pet{left:30%;bottom:4px}
+@keyframes bsDashS{0%{transform:none}40%{transform:translateX(54px) scale(1.06) rotate(5deg)}58%{transform:translateX(48px)}100%{transform:none}}
+@keyframes bsCast{0%,100%{transform:none}35%{transform:translateY(-7px) scale(1.06)}60%{transform:translateY(-4px)}}
+@keyframes bsLeap{0%{transform:none}40%{transform:translate(-34px,-30px) rotate(-14deg)}70%{transform:translate(-40px,-6px)}100%{transform:none}}
+/* the health panel sits top-RIGHT: the top-left is where the crew stand */
+.bs-hud{left:auto;right:8px;width:44%}
+.bs-hud{padding:4px 7px 5px}.bs-hudrow{margin-bottom:3px}.bs-hp.me{height:7px}
