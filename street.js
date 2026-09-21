@@ -621,6 +621,28 @@ async function raidSync(r,dmg){
   }catch(e){}
   return null;
 }
+/* v7.27 - THE SHARED BAR AND THE BOSS WERE BOTH CALLED "HP" AND DIFFERED BY 15x.
+   The server pool is 900 + 700 x T.hp (5,100 at tier 5). The boss she fights is
+   a bloater scaled by tier and level (327 HP at level 10). Damage was posted in
+   RAW LOCAL HP, so taking 74% off the boss in a losing fight moved the shared
+   bar 7%, and a squadmate's whole fight moved her boss by the same sliver.
+   Measured: a solo tier-5 siege took a median 16-35 deaths; v6.44 designed it
+   to take a few. Damage now crosses the wire as a SHARE of the boss: local
+   damage / boss.max x pool. Everything inside the fight stays in local HP. */
+const RAID_POST_MAX=2000;                      // boss_hit clamps one call to this
+function raidPoolMax(T,st){return (st&&st.max>0)?st.max:(900+700*Math.max(1,Math.min(6,(T&&T.hp)||1)));}
+function raidToPool(local,bossMax,poolMax){return (bossMax>0)?Math.round(Math.max(0,local)/bossMax*poolMax):0;}
+function raidToLocal(pool,bossMax,poolMax){return (poolMax>0)?Math.max(0,pool)/poolMax*bossMax:0;}
+// Post `pool` points in calls the server will accept whole. Returns the last reply.
+async function raidPost(r,pool){
+  let left=Math.max(0,Math.round(pool)),res=null;
+  for(let i=0;i<6&&left>0;i++){
+    const send=Math.min(RAID_POST_MAX,left);
+    const x=await raidSync(r,send);if(!x)break;
+    res=x;left-=send;if(x.hp===0)break;
+  }
+  return res;
+}
 // What a raid actually pays, spelled out before she spends anything on it.
 function raidPayout(tier,here){
   const n=1+tier+(here?1:0);
@@ -801,6 +823,7 @@ async function enterRaid(r,remote){
     S.raidCur={id:r.id,tier:T.t,loot:T.loot,n:r.boss,poi:r.poi,r:{id:r.id,poi:r.poi,n:r.n,w:r.w,tier:r.tier,boss:r.boss,endsAt:r.endsAt},remote:!!remote};
     startCombat(en,'liveraid');
     C.myDealt=0;
+    C.bossMax=boss.max;C.poolMax=raidPoolMax(T,st);
     squadStart(r,st);
     pushPlayer();
   });
@@ -814,29 +837,40 @@ function liveRaidAfter(won){
   // A loss used to post a flat 400 x tier no matter what happened, so dying in
   // round two and dying with the boss on its last legs counted the same - and
   // against a big shared pool it barely moved the bar. Post what she really did.
-  let dealt=9999;
+  let dealt=9999,mine=0;
+  const fight=(typeof C!=='undefined'&&C)?C:null;
+  const bMax=(fight&&fight.bossMax)||0, pMax=(fight&&fight.poolMax)||(r?raidPoolMax(r.T,null):0);
   if(!won){
     const boss=(typeof C!=='undefined'&&C&&C.enemies)?C.enemies.find(e=>e.warden):null;
     // C.myDealt counts only her own swings. startHp-hp would also count the
     // damage a squadmate did to the same boss, and post it a second time under
     // her handle - the bar would fall twice as fast as the fight earned.
     dealt=(C&&C.myDealt!==undefined)?C.myDealt:(boss?Math.max(0,(boss.startHp||boss.max)-Math.max(0,boss.hp)):0);
+    // `mine` is everything she did, and is what she is PAID and TOLD about.
+    // v7.5 started posting mid-fight and subtracted that from `dealt` - which
+    // the payout below also read, so the longer a lost fight ran the less it
+    // paid and the smaller the number in the toast.
+    mine=Math.round(dealt);
     // squadPoll has been posting as the fight went on; send only what is left
     // over, or every mid-fight swing gets counted a second time here.
-    dealt=Math.max(0,Math.round(dealt-(SQUAD.posted||0)));
+    dealt=Math.max(0,dealt-(SQUAD.posted||0));
   }
-  if(r&&dealt>0)raidSync(r,dealt);
+  if(r){
+    if(won)raidPost(r,pMax);                                   // it is dead: empty the bar
+    else if(dealt>0&&bMax>0)raidPost(r,raidToPool(dealt,bMax,pMax));
+    else if(dealt>0)raidSync(r,Math.round(dealt));             // no units on record: old behaviour
+  }
   if(!won){
     // You still put damage on the shared bar. Pay for that, or a lost raid is a
     // flare spent on nothing.
     // Pay for the damage done, not just for turning up - so a fight you nearly
     // won is worth more than one you lost immediately.
     const bossMax=(typeof C!=='undefined'&&C&&C.enemies&&(C.enemies.find(e=>e.warden)||{}).max)||1;
-    const share=Math.max(0, Math.min(1, dealt/bossMax));
+    const share=Math.max(0, Math.min(1, mine/bossMax));
     const scrap=4+cur.tier*3+Math.round(cur.tier*12*share), xp=15*cur.tier+Math.round(cur.tier*20*share);
     S.stock.scrap+=scrap;addXp(xp);
-    log('The raid at '+cur.n+' beat you back, but you took '+fmt(dealt)+' off it: +'+scrap+' scrap, +'+xp+' XP. That damage stays on its health bar.');
-    toast('Driven off - but you did '+fmt(dealt)+' damage','a');
+    log('The raid at '+cur.n+' beat you back, but you took '+fmt(mine)+' off it ('+Math.round(share*100)+'% of its health): +'+scrap+' scrap, +'+xp+' XP. That damage stays on its health bar.');
+    toast('Driven off - but you took '+Math.round(share*100)+'% off it','a');
     if(cur.remote)log('Your seat in this raid is paid for. Going back in costs no flare.');
     // Come off the board as "in this raid" on a loss too, or friends keep seeing
     // her standing in a fight she has already been driven out of.
@@ -1191,7 +1225,7 @@ const SQUAD={on:false,base:{},mates:{},seen:{},timer:0,r:null,posted:0};
 function squadMe(){const o=(typeof O==='function')?O():null;return ((o&&o.handle)||'').toLowerCase();}
 function squadStart(r,st){
   squadStop();
-  SQUAD.on=true;SQUAD.r=r;SQUAD.mates={};SQUAD.seen={};SQUAD.posted=0;
+  SQUAD.on=true;SQUAD.r=r;SQUAD.mates={};SQUAD.seen={};SQUAD.posted=0;SQUAD.postedPool=0;
   SQUAD.base=(st&&st.hits)?Object.assign({},st.hits):{};
   // A MUSTERED raid knows its roster before a single blow lands, so the squad is
   // real from round one. Without this the split only began once a squadmate's
@@ -1223,10 +1257,16 @@ function squadStop(){if(SQUAD.timer)clearInterval(SQUAD.timer);SQUAD.timer=0;SQU
    everyone's hit counter move every 6 seconds while the fight is happening. */
 async function squadPoll(){
   if(!SQUAD.on||typeof C==='undefined'||!C||C.over||C.where!=='liveraid'){squadStop();return;}
-  const send=Math.max(0,Math.round((C.myDealt||0)-(SQUAD.posted||0)));
+  // Owed and banked are tracked in POOL units so rounding cannot drift; `posted`
+  // stays in local HP because squadApply and liveRaidAfter subtract it from
+  // C.myDealt, which is local.
+  const fight=C;
+  const owed=raidToPool(fight.myDealt||0,fight.bossMax,fight.poolMax);
+  const send=Math.min(RAID_POST_MAX,Math.max(0,owed-(SQUAD.postedPool||0)));
   const res=await raidSync(SQUAD.r,send);
   if(res&&!res.error){
-    if(send>0)SQUAD.posted=(SQUAD.posted||0)+send;   // only bank it once the server took it
+    if(send>0){SQUAD.postedPool=(SQUAD.postedPool||0)+send;   // only bank it once the server took it
+      SQUAD.posted=raidToLocal(SQUAD.postedPool,fight.bossMax,fight.poolMax);}
     squadApply(res);
   }
 }
@@ -1240,9 +1280,10 @@ function squadApply(res){
   for(const h in hits){
     if(h===me)continue;
     const was=(SQUAD.seen[h]!==undefined)?SQUAD.seen[h]:(SQUAD.base[h]||0);
-    const d=Math.max(0,(hits[h]|0)-was);
+    const dPool=Math.max(0,(hits[h]|0)-was);
     SQUAD.seen[h]=hits[h]|0;
-    if(d<=0)continue;
+    if(dPool<=0)continue;
+    const d=Math.max(1,Math.round(raidToLocal(dPool,C.bossMax||1,C.poolMax||res.max||1)));
     const m=SQUAD.mates[h]||(SQUAD.mates[h]={dmg:0,last:0,name:h});
     const first=!m.last;
     m.dmg+=d;m.last=now;m.name=squadName(h);

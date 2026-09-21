@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.26';
+const VERSION='7.27';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -5722,7 +5722,19 @@ function hardReset(){try{if(S&&S.onboarded)localStorage.setItem('deadmiles.backu
 /* ================= county boss (shared with the party, own loot each) ================= */
 const BOSS_FIGHTS_PER_DAY=2;
 function bossMembers(){const d=S.party&&S.party.data;return S.party&&S.party.code?Math.max(1,(d&&d.members||[]).length):1;}
-function bossMaxHp(){const m=bossMembers();const base=m>1?900+700*m:1400;return Math.round(base*(1+0.15*(S.bossKills||0))*dealMod('bossHp'));}
+/* v7.27 - THE PARTY BOSS WAS SIZED BY THE ROSTER AND FOUGHT BY WHOEVER TURNED UP.
+   900 + 700 x members, fixed by the first sync on Monday. Two fights a day is at
+   most ~1,540 damage a week each, so a party of two where one person plays faced
+   2,300 and could not kill it - "join a party and split the work" made the boss
+   unkillable the moment one friend went quiet. schema_boss_active.sql sizes it by
+   who has actually HIT it (1,400, +800 per new fighter, scaled by the days left),
+   and tags its replies v:2 so this card only describes that rule once it is
+   really installed. Until then the server's number is simply shown as it is.
+   The +15% per kill is a SOLO rule: the server has never applied it to a party,
+   so the card no longer claims it there. */
+const BOSS_BASE=1400,BOSS_PER_FIGHTER=800;
+function bossInParty(){return !!(S.party&&S.party.code);}
+function bossMaxHp(){return Math.round(BOSS_BASE*(bossInParty()?1:(1+0.15*(S.bossKills||0))*dealMod('bossHp')));}
 function bossState(){const w=weekId();if(!S.boss||S.boss.week!==w){S.boss={week:w,hp:bossMaxHp(),max:bossMaxHp(),my:0,killed:false,claimed:false,hits:{},killer:null,srv:false};}
   if(S.bossFightDate!==todayStr()){S.bossFightDate=todayStr();S.bossFightsToday=0;}return S.boss;}
 function bossChance(){return Math.min(1,0.06+(0.03+(bg('gamer')?0.01:0)+sk('lore')*0.01)*(S.bossPity||0));}
@@ -5803,7 +5815,9 @@ function bossAfter(won){if(!C||C.bossDone||C.where!=='boss')return;C.bossDone=tr
   else{b.hp=Math.max(0,b.hp-dmg);if(b.hp<=0&&!b.killed){b.killed=true;b.killer='you';bossKill(true);}}
   save();}
 async function bossPost(dmg){const o=O();const b=bossState();try{const r=await rpc('boss_hit',{p_handle:o.handle,p_token:o.token,p_code:S.party.code,p_week:weekId(),p_dmg:Math.round(dmg),p_members:bossMembers()});if(r&&!r.error)bossApply(r);else if(r&&r.error)toast('Boss server: '+r.error,'d');}catch(e){toast('Could not reach the boss server. Damage kept locally.','d');b.hp=Math.max(0,b.hp-dmg);}save();renderBoss();}
-function bossApply(r){const b=bossState();b.srv=true;b.hp=r.hp;b.max=r.max;b.hits=r.hits||{};b.killer=r.killer||null;const me=O().handle;if(b.hits[me])b.my=Math.max(b.my,b.hits[me]);
+function bossApply(r){const b=bossState();b.srv=true;b.hp=r.hp;b.max=r.max;b.v=r.v||1;
+  if(r.grew>0){log('You joined the hunt for '+bossName()+'. One more fighter, so it is '+fmt(r.grew)+' HP tougher.');toast(bossName()+' grew by '+fmt(r.grew)+' - you joined the hunt','a');}
+  b.hits=r.hits||{};b.killer=r.killer||null;const me=O().handle;if(b.hits[me])b.my=Math.max(b.my,b.hits[me]);
   if(b.hp<=0&&!b.killed){b.killed=true;if(b.my>0)bossKill(b.killer===me);else log(bossName()+' went down this week, but you never hit it. No loot.');}}
 async function bossSync(){if(!(S.party&&S.party.code&&O().ok))return;const o=O();try{const r=await rpc('boss_hit',{p_handle:o.handle,p_token:o.token,p_code:S.party.code,p_week:weekId(),p_dmg:0,p_members:bossMembers()});if(r&&!r.error){bossApply(r);save();renderBoss();}}catch(e){}}
 function bossKill(lastHit){const b=bossState();if(b.claimed)return;b.claimed=true;S.bossKills=(S.bossKills||0)+1;S.bossKilled=weekId();ctEvent('bounty',1);
@@ -5814,14 +5828,14 @@ function bossKill(lastHit){const b=bossState();if(b.claimed)return;b.claimed=tru
   if(lastHit){S.keys++;S.stock.scrap+=10;got.push('last hit: +1 key, +10 scrap');}
   if(Math.random()<0.2&&(S.pets||[]).length<PET_MAX){setTimeout(()=>petJoin(Math.random()<0.5?'dog':'cat','rare'),400);got.push('a stray followed you home');}
   S.league.score+=150;log(bossName()+' is down. Your share: '+got.join(', ')+'.');
-  const html=`<h2>${esc(bossName())} is down</h2><div class="big">${legend?'🌟':'💀'}</div><p>${lastHit?'You landed the last hit. ':''}Your share of the loot:<br><b style="color:var(--bone)">${esc(got.join(' · '))}</b></p><p class="help">${legend?'The legendary chance resets to 6%.':'No legendary this time. Every boss phase you fight raises the chance by 3%. Next kill: '+Math.round(bossChance()*100)+'%.'} The next boss has ${Math.round(15*S.bossKills)}% more HP.</p>`;
+  const html=`<h2>${esc(bossName())} is down</h2><div class="big">${legend?'🌟':'💀'}</div><p>${lastHit?'You landed the last hit. ':''}Your share of the loot:<br><b style="color:var(--bone)">${esc(got.join(' · '))}</b></p><p class="help">${legend?'The legendary chance resets to 6%.':'No legendary this time. Every boss phase you fight raises the chance by 3%. Next kill: '+Math.round(bossChance()*100)+'%.'}${bossInParty()?'':' Fought solo, the next boss has '+Math.round(15*S.bossKills)+'% more HP.'}</p>`;
   if(C&&C.where==='boss'&&!C.summaryShown)C.killHtml=html;else openSheet(html+`<button class="btn r wide" onclick="closeSheet()">Take it</button>`);}
 function renderBoss(){const el=$('#bossBody');if(!el)return;const b=bossState();const left=BOSS_FIGHTS_PER_DAY-S.bossFightsToday;const party=S.party&&S.party.code;$('#bossSub').textContent=b.killed?'down this week':(party?'shared with your party':'solo');
   const hits=Object.entries(b.hits||{}).sort((a,c)=>c[1]-a[1]);
   el.innerHTML=`<div class="row"><b style="font-family:'Bebas Neue';font-size:22px;letter-spacing:1px">${esc(bossName())}</b><span class="chip d">HP ${fmt(Math.max(0,b.hp))} / ${fmt(b.max)}</span></div><div class="hpbar2" style="margin:8px 0"><i style="width:${Math.max(0,b.hp)/b.max*100}%"></i></div>
   <div class="row"><span class="chip a">Your damage ${fmt(b.my)}</span><span class="chip s">Legendary chance ${Math.round(bossChance()*100)}%</span><span class="chip">${left} of ${BOSS_FIGHTS_PER_DAY} fights left today</span></div>
   ${hits.length?`<div class="row" style="margin-top:6px">${hits.map(([h,d])=>`<span class="chip">@${esc(h)} ${fmt(d)}</span>`).join('')}</div>`:''}
-  <p class="help" style="margin-top:8px">${party?'One health bar for the whole party. Everyone who lands damage gets their own loot roll when it dies; last hit gets extra.':'Join a party under Party and the boss gets bigger but you split the work. '}Each fight is one phase of about ${bossPhaseHp()} HP. Every phase you win raises your legendary chance by 3% until one drops. New boss every Monday${S.bossKills?', '+Math.round(15*S.bossKills)+'% tougher for every one you have killed':''}.</p>
+  <p class="help" style="margin-top:8px">${party?(b.v===2?'One health bar for the whole party. It starts at '+fmt(BOSS_BASE)+' and grows by up to '+BOSS_PER_FIGHTER+' the first time someone new lands a hit - less the later in the week they join. A friend who never turns up adds nothing. ':'One health bar for the whole party. ')+'Everyone who lands damage gets their own loot roll when it dies; last hit gets extra.':'Join a party under Party and the boss gets bigger but you split the work. '}Each fight is one phase of about ${bossPhaseHp()} HP. Every phase you win raises your legendary chance by 3% until one drops. New boss every Monday${(S.bossKills&&!party)?', '+Math.round(15*S.bossKills)+'% tougher solo for the ones you have killed':''}.</p>
   ${b.killed?`<p class="help">Down. ${b.killer?'Last hit: @'+esc(b.killer)+'. ':''}Back Monday with more HP.</p>`:`<button class="btn r wide" style="margin-top:8px" onclick="fightBoss()">Fight ${esc(bossName())}</button>`}`;}
 /* ================= share card ================= */
 async function shareCard(){const W=720,H=400;const cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');
