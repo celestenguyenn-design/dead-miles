@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.35';
+const VERSION='7.36';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -161,6 +161,19 @@ function petXpMult(){return 1.15+0.01*(petLevel()-1);}
    Now a stray is always a kind you do not own; the cap is every kind there is;
    and when you own them all a familiar stray turns up with a gift instead.
    Repeats people already have can be rehomed: their steps go to the one you keep. */
+/* v7.36 - FOUR STRAYS THAT ARRIVE ALREADY NAMED, and nobody is told.
+   A coat with `named` is one particular animal. It can turn up anywhere a stray
+   can, at HALF the weight of the rarest legendary - under 1% of new strays at
+   first. Repeats are gone, so the odds climb as a collection fills, and with
+   every ordinary kind at home the next stray is certain to be one of them.
+   IT IS MEANT TO BE A SURPRISE, so nothing may give it away: the counter says
+   "of 17" until someone actually owns one, and the what's-new entry for this
+   version says nothing about pets. Do not "fix" either of those. */
+const PET_NAMED_W=0.5;
+function petCoatsAll(){return Object.entries(ART.CAT_COATS).map(([k,v])=>['cat',k,v]).concat(Object.entries(ART.DOG_COATS).map(([k,v])=>['dog',k,v]));}
+// What the counter shows: every ordinary kind, plus only the named ones she has actually found.
+function petShownMax(){return petCoatsAll().filter(([kind,k,v])=>!v.named||petOwns(kind,k)).length;}
+function petCoatLabel(ci){return ci.named?'one of a kind':ci.n;}
 const PET_MAX=Object.keys(ART.CAT_COATS).length+Object.keys(ART.DOG_COATS).length;
 const PET_RAR_ORDER=['common','uncommon','rare','epic','legendary'],PET_COAT_W={common:40,uncommon:22,rare:10,epic:4,legendary:1};   // the same weights art.js rolls coats with
 function petOwns(kind,coat){return (S.pets||[]).some(x=>x.kind===kind&&x.coat===coat);}
@@ -170,8 +183,9 @@ function petNewCoat(kind,minRarity){
   const src=kind==='dog'?ART.DOG_COATS:ART.CAT_COATS;const min=PET_RAR_ORDER.indexOf(minRarity||'common');
   const free=Object.entries(src).filter(([k])=>!petOwns(kind,k));if(!free.length)return null;
   let pool=free.filter(([k,v])=>PET_RAR_ORDER.indexOf(v.r)>=min);if(!pool.length)pool=free;
-  let t=0;for(const [k,v] of pool)t+=(PET_COAT_W[v.r]||1);let r=Math.random()*t;
-  for(const [k,v] of pool){r-=(PET_COAT_W[v.r]||1);if(r<=0)return k;}return pool[pool.length-1][0];
+  const W=v=>v.named?PET_NAMED_W:(PET_COAT_W[v.r]||1);
+  let t=0;for(const [k,v] of pool)t+=W(v);let r=Math.random()*t;
+  for(const [k,v] of pool){r-=W(v);if(r<=0)return k;}return pool[pool.length-1][0];
 }
 function petDupes(){ // every pet beyond the first of its kind+coat; the keeper is the active one, else the most walked
   const groups={};for(const x of (S.pets||[])){(groups[x.kind+':'+x.coat]=groups[x.kind+':'+x.coat]||[]).push(x);}
@@ -204,10 +218,10 @@ function petJoin(kind,minRarity){if(!S.pets)S.pets=[];
   if(!coat){ // she has all seventeen. A familiar face, and it brought something.
     const gift=2000;S.petXp=(S.petXp||0)+gift;S.stock.scrap+=6;
     log('A stray you already know trotted up, dropped something at your feet and left. +6 scrap, and '+(S.petName||'your companion')+' walked '+fmt(gift)+' steps further for the company.');
-    toast('A familiar stray · +6 scrap','a');save();return;}const ci=ART.coatInfo(kind,coat);const name=pick(PET_NAMES[kind]);const p={id:uid(),kind,coat,name,xp:0,found:Date.now()};S.pets.push(p);
+    toast('A familiar stray · +6 scrap','a');save();return;}const ci=ART.coatInfo(kind,coat);const name=ci.named||pick(PET_NAMES[kind]);const p={id:uid(),kind,coat,name,xp:0,found:Date.now()};S.pets.push(p);
   const first=!S.petActive;if(first){S.petActive=p.id;S.pet=kind;S.petCoat=coat;S.petName=name;S.petXp=0;}
-  log('A '+ci.n.toLowerCase()+' followed you out. It is yours now.');if(ci.r==='legendary')SFX.play('legend');else SFX.play('rare');
-  openSheet(`<h2>A ${esc(ci.n.toLowerCase())}!</h2><div class="big">${ART.petSVG(kind,96,coat)}</div><p><span class="rc-${ci.r}">${RAR[ci.r].n}</span> ${PETS[kind].n.toLowerCase()}. It followed you out and will not leave. ${PETS[kind].d}.</p><input id="petNameIn" type="text" maxlength="14" value="${esc(name)}" style="width:100%;margin:8px 0"><button class="btn r wide" onclick="namePet('${p.id}',$('#petNameIn').value);closeSheet();render()">${first?'Come on, then':'Welcome to the crew'}</button>`);}
+  log(ci.named?(ci.named+' followed you out and will not be left behind.'):('A '+ci.n.toLowerCase()+' followed you out. It is yours now.'));if(ci.r==='legendary')SFX.play('legend');else SFX.play('rare');
+  openSheet(`<h2>${ci.named?esc(ci.named)+'?':'A '+esc(ci.n.toLowerCase())+'!'}</h2><div class="big">${ART.petSVG(kind,96,coat)}</div><p>${ci.named?'<b style="color:var(--amber)">One of a kind.</b> There is a tag on the collar, and it already answers to a name: <b>'+esc(ci.named)+'</b>. It followed you out and will not leave. ':`<span class="rc-${ci.r}">${RAR[ci.r].n}</span> ${PETS[kind].n.toLowerCase()}. It followed you out and will not leave. `}${PETS[kind].d}.</p><input id="petNameIn" type="text" maxlength="14" value="${esc(name)}" style="width:100%;margin:8px 0"><button class="btn r wide" onclick="namePet('${p.id}',$('#petNameIn').value);closeSheet();render()">${first?'Come on, then':'Welcome to the crew'}</button>`);}
 function namePet(id,n){const p=(S.pets||[]).find(x=>x.id===id);if(!p)return;n=(n||p.name).trim().slice(0,14)||p.name;p.name=n;if(S.petActive===id)S.petName=n;save();render();}
 function renamePet(){const p=activePet();if(!p)return;const n=prompt('Name your '+PETS[p.kind].n.toLowerCase(),p.name);if(n&&n.trim()){namePet(p.id,n);}}
 function petFetch(){if(!S.pet)return;const lvl=petLevel();const kennel=S.base&&S.base.rooms.kennel?1:0;const n=1+(lvl>=6?1:0)+kennel;const got=[];
@@ -220,8 +234,8 @@ function petFetch(){if(!S.pet)return;const lvl=petLevel();const kennel=S.base&&S
   S.petGifts=got;S.petLast=todayStr();if(got.length){log(S.petName+' brought back '+got.join(', ')+'.');}}
 function renderPet(){const el=$('#petCard');if(!el)return;if(!S.pet){el.innerHTML='<h2>Companion <span class="sub">none yet</span></h2><p class="help">Strays hide in the houses you search. Keep looting: one always turns up by your 40th room ('+Math.min(40,S.roomsSearched||0)+' searched). Nine kinds of cat and eight kinds of dog are out there, and the rare ones are rare.</p>';return;}
   const lvl=petLevel();const need=4000;const into=(S.petXp||0)-(lvl-1)*need;const p=PETS[S.pet];const ci=ART.coatInfo(S.pet,S.petCoat);const more=1+(lvl>=6?1:0)+(S.base&&S.base.rooms.kennel?1:0);
-  el.innerHTML=`<h2>${esc(S.petName)} <span class="sub"><span class="rc-${ci.r}">${esc(ci.n)}</span> · level ${lvl}${lvl>=10?' (max)':''}</span></h2><div class="you"><div class="petbig">${ART.petSVG(S.pet,104,S.petCoat)}</div><div><div class="kv"><span>Bonus</span><b>${S.pet==='dog'?'blocks '+Math.round(petBlock()*100)+'% of hits':'+'+Math.round((petXpMult()-1)*100)+'% XP'}</b><span>Levels by</span><b>your steps</b><span>Brings back</span><b>${more} thing${more>1?'s':''} a morning</b></div>${lvl<10?`<div class="xp" style="margin-top:8px"><i style="width:${Math.min(100,into/need*100)}%"></i></div><p class="help">${fmt(Math.max(0,need-into))} steps to level ${lvl+1}</p>`:''}</div></div><p class="help" style="margin-top:8px">${S.petGifts&&S.petGifts.length?'This morning: '+esc(S.petGifts.join(', ')):'Nothing found yet. Sleep on it.'}</p><div class="row" style="margin-top:8px"><button class="btn sm ghost" onclick="renamePet()">Rename</button><span class="help">Only the active one walks with you, fetches, and levels.</span></div>
-  <h2 style="margin-top:14px;font-size:18px">Your strays <span class="sub">${(S.pets||[]).length} of ${PET_MAX}</span></h2><div class="petrow">${(S.pets||[]).map(x=>{const c=ART.coatInfo(x.kind,x.coat);const l=Math.min(10,Math.floor((x.id===S.petActive?S.petXp:x.xp||0)/4000)+1);return `<button class="petpick${x.id===S.petActive?' on':''}" style="border-color:${RAR[c.r].c}" onclick="setActivePet('${x.id}')">${ART.petSVG(x.kind,56,x.coat,{still:x.id!==S.petActive})}<b>${esc(x.name)}</b><span class="rc-${c.r}">${esc(c.n)}</span><span class="help">L${l}</span></button>`;}).join('')}</div>${petDupes().length?`<button class="btn sm wide" style="margin-top:8px" onclick="petRehomeSheet()">Rehome ${petDupes().length} repeat${petDupes().length===1?'':'s'} · their steps go to the one you keep</button>`:''}<p class="help" style="margin-top:6px">A new stray is always a kind you do not have yet. They turn up as you search rooms, clear strays on watch duty, and take down county bosses (those are rare or better).</p>`;}
+  el.innerHTML=`<h2>${esc(S.petName)} <span class="sub"><span class="rc-${ci.r}">${esc(petCoatLabel(ci))}</span> · level ${lvl}${lvl>=10?' (max)':''}</span></h2><div class="you"><div class="petbig">${ART.petSVG(S.pet,104,S.petCoat)}</div><div><div class="kv"><span>Bonus</span><b>${S.pet==='dog'?'blocks '+Math.round(petBlock()*100)+'% of hits':'+'+Math.round((petXpMult()-1)*100)+'% XP'}</b><span>Levels by</span><b>your steps</b><span>Brings back</span><b>${more} thing${more>1?'s':''} a morning</b></div>${lvl<10?`<div class="xp" style="margin-top:8px"><i style="width:${Math.min(100,into/need*100)}%"></i></div><p class="help">${fmt(Math.max(0,need-into))} steps to level ${lvl+1}</p>`:''}</div></div><p class="help" style="margin-top:8px">${S.petGifts&&S.petGifts.length?'This morning: '+esc(S.petGifts.join(', ')):'Nothing found yet. Sleep on it.'}</p><div class="row" style="margin-top:8px"><button class="btn sm ghost" onclick="renamePet()">Rename</button><span class="help">Only the active one walks with you, fetches, and levels.</span></div>
+  <h2 style="margin-top:14px;font-size:18px">Your strays <span class="sub">${(S.pets||[]).length} of ${petShownMax()}</span></h2><div class="petrow">${(S.pets||[]).map(x=>{const c=ART.coatInfo(x.kind,x.coat);const l=Math.min(10,Math.floor((x.id===S.petActive?S.petXp:x.xp||0)/4000)+1);return `<button class="petpick${x.id===S.petActive?' on':''}" style="border-color:${RAR[c.r].c}" onclick="setActivePet('${x.id}')">${ART.petSVG(x.kind,56,x.coat,{still:x.id!==S.petActive})}<b>${esc(x.name)}</b><span class="rc-${c.r}">${esc(petCoatLabel(c))}</span><span class="help">L${l}</span></button>`;}).join('')}</div>${petDupes().length?`<button class="btn sm wide" style="margin-top:8px" onclick="petRehomeSheet()">Rehome ${petDupes().length} repeat${petDupes().length===1?'':'s'} · their steps go to the one you keep</button>`:''}<p class="help" style="margin-top:6px">A new stray is always a kind you do not have yet. They turn up as you search rooms, clear strays on watch duty, and take down county bosses (those are rare or better).</p>`;}
 const CLASSES={
   brawler:{n:'Brawler',e:'🥊',d:'Hits hard up close. Starts with a bat and a leather jacket.',kit:['bat','jacket']},
   marksman:{n:'Marksman',e:'🎯',d:'Guns and ammo. Starts with a pistol, 6 rounds and a pipe.',kit:['pistol','pipe'],ammo:6},
@@ -4838,6 +4852,8 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.36',d:'Sep 21',t:'A quiet one',
+  i:['Nothing you need to do. A few things were tidied up behind the scenes.']},
  {v:'7.35',d:'Sep 21',t:'Fights happen on a stage now, and no more repeat pets',
   i:['THE FIGHT SCREEN IS ANIMATED. There is a stage at the top: you on the left, them on the right, and a backdrop for where you are - inside a house, out on the road, at your own fence, or under a red sky for raids and bosses.',
      'THE ROUND PLAYS OUT IN ORDER. You dash in and slash, the number flies off them and they flinch. Then each of them lunges back at you in turn, you flash red, and your health bar drains when the hit lands, not before. Heavy swings shake the whole stage. Guns get a muzzle flash and a tracer. The dead fall over and stay down.',

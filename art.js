@@ -406,7 +406,10 @@ const CAT_COATS={
   calico:{n:'Calico',r:'rare',base:'#f4f0ea',dark:'#e8a04a',belly:'#ffffff',eye:'#e0b040',pat:'patches',dark2:'#2c2c36'},
   siamese:{n:'Siamese',r:'epic',base:'#efe2cf',dark:'#5a3c2e',belly:'#f7ede0',eye:'#5ab0e0',pat:'points'},
   tortie:{n:'Tortoiseshell',r:'epic',base:'#3a2a24',dark:'#e08a3a',belly:'#3a2a24',eye:'#e0b040',pat:'patches',dark2:'#c9602a'},
-  void:{n:'Void cat',r:'legendary',base:'#101018',dark:'#06060a',belly:'#101018',eye:'#ff5a6a',pat:'glow'}
+  void:{n:'Void cat',r:'legendary',base:'#101018',dark:'#06060a',belly:'#101018',eye:'#ff5a6a',pat:'glow'},
+  // Named strays (v7.36). `named` is the name they arrive with.
+  pepper:{n:'Pepper',r:'legendary',named:'Pepper',base:'#1b1b24',dark:'#0c0c12',belly:'#1b1b24',eye:'#3fd06a',pat:'none'},
+  liam:{n:'Liam',r:'legendary',named:'Liam',base:'#8f8373',dark:'#3e352c',belly:'#d9cfbb',eye:'#a8b84a',pat:'mackerel',chin:true}
 };
 const DOG_COATS={
   mutt:{n:'Mutt',r:'common',base:'#b58a5a',dark:'#8a6a3a',belly:'#eadcbf',eye:'#3a2a1a',ears:'floppy',pat:'none'},
@@ -416,7 +419,9 @@ const DOG_COATS={
   husky:{n:'Husky',r:'rare',base:'#8a8a96',dark:'#4a4a56',belly:'#ffffff',eye:'#5ab0e0',ears:'pointy',pat:'mask'},
   dalmatian:{n:'Dalmatian',r:'epic',base:'#f4f0ea',dark:'#2c2c36',belly:'#ffffff',eye:'#3a2a1a',ears:'floppy',pat:'spots'},
   shiba:{n:'Shiba',r:'epic',base:'#e6924a',dark:'#c2782a',belly:'#ffffff',eye:'#3a2a1a',ears:'pointy',pat:'mask'},
-  ghost:{n:'Ghost dog',r:'legendary',base:'#cfe6f2',dark:'#9cc4d8',belly:'#eef8ff',eye:'#ff5a6a',ears:'pointy',pat:'glow'}
+  ghost:{n:'Ghost dog',r:'legendary',base:'#cfe6f2',dark:'#9cc4d8',belly:'#eef8ff',eye:'#ff5a6a',ears:'pointy',pat:'glow'},
+  nori:{n:'Nori',r:'legendary',named:'Nori',base:'#241e20',dark:'#120e10',belly:'#fbf6ee',tan:'#e0a262',eye:'#2a1a12',ears:'pointy',pat:'pom'},
+  cookie:{n:'Cookie',r:'legendary',named:'Cookie',base:'#e6c894',dark:'#33282a',earRim:'#6a5a58',shade:'#c8a46a',belly:'#f4e4c2',eye:'#2a1a12',ears:'button',pat:'pug'}
 };
 const COAT_W={common:40,uncommon:22,rare:10,epic:4,legendary:1};
 function randomCoat(kind,minRarity){const src=kind==='dog'?DOG_COATS:CAT_COATS;const order=['common','uncommon','rare','epic','legendary'];const min=order.indexOf(minRarity||'common');
@@ -428,7 +433,37 @@ function petSVG(kind,size,coat,opts){
   const wag=anim?`<animateTransform attributeName="transform" type="rotate" values="-14 ${kind==='dog'?14:50} 44;14 ${kind==='dog'?14:50} 44;-14 ${kind==='dog'?14:50} 44" dur="${kind==='dog'?'0.7s':'2.4s'}" repeatCount="indefinite"/>`:'';
   const glow=c.pat==='glow'?`<defs><filter id="${id}g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2"/></filter></defs><ellipse cx="32" cy="40" rx="24" ry="20" fill="${c.eye}" opacity=".16" filter="url(#${id}g)">${anim?`<animate attributeName="opacity" values=".1;.26;.1" dur="2.6s" repeatCount="indefinite"/>`:''}</ellipse>`:'';
   let s=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${w}" height="${w}" aria-hidden="true">${glow}`;
-  if(kind==='dog'){
+  if(kind==='dog'&&c.pat==='pom'){
+    // Nori: a tri-colour Pomeranian. Plume tail over the back, a white ruff, tan brows and cheeks.
+    s+=`<g>${wag}<path d="M17 47 q-15 -7 -8 -25 q9 -8 15 2 q-8 3 -5 13z" fill="${c.base}"/><path d="M9 23 q5 -8 13 -2 q-7 0 -10 8z" fill="${c.belly}"/></g>`;
+    s+=`<ellipse cx="30" cy="47" rx="18" ry="13" fill="${c.base}"/><path d="M12 48 q2 6 6 5 q2 5 6 3 q3 5 7 2 q3 4 7 1 q4 3 6 -2 q4 0 4 -6" fill="${c.base}"/>`;
+    s+=`<rect x="16" y="52" width="7" height="10" rx="3.5" fill="${c.dark}"/><rect x="25" y="54" width="7" height="9" rx="3.5" fill="${c.base}"/><rect x="35" y="53" width="7" height="10" rx="3.5" fill="${c.belly}"/><rect x="44" y="54" width="7" height="9" rx="3.5" fill="${c.belly}"/>`;
+    s+=`<path d="M27 40 q3 -6 15 -5 q13 0 15 7 q-1 5 -5 5 q-1 5 -5 4 q-3 5 -7 1 q-4 3 -6 -2 q-5 0 -5 -5 q-3 -2 -2 -5z" fill="${c.belly}"/>`;
+    s+=`<path d="M31 18 l-2 -11 l10 6z" fill="${c.dark}"/><path d="M53 18 l2 -11 l-10 6z" fill="${c.dark}"/><path d="M31.500 16 l-1 -6 l5.500 3.500z M52.500 16 l1 -6 l-5.500 3.500z" fill="${c.tan}"/>`;
+    s+=`<path d="M42 10 q7 -3 11 3 q7 1 7 8 q5 4 1 10 q1 7 -6 8 q-3 5 -9 3 q-4 3 -8 0 q-6 2 -9 -3 q-7 -1 -6 -8 q-4 -6 1 -10 q0 -7 7 -8 q4 -6 11 -3z" fill="${c.base}"/>`;
+    s+=`<ellipse cx="33" cy="33" rx="5.500" ry="4.500" fill="${c.tan}"/><ellipse cx="51" cy="33" rx="5.500" ry="4.500" fill="${c.tan}"/>`;
+    s+=`<path d="M42 20 q-2.500 7 -2 12 h4 q0.500 -5 -2 -12z" fill="${c.belly}"/><ellipse cx="42" cy="35" rx="7" ry="5.500" fill="${c.belly}"/>`;
+    s+=`<ellipse cx="36" cy="22" rx="2.400" ry="1.800" fill="${c.tan}"/><ellipse cx="48" cy="22" rx="2.400" ry="1.800" fill="${c.tan}"/>`;
+    s+=`<ellipse cx="36" cy="27.500" rx="3.400" ry="3.300" fill="#fff"/><ellipse cx="48" cy="27.500" rx="3.400" ry="3.300" fill="#fff"/>`;
+    s+=`<ellipse cx="36.4" cy="27.900" rx="2.600" ry="2.700" fill="${c.eye}">${blink}</ellipse><ellipse cx="48.4" cy="27.900" rx="2.600" ry="2.700" fill="${c.eye}">${blink}</ellipse><circle cx="37.300" cy="26.700" r=".9" fill="#fff"/><circle cx="49.300" cy="26.700" r=".9" fill="#fff"/>`;
+    s+=`<ellipse cx="42" cy="33" rx="2.800" ry="2.100" fill="#1a1216"/><path d="M42 35 q-2.500 3 -4.500 1 M42 35 q2.500 3 4.500 1" stroke="#5a2a2a" stroke-width="1.300" fill="none" stroke-linecap="round"/><path d="M40.500 37.500 q1.500 3 3.500 0z" fill="#ff7a8a"/>`;
+  }else if(kind==='dog'&&c.pat==='pug'){
+    // Cookie: a fawn pug. Stocky, curled tail, black muzzle with smoky eye patches, small folded ears.
+    s+=`<g>${wag}<path d="M14 44 q-8 0 -8 -7 q0 -7 7 -6 q5 1 4 6 q-1 3 -4 2" stroke="${c.base}" stroke-width="4.600" fill="none" stroke-linecap="round"/></g>`;
+    s+=`<ellipse cx="29" cy="48" rx="17" ry="11.500" fill="${c.base}"/><ellipse cx="31" cy="52.500" rx="9.500" ry="5.500" fill="${c.belly}"/>`;
+    s+=`<rect x="15" y="54" width="8" height="8.500" rx="4" fill="${c.shade}"/><rect x="24" y="55.500" width="8" height="7.500" rx="4" fill="${c.base}"/><rect x="34" y="54" width="8" height="8.500" rx="4" fill="${c.shade}"/><rect x="43" y="55.500" width="8" height="7.500" rx="4" fill="${c.base}"/>`;
+    if(opts.collar!==false)s+=`<path d="M29 38.500 q13 -3 25 1" stroke="#c22b3a" stroke-width="3.2" fill="none"/><circle cx="43" cy="39.500" r="2.2" fill="#f5c842"/>`;
+    s+=`<path d="M42 12 q15 0 16 15 q1 6 -3 10 q-5 5 -13 5 q-8 0 -13 -5 q-4 -4 -3 -10 q1 -15 16 -15z" fill="${c.base}"/>`;
+    s+=`<path d="M34 13 q-8 -2.500 -10.500 4 q-1 5.500 4 9 q2.500 -2 4 -5.500 q1.500 -3.500 2.500 -7.500z" fill="${c.dark}" stroke="${c.earRim}" stroke-width="1.100" stroke-linejoin="round"/><path d="M50 13 q8 -2.500 10.500 4 q1 5.500 -4 9 q-2.500 -2 -4 -5.500 q-1.500 -3.500 -2.500 -7.500z" fill="${c.dark}" stroke="${c.earRim}" stroke-width="1.100" stroke-linejoin="round"/>`;
+    s+=`<path d="M25.500 19 q1.500 3.500 3.500 5.500 M58.500 19 q-1.500 3.500 -3.500 5.500" stroke="${c.earRim}" stroke-width="1" fill="none" stroke-linecap="round" opacity=".7"/>`;
+    s+=`<path d="M37 17 q5 -2.500 10 0 M38.500 20 q3.500 -1.800 7 0" stroke="${c.shade}" stroke-width="1.500" fill="none" stroke-linecap="round"/>`;
+    s+=`<ellipse cx="35.500" cy="27.500" rx="5.200" ry="4.800" fill="${c.dark}" opacity=".55"/><ellipse cx="48.500" cy="27.500" rx="5.200" ry="4.800" fill="${c.dark}" opacity=".55"/>`;
+    s+=`<ellipse cx="42" cy="34.500" rx="7.500" ry="5.800" fill="${c.dark}"/>`;
+    s+=`<ellipse cx="35.500" cy="27.500" rx="3.700" ry="3.400" fill="${c.eye}">${blink}</ellipse><ellipse cx="48.500" cy="27.500" rx="3.700" ry="3.400" fill="${c.eye}">${blink}</ellipse><circle cx="36.800" cy="26.200" r="1.250" fill="#fff"/><circle cx="49.800" cy="26.200" r="1.250" fill="#fff"/><circle cx="34.600" cy="28.800" r=".55" fill="#fff" opacity=".8"/><circle cx="47.600" cy="28.800" r=".55" fill="#fff" opacity=".8"/>`;
+    s+=`<ellipse cx="42" cy="32.300" rx="2.600" ry="1.700" fill="#0a0809"/><ellipse cx="41.300" cy="31.800" rx=".9" ry=".4" fill="#7a7074"/><path d="M42 34 v1.600 M42 35.600 q-2.400 2.200 -4.600 .6 M42 35.600 q2.400 2.200 4.600 .6" stroke="#8a8084" stroke-width="1.100" fill="none" stroke-linecap="round"/>`;
+    s+=`<path d="M40.400 37.400 q1.600 3.800 3.400 0z" fill="#ff7a8a"/>`;
+    s+=`<circle cx="31.500" cy="32" r="1.700" fill="#ff9ab0" opacity=".5"/><circle cx="52.500" cy="32" r="1.700" fill="#ff9ab0" opacity=".5"/>`;
+  }else if(kind==='dog'){
     // tail (behind body), body, legs, belly
     s+=`<g>${wag}<path d="M14 44 q-9 -6 -4 -16" stroke="${c.base}" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M11 30 q-1 -3 2 -4" stroke="${c.belly}" stroke-width="3" fill="none" stroke-linecap="round"/></g>`;
     s+=`<ellipse cx="30" cy="47" rx="17" ry="12" fill="${c.base}"/><ellipse cx="30" cy="52" rx="10" ry="6" fill="${c.belly}"/>`;
@@ -453,6 +488,7 @@ function petSVG(kind,size,coat,opts){
     s+=`<ellipse cx="32" cy="47" rx="15" ry="12" fill="${c.base}"/>`;
     if(c.pat==='tuxedo')s+=`<ellipse cx="32" cy="50" rx="8" ry="8" fill="${c.belly}"/>`;
     if(c.pat==='stripes')s+=`<path d="M22 41 q6 -4 12 0 M20 48 q8 -5 16 0 M24 55 q6 -3 12 0" stroke="${c.dark}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
+    if(c.pat==='mackerel')s+=`<path d="M21 40 q5 -4 10 -1 M19 44.500 q6 -4 13 -1 M19 49 q7 -4 14 -1 M21 53.500 q6 -3 12 -1 M37 41 q4 -2 8 1 M38 46 q4 -2 8 1" stroke="${c.dark}" stroke-width="1.7" fill="none" stroke-linecap="round"/><path d="M53.500 41 l4 -1.500 M55.500 36 l4 -1 M56.500 31 l3.500 0" stroke="${c.dark}" stroke-width="1.8" stroke-linecap="round"/>`;
     if(c.pat==='patches')s+=`<ellipse cx="24" cy="44" rx="6" ry="5" fill="${c.dark}"/><ellipse cx="40" cy="50" rx="5" ry="4" fill="${c.dark2||c.dark}"/>`;
     s+=`<rect x="20" y="52" width="6" height="9" rx="3" fill="${c.pat==='points'?c.dark:c.pat==='tuxedo'?c.belly:c.base}"/><rect x="28" y="54" width="6" height="8" rx="3" fill="${c.pat==='points'?c.dark:c.base}"/><rect x="36" y="54" width="6" height="8" rx="3" fill="${c.pat==='points'?c.dark:c.base}"/><rect x="43" y="52" width="6" height="9" rx="3" fill="${c.pat==='points'?c.dark:c.pat==='tuxedo'?c.belly:c.base}"/>`;
     if(opts.collar!==false)s+=`<path d="M20 38 q12 5 24 0" stroke="#c22b3a" stroke-width="3" fill="none"/><circle cx="32" cy="41" r="2.2" fill="#f5c842"/>`;
@@ -464,6 +500,8 @@ function petSVG(kind,size,coat,opts){
     if(c.pat==='patches')s+=`<path d="M18 22 q6 -12 16 -8 q-8 2 -10 12z" fill="${c.dark}"/><path d="M36 14 q8 2 9 12 q-6 -2 -9 -12z" fill="${c.dark2||c.dark}"/>`;
     if(c.pat==='points')s+=`<ellipse cx="32" cy="33" rx="8" ry="6" fill="${c.dark}" opacity=".85"/>`;
     if(c.pat==='tuxedo')s+=`<ellipse cx="32" cy="34" rx="7" ry="5" fill="${c.belly}"/>`;
+    if(c.pat==='mackerel')s+=`<path d="M27 20.500 l1.800 -5.500 l3.200 4.500 l3.200 -4.500 l1.800 5.500" stroke="${c.dark}" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.500 27 q3 -0.500 5 1.500 M18.500 31 q3 0 4.500 1.500 M45.500 27 q-3 -0.500 -5 1.500 M45.500 31 q-3 0 -4.500 1.500" stroke="${c.dark}" stroke-width="1.5" fill="none" stroke-linecap="round"/>`;
+    if(c.chin)s+=`<ellipse cx="32" cy="35.500" rx="6.500" ry="4.500" fill="${c.belly}"/>`;
     s+=`<ellipse cx="26" cy="27" rx="3.6" ry="3.8" fill="#fff"/><ellipse cx="38" cy="27" rx="3.6" ry="3.8" fill="#fff"/>`;
     s+=`<ellipse cx="26.5" cy="27.5" rx="2.2" ry="3" fill="${c.eye}">${blink}</ellipse><ellipse cx="38.5" cy="27.5" rx="2.2" ry="3" fill="${c.eye}">${blink}</ellipse><ellipse cx="26.5" cy="27.8" rx=".8" ry="2.2" fill="#1a1020"/><ellipse cx="38.5" cy="27.8" rx=".8" ry="2.2" fill="#1a1020"/><circle cx="27.6" cy="26" r=".9" fill="#fff"/><circle cx="39.6" cy="26" r=".9" fill="#fff"/>`;
     s+=`<path d="M30.5 33 l3 0 l-1.5 1.8z" fill="#f08a9a"/><path d="M32 35 q-2 3 -4 1 M32 35 q2 3 4 1" stroke="${c.pat==='glow'?'#ff5a6a':'#3a2a24'}" stroke-width="1.1" fill="none" stroke-linecap="round"/>`;
