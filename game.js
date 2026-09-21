@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.28';
+const VERSION='7.29';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -4230,10 +4230,12 @@ function render(){
     <div class="a2">${(c.hp||0)<=0?`<button class="btn sm r" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>${S.active.length<crewSlots()?'<div class="help" style="font-size:11px;margin-top:4px">Their slot is free - bring someone else along meanwhile.</div>':''}`:`<button class="btn sm ${act?'':'r'}" onclick="toggleCrew('${c.id}')">${act?'Leave at base':'Bring along'}</button>${(c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?`<button class="btn sm ghost" style="margin-top:4px" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>`:''}`}</div></div></div>`;}).join(''):'<p class="help">Nobody yet. Survivors hide in the places you search.</p>';
   // base
   const bh=$('#baseHead');
-  if(!S.base){bh.className='card blood';bh.innerHTML='<h2>No base yet</h2><p>Clear any place, then tap <b>Claim as base</b> on it. Where you set up matters: a police station comes with an armory and walls, a pharmacy with a clinic, a gas station with a generator. You can move later for 20 scrap.</p>';}
-  else{bh.className='card';bh.innerHTML=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2>${baseScene()}<p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div><div class="help" style="margin-top:4px;color:var(--amber)">${hordeCountdown()}</div>
+  if(!S.base){bh.className='card blood';bh._html='';bh.innerHTML='<h2>No base yet</h2><p>Clear any place, then tap <b>Claim as base</b> on it. Where you set up matters: a police station comes with an armory and walls, a pharmacy with a clinic, a gas station with a generator. You can move later for 20 scrap.</p>';}
+  else{bh.className='card';const bhHtml=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2>${baseScene()}<p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div><div class="help" style="margin-top:4px;color:var(--amber)">${hordeCountdown()}</div>
     <div class="help" style="margin-top:4px">Held ${baseDays()} day${baseDays()===1?'':'s'}${baseAgePower()?` · raiders hit ${baseAgePower()} harder for it. Moving resets that.`:''}</div>
-    <div class="help" style="margin-top:4px">${S.base.geo?'This is also your <b>home</b> on the live map - same place, one pin. Stand within 60 m of it to stash.':'No map pin yet. Set one from the live map if you want to stash out walking.'}</div></div></div>`;}
+    <div class="help" style="margin-top:4px">${S.base.geo?'This is also your <b>home</b> on the live map - same place, one pin. Stand within 60 m of it to stash.':'No map pin yet. Set one from the live map if you want to stash out walking.'}</div></div></div>`;
+    // Rebuilding this on every render() restarted every animation in the yard, several times a minute.
+    if(bh._html!==bhHtml){bh._html=bhHtml;bh.innerHTML=bhHtml;}}
   $('#baseAlert').hidden=!(S.raidPending&&S.base&&S.base.rooms.tower);
   $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(AMMO_KINDS.filter(k=>k!=='ammo'&&(S.stock[k]||0)>0)).concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',shells:'🟥',bolts:'🎯',candy:'🍬'}[k]}</div><b>${k==='meds'?medsTotal():(S.stock[k]||0)}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`
     /* v7.6 - THE CHEST BUTTON WAS A DANGLING EXPRESSION. It lived on its own
@@ -4305,33 +4307,132 @@ function renderLoc(){
   ${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn ${done?'r':''}" onclick="leaveLoc()">${done?'Move on':'Leave the rest'}</button><button class="btn" onclick="claimBase()">${S.base?'Move base here · compare first':'Claim as base'}</button></div>`;
 }
 function bankedLine(){const b=S.walk.banked||0;if(!b)return '';const d=district();const avg=(d.dist[0]+d.dist[1])/2;const n=Math.floor(b/avg);return `<p class="help" style="margin-top:10px">🚶 <b style="color:var(--bone)">${fmt(b)} steps saved</b> while you stop here. They carry you onward the moment you leave${n>=1?' (about '+n+' more place'+(n>1?'s':'')+' already reached)':''}.</p>`;}
+/* ================= THE BASE, DRAWN (v7.29) =================
+   Everything you build, everyone who lives here and everything that comes for it
+   was text. This is the yard: the building you claimed, walls that grow from
+   wire to timber to concrete, a tower that gets taller, garden beds, barrels, a
+   generator that lights the windows - and on horde night, the horde at the fence.
+   She approved the look from rendered PNGs first (games/tools/base_mockup.html).
+   The people, the pets and the zombies are the UNCHANGED art.js sprites; nothing
+   in art.js was touched. All scenery lives here.
+   It is one SVG string, used for her own Base tab AND for visiting a friend, so
+   it reads everything from `st` and only consults live game state (horde clock,
+   raiders, weather) when st is her own save.
+   Motion is SMIL inside DOM markup. `reduced` strips every animation tag, so
+   reduced-motion draws one still frame - checked by counting <animate. */
+const BS_OUT='#15121a';
+function bsO(w){return 'stroke="'+BS_OUT+'" stroke-width="'+(w||2)+'" stroke-linejoin="round"';}
+function bsShadow(x,y,rx){return '<ellipse cx="'+x+'" cy="'+y+'" rx="'+rx+'" ry="'+(rx*0.28).toFixed(1)+'" fill="#000" opacity=".28"/>';}
+// A real ART sprite with its feet at (x,y). `anim` is an optional SMIL tag for the wrapper.
+function bsSprite(svg,x,y,w,anim){const h=Math.round(w*1.3);
+  return '<g transform="translate('+(x-w/2)+','+(y-h)+')"><g>'+(anim||'')+svg+'</g></g>';}
+function bsAnim(on,tag){return on?tag:'';}
+// Level 0 = a run of wire, 1-3 = a timber palisade getting taller, 4+ = concrete.
+function bsWall(x1,y1,x2,y2,lv,night,k){
+  let s='';k=k||1;const n=Math.max(6,Math.round(Math.hypot(x2-x1,y2-y1)/13));
+  if(!lv){for(let i=0;i<=n;i+=2){const x=x1+(x2-x1)*i/n,y=y1+(y2-y1)*i/n;s+='<path d="M'+x.toFixed(1)+' '+y.toFixed(1)+' v-12" stroke="#5a5240" stroke-width="2"/>';}
+    return s+'<path d="M'+x1+' '+(y1-9)+' L'+x2+' '+(y2-9)+' M'+x1+' '+(y1-4)+' L'+x2+' '+(y2-4)+'" stroke="#5a5240" stroke-width="1" stroke-dasharray="3 3"/>';}
+  const h=(lv>=4?22+(lv-4)*5:10+lv*4)*k;
+  if(lv>=4)return '<path d="M'+x1+' '+y1+' L'+x2+' '+y2+' L'+x2+' '+(y2-h)+' L'+x1+' '+(y1-h)+'z" fill="'+(night?'#55555e':'#8a8a90')+'" '+bsO(2)+'/><path d="M'+x1+' '+(y1-h+4)+' L'+x2+' '+(y2-h+4)+'" stroke="'+BS_OUT+'" stroke-width="1" opacity=".5"/>';
+  for(let i=0;i<n;i++){const x=x1+(x2-x1)*i/n,y=y1+(y2-y1)*i/n,dx=(x2-x1)/n,dy=(y2-y1)/n;
+    s+='<path d="M'+x.toFixed(1)+' '+y.toFixed(1)+' L'+(x+dx).toFixed(1)+' '+(y+dy).toFixed(1)+' L'+(x+dx).toFixed(1)+' '+(y+dy-h).toFixed(1)+' L'+(x+dx/2).toFixed(1)+' '+(y+dy/2-h-4).toFixed(1)+' L'+x.toFixed(1)+' '+(y-h).toFixed(1)+'z" fill="'+(i%2?'#6a4a2a':'#7a5a34')+'" '+bsO(1.4)+'/>';}
+  return s;
+}
+// What is outside the fence right now. Only ever true for her own base.
+function baseThreat(st){
+  if(st!==S||!S.base)return {horde:0,raiders:false,hrs:null};
+  const h=hordeState();const ms=h?h.next-Date.now():Infinity;
+  const horde=(h&&h.pending)||ms<2*3600000?2:ms<24*3600000?1:0;
+  return {horde,raiders:!!S.raidPending,hrs:isFinite(ms)?ms/3600000:null};
+}
 function baseScene(st){st=st||S;if(!st.base)return '';
-  const r=st.base.rooms||{};const night=isNight();const col={house:'#4a3d44',pharmacy:'#2f4a5a',gas:'#5a4a2f',grocery:'#2f5a44',police:'#2f3a5a',clinic:'#5a2f3a',hardware:'#5a3f2f',surplus:'#3f4a2f',stronghold:'#5a2a22'}[st.base.t]||'#4a3d44';
-  let s=`<svg viewBox="0 0 360 170" style="width:100%;display:block;border-radius:8px;margin-top:10px;background:${night?'#0b0b10':'#22202a'}" role="img" aria-label="Your base">`;
-  s+=`<rect x="0" y="120" width="360" height="50" fill="${night?'#17151a':'#2b2528'}"/>`;
-  if(r.generator)s+=`<circle cx="180" cy="60" r="140" fill="#e6a530" opacity=".07"><animate attributeName="opacity" values=".07;.05;.08;.07" dur="3.1s" repeatCount="indefinite"/></circle>`;
-  s+=`<rect x="120" y="40" width="120" height="82" fill="${col}"/><path d="M110 40 L180 8 L250 40z" fill="#1a1719"/><rect x="168" y="86" width="24" height="36" fill="#0d0c0e"/><rect x="136" y="56" width="20" height="18" fill="${r.generator?'#ffd98a':'#161418'}"/><rect x="204" y="56" width="20" height="18" fill="${r.generator?'#ffd98a':'#161418'}"/>`;
-  s+=`<text x="180" y="34" text-anchor="middle" font-size="16">${st.base.e}</text>`;
-  const tro=(st.shelf||[]).slice(-6);if(tro.length){s+=`<rect x="124" y="82" width="112" height="3" fill="#7a6a5a"/>`;tro.forEach((it,i)=>{s+=`<text x="${131+i*18}" y="80" font-size="11">${it.e}</text>`;});}
-  if(r.bell)s+=`<g><animateTransform attributeName="transform" type="rotate" values="-8 180 4;8 180 4;-8 180 4" dur="2.2s" repeatCount="indefinite"/><path d="M176 6 q4 -6 8 0 v6 h-8z" fill="#e6a530"/><circle cx="180" cy="13" r="1.5" fill="#5a3a1a"/></g>`;
-  if(r.forge)s+=`<rect x="96" y="90" width="18" height="30" fill="#3a2a2a"/><circle cx="105" cy="100" r="4" fill="#ff7a30"><animate attributeName="r" values="3.5;5;4;5.5;3.5" dur="0.9s" repeatCount="indefinite"/></circle><circle cx="105" cy="100" r="9" fill="#ff7a30" opacity=".18"><animate attributeName="opacity" values=".12;.28;.12" dur="0.9s" repeatCount="indefinite"/></circle><circle cx="103" cy="84" r="2" fill="#777" opacity=".5"><animate attributeName="cy" values="86;66" dur="2.4s" repeatCount="indefinite"/><animate attributeName="opacity" values=".5;0" dur="2.4s" repeatCount="indefinite"/></circle>`;
-  if(r.workshop)s+=`<rect x="60" y="98" width="30" height="22" fill="#4a3f34"/><path d="M58 98 l17 -10 l17 10z" fill="#2a2320"/>`;
-  if(r.kennel)s+=`<rect x="250" y="102" width="22" height="18" fill="#6a4a2a"/><path d="M248 102 l13 -9 l13 9z" fill="#3a2a1a"/><rect x="257" y="110" width="8" height="10" fill="#1a1410"/>`;
-  if(r.vault)s+=`<rect x="206" y="100" width="16" height="16" fill="#555a66"/><circle cx="214" cy="108" r="3" fill="#2a2a30"/>`;
-  const wl=r.walls||0;if(wl){const hh=10+wl*8;for(let x=8;x<352;x+=16){if(x>110&&x<250)continue;s+=`<rect x="${x}" y="${120-hh}" width="10" height="${hh}" fill="${wl>=3?'#6a6a74':'#5a4a3a'}"/>`;}s+=`<rect x="0" y="${120-hh-3}" width="112" height="4" fill="#3a3a44"/><rect x="248" y="${120-hh-3}" width="112" height="4" fill="#3a3a44"/>`;}
-  if(r.tower){const th=(r.tower||1)*22+30;s+=`<rect x="300" y="${120-th}" width="8" height="${th}" fill="#5a4a3a"/><rect x="292" y="${120-th-14}" width="24" height="16" fill="#3a3335"/><circle cx="304" cy="${120-th-8}" r="3" fill="#ffd166"><animate attributeName="opacity" values="1;.4;1" dur="2.8s" repeatCount="indefinite"/></circle>`;}
-  if(r.traps){for(let i=0;i<r.traps*4;i++){const x=20+i*14;s+=`<path d="M${x} 120 l4 -9 l4 9z" fill="#8a8a94"/>`;}}
-  if(r.garden){for(let i=0;i<r.garden*3;i++){const x=258+i*16;s+=`<rect x="${x}" y="108" width="12" height="12" fill="#3a2a1a"/><circle cx="${x+6}" cy="106" r="5" fill="#7fbf4d"/>`;}}
-  if(r.radio)s+=`<path d="M232 40 v-30 M226 16 h12 M228 24 h8" stroke="#8fb3c9" stroke-width="2"/><circle cx="232" cy="10" r="2" fill="#ff5a6a"><animate attributeName="opacity" values="1;0.2;1" dur="1.6s" repeatCount="indefinite"/></circle>`;
-  if(r.generator)s+=`<rect x="96" y="104" width="22" height="16" fill="#3a3a44"/><rect x="100" y="98" width="6" height="8" fill="#555"/>`;
-  if(r.bunk)s+=`<path d="M40 120 l18 -22 l18 22z" fill="#4a5a44"/><rect x="54" y="106" width="8" height="14" fill="#1a1a1e"/>`;
-  if(r.clinic)s+=`<rect x="126" y="44" width="10" height="10" fill="#e8f4f8"/><path d="M131 45 v8 M127 49 h8" stroke="#c22b3a" stroke-width="2"/>`;
-  if(r.armory)s+=`<rect x="256" y="104" width="18" height="16" fill="#5a4a3a"/><path d="M256 112 h18" stroke="#2a1a0a" stroke-width="2"/>`;
-  const crew=(st===S?activeCrew():((st.active||[]).map(id=>(st.crew||[]).find(c=>c.id===id)).filter(Boolean))).slice(0,3);crew.forEach((c,i)=>{s+=`<svg x="${28+i*30}" y="86" width="26" height="34" viewBox="0 0 100 130"><g><animateTransform attributeName="transform" type="translate" values="0 0;0 -3;0 0" dur="${(2.2+i*0.4).toFixed(1)}s" repeatCount="indefinite"/>${ART.avatarSVG(c.av,100).replace(/<svg[^>]*>|<\/svg>/g,'')}</g></svg>`;});
-  s+=`<svg x="150" y="80" width="30" height="40" viewBox="0 0 100 130"><g><animateTransform attributeName="transform" type="translate" values="0 0;0 -3;0 0" dur="2.6s" repeatCount="indefinite"/>${ART.avatarSVG(st.av,100).replace(/<svg[^>]*>|<\/svg>/g,'')}</g></svg>`;
-  if(st.pet)s+=`<svg x="185" y="100" width="20" height="20" viewBox="0 0 64 64">${ART.petSVG(st.pet,64,st.petCoat,{still:true}).replace(/<svg[^>]*>|<\/svg>/g,'')}</svg>`;
-  if(night)s+=`<circle cx="40" cy="26" r="12" fill="#e8e0d0" opacity=".8"/>`;
-  s+='</svg>';return s;
+  const r=st.base.rooms||{};const R=k=>r[k]||0;const mine=st===S;
+  const th=baseThreat(st);const night=isNight()||th.horde===2;const A=!reduced;
+  const wx=(mine&&typeof wxKind==='function')?wxKind():'';
+  const col={house:'#5b4a44',pharmacy:'#3f5a6a',gas:'#6a5a3f',grocery:'#3f6a54',police:'#3f4a6a',clinic:'#6a3f4a',hardware:'#6a4f3f',surplus:'#4f5a3f',stronghold:'#6a3a32'}[st.base.t]||'#5b4a44';
+  // the strip of street under the front fence is only worth the height when something is standing in it
+  const W=390,H=(th.horde||th.raiders||R('traps'))?300:266;let s='';
+  s+='<defs><linearGradient id="bsSky" x1="0" y1="0" x2="0" y2="1">'+(night
+      ?'<stop offset="0" stop-color="#07070c"/><stop offset=".7" stop-color="#15121c"/><stop offset="1" stop-color="#2a1c22"/>'
+      :(wx==='rain'||wx==='storm')?'<stop offset="0" stop-color="#1a1c22"/><stop offset="1" stop-color="#3a3a44"/>'
+      :'<stop offset="0" stop-color="#2a2a3a"/><stop offset=".6" stop-color="#5a4a52"/><stop offset="1" stop-color="#a0705a"/>')+'</linearGradient>'
+    +'<radialGradient id="bsGlow"><stop offset="0" stop-color="#ffd166" stop-opacity=".55"/><stop offset="1" stop-color="#ffd166" stop-opacity="0"/></radialGradient>'
+    +'<radialGradient id="bsFire"><stop offset="0" stop-color="#ff8a3a" stop-opacity=".6"/><stop offset="1" stop-color="#ff8a3a" stop-opacity="0"/></radialGradient></defs>';
+  s+='<rect width="'+W+'" height="'+H+'" fill="url(#bsSky)"/>';
+  if(night){s+='<circle cx="318" cy="38" r="17" fill="#e8e0d0" opacity=".9"/><circle cx="325" cy="33" r="15" fill="#0b0b11"/>';
+    [[40,30],[96,18],[150,44],[214,22],[262,50],[356,70],[20,66]].forEach((p,i)=>{s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="1.1" fill="#e8e0d0">'+bsAnim(A,'<animate attributeName="opacity" values="1;.25;1" dur="'+(2.4+i*0.7).toFixed(1)+'s" repeatCount="indefinite"/>')+'</circle>';});}
+  else{s+='<circle cx="318" cy="52" r="20" fill="#d9c9a6" opacity=".8"/>';
+    [[-60,40,26],[-160,66,20]].forEach((c,i)=>{s+='<g opacity=".35"><ellipse cx="'+c[0]+'" cy="'+c[1]+'" rx="'+c[2]*1.6+'" ry="'+c[2]*0.5+'" fill="#3c3237"/>'+bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 0;520 0" dur="'+(70+i*34)+'s" repeatCount="indefinite"/>')+'</g>';});}
+  [[0,40,48],[44,30,70],[78,50,40],[132,36,62],[236,44,52],[284,30,76],[318,40,44],[360,30,60]].forEach(b=>{s+='<rect x="'+b[0]+'" y="'+(112-b[2])+'" width="'+b[1]+'" height="'+b[2]+'" fill="#17151a"/>';});
+  // ground: the street outside, the yard inside
+  s+='<rect y="108" width="'+W+'" height="'+(H-108)+'" fill="'+(night?'#1c1a1d':'#2b2528')+'"/>';
+  s+='<path d="M50 124 L340 124 L366 250 L24 250 Z" fill="'+(night?'#2a2622':'#4a4034')+'" '+bsO(2)+'/>';
+  for(let i=0;i<14;i++){const x=58+(i*53)%280,y=140+(i*37)%100;s+='<path d="M'+x+' '+y+' l2 -5 l2 5 M'+(x+4)+' '+y+' l2 -4 l2 4" stroke="'+(night?'#2e3a26':'#5f7a3e')+'" stroke-width="1.4" fill="none"/>';}
+  s+=bsWall(50,124,340,124,R('walls'),night);
+  // the building you claimed
+  const lit=R('generator')>0;
+  s+=bsShadow(196,172,74);
+  s+='<path d="M252 92 v-20 h12 v26z" fill="#3a2a2a" '+bsO(2)+'/>';
+  if(A&&(lit||night))for(let i=0;i<3;i++)s+='<circle cx="258" cy="68" r="4" fill="#b9b2a4" opacity="0"><animate attributeName="cy" values="68;30" dur="4.200s" begin="'+(i*1.4)+'s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;.35;0" dur="4.200s" begin="'+(i*1.4)+'s" repeatCount="indefinite"/><animate attributeName="r" values="3;8" dur="4.200s" begin="'+(i*1.4)+'s" repeatCount="indefinite"/></circle>';
+  s+='<path d="M128 170 V112 L196 84 L264 112 V170 Z" fill="'+col+'" '+bsO(2.4)+'/>';
+  s+='<path d="M120 114 L196 78 L272 114 L264 120 L196 90 L128 120 Z" fill="#3a2a2a" '+bsO(2.4)+'/>';
+  [[142,126],[228,126]].forEach((w,i)=>{
+    s+='<rect x="'+w[0]+'" y="'+w[1]+'" width="22" height="20" rx="2" fill="'+(lit?'#ffd166':(night?'#0e0e12':'#2a3440'))+'" '+bsO(2)+'>'+bsAnim(A&&lit,'<animate attributeName="fill" values="#ffd166;#ffc94a;#ffd98a;#ffd166" dur="'+(3.3+i)+'s" repeatCount="indefinite"/>')+'</rect><path d="M'+(w[0]+11)+' '+w[1]+' v20 M'+w[0]+' '+(w[1]+10)+' h22" stroke="'+BS_OUT+'" stroke-width="1.5"/>';
+    if(lit&&night)s+='<circle cx="'+(w[0]+11)+'" cy="'+(w[1]+10)+'" r="30" fill="url(#bsGlow)"/>';});
+  s+='<rect x="184" y="136" width="24" height="34" rx="2" fill="#2a1c18" '+bsO(2)+'/><circle cx="203" cy="154" r="1.8" fill="#c9a04a"/>';
+  s+='<text x="196" y="108" text-anchor="middle" font-size="13">'+(st.base.e||'')+'</text>';
+  // the last few trophies, on a plank by the door - so a visit shows them off
+  const tro=(st.shelf||[]).slice(-3);if(tro.length){s+='<rect x="166" y="131" width="60" height="2.500" fill="#7a6a5a"/>';tro.forEach((it,i)=>{s+='<text x="'+(172+i*19)+'" y="130" font-size="9">'+it.e+'</text>';});}
+  if(R('radio'))s+='<path d="M236 100 V58 M226 68 h20 M230 78 h12" stroke="#b9b2a4" stroke-width="2.2" fill="none"/><circle cx="236" cy="56" r="3" fill="#c22b3a">'+bsAnim(A,'<animate attributeName="opacity" values="1;.2;1" dur="1.6s" repeatCount="indefinite"/>')+'</circle>';
+  if(R('bell'))s+='<path d="M212 128 h10" stroke="#3a2a2a" stroke-width="3" stroke-linecap="round"/><g>'+bsAnim(A,'<animateTransform attributeName="transform" type="rotate" values="'+(th.horde===2?'-16 217 128;16 217 128;-16 217 128':'-4 217 128;4 217 128;-4 217 128')+'" dur="'+(th.horde===2?'0.7':'3.4')+'s" repeatCount="indefinite"/>')+'<path d="M218 129 q-6 8 -6 12 h12 q0 -4 -6 -12z" fill="#c9a04a" '+bsO(1.6)+'/><circle cx="218" cy="142.500" r="1.8" fill="'+BS_OUT+'"/></g>';
+  for(let i=0;i<Math.min(3,R('bunk'));i++){const x=272+i*22;s+='<path d="M'+x+' 170 l11 -20 l11 20z" fill="#6a5a3a" '+bsO(2)+'/><path d="M'+(x+11)+' 150 v20" stroke="'+BS_OUT+'" stroke-width="1.5"/>';}
+  if(R('tower')){const h=44+Math.min(3,R('tower'))*18,x=72,y=170,ly=y-h-8;
+    s+=bsShadow(x,y,20);
+    s+='<path d="M'+(x-14)+' '+y+' L'+(x-9)+' '+(y-h)+' M'+(x+14)+' '+y+' L'+(x+9)+' '+(y-h)+' M'+(x-12)+' '+(y-h*0.33).toFixed(1)+' L'+(x+11)+' '+(y-h*0.66).toFixed(1)+' M'+(x+12)+' '+(y-h*0.33).toFixed(1)+' L'+(x-11)+' '+(y-h*0.66).toFixed(1)+'" stroke="#6a4a2a" stroke-width="4" stroke-linecap="round"/>';
+    s+='<rect x="'+(x-18)+'" y="'+(y-h-16)+'" width="36" height="18" fill="#7a5a34" '+bsO(2)+'/><path d="M'+(x-22)+' '+(y-h-16)+' L'+x+' '+(y-h-32)+' L'+(x+22)+' '+(y-h-16)+'z" fill="#3a2a2a" '+bsO(2)+'/>';
+    if(night)s+='<g>'+bsAnim(A,'<animateTransform attributeName="transform" type="rotate" values="-14 '+(x+14)+' '+ly+';20 '+(x+14)+' '+ly+';-14 '+(x+14)+' '+ly+'" dur="9s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1" keyTimes="0;0.5;1"/>')+'<path d="M'+(x+14)+' '+ly+' L'+(x+170)+' '+(ly+92)+' L'+(x+128)+' '+(ly+120)+'z" fill="#ffd166" opacity=".13"/></g>';
+    s+='<circle cx="'+(x+14)+'" cy="'+ly+'" r="4" fill="#ffd166" '+bsO(1.4)+'>'+bsAnim(A,'<animate attributeName="opacity" values="1;.5;1" dur="2.8s" repeatCount="indefinite"/>')+'</circle>';}
+  for(let i=0;i<Math.min(2,R('barrel'));i++){const px=116-i*19;s+=bsShadow(px,172,9)+'<rect x="'+(px-8)+'" y="150" width="16" height="22" rx="3" fill="#3a6a9a" '+bsO(2)+'/><path d="M'+(px-8)+' 157 h16 M'+(px-8)+' 165 h16" stroke="'+BS_OUT+'" stroke-width="1.4"/>';}
+  if(R('generator')){s+='<path d="M300 196 Q280 182 264 164" stroke="'+BS_OUT+'" stroke-width="2.5" fill="none"/>'+bsShadow(312,206,18);
+    s+='<g>'+bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 0;0.600 -0.500;-0.500 0.400;0 0" dur="0.220s" repeatCount="indefinite"/>')
+      +'<rect x="296" y="186" width="32" height="20" rx="3" fill="#c9a04a" '+bsO(2)+'/><rect x="300" y="190" width="10" height="8" fill="#3a3a44" '+bsO(1.2)+'/><path d="M316 190 l-3 6 h5 l-3 6" stroke="'+BS_OUT+'" stroke-width="1.6" fill="none"/>'
+      +(R('generator')>1?'<rect x="330" y="190" width="14" height="16" rx="2" fill="#8a3a2a" '+bsO(2)+'/>':'')+'</g>';
+    if(A)for(let i=0;i<2;i++)s+='<circle cx="326" cy="184" r="2" fill="#8a8a90" opacity="0"><animate attributeName="cy" values="184;162" dur="1.800s" begin="'+(i*0.9)+'s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;.5;0" dur="1.800s" begin="'+(i*0.9)+'s" repeatCount="indefinite"/></circle>';}
+  for(let i=0;i<Math.min(3,R('garden'));i++){const x=44+i*3,y=186+i*15;s+='<path d="M'+x+' '+y+' h70 l4 12 h-78z" fill="#3a2a1c" '+bsO(2)+'/>';
+    for(let k=0;k<6;k++){const px=x+6+k*11;s+='<g>'+bsAnim(A,'<animateTransform attributeName="transform" type="rotate" values="-5 '+px+' '+(y+8)+';5 '+px+' '+(y+8)+';-5 '+px+' '+(y+8)+'" dur="'+(2.6+((k+i)%3)*0.5).toFixed(1)+'s" repeatCount="indefinite"/>')+'<path d="M'+px+' '+(y+8)+' v-7 M'+px+' '+(y+3)+' q-5 -4 -6 -1 M'+px+' '+(y+3)+' q5 -4 6 -1" stroke="#7fbf4d" stroke-width="2" fill="none" stroke-linecap="round"/></g>';}}
+  if(R('workshop'))s+=bsShadow(250,216,22)+'<rect x="228" y="200" width="44" height="7" fill="#7a5a34" '+bsO(2)+'/><path d="M232 207 v10 M268 207 v10" stroke="#6a4a2a" stroke-width="3.5"/><path d="M238 199 h16 l4 -5 h-16z" fill="#b9b2a4" '+bsO(1.4)+'/>';
+  if(R('forge')){s+='<g transform="translate(-4,-12)"><circle cx="296" cy="232" r="24" fill="url(#bsFire)">'+bsAnim(A,'<animate attributeName="r" values="20;27;22;26;20" dur="1.100s" repeatCount="indefinite"/>')+'</circle>'+bsShadow(296,240,16)
+    +'<path d="M284 240 h24 v-8 h-6 v-6 h10 v-5 h-32 v5 h10 v6 h-6z" fill="#3a3a44" '+bsO(2)+'/><path d="M292 219 q4 -10 8 0" fill="#ff8a3a" '+bsO(1.2)+'>'+bsAnim(A,'<animate attributeName="d" values="M292 219 q4 -10 8 0;M292 219 q4 -14 8 0;M292 219 q4 -8 8 0;M292 219 q4 -10 8 0" dur="0.800s" repeatCount="indefinite"/>')+'</path>';
+    if(A)for(let i=0;i<2;i++)s+='<circle cx="'+(294+i*4)+'" cy="214" r="1.200" fill="#ffd166" opacity="0"><animate attributeName="cy" values="214;192" dur="1.300s" begin="'+(i*0.65)+'s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;0" dur="1.300s" begin="'+(i*0.65)+'s" repeatCount="indefinite"/></circle>';
+    s+='</g>';}
+  if(R('armory'))s+='<path d="M316 176 v-30 h22 v30" stroke="#6a4a2a" stroke-width="3.5" fill="none"/><path d="M322 172 v-22 M328 172 v-24 l3 -4 M334 172 v-20" stroke="#b9b2a4" stroke-width="2.4" stroke-linecap="round"/>';
+  if(R('clinic'))s+=bsShadow(146,222,24)+'<path d="M122 222 l24 -30 l24 30z" fill="#e8e0d0" '+bsO(2)+'/><path d="M146 203 v12 M140 209 h12" stroke="#c22b3a" stroke-width="4"/>';
+  if(R('vault'))s+='<ellipse cx="206" cy="236" rx="15" ry="5" fill="#3a3a44" '+bsO(2)+'/><path d="M199 236 h14 M206 233 v6" stroke="#8a8a90" stroke-width="2"/>';
+  if(R('kennel'))s+=bsShadow(338,232,15)+'<path d="M324 232 v-14 l14 -11 l14 11 v14z" fill="#8a3a2a" '+bsO(2)+'/><path d="M332 232 v-9 a6 6 0 0 1 12 0 v9z" fill="'+BS_OUT+'"/>';
+  // who lives here - the real sprites, breathing and blinking
+  const crew=(mine?activeCrew():((st.active||[]).map(id=>(st.crew||[]).find(c=>c.id===id)).filter(Boolean))).slice(0,3);
+  const spots=[[176,214,40],[268,190,36],[150,180,34]];
+  crew.forEach((c,i)=>{const p=spots[i];
+    s+=bsShadow(p[0],p[1],p[2]*0.32)+bsSprite(ART.avatarSVG(c.av,p[2],{alive:A,phase:i+1}),p[0],p[1],p[2],bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 0;'+(i%2?-7:8)+' 0;0 0" dur="'+(11+i*3)+'s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1" keyTimes="0;0.5;1"/>'));});
+  s+=bsShadow(212,226,15)+bsSprite(ART.avatarSVG(st.av,46,{alive:A,weapon:th.horde===2?'melee':''}),212,226,46);
+  if(st.pet)s+=bsShadow(240,233,9)+bsSprite(ART.petSVG(st.pet,26,st.petCoat,{still:true}),240,234,26,bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 0;0 -3;0 0;0 0" keyTimes="0;0.12;0.24;1" dur="2.600s" repeatCount="indefinite"/>'));
+  // walls over the yard edge, then whatever is outside them
+  s+=bsWall(50,124,24,250,R('walls'),night)+bsWall(340,124,366,250,R('walls'),night);
+  const sway=(i,cx,cy)=>bsAnim(A,'<animateTransform attributeName="transform" type="rotate" values="-4 '+cx+' '+cy+';4 '+cx+' '+cy+';-4 '+cx+' '+cy+'" dur="'+(1.9+(i%4)*0.45).toFixed(2)+'s" repeatCount="indefinite"/>');
+  if(th.horde===2)[[14,176,'runner',34],[378,182,'walker',34],[8,226,'walker',40]].forEach((z,i)=>{s+=bsSprite(ART.zombieSVG(z[2],z[3]),z[0],z[1],z[3],sway(i,z[3]/2,z[3]*1.3));});
+  const gl=170,gr=220,wl=R('walls');const gh=(wl>=4?22+(wl-4)*5:wl?10+wl*4:12)*0.55;
+  s+=bsWall(24,250,gl,250,wl,night,0.55)+bsWall(gr,250,366,250,wl,night,0.55);
+  s+='<path d="M'+gl+' 250 v-'+(gh+6).toFixed(1)+' M'+gr+' 250 v-'+(gh+6).toFixed(1)+'" stroke="#3a2a2a" stroke-width="5" stroke-linecap="round"/>';
+  if(R('traps'))for(let i=0;i<Math.min(3,R('traps'))*5;i++){const x=30+i*(330/(Math.min(3,R('traps'))*5));if(x>160&&x<226)continue;s+='<path d="M'+x.toFixed(1)+' 266 l-5 -9 M'+x.toFixed(1)+' 266 l0 -11 M'+x.toFixed(1)+' 266 l5 -9" stroke="#b9b2a4" stroke-width="2" stroke-linecap="round"/>';}
+  const mob=th.horde===2?[[52,296,'walker',50],[104,298,'runner',46],[150,296,'walker',48],[246,298,'walker',46],[298,297,'bloater',54],[348,296,'runner',46],[384,250,'walker',40]]
+           :th.horde===1?[[40,298,'walker',40],[330,297,'walker',38],[372,296,'runner',36]]:[];
+  mob.forEach((z,i)=>{s+=bsShadow(z[0],z[1]-1,z[3]*0.3)+bsSprite(ART.zombieSVG(z[2],z[3]),z[0],z[1],z[3],sway(i+3,z[3]/2,z[3]*1.3));});
+  if(th.raiders&&th.horde<2)[[286,297,'raider',44],[326,298,'gunner',42]].forEach((z,i)=>{s+=bsShadow(z[0],z[1]-1,z[3]*0.3)+bsSprite(ART.zombieSVG(z[2],z[3]),z[0],z[1],z[3]);});
+  if(wx==='rain'||wx==='storm'){s+='<g opacity=".35" stroke="#8fb3c9" stroke-width="1">'+bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 -40;-12 0" dur="0.450s" repeatCount="indefinite"/>');
+    for(let i=0;i<34;i++){const x=(i*47)%400,y=(i*83)%330;s+='<path d="M'+x+' '+y+' l-4 14"/>';}s+='</g>';}
+  if(th.horde===2)s+='<rect width="'+W+'" height="'+H+'" fill="#c22b3a" opacity=".07">'+bsAnim(A,'<animate attributeName="opacity" values=".04;.12;.04" dur="2.400s" repeatCount="indefinite"/>')+'</rect>';
+  const label=th.horde===2?'Horde night. They are at the fence.':th.horde===1?'They are gathering outside.':th.raiders?'Raiders on the street.':'Your base';
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;border-radius:8px;margin-top:10px" role="img" aria-label="'+label+'">'+s+'</svg>';
 }
 function renderEvent(){const el=$('#eventCard');if(!el)return;const ev=eventNow();if(ev!=='halloween'){el.hidden=true;return;}el.hidden=false;el.className='card amber';const candy=S.stock.candy||0;
   el.innerHTML=`<h2>🎃 Hollow-een <span class="sub">until Nov 2</span></h2><p>Candy turns up in rooms all event long, and the Gourd King holds every stronghold. Spend candy on costumes that stay forever.</p><div class="row" style="margin:8px 0"><span class="chip a">🍬 ${candy} candy</span></div><div class="stack">${HALLOWEEN_SHOP.map(x=>`<div class="room2${S.cosmetics.includes(x.id)?' own':''}"><div class="e">🎃</div><div class="t"><b>${x.n}</b><span>${S.cosmetics.includes(x.id)?'yours':x.c+' candy'}</span></div>${S.cosmetics.includes(x.id)?'<span class="chip z">owned</span>':`<button class="btn sm a" onclick="buyCandy('${x.id}',${x.c})">Buy</button>`}</div>`).join('')}</div>`;}
