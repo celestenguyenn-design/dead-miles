@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.38';
+const VERSION='7.39';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -272,7 +272,7 @@ const SKILLS={
     {id:'appraiser',n:'Appraiser',max:3,req:6,d:r=>'Salvage gives another '+(20*r)+'% scrap'},
     {id:'packrat',n:'Pack Rat',max:3,req:9,d:r=>'+'+(2*r)+' more pack capacity'},
     {id:'shadow',n:'Shadow',max:2,req:13,d:r=>(12*r)+'% chance to slip past a road encounter'}],
-  medic:[{id:'fielddressing',n:'Field Dressing',max:3,d:r=>'Meds heal '+(10*r)+' more'},{id:'tough',n:'Tough',max:3,d:r=>'+'+(10*r)+' max HP'},{id:'triage',n:'Triage',max:3,d:r=>'Heal '+(4*r)+' HP every combat round'},{id:'adrenaline',n:'Adrenaline',max:3,d:r=>'Enemies miss you '+(6*r)+'% more'},{id:'steady',n:'Steady',max:2,d:r=>'Brace blocks '+(60+10*r)+'% instead of 50%'},
+  medic:[{id:'fielddressing',n:'Field Dressing',max:3,d:r=>'Meds heal '+(10*r)+' more'},{id:'tough',n:'Tough',max:3,d:r=>'+'+(10*r)+' max HP'},{id:'triage',n:'Triage',max:3,d:r=>'Heal '+(4*r)+' HP every combat round'},{id:'adrenaline',n:'Adrenaline',max:3,d:r=>'Enemies miss you '+(6*r)+'% more'},{id:'steady',n:'Steady',max:2,d:r=>'Counter blocks '+(60+10*r)+'% instead of 50%'},
     {id:'clotting',n:'Clotting',max:2,req:6,d:r=>'Bleeding hurts '+(25*r)+'% less and bleed/poison end '+r+' round sooner'},
     {id:'transfusion',n:'Transfusion',max:3,req:9,d:r=>'Heal '+(3*r)+' HP every time an enemy goes down'},
     {id:'fieldsurgeon',n:'Field Surgeon',max:2,req:13,d:r=>'Wake at '+(40+15*r)+'% HP after going down, and keep '+(25*r)+'% of the pack'}],
@@ -2354,6 +2354,33 @@ function wearArmor(){
   if(g.dur<=0)breakWeapon(g);
   else if(g.dur<=3)clog(g.n+' is close to giving out - '+g.dur+' more hit'+(g.dur===1?'':'s')+'.','hit');
 }
+/* v7.39 - BRACE BECAME COUNTER. Her words: "you can also remove brace, we don't use it
+   apparently. Make it something else if it's helpful." Nobody used it because it was
+   a wasted turn: half damage for one round, and you did nothing. A med or a swing
+   was always the better button.
+   COUNTER keeps the damage reduction (so the Steady skill still means something) and
+   adds the missing half: EVERY enemy that lands a hit on you that round takes a
+   strike back at COUNTER_MULT of a normal swing. It can be dodged or miss like any
+   swing, and a round in which one lands costs a point of weapon wear.
+   Two earlier shapes were measured and thrown away: answering only the FIRST
+   attacker at 60-85% was no better than attacking in a crowd (59 vs 58 HP lost, and
+   slower) - Brace all over again - and without miss/dodge rules it was simply the
+   best button against one hard hitter. Answering everyone makes it what a stance
+   should be: strong when you are surrounded, pointless against a lone walker. */
+const COUNTER_MULT=0.45;   // per attacker; tuned by measurement, see v7.39
+function counterStrike(){
+  if(!C||!C.brace||C.actor===undefined||C.actor<0)return;
+  const e=C.enemies[C.actor];if(!e||e.dead||e.hp<=0)return;
+  const w=eqItem('melee');const dm=w?wDmg(w):baseDmg();
+  // Same rules as any swing of hers: it can be dodged and it can miss. Without this it never
+  // missed, and against one hard hitter Counter was simply better than attacking (measured).
+  if(Math.random()<(e.dodge||0)){clog(e.n+' slips your counter.','');fxPush({k:'miss',i:C.actor});return;}
+  if(Math.random()>=(buffOn('numb')?0.72:0.9)){clog('Your counter goes wide.','');fxPush({k:'miss',i:C.actor});return;}
+  const d=Math.max(1,Math.round((rint(dm[0],dm[1])+(w?(S.lvl-1):fistLvlBonus())+(w?dmgBonus():0))*COUNTER_MULT*hydroDmg()));
+  dealTo(e,d,'You counter '+e.n,'slash');
+  // It is a real swing, so it wears the weapon like one. Free, it was simply the best button.
+  if(w&&!C.countered){C.countered=true;w.dur--;breakWeapon(w);}   // one point for the round, however many she answers
+}
 function hurt(n,src){let d=Math.max(1,Math.round((n-dr())*(1-drSoak())));
   // Vigil caps the OPENING hit of a fight. It does nothing for the rest of the
   // fight, so it is protection against being ambushed, not a damage sponge.
@@ -2362,7 +2389,8 @@ function hurt(n,src){let d=Math.max(1,Math.round((n-dr())*(1-drSoak())));
   if(C.brace)d=Math.ceil(d*(1-(sk('steady')?0.6+sk('steady')*0.1:0.5)));if(S.pet==='dog'&&Math.random()<petBlock()){clog(S.petName+' lunges and takes the hit meant for you.','good');fxPush({k:'petblock',from:(C.actor===undefined?-1:C.actor)});return;}if(C.adrena===C.turn&&S.hp-d<=0){d=S.hp-1;clog('The adrenaline holds you up at 1 HP.','good');}
   else if(sk('ironjaw')&&!C.jaw&&S.hp-d<=0){C.jaw=true;d=S.hp-1;clog('Iron Jaw. You stay on your feet at 1 HP.','good');}
   wearArmor();
-  S.hp-=d;C.pfx={d,t:Date.now()};fxPush({k:'hurt',d,from:(C.actor===undefined?-1:C.actor),big:d>=maxHp()*0.2});clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
+  S.hp-=d;C.pfx={d,t:Date.now()};fxPush({k:'hurt',d,from:(C.actor===undefined?-1:C.actor),big:d>=maxHp()*0.2});
+  if(S.hp>0)counterStrike();clog(src+' hits you for '+d+'.','hit');SFX.play('hurt');$('#sheet').classList.add('shake');setTimeout(()=>$('#sheet').classList.remove('shake'),400);}
 function dealTo(t,d,label,kind){if(C.poison>0)d=Math.max(1,Math.round(d*0.8));
   if(t.warden&&(sk('raidvet')||setPerk('bossDmg')))d=Math.round(d*(1+0.05*sk('raidvet')+setPerk('bossDmg')));
   if(t.plate&&!t.cracked){
@@ -2453,7 +2481,7 @@ function breakWeapon(w){if(w.dur===undefined||w.dur>0)return;
   }else{clog('The '+w.n+(slot==='ranged'?' jams for good.':' breaks.'),'sys');
     S.gear=S.gear.filter(g=>g.uid!==w.uid);if(S.eq[slot]===w.uid)S.eq[slot]=null;}}
 function act(kind){
-  if(!C||C.over)return;C.brace=false;
+  if(!C||C.over)return;C.brace=false;C.countered=false;C.actor=-1;   // `actor` only means something on THEIR turn
   C.fxq=[];C.fxNew=false;C.hp0=S.hp;for(const e of C.enemies)e.hp0=e.hp;   // the stage replays this round from here
   const t=targetEnemy();if(!t){endCombat(true);return;}
   // "Fists" is the same swing with the weapon deliberately left out of it. She
@@ -2515,7 +2543,7 @@ function act(kind){
       breakWeapon(g);
     }
   }
-  else if(kind==='brace'){C.brace=true;clog('You brace.','you');fxPush({k:'brace'});}
+  else if(kind==='brace'){C.brace=true;clog('You set your feet and wait for it.','you');fxPush({k:'brace'});}
   else if(kind==='med'){
     // Unlimited patch-ups meant ten meds were 400 extra HP and no boss could
     // ever out-damage a pack. Two a fight (three with Field Dressing) turns
@@ -2564,18 +2592,21 @@ function act(kind){
   const ml=roleLvl('medic');if(ml&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+6+ml*3);fxPush({k:'heal',n:6+ml*3,by:'crew:medic'});clog(activeCrew().find(c=>c.role==='medic').name+' patches you: +'+(6+ml*3)+'.','good');}
   if(sk('triage')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('triage')*4);}
   if(eqItem('armor')&&eqItem('armor').id==='nightingale'&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+5);}
-  for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;fxPush({k:'die',i:C.enemies.indexOf(e)});codexKill(e);S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);if(sk('transfusion')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('transfusion')*3);clog('You patch up as '+e.n+' drops. +'+(sk('transfusion')*3)+' HP.','good');}clog(e.n+' goes down. +'+e.xp+' XP.','good');
+  const reap=()=>{for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;fxPush({k:'die',i:C.enemies.indexOf(e)});codexKill(e);S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);if(sk('transfusion')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('transfusion')*3);clog('You patch up as '+e.n+' drops. +'+(sk('transfusion')*3)+' HP.','good');}clog(e.n+' goes down. +'+e.xp+' XP.','good');
     if(e.burst&&!e.shot){hurt(Math.round((e.burst+dr())*(sk('lungs')?0.5:1)),'The bloater bursts and');}
     if(e.human){if(Math.random()<0.5){const g=pick(['pipe','bat','jacket','helmet','crowbar']);S.gear.push({uid:uid(),id:g,...GEAR[g]});clog('It dropped a '+GEAR[g].n+'.','sys');}
       if(Math.random()<0.5){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:3,n:'Rounds (x3)'});clog('You take 3 rounds off the body.','sys');}
       if(e.boss){S.keys++;S.pack.push({id:'skull',...ITEMS.skull,uid:uid()});clog('The boss mask, and a key from the belt.','sys');
         if(e.wanted&&!e.fled){S.bossKilled=weekId();S.pack.push({id:'wanted',...ITEMS.wanted,uid:uid()});clog('Bounty claimed: '+e.n+'. The poster comes off the wall.','good');ctEvent('bounty',1);if(Math.random()<0.3)dropLegend('The boss was carrying something.');}}}
     else if(Math.random()<0.06){S.pack.push({id:'dogtag',...ITEMS.dogtag,uid:uid()});clog('A dog tag around its neck. Trophy.','sys');}}}
+  };reap();
   // Hold the fight this timer belongs to: if a new one somehow started in the
   // meantime, the old victory must not end it.
   if(!alive().length){const mine=C;renderCombat();setTimeout(()=>{if(C===mine)endCombat(true);},500);return;}
   enemyPhase();
   if(S.hp<=0){death();return;}
+  reap();   // a counter-strike can finish something on THEIR turn
+  if(!alive().length){const mine=C;renderCombat();setTimeout(()=>{if(C===mine)endCombat(true);},500);return;}
   renderCombat();
 }
 /* ================= RAID BOSS MECHANICS (v6.44) =================
@@ -2899,7 +2930,7 @@ function renderCombat(){
     ${w?`<button class="btn" onclick="act('fists')">👊 Fists<small>${fistDmg()[0]}-${fistDmg()[1]} dmg · saves your ${esc(w.n)}</small></button>`:''}
     <button class="btn" onclick="swapSheet()">🔄 Switch weapon<small>${swapOptions().length} in your gear${w?' · costs your turn':' · free, hands empty'}</small></button>
     <button class="btn" onclick="shootGuard()" ${g&&(ammoN||g.id==='mercy')?'':'disabled'}>${g?g.e+' '+esc(g.n)+(temperOf(g)?' <span class="chip s">'+esc(temperOf(g).n)+'</span>':''):'🔫 No gun'}<small>${g?(wDmg(g)[0]+sk('steadyaim')*3)+'-'+(wDmg(g)[1]+sk('steadyaim')*3)+' · '+ammoN+' rounds'+(g.dur!==undefined?' · '+g.dur+' left':''):'find one'}</small></button>
-    <button class="btn" onclick="act('brace')">🛡️ Brace<small>${sk('steady')?60+sk('steady')*10:50}% less damage this round</small></button>
+    <button class="btn" onclick="act('brace')">⚔️ Counter<small>take ${sk('steady')?60+sk('steady')*10:50}% less · hit back everyone who lands one</small></button>
     <button class="btn" onclick="act('med')" ${meds?'':'disabled'}>${meds?MEDS[bestMed()].e:'🩹'} Patch up<small>${meds?esc(MEDS[bestMed()].n)+' · +'+Math.min(medHeal(bestMed()),maxHp()-S.hp):'no meds'}</small></button>
     <button class="btn ghost" onclick="act('flee')" ${C.where==='raid'?'disabled':''}>🏃 Run<small>70% · drop 25% pack</small></button>
   </div>
@@ -4969,6 +5000,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.39',d:'Sep 21',t:'Brace is gone. Counter is what it should have been',
+  i:['NOBODY PRESSED BRACE, and you were right not to: it halved the damage for a round and did nothing else, so patching up or swinging was always the better turn.',
+     'COUNTER takes its place. You still take half damage that round - but EVERYONE who lands a hit on you gets struck back, each for 45% of a normal swing. It can miss or be dodged like any swing, and it costs one point of weapon wear for the round.',
+     'WHEN TO USE IT: when you are surrounded. Five of them swinging at you is five strikes back. Against one or two, just hit them - it is weaker than a swing and nothing happens at all if nothing lands on you.',
+     'The Steady skill now improves Counter the same way it improved Brace.']},
  {v:'7.38',d:'Sep 21',t:'Your crew and your pet are in the fight',
   i:['YOUR CREW STAND BEHIND YOU NOW. They have always fought every round - the brawler throws a punch, the hunter fires, the medic patches you up - but none of it was ever drawn. Now the brawler steps in and swings, the hunter gets a muzzle flash and a tracer from where they stand, and the medic raises a hand as the green lifts off you.',
      'WHEN SOMETHING TURNS ON A CREW MEMBER you see it lunge at them, and the number comes off them, not you.',
