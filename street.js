@@ -695,7 +695,7 @@ function raidSheet(r){
     +(mine?'<button class="btn" disabled>You fought this one</button>'
       :dead?'<button class="btn" disabled>Already down</button>'
       :near?'<button class="btn r" onclick="joinRaid(\''+esc(r.poi)+'\')">Join the raid</button>'
-      :'<button class="btn" disabled>Too far away</button>')
+      :'<button class="btn" disabled>Too far away'+(()=>{const pp=STREET.pois.find(x=>x.id===r.poi);return (pp&&STREET.pos)?' · '+Math.round(geoDist(pp,STREET.pos))+' m, reach '+Math.round(reachRadius())+' m':' · no GPS fix yet';})()+'</button>')
     +'</div>'
     +'<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet()">Back</button>',true);
 }
