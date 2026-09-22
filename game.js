@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.49';
+const VERSION='7.50';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2161,6 +2161,99 @@ function checkMilestones(){
     log('You are a '+vetTitle()+' now. '+fmt(r*VET_STEP)+' lifetime steps. +1 skill point, +2 keys.');
     toast(vetTitle()+' · '+fmt(r*VET_STEP)+' steps','l');SFX.play('legend');}
 }
+
+/* ================= THE AWAY ENGINE (v7.50) =================
+   Her words: "an idle walking game ... something you don't have to check 50 times a day."
+   Steps only reach the game when the app is opened, so the design is: everything that
+   happened since last time plays out the moment you open it.
+   The bug this replaces: with a place open on the road, every step that arrived was
+   BANKED until she dealt with the place. Close the app at a house, walk 6,000 steps,
+   nothing moved.
+   Now, when the app has been away for an hour or more, the steps that arrive in the
+   first minutes after opening are AWAY STEPS and the road plays out without her: the
+   crew clears the door (an estimate, not the real fight), searches the rooms at 70%,
+   and walks on. Bosses, strongholds, landmarks, rivals, sealed rooms and live-map
+   places are never resolved for her - the first one waits, and steps bank there as
+   before. Away fights hurt but never kill: under 20% HP the crew pulls her out and
+   moves on. All of it lands in one report. */
+const AWAY_MIN_MS=3600000, AWAY_WINDOW_MS=5*60000, AWAY_LOOT=0.7, AWAY_FLOOR=0.2;
+let AWAY_UNTIL=0;
+function awayArm(awayMs){if(awayMs>=AWAY_MIN_MS)AWAY_UNTIL=Date.now()+AWAY_WINDOW_MS;}
+function awayMode(){return Date.now()<AWAY_UNTIL&&!C&&!S.combat;}
+function awayCanResolve(loc){return !!loc&&!loc.geo&&!loc.stronghold&&!loc.rival&&!loc.landmark&&!loc.boss;}
+function awayRep(){if(!S.awayRep)S.awayRep={at:Date.now(),steps:0,places:0,skipped:0,kills:0,dmg:0,heal:0,items:[],lines:[],waiting:''};return S.awayRep;}
+// A fight as an estimate: average damage each side, hit rates, crew roles, your armour.
+// Deliberately a little worse than playing it yourself, and it can never kill you.
+function awayFight(en,where){
+  const rep=awayRep();const w=eqItem('melee');const dm=w?wDmg(w):baseDmg();
+  const mine=((dm[0]+dm[1])/2+(w?(S.lvl-1):fistLvlBonus())+(w?dmgBonus():0))*0.85;
+  const bl=roleLvl('brawler'),hl=roleLvl('hunter'),ml=roleLvl('medic');
+  const g=eqItem('ranged');const ammo=g?(S.pack.filter(p=>p.cat==='ammo'&&p.id===g.ammo).reduce((a,b)=>a+(b.qty||0),0)+ammoStock(g.ammo)):0;
+  const crew=(bl?(12+bl*2.5):0)+((hl&&ammo>0)?(10+hl*3):0);
+  const dpr=Math.max(1,mine+crew);
+  let ehp=en.reduce((a,e)=>a+e.hp,0);const rounds=Math.max(1,Math.min(14,Math.ceil(ehp/dpr)));
+  // what they do to you: each enemy's average, its hit chance, your armour; a medic patches
+  let taken=0;const soak=drSoak(),armor=dr();const heal=ml?(6+ml*3):0;
+  for(let r=0;r<rounds;r++){
+    const share=Math.max(0,1-r/rounds*0.6);   // they thin out as the fight goes
+    let hit=0;for(const e of en){const avg=(e.dmg[0]+e.dmg[1])/2;hit+=Math.max(1,(avg-armor)*(1-soak))*e.hit*share;}
+    taken+=Math.max(0,hit-heal*0.6);
+  }
+  taken=Math.round(taken);const floor=Math.max(1,Math.round(maxHp()*AWAY_FLOOR));
+  let won=true;if(S.hp-taken<floor){taken=Math.max(0,S.hp-floor);won=false;}
+  S.hp=Math.max(floor,S.hp-taken);rep.dmg+=taken;if(ml)rep.heal+=Math.round(heal*0.6*rounds);
+  if(w&&w.dur!==undefined){w.dur=Math.max(0,w.dur-rounds);if(w.dur<=0)rep.lines.push('Your '+w.n+' broke '+where+'.');}
+  if(won){rep.kills+=en.length;S.kills=(S.kills||0)+en.length;for(const e of en)addXp(Math.round((e.xp||5)*0.7));crewXp(1);
+    if(taken>0&&!ml&&!infect()&&Math.random()<infectChance()*1.5){catchInfection('a bite '+where);rep.lines.push('Something broke the skin '+where+'. No medic with you - it is going to fester.');}}
+  return {won,taken,rounds,n:en.length};
+}
+function awaySearch(loc){
+  const rep=awayRep();let got=0,left=0;const t0=window.toast,r0=window.rarToast;window.toast=()=>{};window.rarToast=()=>{};
+  try{for(const r of loc.rooms){if(r.done||r.sealed)continue;r.done=true;S.roomsSearched=(S.roomsSearched||0)+1;
+      for(const it of r.items){if(Math.random()>AWAY_LOOT){left++;continue;}if(takeItem(it,loc)){got++;rep.items.push(it.e+' '+it.n+(it.qty&&it.qty>1?' x'+it.qty:''));}else left++;}
+      ctEvent('rooms',1);}
+    if(loc.rooms.some(r=>r.sealed))rep.lines.push(loc.n+' has a sealed room. The crew left it for you.');
+  }finally{window.toast=t0;window.rarToast=r0;}
+  crewXp(1);return {got,left};
+}
+// Resolve the place she is standing at. True = walked on, false = it waits for her.
+function awayResolvePlace(){
+  const loc=S.loc;if(!loc)return true;const rep=awayRep();
+  if(!awayCanResolve(loc)){if(!rep.waiting){rep.waiting=loc.n;rep.lines.push((loc.stronghold?'A stronghold':loc.rival?RIVALS.find(x=>x.id===loc.rival).n:loc.geo?'A place on the live map':loc.n)+' is waiting for you at '+loc.n+'. The crew does not go in without you.');}return false;}
+  if(!loc.cleared){const en=encounterFor(loc);
+    // already at the floor: the crew does not start a fight it cannot finish - it walks past
+    if(en.length&&S.hp<=Math.round(maxHp()*AWAY_FLOOR)){rep.lines.push('Too hurt to go into '+loc.n+' - the crew walked past it.');rep.skipped++;S.loc=null;newDistance();return true;}
+    if(en.length){const f=awayFight(en,'at '+loc.n);
+      if(!f.won){rep.lines.push('The crew pulled you out of '+loc.n+' at '+S.hp+' HP and moved on. '+f.n+' hostiles, '+f.taken+' damage.');rep.skipped++;S.loc=null;S.run=0;newDistance();return true;}
+      rep.lines.push(loc.n+': '+f.n+' hostile'+(f.n===1?'':'s')+' at the door, cleared in '+f.rounds+' round'+(f.rounds===1?'':'s')+(f.taken?', '+f.taken+' damage':', untouched')+'.');}
+    else rep.lines.push(loc.n+' was quiet.');
+    loc.cleared=true;ctEvent('places',1);}
+  const s=awaySearch(loc);rep.places++;
+  rep.lines.push('Searched '+loc.n+': '+s.got+' thing'+(s.got===1?'':'s')+' brought back'+(s.left?', '+s.left+' left behind':'')+'.');
+  // leave, the way leaveLoc does, without replaying the bank (the caller is mid-replay)
+  if(loc.cleared)S.run++;S.loc=null;
+  const maxD=unlockedDistrict();if(S.walk.houses%5===0&&S.walk.district<maxD){S.walk.district++;rep.lines.push('You crossed into '+district().n+'.');}
+  newDistance();return true;
+}
+function awayAmbush(n){
+  // the road's own ambush odds, resolved the same way; at most one per batch
+  const rep=awayRep();if(rep.ambushed)return;rep.ambushed=true;
+  if(Math.random()>=Math.min(0.5,n/300*0.07*dealMod('road')))return;
+  if(Math.random()<sk('shadow')*0.12){rep.lines.push('Something moved in the treeline. You went around it.');return;}
+  const en=worldCrowd([worldEnemy(Math.random()<0.7?'walker':'runner')]);const f=awayFight(en,'on the road');
+  rep.lines.push((f.won?'Ambushed on the road: '+f.n+' put down':'Ambushed on the road - the crew got you clear')+(f.taken?', '+f.taken+' damage':'')+'.');
+}
+function awayReportSheet(){
+  const r=S.awayRep;if(!r||(!r.places&&!r.lines.length))return;
+  const hrs=Math.max(1,Math.round((Date.now()-(S.lastOpen||Date.now()))/3600000));
+  const items=r.items.slice(0,12).map(x=>'<li><span>'+esc(x)+'</span></li>').join('')+(r.items.length>12?'<li><span class="help">and '+(r.items.length-12)+' more in your pack</span></li>':'');
+  openSheet('<h2>While you were out</h2><p class="help">'+fmt(r.steps)+' steps replayed'+(r.places?' · '+r.places+' place'+(r.places===1?'':'s')+' searched':'')+(r.kills?' · '+r.kills+' put down':'')+(r.dmg?' · '+r.dmg+' damage taken':'')+(r.heal?' · '+r.heal+' patched':'')+'</p>'
+    +'<ul class="journal" style="margin:8px 0 12px">'+r.lines.slice(0,14).map(m=>'<li><span>'+esc(m)+'</span></li>').join('')+'</ul>'
+    +(r.items.length?'<p><b style="color:var(--bone)">Brought back</b></p><ul class="journal" style="margin:4px 0 12px">'+items+'</ul>':'')
+    +(r.waiting?'<p style="color:var(--amber)"><b>'+esc(r.waiting)+' is waiting for you.</b> Steps you walk now are saved until you deal with it.</p>':'')
+    +'<p class="help">The crew searches at about 70% of what you would find yourself, and never goes into a stronghold, a boss, a landmark or a rival without you.</p>'
+    +'<button class="btn r wide" style="margin-top:8px" onclick="S.awayRep=null;save();closeSheet()">OK</button>');
+}
 function addSteps(n,src){
   n=Math.floor(n);if(!(n>0))return;rollDay();rollWeek();S.lastAnim=Date.now();
   // The in-app pedometer walks the same legs the phone counts, so it raises
@@ -2172,11 +2265,18 @@ function addSteps(n,src){
     while(S.infectStep>=INFECT_PER_STEPS){S.infectStep-=INFECT_PER_STEPS;S.hp=Math.max(1,S.hp-1-infectStage());}}
   if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(Math.max(3,Math.round(6*thirstMult())));}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip'||src==='clipboard'||src==='shortcut')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);checkLadder();if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
   if(src!=='carry'&&S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');streakReward();}
+  // v7.50: steps that arrive in the first minutes after an hour or more away are AWAY STEPS.
+  // The road plays out - the crew clears and searches the place she was standing at, and every
+  // place reached on the way - instead of banking everything behind one open door.
+  const away=(src!=='live'&&src!=='demo'&&src!=='carry'&&typeof awayMode==='function'&&awayMode());
+  if(away){const rp=awayRep();rp.steps+=n;
+    if(S.loc&&!S.combat){const carry=S.walk.banked||0;S.walk.banked=0;if(awayResolvePlace())n+=carry;else S.walk.banked=carry;}}
   if(S.loc||S.combat){S.walk.banked=(S.walk.banked||0)+n;if(src!=='carry'&&src!=='live')toast('+'+fmt(n)+' steps saved for after this stop','z');save();render();return;}
-  let left=n;
-  while(left>0){if(left>=S.walk.toNext){left-=S.walk.toNext;S.walk.progress=S.walk.dist;S.walk.toNext=0;arrive();break;}else{S.walk.toNext-=left;S.walk.progress=S.walk.dist-S.walk.toNext;left=0;}}
+  let left=n,hops=0;
+  while(left>0){if(left>=S.walk.toNext){left-=S.walk.toNext;S.walk.progress=S.walk.dist;S.walk.toNext=0;arrive();if(away&&hops++<60&&awayResolvePlace())continue;break;}else{S.walk.toNext-=left;S.walk.progress=S.walk.dist-S.walk.toNext;left=0;}}
   if(left>0)S.walk.banked=(S.walk.banked||0)+left;
-  if(!S.loc&&!S.combat&&S.flags.roadCheck<1&&Math.random()<Math.min(0.5,n/300*0.07*dealMod('road'))){S.flags.roadCheck++;if(Math.random()<sk('shadow')*0.12){log('Something moved in the treeline. You went around it.');save();render();return;}save();render();setTimeout(()=>startCombat(worldCrowd([worldEnemy(Math.random()<0.7?'walker':'runner')]),'road'),400);return;}
+  if(away){try{awayAmbush(n);}catch(e){}clearTimeout(AWAY_T);AWAY_T=setTimeout(()=>{const rp=S.awayRep;if(rp&&(rp.places||rp.lines.length))rp.done=true;render();},1500);}
+  else if(!S.loc&&!S.combat&&S.flags.roadCheck<1&&Math.random()<Math.min(0.5,n/300*0.07*dealMod('road'))){S.flags.roadCheck++;if(Math.random()<sk('shadow')*0.12){log('Something moved in the treeline. You went around it.');save();render();return;}save();render();setTimeout(()=>startCombat(worldCrowd([worldEnemy(Math.random()<0.7?'walker':'runner')]),'road'),400);return;}
   save();render();
 }
 function arrive(){
@@ -3884,6 +3984,8 @@ function wallsThatWouldHold(power,def){
   return 'Even maxed walls would not have held this one alone. A vault keeps most of the stock when they get in.';
 }
 const STOLE_N={food:['\u{1F96B}','food'],water:['\u{1F4A7}','water'],meds:['\u{1F48A}','meds'],scrap:['\u{1F529}','scrap'],ammo:['\u{1F9F0}','rounds'],walls:['\u{1F9F1}','a wall section knocked down'],traps:['\u{1FAA4}','a trap wrecked']};
+let AWAY_T=0;
+function awayTick(){const r=S.awayRep;if(!r||!r.done)return;if(document.visibilityState!=='visible'||S.combat||C||$('#modal').classList.contains('on'))return;awayReportSheet();}
 function reportTick(){
   const r=S.raidReport;if(!r)return;
   if(document.visibilityState!=='visible'||S.combat||S.loc||$('#modal').classList.contains('on'))return;
@@ -4891,7 +4993,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
+  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5098,6 +5200,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.50',d:'Sep 23',t:'The road keeps walking while you are away',
+  i:['OPEN THE GAME AND THE DAY PLAYS OUT. Until now, if you closed the game while standing at a place on the road, every step you walked was saved up behind that one door - walk 6,000 steps, nothing moved. Now, when you have been away an hour or more, the steps that come in replay the road: your crew clears the door, searches the rooms, and walks on to the next place.',
+     'ONE REPORT. What was found, what was fought, what it cost, what was left behind - in the While You Were Out card.',
+     'THE CREW HAS LIMITS. They bring back about 70% of what you would find yourself. They can get hurt but never killed - under 20% HP they pull you out and move on. And they never go into a stronghold, a boss, a landmark, a rival or a live-map place without you: the first one waits, and steps save up there like before.',
+     'This is the first piece of the idle game. Expeditions come next.']},
  {v:'7.49',d:'Sep 22',t:'Notifications, right up top',
   i:['A CARD AT THE TOP OF THE ROAD PAGE asks you to turn on notifications if you have not yet. Horde night an hour before, raiders at your fence, a streak about to break, your rival passing you - nothing else. Since raids now wait for you, a nudge means you actually get to answer them.',
      'IPHONES: notifications only work from a home-screen icon. The card walks you through it. Not now hides it for a week; the switch is always under Settings too.',
@@ -6253,7 +6360,7 @@ function syncNow(){
 // re-adding the icon "fixed" it. Now every resume pulls immediately.
 let LAST_ACTIVE=Date.now();
 function onResume(){
-  const away=Date.now()-LAST_ACTIVE;LAST_ACTIVE=Date.now();
+  const away=Date.now()-LAST_ACTIVE;LAST_ACTIVE=Date.now();try{awayArm(away);}catch(e){}
   try{stepsBeacon();autoSyncFromUrl();}catch(e){}   // a Shortcut may have just opened us with ?steps=
   if(away>6*3600000){location.reload();return;}
   if(O().ok){pullSteps();loadFriends();partySync();bossSync();takeGifts();}
@@ -6748,7 +6855,7 @@ function whileYouWereOut(){
   openSheet(`<h2>While you were out</h2><p class="help">${hrs} hours away · ${esc(w)}</p><ul class="journal" style="margin:8px 0 12px">${items.length?items.map(m=>`<li><span>${esc(m)}</span></li>`).join(''):'<li><span>Quiet night. Nothing came over the fence.</span></li>'}</ul><p>${ct?ct+' contract'+(ct>1?'s':'')+' open today. ':''}${S.raidPending?'Raiders are expected today at '+S.raidPending.hour+':00. ':''}${S.base?hordeCountdown()+' ':''}The Wanted boss this week is ${esc(bossName())}.</p><button class="btn r wide" onclick="closeSheet()">Back to the road</button>`);
 }
 function start(){
-  S=load()||fresh();recoverStuckRaid();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
+  S=load()||fresh();try{awayArm(Date.now()-(S.lastOpen||Date.now()));}catch(e){}recoverStuckRaid();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
   wire();render();fetchWeather();
   if(typeof mapChrome==='function')try{mapChrome();}catch(e){}
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
