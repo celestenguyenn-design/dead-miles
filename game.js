@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.42';
+const VERSION='7.43';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -578,7 +578,7 @@ async function restoreCloudSnap(id){
   const r=(CLOUD_SNAPS||[]).find(x=>x.id===id);
   if(!confirm('Go back to the server save from '+(r?ago(new Date(r.at).getTime()):'that time')+'?'+(r?' (level '+(r.lvl||1)+', '+fmt(r.steps_total||0)+' steps.)':'')+' What is on this phone right now is kept as a restore point.'))return;
   try{const st=await rpc('get_save',{p_handle:o.handle,p_token:o.token,p_id:id});
-    const cs=st&&st.public&&st.public.save;
+    const cs=cloudSaveOf(st);
     if(!cs||!cs.onboarded){toast('That restore point has no character in it.','d');return;}
     snapshot('before a server restore');
     const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),cs);S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();
@@ -4106,7 +4106,8 @@ async function goOnline(handle,token){
   try{const ok=await rpc('register_player',{p_handle:handle,p_token:o.token,p_name:S.name||handle});
     if(!ok){o.ok=false;o.err='The handle "'+handle+'" is already registered. If it is yours from another browser, paste that browser\'s account key below. Otherwise pick another handle.';toast(o.err,'d');save();render();return;}
     o.handle=handle;o.ok=true;o.err='';identWrite(handle,o.token);log('Online as @'+handle+'.');toast('Online as @'+handle,'z');save();render();
-    if(token&&token.trim()){try{const b=await rpc('get_base',{p_handle:handle});const cs=b&&b.public&&b.public.save;
+    if(token&&token.trim()){try{let b=null;try{b=await rpc('get_my_state',{p_handle:handle,p_token:o.token});}catch(e){}   // key-checked (v7.43 SQL); before that SQL runs it throws
+      if(!b)b=await rpc('get_base',{p_handle:handle});const cs=cloudSaveOf(b);
       if(cs&&cs.onboarded){const cloudAt=cs.savedAt||0;const localAt=S.savedAt||0;const localNewer=S.onboarded&&(localAt>cloudAt+60000||(S.steps&&S.steps.total)>((cs.steps&&cs.steps.total)||0));
         if(!S.onboarded){const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),cs);S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();log('Brought your character back from the server.');save();closeSheet();render();toast('Welcome back, '+(S.name||handle),'z');identWrite(handle,o.token);pushPlayer();return;}
         openSheet(`<h2>Found your save</h2><div class="big">${ART.avatarSVG(cs.av||S.av,70)}</div><p><b style="color:var(--bone)">${esc(cs.name||handle)}</b>, level ${cs.lvl||1}, ${fmt((cs.steps&&cs.steps.total)||0)} lifetime steps${cs.base?', base at '+esc(cs.base.n):''}.<br><span class="help">Cloud copy saved ${cloudAt?ago(cloudAt):'at an unknown time'}${S.onboarded?' · this phone saved '+(localAt?ago(localAt):'at an unknown time'):''}.</span></p>${localNewer?'<p style="color:#ff8a92"><b>Careful:</b> what is on this phone looks NEWER than the cloud copy. Restoring would roll you back. Keep this one unless you know the cloud copy is the right one.</p>':'<p>Restore it here? What is on this device right now gets replaced (a backup is kept under Settings for 7 days).</p>'}<div class="grid2"><button class="btn${localNewer?' r':''}" onclick="closeSheet();pushPlayer()">Keep this one</button><button class="btn${localNewer?'':' r'}" id="restoreBtn">Restore the cloud copy</button></div>`,true);
@@ -4117,13 +4118,24 @@ async function goOnline(handle,token){
 }
 // v7.41: c.town is where she has physically walked. It never leaves the phone.
 function compactSave(){const c=JSON.parse(JSON.stringify(S));delete c.town;delete c.online;delete c.journal;delete c.wx;delete c.combat;if(c.party)delete c.party.data;return c;}
-function publicState(){return {public:{save:compactSave(),name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code,raiding:(S.raidCur?{id:S.raidCur.id,n:S.raidCur.n,tier:S.raidCur.tier,at:Date.now()}:null),flare:(S.flare&&S.flare.endsAt>Date.now())?S.flare:null,
+/* v7.43 - THE SAVE IS NO LONGER PUBLIC. Until now the whole save rode inside
+   state.public, and get_board / get_base hand state.public to anyone with the game's
+   address and no account key - five players' complete saves, four with the home pin's
+   latitude and longitude. Measured against the live backend printing counts only.
+   Now the save is state.private, which no public function returns; save_player still
+   stores the whole record and the key-checked get_save / get_my_state return it whole.
+   What a base visit draws (base, shelf, avatar, pet, three crew) is listed in `public`
+   by name. Each player's old row is replaced the first time their updated game syncs. */
+function visitState(){const crew=(S.active||[]).map(id=>(S.crew||[]).find(c=>c.id===id)).filter(Boolean).slice(0,3).map(c=>({id:c.id,n:c.n,av:c.av,role:c.role,cls:c.cls}));
+  return {shelf:(S.shelf||[]).map(x=>({id:x.id})),pet:S.pet||null,petCoat:S.petCoat||null,petName:S.petName||'',petXp:S.petXp||0,petCount:(S.pets||[]).length,crew,active:crew.map(c=>c.id)};}
+function cloudSaveOf(st){return st&&((st.private&&st.private.save)||(st.public&&st.public.save))||null;}
+function publicState(){return {private:{save:compactSave()},public:Object.assign(visitState(),{name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code,raiding:(S.raidCur?{id:S.raidCur.id,n:S.raidCur.n,tier:S.raidCur.tier,at:Date.now()}:null),flare:(S.flare&&S.flare.endsAt>Date.now())?S.flare:null,
     // The muster rides here for the same reason the flare does: every client
     // already polls this board, so a ready-check needs no new table.
     muster:(S.muster&&!S.muster.started&&(S.muster.at||0)+90000>Date.now())?
       {id:S.muster.id,poi:S.muster.poi,n:S.muster.n,w:S.muster.w,tier:S.muster.tier,
        boss:S.muster.boss,endsAt:S.muster.endsAt,host:S.muster.host,at:S.muster.at,
-       ready:!!S.muster.ready,started:!!S.muster.started}:null},stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:ammoTotal()}};}
+       ready:!!S.muster.ready,started:!!S.muster.started}:null}),stash:{food:S.stock.food,water:S.stock.water,meds:S.stock.meds,scrap:S.stock.scrap,ammo:ammoTotal()}};}
 let pushTimer=0;let pushSoonTimer=0;function pushSoon(){clearTimeout(pushSoonTimer);pushSoonTimer=setTimeout(()=>pushPlayer(),8000);}
 function pushPlayer(){const o=O();if(!o.ok||!S.onboarded||STALE)return Promise.resolve();clearTimeout(pushTimer);return new Promise(res=>{pushTimer=setTimeout(async()=>{try{rollWeek();
   const ok=await rpc('save_player',{p_handle:o.handle,p_token:o.token,p_name:S.name,p_tier:S.league.tier,p_week:S.league.week,p_score:S.league.score,p_state:publicState()});
@@ -5066,6 +5078,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.43',d:'Sep 22',t:'Your save is private now',
+  i:['YOUR SAVE FILE NO LONGER TRAVELS WITH THE LEADERBOARD. The cloud backup used to ride inside the same record the board and base visits read. It is now stored separately, behind your account key, and the board only carries what a visit needs to draw: your base, shelf, outfit, pet and crew.',
+     'THIS INCLUDES YOUR BASE PIN. Where your base pin sits on the real map was in that record. It is not any more.',
+     'NOTHING TO DO. Your row is rewritten the first time this version syncs. Restoring on a new phone still works.']},
  {v:'7.42',d:'Sep 22',t:'Raids wait for you now, and tell you what happened',
   i:['THEY WAIT AT THE FENCE. If you are not on the screen at the raid hour - phone in your pocket, in class - nothing happens until you open the game that day. Then you get the same choice as always: fight, or let the walls hold. Only if the whole day passes do the walls decide without you. Before this, the raid resolved silently the moment the screen was off.',
      'A REPORT, EVERY TIME. The next time you open the game after a raid or a horde night you get a sheet: who came, what held, what was taken item by item, and what would have held - "walls at L4 would have held - one more level." The two-second toast and the line at the bottom of the Road page were all there was.',
@@ -6367,8 +6383,8 @@ function renderOnline(){renderStepsHelp();if(offscreen('#onlineStatus'))return;
   </div></details>
   <b>Android:</b> install the tiny companion app <a href="./DeadMilesSteps.apk">DeadMilesSteps.apk</a> (Android asks once to allow installs from your browser), paste the handle <b>${esc(o.handle)}</b> and token <b style="word-break:break-all">${esc(o.token)}</b> into it, tap Allow reading steps, then Save. It posts your Health Connect steps every hour on its own.`:'Go online first, then your personal sync address and code appear here.';}
 }
-function visitFriend(i){const f=friends[i];if(!f)return;const pub=f.pub||{};const sv=pub.save||{};const st={base:sv.base||(pub.base?{...pub.base}:null),shelf:sv.shelf||[],av:sv.av||pub.av||S.av,pet:sv.pet||null,petCoat:sv.petCoat||null,active:sv.active||[],crew:sv.crew||[]};
-  openSheet(`<h2>${esc(f.name)}'s place</h2>${st.base?baseScene(st):'<p class="help">No base claimed yet.</p>'}<div class="kv" style="margin-top:10px"><span>Level</span><b>${pub.lvl||1}</b><span>Kills</span><b>${fmt(pub.kills||0)}</b><span>Defense</span><b>${pub.defense||0}</b><span>Streak</span><b>${pub.streak||0}</b><span>Trophies</span><b>${st.shelf.length}</b><span>Companion</span><b>${st.pet?(sv.petName||PETS[st.pet].n)+' the '+ART.coatInfo(st.pet,st.petCoat).n.toLowerCase()+' L'+Math.min(10,Math.floor((sv.petXp||0)/4000)+1)+((sv.pets||[]).length>1?' (+'+((sv.pets||[]).length-1)+' more)':''):'none'}</b><span>Weapon</span><b>${esc(pub.weapon||'fists')}</b></div><button class="btn r wide" style="margin-top:10px" onclick="closeSheet()">Head back</button>`);}
+function visitFriend(i){const f=friends[i];if(!f)return;const pub=f.pub||{};const sv=Object.assign({},pub.save||{},pub);const st={base:pub.base?{...pub.base}:(sv.base||null),shelf:sv.shelf||[],av:sv.av||pub.av||S.av,pet:sv.pet||null,petCoat:sv.petCoat||null,active:sv.active||[],crew:sv.crew||[]};
+  openSheet(`<h2>${esc(f.name)}'s place</h2>${st.base?baseScene(st):'<p class="help">No base claimed yet.</p>'}<div class="kv" style="margin-top:10px"><span>Level</span><b>${pub.lvl||1}</b><span>Kills</span><b>${fmt(pub.kills||0)}</b><span>Defense</span><b>${pub.defense||0}</b><span>Streak</span><b>${pub.streak||0}</b><span>Trophies</span><b>${st.shelf.length}</b><span>Companion</span><b>${st.pet?(sv.petName||PETS[st.pet].n)+' the '+ART.coatInfo(st.pet,st.petCoat).n.toLowerCase()+' L'+Math.min(10,Math.floor((sv.petXp||0)/4000)+1)+((sv.petCount||(sv.pets||[]).length)>1?' (+'+((sv.petCount||(sv.pets||[]).length)-1)+' more)':''):'none'}</b><span>Weapon</span><b>${esc(pub.weapon||'fists')}</b></div><button class="btn r wide" style="margin-top:10px" onclick="closeSheet()">Head back</button>`);}
 let LB_TAB='today';function lbTab(t){LB_TAB=t;SFX.play('ui');render();}
 function hideFriend(h){if(!S.hidden.includes(h))S.hidden.push(h);if(S.rival===h)S.rival='';save();render();}
 function unhideFriend(h){S.hidden=S.hidden.filter(x=>x!==h);save();render();}
