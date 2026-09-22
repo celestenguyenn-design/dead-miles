@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.41';
+const VERSION='7.42';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3832,29 +3832,82 @@ function ammoTotal(){return AMMO_KINDS.reduce((a,k)=>a+(S.stock[k]||0),0);}
 function ammoWord(kind){return kind==='shells'?'shells':kind==='bolts'?'bolts':'rounds';}
 function stockValue(){return S.stock.food*5+S.stock.water*5+medsTotal()*10+S.stock.scrap*4+ammoTotal()*3;}
 function checkRaids(){
-  if(!S.base)return;const t=todayStr();if(S.flags.lastRaidCheck===t)return;
+  if(!S.base)return;const t=todayStr();
+  if(S.raidPending&&S.raidPending.date!==t){const p=S.raidPending;resolveRaid(p.power,p.hour,p.date,'waited');}
+  if(S.flags.lastRaidCheck===t)return;
   const rng=mulberry(hash(t+'raid'+S.created));
   const daysSince=Math.floor((Date.now()-S.base.claimed)/86400000);
   if(daysSince<1){S.flags.lastRaidCheck=t;return;}
   let odds=0.18+Math.min(0.4,stockValue()/600)+S.league.tier*0.05;
   if(S.base.rooms.generator)odds*=(S.base.rooms.generator>=2?0.55:0.7)*(1-sk('gennie')*0.05);if(S.base.t==='stronghold')odds*=1.4;if(S.campCleared===weekId())odds*=0.5;
-  const hour=8+Math.floor(rng()*13);const now=new Date();
+  const hour=quietShift(8+Math.floor(rng()*13));
   if(rng()<odds){const power=Math.round((10+rng()*20+S.league.tier*6+daysSince*0.5+(S.bossKills||0)*2)*dealMod('raid'));
-    if(now.getHours()>=hour){resolveRaid(power,hour,t);S.flags.lastRaidCheck=t;}
-    else{S.raidPending={date:t,hour,power};}
+    // v7.42: the raiders WAIT. Opening the app after the hour used to resolve the raid
+    // on the spot with no choice; now it is pending until you answer it (raidTick).
+    S.raidPending={date:t,hour,power};
   }else S.flags.lastRaidCheck=t;
 }
-function resolveRaid(power,hour,date){
-  const def=defense();let stolen={};let repelled=def>=power;
+/* v7.42 - RAIDS WAIT AT THE GATE. Her words: "sometimes we can't be on the game at a
+   certain time. Like I was in class. So how do we prevent those type of raids?"
+   Three things were wrong, all measured in the code, not guessed:
+   1. If the app was open but NOT on screen at the raid hour (phone in a pocket), the
+      raid resolved silently. Now nothing resolves while you are away: the raiders wait
+      at the fence until you open the app that day and you get the choice as normal. Only
+      if the day ends without you do the walls decide on their own.
+   2. The only report was a two-second toast and a line at the bottom of the Road page.
+      Now every raid that resolves leaves S.raidReport, and the next time the game has
+      the screen it opens a sheet: who came, what held, what was taken item by item,
+      and what would have held.
+   3. Quiet hours (Settings > Game): raids are never scheduled inside them. */
+function quietShift(hour){
+  const q=S.quiet;if(!q||q.a===q.b)return hour;
+  const inQ=h=>q.a<q.b?(h>=q.a&&h<q.b):(h>=q.a||h<q.b);
+  for(let i=0;i<24&&inQ(hour);i++)hour=(hour+1)%24;
+  return hour;
+}
+function quietText(){const q=S.quiet;if(!q||q.a===q.b)return 'off';const f=h=>(h%12||12)+(h<12?'am':'pm');return f(q.a)+' to '+f(q.b);}
+function setQuiet(a,b){a=+a;b=+b;S.quiet=(isNaN(a)||isNaN(b)||a===b)?null:{a,b};save();renderQuiet();toast(S.quiet?'No raids from '+quietText():'Quiet hours off','a');}
+function renderQuiet(){
+  const el=$('#quietBody');if(!el)return;const q=S.quiet||{a:0,b:0};
+  const opt=v=>{let o='';for(let h=0;h<24;h++)o+='<option value="'+h+'"'+(h===v?' selected':'')+'>'+(h%12||12)+(h<12?' am':' pm')+'</option>';return o;};
+  el.innerHTML='<div class="row" style="align-items:center;gap:8px">No raids from <select id="quietA" style="width:auto">'+opt(q.a)+'</select> to <select id="quietB" style="width:auto">'+opt(q.b)+'</select>'
+    +(S.quiet?'<button class="btn sm ghost" onclick="setQuiet(0,0)">Off</button>':'')+'</div>'
+    +'<p class="help" style="margin-top:6px">'+(S.quiet?'Raids are never scheduled between '+quietText()+'. One rolled for inside that window moves to '+((q.b%12)||12)+(q.b<12?' am':' pm')+'.':'Class, work, sleep - set the hours you cannot answer the door and raids will not be scheduled then. They still happen that day, just at a time you can be there.')+'</p>';
+  const a=$('#quietA'),b=$('#quietB');if(a&&b){a.onchange=b.onchange=()=>setQuiet(a.value,b.value);}
+}
+function wallsThatWouldHold(power,def){
+  const l=(S.base&&S.base.rooms.walls)||0;const D=BUILD.walls.def;const need=power-def;if(need<=0)return '';
+  for(let n=l+1;n<=D.length;n++){if(D[n-1]-(D[l-1]||0)>=need)return 'Walls at L'+n+' would have held'+(n===l+1?' - one more level.':' ('+(n-l)+' levels up).');}
+  return 'Even maxed walls would not have held this one alone. A vault keeps most of the stock when they get in.';
+}
+const STOLE_N={food:['\u{1F96B}','food'],water:['\u{1F4A7}','water'],meds:['\u{1F48A}','meds'],scrap:['\u{1F529}','scrap'],ammo:['\u{1F9F0}','rounds'],walls:['\u{1F9F1}','a wall section knocked down'],traps:['\u{1FAA4}','a trap wrecked']};
+function reportTick(){
+  const r=S.raidReport;if(!r)return;
+  if(document.visibilityState!=='visible'||S.combat||S.loc||$('#modal').classList.contains('on'))return;
+  const held=r.repelled;const fought=!!r.fought;const horde=!!r.by;
+  const title=horde?(held?(fought?'You held the walls':'The walls held the horde'):'The horde broke in'):(held?(fought?'You held the gate':'The walls held'):'They got in');
+  const who=horde?ART.zombieSVG('walker',54)+ART.zombieSVG('runner',54)+ART.zombieSVG('bloater',54):(r.n>=3?ART.zombieSVG('gunner',54):'')+ART.zombieSVG('raider',54)+(r.n>=2?ART.zombieSVG('raider',54):'');
+  const items=Object.entries(r.stolen||{}).map(([k,v])=>{const d=STOLE_N[k]||['',k];return '<div class="kv" style="grid-template-columns:auto 1fr"><span>'+d[0]+'</span><b>'+(k==='walls'||k==='traps'?d[1]:v+' '+d[1])+'</b></div>';}).join('');
+  const when=horde?'Horde night '+r.by.replace(/\D/g,'')+', 9 pm':'They came at '+String(r.hour).padStart(2,'0')+':00';
+  const how=r.how==='waited'?'You never came back that day, so the walls decided on their own.':r.how==='fence'?'They waited at the fence from '+String(r.hour).padStart(2,'0')+':00 until you got back.':fought?'You met them yourself.':'';
+  openSheet('<h2>'+title+'</h2><div class="big">'+who+'</div>'
+    +'<p><b style="color:var(--bone)">'+when+'</b>'+(horde||fought?'':' with a crew of '+r.n)+' - <b>'+r.power+'</b> against your <b>'+r.def+'</b>.'+(how?'<br><span class="help">'+how+'</span>':'')+'</p>'
+    +(held?'<p>'+(fought?'They are driven off. '+(horde?'+25 scrap, +1 key.':'+'+(r.scrap||0)+' scrap.'):'Nothing was taken.')+'</p>'
+          :'<p style="color:#ff8a92"><b>Taken:</b></p>'+(items||'<p class="help">Nothing worth carrying.</p>')+'<p class="help" style="margin-top:8px">'+esc(wallsThatWouldHold(r.power,r.def))+'</p>')
+    +'<div class="grid2" style="margin-top:10px"><button class="btn" onclick="S.raidReport=null;save();closeSheet();document.querySelector(\'.nav button[data-v=base]\').click()">Go to the base</button><button class="btn r" onclick="S.raidReport=null;save();closeSheet()">OK</button></div>');
+}
+function resolveRaid(power,hour,date,how){
+  const def=defense();let stolen={};let repelled=def>=power;const crew=power>25?4:power>18?3:2;
   if(S.base.rooms.traps&&Math.random()<0.3){power=Math.round(power*0.7);repelled=def>=power;}
   if(!repelled){let frac=clamp((power-def)/power*0.6,0.1,0.6);const vl=S.base.rooms.vault||0;if(vl)frac*=vl>=2?0.2:0.5;frac*=1-sk('boards')*0.1;for(const k of ['food','water','meds','scrap','ammo']){const n=Math.floor(S.stock[k]*frac);if(n){S.stock[k]-=n;stolen[k]=n;}}
     if(S.base.rooms.walls&&Math.random()<0.5){S.base.rooms.walls--;stolen.walls=1;}}
   const entry={t:date+' '+String(hour).padStart(2,'0')+':00',power,def,repelled,stolen};
   S.raids.unshift(entry);S.raids=S.raids.slice(0,12);S.raidPending=null;
+  S.raidReport=Object.assign({},entry,{hour,n:crew,how:how||''});
   log(repelled?'Raiders hit the base at '+hour+':00 and your defenses held ('+def+' vs '+power+').':'Raiders broke in at '+hour+':00 ('+power+' vs your '+def+') and took '+Object.entries(stolen).map(([k,v])=>v+' '+k).join(', ')+'.');
   toast(repelled?'Raid repelled':'Base raided','d');
 }
-function resolveRaidFight(won){if(!S.raidPending)return;const p=S.raidPending;S.raids.unshift({t:p.date+' '+String(p.hour).padStart(2,'0')+':00',power:p.power,def:defense(),repelled:true,stolen:{},fought:true});S.raidPending=null;S.flags.lastRaidCheck=p.date;log('You held the base yourself. Raiders driven off.');addXp(30);S.stock.scrap+=rint(4,10);}
+function resolveRaidFight(won){if(!S.raidPending)return;const p=S.raidPending;const e={t:p.date+' '+String(p.hour).padStart(2,'0')+':00',power:p.power,def:defense(),repelled:true,stolen:{},fought:true};S.raids.unshift(e);S.raidPending=null;S.flags.lastRaidCheck=p.date;log('You held the base yourself. Raiders driven off.');addXp(30);const sc=rint(4,10);S.stock.scrap+=sc;S.raidReport=Object.assign({},e,{hour:p.hour,n:p.power>25?4:p.power>18?3:2,scrap:sc});}
 /* ================= horde night (every 7 days) ================= */
 function hordeAt(fromMs){const d=new Date(fromMs);d.setHours(21,0,0,0);d.setDate(d.getDate()+7);return d.getTime();}
 function hordeState(){if(!S.base)return null;if(!S.horde||!S.horde.next){let nx=hordeAt(S.base.claimed||Date.now());while(nx<Date.now())nx=hordeAt(nx);S.horde={n:0,next:nx,pending:false};}return S.horde;}
@@ -3865,7 +3918,7 @@ function resolveHorde(fought,won){const h=hordeState();if(!h)return;const power=
     for(const k of ['food','water','meds','scrap','ammo']){const n=Math.floor(S.stock[k]*frac);if(n){S.stock[k]-=n;stolen[k]=n;}}
     if(S.base.rooms.walls){S.base.rooms.walls--;stolen.walls=1;}if(S.base.rooms.traps&&Math.random()<0.5){S.base.rooms.traps--;stolen.traps=1;}}
   else if(fought){S.stock.scrap+=25;S.keys++;addXp(40);}
-  S.raids.unshift({t:todayStr()+' 21:00',power,def,repelled,stolen,fought,by:'Horde night '+(h.n+1)});S.raids=S.raids.slice(0,12);
+  const he={t:todayStr()+' 21:00',power,def,repelled,stolen,fought,by:'Horde night '+(h.n+1)};S.raids.unshift(he);S.raids=S.raids.slice(0,12);S.raidReport=Object.assign({},he,{hour:21,n:0});
   log(repelled?(fought?'You held the walls against horde night '+(h.n+1)+' yourself. +25 scrap, +1 key.':'Horde night '+(h.n+1)+': '+def+' defense against '+power+'. The walls held.'):'Horde night '+(h.n+1)+' broke through ('+power+' vs '+def+') and took '+Object.entries(stolen).map(([k,v])=>v+' '+k).join(', ')+'.');
   toast(repelled?'Horde repelled':'The horde broke in','d');if(!repelled)SFX.play('hurt');else SFX.play('win');
   h.n++;h.next=hordeAt(h.next);h.pending=false;save();render();}
@@ -3873,13 +3926,16 @@ function fightHorde(){gearCheck(()=>{const h=hordeState();const n=Math.min(6,4+M
 function hordeTick(){const h=hordeState();if(!h)return;if(Date.now()<h.next)return;
   if(document.visibilityState==='visible'&&!S.combat&&!S.loc&&!$('#modal').classList.contains('on')){h.pending=true;save();
     openSheet(`<h2>Horde night</h2><div class="big">${ART.zombieSVG('walker',60)}${ART.zombieSVG('runner',60)}${ART.zombieSVG('bloater',60)}</div><p>Day ${7*(h.n+1)}. They come every seven days and they come all at once. Your walls: <b>${hordeDefense()}</b> vs the horde's <b>${hordePower()}</b>. Fight at the gate, or let the walls decide. Lose and they take the stockpile.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveHorde(false)">Let the walls decide</button><button class="btn r" onclick="closeSheet();fightHorde()">Fight at the gate</button></div>`);}
-  else if(document.visibilityState!=='visible'||Date.now()-h.next>6*3600000){resolveHorde(false);}}
+  else if(Date.now()-h.next>12*3600000){resolveHorde(false);}}   // v7.42: waits for you up to 12 h; never resolves just because the screen is off
 function hordeCountdown(){const h=hordeState();if(!h)return '';const ms=h.next-Date.now();if(ms<=0)return 'Horde night is here.';const d=Math.floor(ms/86400000),hr=Math.floor(ms%86400000/3600000);const dt=new Date(h.next);return 'Horde night '+(h.n+1)+' in '+(d?d+'d ':'')+hr+'h ('+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()]+' 9pm) · they bring '+hordePower()+', you have '+hordeDefense()+'.';}
 function raidTick(){
   if(!S.raidPending)return;const p=S.raidPending;const now=new Date();
-  if(todayStr()!==p.date){resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=todayStr();save();return;}
-  if(now.getHours()>=p.hour){ if(document.visibilityState==='visible'&&!S.combat&&!S.loc&&!$('#modal').classList.contains('on')){openSheet(`<h2>Raiders at the walls</h2><div class="big">${ART.zombieSVG('raider',70)}${ART.zombieSVG('gunner',70)}</div><p>A crew of ${p.power>25?'four':p.power>18?'three':'two'} is coming over the fence. Your defenses: ${defense()} vs their ${p.power}. Fight them yourself, or let the walls decide.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveRaid(${p.power},${p.hour},'${p.date}');S.flags.lastRaidCheck='${p.date}';save();render()">Let the walls hold</button><button class="btn d" onclick="closeSheet();fightRaid()">Fight</button></div>`,true);}
-    else if(document.visibilityState!=='visible'){resolveRaid(p.power,p.hour,p.date);S.flags.lastRaidCheck=p.date;save();}}
+  if(todayStr()!==p.date){resolveRaid(p.power,p.hour,p.date,'waited');S.flags.lastRaidCheck=todayStr();save();return;}
+  if(now.getHours()>=p.hour){ if(document.visibilityState==='visible'&&!S.combat&&!S.loc&&!$('#modal').classList.contains('on')){
+    const late=now.getHours()>p.hour||now.getMinutes()>=10;const how=late?'fence':'';
+    openSheet(`<h2>Raiders at the walls</h2><div class="big">${ART.zombieSVG('raider',70)}${ART.zombieSVG('gunner',70)}</div><p>A crew of ${p.power>25?'four':p.power>18?'three':'two'} ${late?'has been at the fence since '+String(p.hour).padStart(2,'0')+':00, waiting for someone to answer':'is coming over the fence'}. Your defenses: ${defense()} vs their ${p.power}. Fight them yourself, or let the walls decide.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveRaid(${p.power},${p.hour},'${p.date}','${how}');S.flags.lastRaidCheck='${p.date}';save();render()">Let the walls hold</button><button class="btn d" onclick="closeSheet();fightRaid()">Fight</button></div>`,true);}
+    // v7.42: no "else resolve while hidden". They wait.
+  }
 }
 function fightRaid(){gearCheck(()=>{const p=S.raidPending;const n=p.power>25?4:p.power>18?3:2;const en=[];for(let i=0;i<n;i++)en.push(mk(i===0&&p.power>22?'gunner':'raider'));const tc=trapCatch(en);startCombat(en,'raid');if(tc){clog('One of them put a foot in a trap on the way over. '+tc.n+' starts half dead.','good');fxPush({k:'trap',i:en.indexOf(tc)});renderCombat();}});}
 
@@ -4803,7 +4859,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();
+  renderOnline();renderStepsHelp();renderWanderer();if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();renderQuiet();
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5010,6 +5066,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.42',d:'Sep 22',t:'Raids wait for you now, and tell you what happened',
+  i:['THEY WAIT AT THE FENCE. If you are not on the screen at the raid hour - phone in your pocket, in class - nothing happens until you open the game that day. Then you get the same choice as always: fight, or let the walls hold. Only if the whole day passes do the walls decide without you. Before this, the raid resolved silently the moment the screen was off.',
+     'A REPORT, EVERY TIME. The next time you open the game after a raid or a horde night you get a sheet: who came, what held, what was taken item by item, and what would have held - "walls at L4 would have held - one more level." The two-second toast and the line at the bottom of the Road page were all there was.',
+     'QUIET HOURS. Settings > Game: set the hours you cannot answer the door and raids are never scheduled inside them. They still come that day, just when you can be there.',
+     'Horde night waits for you up to 12 hours the same way.']},
  {v:'7.41',d:'Sep 21',t:'Paint the town',
   i:['THE MAP REMEMBERS WHERE YOU HAVE WALKED. Every 50 m square you pass through on the live map turns amber and stays amber. Streets around your base pin that you have not walked yet show as a faint blue wash, so the map itself tells you where to go next.',
      'A PERCENTAGE OF YOUR OWN NEIGHBOURHOOD. It counts the streets within 1 km of your base pin and tells you what share you have covered. Rewards at 1, 5, 10, 20, 35, 50, 75 and 100% - scrap, parts and chest keys. Tap the new chip under the live map to see them.',
