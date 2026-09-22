@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.46';
+const VERSION='7.47';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -5081,6 +5081,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.47',d:'Sep 22',t:'The ring around you is your reach',
+  i:['THE RING ON THE LIVE MAP NOW MEANS WHAT IT LOOKS LIKE IT MEANS. It was the GPS accuracy circle - how unsure your phone was - while "in reach" was a different, smaller number. Under trees or between buildings the ring could be 100 m wide with reach stuck at 70, so a raid inside your ring said walk closer. The ring is drawn at your actual reach now: anything inside it, you can tap.',
+     'BAD GPS GETS MORE SLACK. Reach grows with how unsure the phone is, up to 110 m (was 70), so you can reach what you are standing on even when the signal is rough. The walk-closer message now says how far away it is and what your reach is.']},
  {v:'7.46',d:'Sep 22',t:'The live map has its own tab',
   i:['A MAP BUTTON IN THE BOTTOM BAR. The Road tab is back to exactly what it was. Tap Map and the live map fills the screen; tap anything else and it stops, so GPS only runs while you are looking at it.',
      'THE GOOD PARTS STAYED: the chips over the map for raiders due, horde night, where you are, the nearest place to loot and how far, your town percentage; the re-centre button; bigger pins.',

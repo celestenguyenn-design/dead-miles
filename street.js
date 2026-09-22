@@ -70,7 +70,11 @@ function onFootCheck(what){
   return false;
 }
 function streetState(){if(!S.street)S.street={looted:{},visits:0};return S.street;}
-function reachRadius(){const acc=STREET.pos&&STREET.pos.acc||20;return Math.min(70,Math.max(35,acc+15));}
+// v7.47: the cap was 70 m while the RING on the map was drawn at the GPS accuracy, which can be
+// 100 m under trees or between buildings. Bel had a raid inside her ring that said "walk closer".
+// The ring is now drawn at this radius, so what is inside it is always reachable, and the cap is
+// 110 m so a phone that is 100 m unsure can still reach what it is standing on.
+function reachRadius(){const acc=STREET.pos&&STREET.pos.acc||20;return Math.min(110,Math.max(35,acc+15));}
 
 /* ---------- open / close ---------- */
 // Each map skin brings its own tiles (see MAPSKINS). Swapping the layer rather
@@ -139,8 +143,8 @@ function onPos(p){
   noteSpeed(pos,p.coords.speed);STREET.pos=pos;
   try{townMark(pos);}catch(e){}
   if(!STREET.me){STREET.me=L.marker([pos.lat,pos.lon],{icon:L.divIcon({className:'me-icon',html:ART.avatarSVG(S.av,44),iconSize:[44,57],iconAnchor:[22,54]}),zIndexOffset:1000}).addTo(STREET.map);
-    STREET.accC=L.circle([pos.lat,pos.lon],{radius:pos.acc,color:'#8fb3c9',weight:1,fillOpacity:.08}).addTo(STREET.map);}
-  else{STREET.me.setLatLng([pos.lat,pos.lon]);STREET.accC.setLatLng([pos.lat,pos.lon]).setRadius(pos.acc);}
+    STREET.accC=L.circle([pos.lat,pos.lon],{radius:reachRadius(),color:'#8fb3c9',weight:1,fillOpacity:.08}).addTo(STREET.map);}
+  else{STREET.me.setLatLng([pos.lat,pos.lon]);STREET.accC.setLatLng([pos.lat,pos.lon]).setRadius(reachRadius());}
   if(first){STREET.map.setView([pos.lat,pos.lon],17);spawnZombies(true);try{townDraw();townRow();townStreets();}catch(e){}}
   // 250 -> 130. The building query reaches 220 m, so refetching at 250 m meant
   // she was already outside the loaded area when the request started, and the
@@ -447,7 +451,7 @@ function tapPoi(id){
   const p=STREET.pois.find(x=>x.id===id);if(!p)return;const st=poiState(p);
   if(S.loc&&S.loc.geo!==id){toast('Finish or leave '+S.loc.n+' first');return;}
   if(st==='looted'){const t=streetState().looted[id];const h=Math.ceil((24*3600000-(Date.now()-t))/3600000);toast(p.n+' is picked clean. Resets in '+h+'h');return;}
-  if(st==='far'){toast(p.n+': walk closer ('+Math.round(geoDist(p,STREET.pos))+' m)');return;}
+  if(st==='far'){toast(p.n+': walk closer ('+Math.round(geoDist(p,STREET.pos))+' m away, your reach is '+Math.round(reachRadius())+' m)');return;}
   if(!onFootCheck('search a place'))return;   // looting from a moving car does not count
   if(S.loc&&S.loc.geo===id){$('#locCard').scrollIntoView({behavior:'smooth'});return;}
   const tier=poiTierOf(p)||farTierFor(null);
@@ -759,7 +763,7 @@ function openCallGo(i){
 }
 async function joinRaid(poiId){
   const p=STREET.pois.find(x=>x.id===poiId);const r=p&&raidAt(p);if(!r)return;
-  if(!raidNear(r)){toast('Walk closer to join');return;}
+  if(!raidNear(r)){const p=STREET.pois.find(x=>x.id===r.poi);toast('Walk closer to join'+(p&&STREET.pos?' ('+Math.round(geoDist(p,STREET.pos))+' m away, your reach is '+Math.round(reachRadius())+' m)':''));return;}
   if(!onFootCheck('join a raid'))return;      // driving past does not count
   return enterRaid(r,false);
 }
