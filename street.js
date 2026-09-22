@@ -1624,7 +1624,7 @@ function homeLayout(){
   return true;
 }
 function drawerOpen(on){const dr=$('#drawer');if(!dr)return;dr.classList.toggle('open',!!on);if(!on)dr.scrollTop=0;try{renderChips();}catch(e){}}
-function drawerShow(id){const el=$('#'+id);if(!el)return;drawerOpen(true);setTimeout(()=>{try{el.scrollIntoView({block:'start',behavior:'smooth'});}catch(e){}},60);}
+function drawerShow(id){const el=$('#'+id);if(!el)return;drawerOpen(true);setTimeout(()=>{const dr=$('#drawer');const top=el.getBoundingClientRect().top-dr.getBoundingClientRect().top+dr.scrollTop-56;dr.scrollTo({top:Math.max(0,top),behavior:'smooth'});},80);}
 function setMapHome(on){S.mapHome=!!on;save();toast(on?'The map is your home screen. Reloading...':'Back to the old Road page. Reloading...','a');setTimeout(()=>location.reload(),700);}
 function renderHomeSwitch(){const b=$('#mapHomeBtn');if(!b)return;const on=S.mapHome!==false;b.textContent=on?'On':'Off';b.onclick=()=>setMapHome(!on);}
 // the things that float over the map
@@ -1644,6 +1644,8 @@ function renderChips(){
   if(S.raidPending&&S.base){const p=S.raidPending;const due=new Date().getHours()>=p.hour;
     if(due||S.base.rooms.tower)H('⚔️ Raiders '+(due?'at the fence':'at '+String(p.hour).padStart(2,'0')+':00')+' <small>· '+defense()+' vs '+p.power+(due?' · tap':'')+'</small>','blood',()=>{if(due){closeSheet();raidTick();}else drawerShow('raidCard');});}
   const h=(typeof hordeState==='function')?hordeState():null;if(h&&(h.pending||h.next-Date.now()<2*3600000))H('\u{1F9DF} Horde night at 9 pm <small>· walls '+hordeDefense()+' vs '+hordePower()+'</small>','blood',()=>drawerShow('raidCard'));
+  // v7.45: at a place (the road arrives somewhere every few hundred steps) - a chip, never an auto-opened drawer.
+  if(S.loc&&!$('#locCard').hidden)H('\u{1F4CD} You are here <small>\u00b7 '+esc(S.loc.n||'a place')+' \u00b7 tap to search it</small>','amber',()=>drawerShow('locCard'));
   const np=nearestPlace();if(np&&!lock)H(np.p.e+' '+esc(np.p.n||'a place')+' <small>· '+(np.d>=1000?(np.d/1000).toFixed(1)+' km':np.d+' m')+(np.near?' · in reach':'')+'</small>',np.near?'amber':'',()=>{if(np.near)tapPoi(np.p.id);else if(STREET.map)STREET.map.panTo([np.p.lat,np.p.lon]);});
   const town=$('#townRow');
   box.querySelectorAll('.mchip').forEach(e=>e.remove());
@@ -1653,7 +1655,4 @@ function renderChips(){
   const ct=((S.ct&&S.ct.daily)||[]).filter(c=>!c.done).length;if(ct)n++;
   try{const w=watchState();if(watchMax()-w.used>0)n++;}catch(e){}
   const hd=$('#drawerHead');if(hd)hd.innerHTML='<span>'+(n?n+' thing'+(n===1?'':'s')+' need'+(n===1?'s':'')+' you':'All quiet')+'</span><small>'+($('#drawer').classList.contains('open')?'swipe down':'swipe up')+'</small>';
-  // at a place: bring its card up once
-  if(S.loc&&S.loc!==HOME_LOC_SHOWN){HOME_LOC_SHOWN=S.loc;drawerShow('locCard');}
-  if(!S.loc)HOME_LOC_SHOWN=null;
 }

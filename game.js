@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.44';
+const VERSION='7.45';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -5078,6 +5078,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.45',d:'Sep 22',t:'The drawer stays down until you pull it',
+  i:['THE DRAWER NO LONGER OPENS ON ITS OWN. Arriving at a place on the road used to pull it up over the map every time. Now a "You are here" chip appears instead - tap it to search the place.',
+     'When you do open the drawer it covers about three-quarters of the map, not all of it, and the walking strip is a little shorter so the map gets more room.']},
  {v:'7.44',d:'Sep 22',t:'The map is your home screen',
   i:['OPEN THE GAME AND YOU ARE ON THE MAP. Your avatar, the buildings, the base pin, the paint. The walking scene is a strip across the top - tap it to open it up - and the road still counts your steps exactly as before.',
      'EVERYTHING ELSE IS IN THE DRAWER. Pull up from the bottom of the map for steps, contracts, watch duty, the call - every card that used to be on the Road page. The handle says how many things need you. Tap a building and its card comes up on its own.',
