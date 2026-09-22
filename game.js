@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.48';
+const VERSION='7.49';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -4225,6 +4225,20 @@ async function pushState(){if(!pushSupported())return 'unsupported';if(Notificat
   try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();return sub?'on':'off';}catch(e){return 'off';}}
 let PUSH_MSG='';
 function pushSay(m){PUSH_MSG=m;renderPush();}
+/* v7.49 - "You should also turn on notifications for everyone." Nobody can switch them on for
+   another phone - the phone asks its owner - but the switch was buried in Settings. This card sits
+   at the top of the Road page for anyone who has not decided yet, with the button on it. It says
+   the iPhone rule out loud, and "Not now" hides it for a week. */
+async function renderPushNudge(){
+  const el=$('#pushNudge');if(!el)return;
+  const st=await pushState();const o=O();const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+  const snoozed=(S.pushNudgeAt||0)>Date.now()-7*86400000;
+  const show=!snoozed&&o.ok&&S.onboarded&&(st==='off'||(st==='unsupported'&&isIOS()&&!standalone));
+  el.hidden=!show;if(!show)return;
+  el.innerHTML=st==='off'
+    ?'<h2>\u{1F514} Turn on notifications</h2><p>Horde night an hour before, raiders at your fence, a streak about to break, your rival passing you. Nothing else - and since raids wait for you now, a nudge means you get to answer them.</p><div class="row" style="margin-top:8px"><button class="btn r" onclick="pushOn().then(()=>renderPushNudge())">Turn on notifications</button><button class="btn ghost" onclick="S.pushNudgeAt=Date.now();save();renderPushNudge()">Not now</button></div>'
+    :'<h2>\u{1F514} Notifications need the home-screen icon</h2><p>On an iPhone the game can only send notifications when it is opened from an icon on your home screen. Tap the share button in Safari, choose <b>Add to Home Screen</b>, then open Dead Miles from that icon and this card will offer the switch.</p><div class="row" style="margin-top:8px"><button class="btn ghost" onclick="S.pushNudgeAt=Date.now();save();renderPushNudge()">Not now</button></div>';
+}
 async function pushOn(){
   const o=O();
   if(!o.ok){pushSay('Go online first, in the Online box just below this one. Notifications are tied to your handle.');return;}
@@ -4368,8 +4382,11 @@ async function renderPush(){
 }
 let updateReady=false;
 async function applyUpdate(){try{const rs=await navigator.serviceWorker.getRegistrations();for(const r of rs)await r.unregister();const ks=await caches.keys();for(const k of ks)await caches.delete(k);}catch(e){}location.href=location.pathname+'?r='+Date.now();}
-async function checkUpdate(){try{const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=(await r.text()).trim();if(v&&v!==VERSION){updateReady=v;const b=$('#updateBar');if(b){b.hidden=false;b.textContent='Version '+v+' is ready. Tap to update.';}}}catch(e){}}
-function maybeAutoUpdate(){if(updateReady&&!C&&!$('#modal').classList.contains('on')){toast('Updating to v'+updateReady,'z');setTimeout(applyUpdate,800);}}
+async function checkUpdate(){try{const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=(await r.text()).trim();if(v&&v!==VERSION){updateReady=v;const b=$('#updateBar');if(b){b.hidden=false;b.textContent='Version '+v+' is ready. Tap to update.';}
+    // v7.49: apply it now if nothing is open. Waiting for the bar to be tapped, or for the app to be
+    // re-opened with no sheet up, left phones on old builds for hours - and a fix nobody has is no fix.
+    maybeAutoUpdate();}}catch(e){}}
+function maybeAutoUpdate(){if(updateReady&&!C&&!S.combat&&!$('#modal').classList.contains('on')){toast('Updating to v'+updateReady,'z');setTimeout(applyUpdate,800);}}
 /* ================= pedometer + sync ================= */
 let pedo={on:false,last:0,filt:0,count:0,got:false,wake:null,dev:0,warm:0,armed:true,gaps:[],lock:0,pend:0};
 function pedoToggle(){
@@ -4874,7 +4891,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
+  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5081,6 +5098,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.49',d:'Sep 22',t:'Notifications, right up top',
+  i:['A CARD AT THE TOP OF THE ROAD PAGE asks you to turn on notifications if you have not yet. Horde night an hour before, raiders at your fence, a streak about to break, your rival passing you - nothing else. Since raids now wait for you, a nudge means you actually get to answer them.',
+     'IPHONES: notifications only work from a home-screen icon. The card walks you through it. Not now hides it for a week; the switch is always under Settings too.',
+     'UPDATES APPLY THEMSELVES. When a new version is out the game now updates as soon as you are not in a fight or a sheet, instead of waiting for you to tap the green bar. Your save is untouched by an update.']},
  {v:'7.48',d:'Sep 22',t:'Too far away says how far',
   i:['THE RAID SHEET SAYS THE NUMBERS. "Too far away" now reads "Too far away · 84 m, reach 70 m", so you can see exactly why - and so can I when you send me a screenshot. If you are on this version the ring on the map and that reach number are the same thing.']},
  {v:'7.47',d:'Sep 22',t:'The ring around you is your reach',
