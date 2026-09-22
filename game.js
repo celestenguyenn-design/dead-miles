@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.43';
+const VERSION='7.44';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -4329,7 +4329,7 @@ function goInfect(){
   if(!infect()){const b=$('#infectBar');if(b)b.hidden=true;return;}
   // The card is on the road screen, so switch there first if she is elsewhere.
   const btn=document.querySelector('.nav button[data-v="street"]');
-  const onRoad=$('#v-street')&&$('#v-street').classList.contains('on');
+  const onRoad=(typeof roadOn==='function')?roadOn():($('#v-street')&&$('#v-street').classList.contains('on'));
   if(!onRoad&&btn)btn.click();
   setTimeout(()=>{const ic=$('#infectCard');if(!ic||ic.hidden)return;
     ic.scrollIntoView({behavior:(typeof reduced!=='undefined'&&reduced)?'auto':'smooth',block:'center'});
@@ -4717,7 +4717,7 @@ function drawBuilding(x,kind,emoji){const w=220,h=170,y=290-h;const col={house:'
   for(let i=0;i<3;i++)for(let j=0;j<2;j++){ctx.fillStyle=(i+j)%3===0?'#0d0c0e':'#161418';ctx.fillRect(x+24+i*66,y+28+j*66,36,36);ctx.strokeStyle='#0d0c0e';ctx.lineWidth=3;ctx.strokeRect(x+24+i*66,y+28+j*66,36,36);if((i*j)%2===1){ctx.strokeStyle='#5a4a3a';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x+20+i*66,y+36+j*66);ctx.lineTo(x+64+i*66,y+40+j*66);ctx.stroke();}}
   ctx.fillStyle='#0d0c0e';ctx.fillRect(x+w/2-22,y+h-64,44,64);ctx.font='38px serif';ctx.textAlign='center';ctx.fillText(emoji||'',x+w/2,y-12);ctx.textAlign='start';
   if(kind==='stronghold'){ctx.fillStyle='#c22b3a';ctx.fillRect(x+w/2-3,y-110,6,50);ctx.fillRect(x+w/2,y-110,40,22);}}
-let raf=0;function animate(){cancelAnimationFrame(raf);const step=(t)=>{drawScene(t);const road=$('#v-street').classList.contains('on')&&document.visibilityState==='visible';if(!reduced&&road)raf=requestAnimationFrame(step);else raf=0;};raf=requestAnimationFrame(step);}
+let raf=0;function animate(){cancelAnimationFrame(raf);const step=(t)=>{drawScene(t);const road=(typeof roadOn==='function'?roadOn():$('#v-street').classList.contains('on'))&&document.visibilityState==='visible';if(!reduced&&road)raf=requestAnimationFrame(step);else raf=0;};raf=requestAnimationFrame(step);}
 function animateOnce(){if(!raf)animate();else drawScene(performance.now());}
 
 /* ================= render ================= */
@@ -4871,7 +4871,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();renderQuiet();
+  renderOnline();renderStepsHelp();renderWanderer();if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();renderQuiet();if(typeof renderHomeSwitch==='function')renderHomeSwitch();if(typeof renderChips==='function')try{renderChips();}catch(e){}
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5078,6 +5078,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.44',d:'Sep 22',t:'The map is your home screen',
+  i:['OPEN THE GAME AND YOU ARE ON THE MAP. Your avatar, the buildings, the base pin, the paint. The walking scene is a strip across the top - tap it to open it up - and the road still counts your steps exactly as before.',
+     'EVERYTHING ELSE IS IN THE DRAWER. Pull up from the bottom of the map for steps, contracts, watch duty, the call - every card that used to be on the Road page. The handle says how many things need you. Tap a building and its card comes up on its own.',
+     'THE URGENT THINGS FLOAT OVER THE MAP: raiders due, horde night, the nearest place to loot and how far it is, your town percentage. Tap the nearest-place chip to go there.',
+     'PINS ARE A QUARTER BIGGER, for thumbs. The button in the corner re-centres the map on you.',
+     'GPS RUNS WHILE THE MAP IS ON SCREEN, and stops when you switch to another tab. If that costs your battery more than you like, Settings > Game > "Map is my home screen" puts the old Road page back.']},
  {v:'7.43',d:'Sep 22',t:'Your save is private now',
   i:['YOUR SAVE FILE NO LONGER TRAVELS WITH THE LEADERBOARD. The cloud backup used to ride inside the same record the board and base visits read. It is now stored separately, behind your account key, and the board only carries what a visit needs to draw: your base, shelf, outfit, pet and crew.',
      'THIS INCLUDES YOUR BASE PIN. Where your base pin sits on the real map was in that record. It is not any more.',
@@ -6508,8 +6514,10 @@ function classSheet(){let cls='brawler';const draw=()=>{$('#sheet').innerHTML=`<
 
 /* ================= wiring ================= */
 function wire(){
-  document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{SFX.play('ui');if(typeof STREET!=='undefined'&&STREET.on){STREET.on=false;if(STREET.watch!==null){navigator.geolocation.clearWatch(STREET.watch);STREET.watch=null;}clearInterval(STREET.timer);$('#v-street').insertBefore($('#locCard'),$('#raidCard'));}document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.view').forEach(v=>{const on=v.id==='v-'+b.dataset.v;v.classList.toggle('on',on);
-      v.classList.remove('tabin');if(on&&!reduced){void v.offsetWidth;v.classList.add('tabin');}});$('#main').scrollTop=0;render();if(b.dataset.v==='street')animate();});
+  document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{SFX.play('ui');const home=(typeof mapHome==='function')&&mapHome();const toRoad=b.dataset.v==='street';
+    if(typeof STREET!=='undefined'&&STREET.on&&!(home&&toRoad)){STREET.on=false;if(STREET.watch!==null){navigator.geolocation.clearWatch(STREET.watch);STREET.watch=null;}clearInterval(STREET.timer);$('#raidCard').parentElement.insertBefore($('#locCard'),$('#raidCard'));}
+    document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x===b));const want=(home&&toRoad)?'v-map':'v-'+b.dataset.v;document.querySelectorAll('.view').forEach(v=>{const on=v.id===want;v.classList.toggle('on',on);
+      v.classList.remove('tabin');if(on&&!reduced){void v.offsetWidth;v.classList.add('tabin');}});$('#main').scrollTop=0;render();if(toRoad)animate();if(home&&toRoad&&typeof STREET!=='undefined'&&!STREET.on)streetStart();});
   // Two buttons instead of one, because "5,000" meant "add 5,000" to her and
   // "my total is 5,000" to the code, and nothing on screen said which.
   $('#syncInput').oninput=syncMath;syncMath();
@@ -6705,6 +6713,7 @@ function whileYouWereOut(){
 function start(){
   S=load()||fresh();recoverStuckRaid();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
   wire();render();fetchWeather();
+  if(typeof homeLayout==='function'&&homeLayout()){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x.dataset.v==='street'));try{streetStart();}catch(e){}}
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
   // A keyed address is handled before anything else: this copy may be a blank
   // Safari tab that would otherwise try to onboard her instead of delivering.

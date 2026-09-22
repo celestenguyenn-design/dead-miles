@@ -100,8 +100,8 @@ function streetStart(){
   if(typeof L==='undefined'){toast('The map library did not load. Check your connection.','d');return;}
   if(!navigator.geolocation){toast('This browser has no location access.','d');return;}
   STREET.on=true;
-  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-map'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('on'));
-  $('#v-map').appendChild($('#locCard'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-map'));document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',mapHome()&&x.dataset.v==='street'));
+  if(!mapHome())$('#v-map').appendChild($('#locCard'));
   if(!STREET.map){
     STREET.map=L.map('map',{zoomControl:false,attributionControl:true}).setView([40.71,-74.0],17);
     applyTiles();
@@ -128,7 +128,7 @@ function streetStart(){
 function streetStop(){
   STREET.on=false;if(STREET.watch!==null){navigator.geolocation.clearWatch(STREET.watch);STREET.watch=null;}
   clearInterval(STREET.timer);clearInterval(STREET.lockTimer);if(STREET.wake){try{STREET.wake.release();}catch(e){}STREET.wake=null;}
-  $('#v-street').insertBefore($('#locCard'),$('#raidCard'));
+  $('#raidCard').parentElement.insertBefore($('#locCard'),$('#raidCard'));
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-street'));document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x.dataset.v==='street'));
   render();
 }
@@ -149,7 +149,7 @@ function onPos(p){
   if(!STREET.lastFetch||geoDist(STREET.lastFetch,pos)>130){if(!STREET.loading)fetchPois(pos);}
   rebuildVisible();
   if(STREET.pois.length&&!STREET.loading)$('#mapStatus').textContent=STREET.pois.length+' places nearby';
-  drawBase();updateMarkers();renderStreet();
+  drawBase();updateMarkers();renderStreet();try{renderChips();}catch(e){}
 }
 
 /* ---------- places from OpenStreetMap ---------- */
@@ -307,7 +307,7 @@ async function fetchPois(pos,force){
 function poiScale(){
   if(!STREET.map)return;
   const z=STREET.map.getZoom();
-  const px=z>=19?34:z>=18?30:z>=17?24:z>=16?19:15;
+  const px=z>=19?42:z>=18?36:z>=17?30:z>=16?24:19;   // v7.44: about a quarter bigger - they are tapped with a thumb
   document.documentElement.style.setProperty('--poiSize',px+'px');
 }
 function poiState(p){const st=streetState();const t=st.looted[p.id];if(t&&Date.now()-t<24*3600000)return 'looted';if(!STREET.pos)return 'far';return geoDist(p,STREET.pos)<=reachRadius()?'near':'far';}
@@ -1566,8 +1566,8 @@ function townRow(){
   if(!S.base||!S.base.geo){el.innerHTML='<span class="help">\u{1F3A8} Drop your base pin and the map starts remembering which streets around it you have walked.</span>';return;}
   const s=townStats();if(!s){el.innerHTML='';return;}
   const next=TOWN_MILES[S.town.paid||0];
-  el.innerHTML='<button class="btn sm townchip" onclick="townSheet()">\u{1F3A8} <b>'+(s.pct==null?fmt(s.walked)+' squares':townPctText(s.pct))+'</b> of your town walked'
-    +(s.pct!=null&&next?'<small>next reward at '+next[0]+'%</small>':s.pct==null?'<small>'+(STREET.townLoading?'counting your streets...':'street count not loaded yet')+'</small>':'')+'</button>';
+  el.innerHTML='<button class="btn sm townchip" onclick="townSheet()">\u{1F3A8} <b>'+(s.pct==null?fmt(s.walked)+' squares':townPctText(s.pct))+'</b>'+(s.pct==null?' walked':' of your town')
+    +(s.pct!=null&&next?'<small>· next reward at '+next[0]+'%</small>':s.pct==null?'<small>· '+(STREET.townLoading?'counting streets...':'streets not counted yet')+'</small>':'')+'</button>';
 }
 function townToggle(){if(!S.town)return;S.town.hide=!S.town.hide;save();townDraw();townSheet();}
 function townSheet(){
@@ -1581,4 +1581,79 @@ function townSheet(){
     +TOWN_MILES.map((m,i)=>'<div class="kv" style="grid-template-columns:auto 1fr auto;gap:10px;opacity:'+(i<paid?.55:1)+'"><b>'+m[0]+'%</b><span>'+townGive(m[1])+'</span><span>'+(i<paid?'✓ collected':'')+'</span></div>').join('')
     +(s.pct==null?'<button class="btn wide" style="margin-top:10px" onclick="closeSheet();townStreets(true)">Count my streets now</button>':'')
     +'<div class="grid2" style="margin-top:10px"><button class="btn" onclick="townToggle()">'+(S.town.hide?'Show the paint on the map':'Hide the paint on the map')+'</button><button class="btn r" onclick="closeSheet()">Back</button></div>',true);
+}
+
+/* ================= THE MAP IS HOME (v7.44) =================
+   Her words: "I do wish the live view map could be better honestly, if you could kind
+   of just see it there permanently kind of like Pokemon go / pikmin on the first page."
+   Measured before this: the Road page was 9,571 px tall and the live map sat behind a
+   button in the fourth card. Now the Road tab IS the map. The walking scene is a strip
+   on top (tap it to open it up), the map fills the rest, the urgent things float over
+   the map as chips, and every card that used to be on the Road page lives in a drawer
+   you pull up from the bottom. Nothing was deleted - the same elements moved, by id, so
+   every render function still finds them.
+   Settings > Game > "Map is my home screen" turns it off (the page reloads in the old
+   layout). It is on by default. If the phone has no location at all, it stays off. */
+function mapHome(){return S.mapHome!==false&&!!navigator.geolocation&&typeof L!=='undefined';}
+function roadOn(){const s=$('#v-street'),m=$('#v-map');return !!((s&&s.classList.contains('on'))||(mapHome()&&m&&m.classList.contains('on')));}
+function homeLayout(){
+  if(!mapHome())return false;const vm=$('#v-map'),vs=$('#v-street');if(!vm||!vs||vm.classList.contains('home'))return vm&&vm.classList.contains('home');
+  vm.classList.add('home');$('#main').classList.add('homeon');
+  const scene=vs.querySelector('.scene'),prog=vs.querySelector('.progress');
+  vm.insertBefore(scene,vm.firstChild);vm.insertBefore(prog,scene.nextSibling);
+  scene.addEventListener('click',()=>{scene.classList.toggle('open');});
+  const wrap=document.createElement('div');wrap.id='mapWrap';wrap.className='mapwrap';const map=$('#map');map.parentNode.insertBefore(wrap,map);wrap.appendChild(map);
+  wrap.insertAdjacentHTML('beforeend','<div class="chips" id="mapChips"></div><button class="mebtn" id="meBtn" aria-label="Centre on me">◎</button>'
+    +'<div class="drawer" id="drawer"><div class="grip"></div><h3 id="drawerHead"><span>All quiet</span><small>swipe up</small></h3><div class="row" id="drawerInfo"></div><div class="body" id="drawerBody"></div></div>');
+  const body=$('#drawerBody');
+  // the street-mode card has nothing to open any more
+  const sm=$('#streetBtn')&&$('#streetBtn').closest('.card');if(sm)sm.hidden=true;
+  for(const c of [...vs.children])body.appendChild(c);
+  // the map's own bits and pieces
+  $('#drawerInfo').appendChild($('#mapInfo'));
+  const extras=document.createElement('div');extras.className='card';extras.id='mapExtras';extras.innerHTML='<h2>Map</h2>';
+  for(const el of [...vm.children]){if(el===scene||el===prog||el===wrap)continue;if(el.id==='raidList'){body.insertBefore(el,body.firstChild);continue;}if(el.id==='townRow'){$('#mapChips').appendChild(el);continue;}extras.appendChild(el);}
+  body.appendChild(extras);const back=$('#mapBack');if(back)back.hidden=true;
+  // the drawer: tap the handle, or drag it
+  const dr=$('#drawer');const head=$('#drawerHead'),grip=dr.querySelector('.grip');
+  [head,grip].forEach(h=>h.addEventListener('click',()=>drawerOpen(!dr.classList.contains('open'))));
+  let y0=null;dr.addEventListener('touchstart',e=>{y0=e.touches[0].clientY;},{passive:true});
+  dr.addEventListener('touchend',e=>{if(y0===null)return;const dy=e.changedTouches[0].clientY-y0;y0=null;if(dy<-40)drawerOpen(true);else if(dy>40&&dr.scrollTop<=0)drawerOpen(false);},{passive:true});
+  $('#meBtn').onclick=()=>{if(STREET.map&&STREET.pos)STREET.map.setView([STREET.pos.lat,STREET.pos.lon],Math.max(STREET.map.getZoom(),17));else toast('Waiting for GPS');};
+  if(STREET.map)setTimeout(()=>STREET.map.invalidateSize(),60);
+  return true;
+}
+function drawerOpen(on){const dr=$('#drawer');if(!dr)return;dr.classList.toggle('open',!!on);if(!on)dr.scrollTop=0;try{renderChips();}catch(e){}}
+function drawerShow(id){const el=$('#'+id);if(!el)return;drawerOpen(true);setTimeout(()=>{try{el.scrollIntoView({block:'start',behavior:'smooth'});}catch(e){}},60);}
+function setMapHome(on){S.mapHome=!!on;save();toast(on?'The map is your home screen. Reloading...':'Back to the old Road page. Reloading...','a');setTimeout(()=>location.reload(),700);}
+function renderHomeSwitch(){const b=$('#mapHomeBtn');if(!b)return;const on=S.mapHome!==false;b.textContent=on?'On':'Off';b.onclick=()=>setMapHome(!on);}
+// the things that float over the map
+const ATTN_CARDS=['stuckCard','packMeter','musterCard','cacheCard','landmarkCard','npcCard','locCard','rivalCard','raidCard','checkinCard','callCard','infectCard'];
+let HOME_LOC_SHOWN=null;
+function nearestPlace(){
+  if(!STREET.pos||!STREET.pois.length)return null;let best=null,bd=1e9;
+  for(const p of STREET.pois){if(poiState(p)==='looted')continue;const d=geoDist(p,STREET.pos);if(d<bd){bd=d;best=p;}}
+  return best?{p:best,d:Math.round(bd),near:poiState(best)==='near'}:null;
+}
+function renderChips(){
+  const box=$('#mapChips');if(!box||!mapHome())return;
+  const chips=[];const H=(txt,cls,fn)=>chips.push({txt,cls,fn});
+  if(STREET.err&&!STREET.pos)H('\u{1F4CD} Location is off <small>· tap for how to allow it</small>','blood',()=>toast($('#mapStatus').textContent||STREET.err,'d'));
+  else if(!STREET.pos)H('\u{1F4CD} Finding you...','',null);
+  const lock=drivingLock();if(lock)H('\u{1F697} In a vehicle <small>· on foot in '+lock+'s</small>','',null);
+  if(S.raidPending&&S.base){const p=S.raidPending;const due=new Date().getHours()>=p.hour;
+    if(due||S.base.rooms.tower)H('⚔️ Raiders '+(due?'at the fence':'at '+String(p.hour).padStart(2,'0')+':00')+' <small>· '+defense()+' vs '+p.power+(due?' · tap':'')+'</small>','blood',()=>{if(due){closeSheet();raidTick();}else drawerShow('raidCard');});}
+  const h=(typeof hordeState==='function')?hordeState():null;if(h&&(h.pending||h.next-Date.now()<2*3600000))H('\u{1F9DF} Horde night at 9 pm <small>· walls '+hordeDefense()+' vs '+hordePower()+'</small>','blood',()=>drawerShow('raidCard'));
+  const np=nearestPlace();if(np&&!lock)H(np.p.e+' '+esc(np.p.n||'a place')+' <small>· '+(np.d>=1000?(np.d/1000).toFixed(1)+' km':np.d+' m')+(np.near?' · in reach':'')+'</small>',np.near?'amber':'',()=>{if(np.near)tapPoi(np.p.id);else if(STREET.map)STREET.map.panTo([np.p.lat,np.p.lon]);});
+  const town=$('#townRow');
+  box.querySelectorAll('.mchip').forEach(e=>e.remove());
+  chips.forEach((c,i)=>{const b=document.createElement('button');b.className='mchip'+(c.cls?' '+c.cls:'');b.innerHTML=c.txt;if(c.fn)b.onclick=c.fn;else b.disabled=true;box.insertBefore(b,town||null);});
+  // the drawer handle: how many things want her
+  let n=ATTN_CARDS.filter(id=>{const el=$('#'+id);return el&&!el.hidden;}).length;
+  const ct=((S.ct&&S.ct.daily)||[]).filter(c=>!c.done).length;if(ct)n++;
+  try{const w=watchState();if(watchMax()-w.used>0)n++;}catch(e){}
+  const hd=$('#drawerHead');if(hd)hd.innerHTML='<span>'+(n?n+' thing'+(n===1?'':'s')+' need'+(n===1?'s':'')+' you':'All quiet')+'</span><small>'+($('#drawer').classList.contains('open')?'swipe down':'swipe up')+'</small>';
+  // at a place: bring its card up once
+  if(S.loc&&S.loc!==HOME_LOC_SHOWN){HOME_LOC_SHOWN=S.loc;drawerShow('locCard');}
+  if(!S.loc)HOME_LOC_SHOWN=null;
 }

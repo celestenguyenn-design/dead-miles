@@ -623,3 +623,32 @@ button.room2{width:100%;text-align:left;color:inherit;font:inherit}
 .townchip{width:100%;text-align:left;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
 .townchip b{color:var(--amber)}
 .townchip small{margin-left:auto;opacity:.7}
+/* v7.44 - the map is home */
+.main.homeon{padding-bottom:0;overflow:hidden}
+#v-map.home{height:100%;gap:8px;padding-top:8px;overflow:hidden}
+#v-map.home .scene{flex:0 0 auto;height:78px;cursor:pointer;transition:height .25s ease}
+#v-map.home .scene canvas{transform:translateY(-34%)}
+#v-map.home .scene.open{height:auto} #v-map.home .scene.open canvas{transform:none}
+#v-map.home .scene .tag{top:8px} #v-map.home .scene .wx{display:none} #v-map.home .scene.open .wx{display:block}
+#v-map.home .chips .townchip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+#v-map.home .progress{flex:0 0 auto}
+#v-map.home .mapwrap{flex:1 1 auto;position:relative;min-height:220px;border-radius:12px;overflow:hidden;border:1px solid var(--line);isolation:isolate;margin-bottom:8px}
+#v-map.home #map{height:100%;min-height:0;border:0;border-radius:0}
+#v-map.home .chips{position:absolute;left:8px;top:8px;right:56px;z-index:900;display:flex;flex-direction:column;gap:6px;align-items:flex-start;pointer-events:none}
+#v-map.home .chips>*{pointer-events:auto}
+.mchip{display:inline-flex;align-items:baseline;gap:6px;padding:7px 11px;border-radius:8px;font:700 13px 'Barlow',system-ui,sans-serif;background:rgba(20,20,26,.92);border:1px solid var(--line);color:var(--bone);box-shadow:0 2px 8px rgba(0,0,0,.4);text-align:left;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mchip small{font-weight:600;opacity:.8}
+.mchip.blood{background:rgba(120,24,32,.94);border-color:#c23b4a}
+.mchip.amber{background:rgba(230,165,48,.95);color:#2a1a00;border-color:#ffd27a}
+.mchip:disabled{opacity:.9}
+#v-map.home .chips .townchip{width:auto;display:inline-flex;align-items:baseline;gap:6px;padding:7px 11px;border-radius:8px;font:700 13px 'Barlow',system-ui,sans-serif;background:rgba(230,165,48,.95);color:#2a1a00;border:1px solid #ffd27a;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+#v-map.home .chips .townchip b{color:#2a1a00} #v-map.home .chips .townchip small{margin-left:0;opacity:.8;color:#2a1a00}
+.mebtn{position:absolute;right:10px;top:8px;z-index:900;width:40px;height:40px;border-radius:50%;background:rgba(20,20,26,.92);border:1px solid var(--line);color:var(--bone);display:grid;place-items:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.4);cursor:pointer}
+.drawer{position:absolute;left:0;right:0;bottom:0;z-index:950;background:linear-gradient(180deg,rgba(28,28,34,.97),rgba(20,20,26,.99));border-top:1px solid var(--line);border-radius:14px 14px 0 0;padding:6px 12px 10px;box-shadow:0 -6px 18px rgba(0,0,0,.45);max-height:44px;overflow:hidden;transition:max-height .28s ease;-webkit-overflow-scrolling:touch}
+.drawer.open{max-height:92%;overflow-y:auto}
+.drawer .grip{width:38px;height:4px;border-radius:2px;background:var(--muted);margin:0 auto 6px;opacity:.7;cursor:pointer}
+.drawer h3{margin:0;font-family:'Bebas Neue';font-size:18px;letter-spacing:1px;color:var(--bone);display:flex;justify-content:space-between;align-items:baseline;cursor:pointer;font-weight:400}
+.drawer h3 small{font-family:'Barlow';font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--amber)}
+.drawer #drawerInfo{margin-top:8px}
+.drawer .body{display:none} .drawer.open .body{display:flex;flex-direction:column;gap:14px;padding:12px 0 16px}
+@media (prefers-reduced-motion:reduce){.drawer,#v-map.home .scene{transition:none}}

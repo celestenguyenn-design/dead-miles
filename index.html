@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=7.43">
+<link rel="stylesheet" href="style.css?v=7.44">
 </head>
 <body>
 <div id="app">
@@ -161,6 +161,8 @@
 <details class="fold"><summary><b>Game</b> <span class="sub">name, target, sound</span></summary><div class="foldbody">          <label class="row" style="justify-content:space-between">Daily step target <input id="goalInput" type="number" inputmode="numeric" min="1000" step="500" style="width:120px"></label>
           <label class="row" style="justify-content:space-between">Your name <input id="nameInput" type="text" maxlength="18" style="width:160px"></label>
           <label class="row" style="justify-content:space-between">Sounds <button class="btn sm" id="sfxBtn">On</button></label>
+          <label class="row" style="justify-content:space-between">Map is my home screen <button class="btn sm" id="mapHomeBtn">On</button></label>
+          <p class="help" style="margin:-4px 0 6px">On: the Road tab is the live map, with everything else in a drawer. Off: the old Road page. Changing it reloads the game.</p>
           <div style="margin-top:6px"><b>Quiet hours</b> <span class="sub">no raids while you are in class</span><div id="quietBody" style="margin-top:4px"></div></div>
           <div class="row"><button class="btn sm" onclick="newsSheet()">What's new</button><span class="help">Every update, explained in the game.</span></div>
           <div class="row"><button class="btn sm" id="updateBtn">Update the game now</button><span class="help">Pulls the newest version.</span></div></div></details>
@@ -197,8 +199,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=7.43"></script>
-<script src="street.js?v=7.43"></script>
-<script src="game.js?v=7.43"></script>
+<script src="art.js?v=7.44"></script>
+<script src="street.js?v=7.44"></script>
+<script src="game.js?v=7.44"></script>
 </body>
 </html>
