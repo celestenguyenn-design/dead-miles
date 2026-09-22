@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.45';
+const VERSION='7.46';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2208,7 +2208,10 @@ function mayaOffers(){const t=mayaTier();
   const o=[{id:'abx',cat:'food',need:t>=2?2:3,give:'abx',n:t>=1?3:2}];
   if(t>=2)o.push({id:'kit',cat:'water',need:3,give:'kit',n:1});
   return o;}
-function mayaHave(cat){return S.pack.filter(x=>x.cat===cat).length;}
+// v7.46: she counts your STASH too. Her report from a bungalow: "three food for two antibiotics and it
+// says I have zero. I have both though" - the food was in the base stash, and this only looked in the pack.
+function mayaHave(cat){return S.pack.filter(x=>x.cat===cat).length+((S.stock&&S.stock[cat])||0);}
+function mayaTake(cat,need){let n=0;S.pack=S.pack.filter(x=>{if(x.cat===cat&&n<need){n++;return false;}return true;});const rest=need-n;if(rest>0&&S.stock&&S.stock[cat]){const k=Math.min(rest,S.stock[cat]);S.stock[cat]-=k;n+=k;}return n;}
 function theoOdds(){const r=rel('theo');const base=0.5+(S.lvl-1)*0.03+roleLvl('scout')*0.05;
   return clamp(base+(r.ls>=3?0.10:0)-(r.ws>=3?0.08:0),0.10,0.95);}
 function theoBonus(){return rel('theo').won>=5?1.4:1.3;}
@@ -2233,7 +2236,7 @@ function rivalCardBody(loc){
   if(loc.rival==='maya'){const t=mayaTier();
     const hello=['Maya waves you over.','Maya looks up and nods - she knows your face now.','Maya shifts along the log to make room for you.','Maya already has a cup poured for you.'][t];
     return '<p>'+name+' has a fire going out front. '+hello+'</p><div class="stack" style="margin-top:12px">'
-      +mayaOffers().map(o=>{const ok=mayaHave(o.cat)>=o.need;return '<button class="btn a wide'+(ok?'':' off')+'" '+(ok?'':'disabled ')+'onclick="rivalAct(\'trade\',\''+o.id+'\')">'+o.need+' '+o.cat+' → '+o.n+' '+esc(ITEMS[o.give].n.toLowerCase())+(ok?'':' · you have '+mayaHave(o.cat))+'</button>';}).join('')
+      +mayaOffers().map(o=>{const ok=mayaHave(o.cat)>=o.need;return '<button class="btn a wide'+(ok?'':' off')+'" '+(ok?'':'disabled ')+'onclick="rivalAct(\'trade\',\''+o.id+'\')">'+o.need+' '+o.cat+' → '+o.n+' '+esc(ITEMS[o.give].n.toLowerCase())+(ok?'':' · you have '+mayaHave(o.cat)+' in pack and stash')+'</button>';}).join('')
       +'<button class="btn wide" onclick="S.loc.rival=\'\';save();render()">No thanks</button></div>'+tag;}
   const free=nadiaYields();
   return '<p>'+name+'. Two of Nadia\'s scouts are watching the door from a truck bed. '+(free?'They see who it is and look away.':'They have seen you.')+'</p>'
@@ -2258,8 +2261,8 @@ function rivalAct(kind,arg){
   else if(kind==='wait'){loc.rival='';loc.cleared=true;rollWanderer(loc);S.walk.toNext=Math.min(S.walk.dist,S.walk.toNext+150);S.walk.progress=S.walk.dist-S.walk.toNext;log('You waited out '+first+'. They cleared the walkers for you; it cost you 150 steps of daylight.');ctEvent('places',1);}
   else if(kind==='trade'){
     const o=mayaOffers().find(x=>x.id===(arg||'abx'));if(!o)return;
-    if(mayaHave(o.cat)<o.need){toast('Maya wants '+o.need+' '+o.cat+' from your pack');return;}
-    let n=0;S.pack=S.pack.filter(x=>{if(x.cat===o.cat&&n<o.need){n++;return false;}return true;});
+    if(mayaHave(o.cat)<o.need){toast('Maya wants '+o.need+' '+o.cat+' - pack or stash');return;}
+    mayaTake(o.cat,o.need);
     for(let i=0;i<o.n;i++)S.pack.push({id:o.give,...ITEMS[o.give],uid:uid()});
     const R=rel('maya'),before=mayaTier();R.trades++;R.last=todayStr();loc.rival='';
     let line='Traded '+o.need+' '+o.cat+' to Maya for '+o.n+' '+ITEMS[o.give].n.toLowerCase()+'.';
@@ -4329,7 +4332,7 @@ function goInfect(){
   if(!infect()){const b=$('#infectBar');if(b)b.hidden=true;return;}
   // The card is on the road screen, so switch there first if she is elsewhere.
   const btn=document.querySelector('.nav button[data-v="street"]');
-  const onRoad=(typeof roadOn==='function')?roadOn():($('#v-street')&&$('#v-street').classList.contains('on'));
+  const onRoad=$('#v-street')&&$('#v-street').classList.contains('on');
   if(!onRoad&&btn)btn.click();
   setTimeout(()=>{const ic=$('#infectCard');if(!ic||ic.hidden)return;
     ic.scrollIntoView({behavior:(typeof reduced!=='undefined'&&reduced)?'auto':'smooth',block:'center'});
@@ -4717,7 +4720,7 @@ function drawBuilding(x,kind,emoji){const w=220,h=170,y=290-h;const col={house:'
   for(let i=0;i<3;i++)for(let j=0;j<2;j++){ctx.fillStyle=(i+j)%3===0?'#0d0c0e':'#161418';ctx.fillRect(x+24+i*66,y+28+j*66,36,36);ctx.strokeStyle='#0d0c0e';ctx.lineWidth=3;ctx.strokeRect(x+24+i*66,y+28+j*66,36,36);if((i*j)%2===1){ctx.strokeStyle='#5a4a3a';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x+20+i*66,y+36+j*66);ctx.lineTo(x+64+i*66,y+40+j*66);ctx.stroke();}}
   ctx.fillStyle='#0d0c0e';ctx.fillRect(x+w/2-22,y+h-64,44,64);ctx.font='38px serif';ctx.textAlign='center';ctx.fillText(emoji||'',x+w/2,y-12);ctx.textAlign='start';
   if(kind==='stronghold'){ctx.fillStyle='#c22b3a';ctx.fillRect(x+w/2-3,y-110,6,50);ctx.fillRect(x+w/2,y-110,40,22);}}
-let raf=0;function animate(){cancelAnimationFrame(raf);const step=(t)=>{drawScene(t);const road=(typeof roadOn==='function'?roadOn():$('#v-street').classList.contains('on'))&&document.visibilityState==='visible';if(!reduced&&road)raf=requestAnimationFrame(step);else raf=0;};raf=requestAnimationFrame(step);}
+let raf=0;function animate(){cancelAnimationFrame(raf);const step=(t)=>{drawScene(t);const road=$('#v-street').classList.contains('on')&&document.visibilityState==='visible';if(!reduced&&road)raf=requestAnimationFrame(step);else raf=0;};raf=requestAnimationFrame(step);}
 function animateOnce(){if(!raf)animate();else drawScene(performance.now());}
 
 /* ================= render ================= */
@@ -4871,7 +4874,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();renderQuiet();if(typeof renderHomeSwitch==='function')renderHomeSwitch();if(typeof renderChips==='function')try{renderChips();}catch(e){}
+  renderOnline();renderStepsHelp();renderWanderer();if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5078,6 +5081,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.46',d:'Sep 22',t:'The live map has its own tab',
+  i:['A MAP BUTTON IN THE BOTTOM BAR. The Road tab is back to exactly what it was. Tap Map and the live map fills the screen; tap anything else and it stops, so GPS only runs while you are looking at it.',
+     'THE GOOD PARTS STAYED: the chips over the map for raiders due, horde night, where you are, the nearest place to loot and how far, your town percentage; the re-centre button; bigger pins.',
+     'NO DRAWER, and nothing opens by itself. That was the wrong idea and it is gone.',
+     'MAYA COUNTS YOUR STASH. Her trades only looked at your pack, so with a stash full of food she said you had none. Pack first, then stash.']},
  {v:'7.45',d:'Sep 22',t:'The drawer stays down until you pull it',
   i:['THE DRAWER NO LONGER OPENS ON ITS OWN. Arriving at a place on the road used to pull it up over the map every time. Now a "You are here" chip appears instead - tap it to search the place.',
      'When you do open the drawer it covers about three-quarters of the map, not all of it, and the walking strip is a little shorter so the map gets more room.']},
@@ -6517,10 +6525,10 @@ function classSheet(){let cls='brawler';const draw=()=>{$('#sheet').innerHTML=`<
 
 /* ================= wiring ================= */
 function wire(){
-  document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{SFX.play('ui');const home=(typeof mapHome==='function')&&mapHome();const toRoad=b.dataset.v==='street';
-    if(typeof STREET!=='undefined'&&STREET.on&&!(home&&toRoad)){STREET.on=false;if(STREET.watch!==null){navigator.geolocation.clearWatch(STREET.watch);STREET.watch=null;}clearInterval(STREET.timer);$('#raidCard').parentElement.insertBefore($('#locCard'),$('#raidCard'));}
-    document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x===b));const want=(home&&toRoad)?'v-map':'v-'+b.dataset.v;document.querySelectorAll('.view').forEach(v=>{const on=v.id===want;v.classList.toggle('on',on);
-      v.classList.remove('tabin');if(on&&!reduced){void v.offsetWidth;v.classList.add('tabin');}});$('#main').scrollTop=0;render();if(toRoad)animate();if(home&&toRoad&&typeof STREET!=='undefined'&&!STREET.on)streetStart();});
+  document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{SFX.play('ui');const toMap=b.dataset.v==='map';
+    if(typeof STREET!=='undefined'&&STREET.on&&!toMap){STREET.on=false;if(STREET.watch!==null){navigator.geolocation.clearWatch(STREET.watch);STREET.watch=null;}clearInterval(STREET.timer);$('#raidCard').parentElement.insertBefore($('#locCard'),$('#raidCard'));}
+    document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.view').forEach(v=>{const on=v.id==='v-'+b.dataset.v;v.classList.toggle('on',on);
+      v.classList.remove('tabin');if(on&&!reduced){void v.offsetWidth;v.classList.add('tabin');}});$('#main').scrollTop=0;render();if(b.dataset.v==='street')animate();if(toMap&&typeof STREET!=='undefined'&&!STREET.on)streetStart();});
   // Two buttons instead of one, because "5,000" meant "add 5,000" to her and
   // "my total is 5,000" to the code, and nothing on screen said which.
   $('#syncInput').oninput=syncMath;syncMath();
@@ -6716,7 +6724,7 @@ function whileYouWereOut(){
 function start(){
   S=load()||fresh();recoverStuckRaid();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
   wire();render();fetchWeather();
-  if(typeof homeLayout==='function'&&homeLayout()){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('on',x.dataset.v==='street'));try{streetStart();}catch(e){}}
+  if(typeof mapChrome==='function')try{mapChrome();}catch(e){}
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
   // A keyed address is handled before anything else: this copy may be a blank
   // Safari tab that would otherwise try to onboard her instead of delivering.
