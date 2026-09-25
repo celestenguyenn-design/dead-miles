@@ -1,0 +1,19 @@
+name: Server check
+# Read-only probe of the Supabase step endpoint. Sends a one-part code, which
+# the function rejects before touching any table, so nothing is written.
+# Round thirteen installed  -> reply is the "code is incomplete" sentence.
+# Round thirteen missing    -> PostgREST says it cannot find post_steps_link(p, y).
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Does post_steps_link accept y?
+        run: |
+          KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkZWp4ZmNzanF3ZWRiZ3VseWdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0NTExMzEsImV4cCI6MjEwNTAyNzEzMX0.Z0T954DSwTVlRM37i_fJLVtu_x2IrdOoJMx6ImInVKI'
+          URL='https://edejxfcsjqwedbgulygi.supabase.co/rest/v1/rpc/post_steps_link'
+          echo "--- with y (round thirteen) ---"
+          curl -sS -X POST "$URL?apikey=$KEY" -H 'Content-Type: application/json' -d '{"p":"probe","y":"1"}'; echo
+          echo "--- p only (older shortcuts) ---"
+          curl -sS -X POST "$URL?apikey=$KEY" -H 'Content-Type: application/json' -d '{"p":"probe"}'; echo
