@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.52';
+const VERSION='7.53';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -5251,6 +5251,8 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.53',d:'Sep 25',t:'A rebuild prompt the Shortcuts AI can actually follow',
+  i:['iPhone Shortcuts has no "Start Date is yesterday" filter, so the old prompt made the AI guess. The new one uses the date steps it can build, names every number (Today, Yesterday) so nothing points at the wrong Sum, keeps your run times, and ends with a box that shows the server\'s reply.']},
  {v:'7.52',d:'Sep 25',t:'The rebuild prompt is on the Road tab',
   i:['Copy the rebuild prompt now sits right under Run my Health shortcut on the Road Steps card. It used to be three folds deep in Base, Settings.']},
  {v:'7.51',d:'Sep 25',t:'Steps stop vanishing at midnight',
@@ -6021,19 +6023,36 @@ async function fetchStepKey(){
    iOS 27 upgrade. Inspection could never have found it. Rebuilding did.
    So the prompt is a button now, generated with her real address and key. */
 function rebuildPrompt(){
+  /* v7.53 - iOS Shortcuts has no "Start Date is yesterday" filter; asking for
+     one made the AI improvise ("is in the last 1 day" = a rolling 24 hours).
+     The date steps below are what her Shortcuts AI actually built on 9/25.
+     Every number gets a NAME with Set Variable, because two actions both
+     called "Sum" and two both called "Adjusted Date" cannot be told apart on
+     a phone screen - and one of them pointing at the wrong source is silent.
+     Show Result stays at the end so a manual run says what the server said. */
   const o=O();
-  return 'Rebuild this shortcut to have exactly these five actions, in this order:\n\n'
+  return 'Rebuild this shortcut from scratch. Keep its run times (the "At" times at the top) exactly as they are. '
+    +'Delete every existing action, then add exactly these actions, in this order:\n\n'
     +'1. Find Health Samples\n   Type: Steps\n   Filter: Start Date is today\n   Unit: count\n'
-    +'   Group by: Day\n   Fill Missing: OFF\n   Limit: OFF\n\n'
-    +'2. Calculate Statistics\n   Operation: Sum\n   Input: the Health Samples from step 1\n\n'
-    +'3. Find Health Samples\n   Type: Steps\n   Filter: Start Date is yesterday\n   Unit: count\n'
-    +'   Group by: Day\n   Fill Missing: OFF\n   Limit: OFF\n\n'
-    +'4. Calculate Statistics\n   Operation: Sum\n   Input: the Health Samples from step 3\n\n'
-    +'5. Get Contents of URL\n   URL: '+SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key+'\n'
+    +'   Group by: Day\n   Fill Missing: OFF\n   Limit: OFF\n'
+    +'2. Calculate Statistics: Sum of the Health Samples from action 1\n'
+    +'3. Set Variable: name it Today, set it to the Sum from action 2\n\n'
+    +'4. Date: Current Date\n'
+    +'5. Adjust Date: Get Start of Day of the Date from action 4\n'
+    +'6. Set Variable: name it TodayStart, set it to the Adjusted Date from action 5\n'
+    +'7. Adjust Date: Subtract 1 day from TodayStart\n'
+    +'8. Set Variable: name it YesterdayStart, set it to the Adjusted Date from action 7\n\n'
+    +'9. Find Health Samples\n   Type: Steps\n   Filter: Start Date is after YesterdayStart\n'
+    +'   Filter: Start Date is before TodayStart\n   Unit: count\n'
+    +'   Group by: Day\n   Fill Missing: OFF\n   Limit: OFF\n'
+    +'10. Calculate Statistics: Sum of the Health Samples from action 9\n'
+    +'11. Set Variable: name it Yesterday, set it to the Sum from action 10\n\n'
+    +'12. Get Contents of URL\n   URL: '+SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key+'\n'
     +'   Method: POST\n   Request Body: JSON\n   Two text fields:\n'
-    +'     Key: p\n     Value: '+stepCode()+' immediately followed by the Sum from step 2,\n'
-    +'            with no space between the | and the number\n'
-    +'     Key: y\n     Value: the Sum from step 4, nothing else\n\n'
+    +'     Key: p\n     Value: '+stepCode()+' immediately followed by the variable Today,\n'
+    +'            with no space between the | and Today\n'
+    +'     Key: y\n     Value: the variable Yesterday, nothing else\n\n'
+    +'13. Show Result: the Contents of URL from action 12\n\n'
     +'Do not add any other actions. Do not add a notification.\n'
     +'Name the shortcut exactly: '+(S.scName||SC_NAME);
 }
@@ -6408,7 +6427,7 @@ function rebuildSheet(){
       +'<p><b>2.</b> Open <b>'+esc(S.scName||SC_NAME)+'</b> in the Shortcuts app, ask the <b>Shortcuts AI</b> to edit it, and paste this in. Your address and key are already in it.</p>'
       +'<textarea id="rebuildSheetTxt" readonly rows="8" style="width:100%;margin:8px 0;font-size:11px;font-family:monospace">'+esc(rebuildPrompt())+'</textarea>'
       +'<button class="btn r wide" onclick="copyText($(\'#rebuildSheetTxt\').value,\'rebuildSheetTxt\')">Copy the rebuild prompt</button>'
-      +'<p class="help" style="margin-top:8px"><b>3.</b> Afterwards check: the second <b>Find Health Samples</b> says <b>Start Date is yesterday</b>, the last action has two fields <b>p</b> and <b>y</b>, and it is still named <b>'+esc(S.scName||SC_NAME)+'</b>. Run it once - the reply should end with <b>(yesterday ...)</b>.</p>'
+      +'<p class="help" style="margin-top:8px"><b>3.</b> Run it once. A box should pop up saying <b>ok - ... steps for @'+esc(O().handle||'you')+' (yesterday ...)</b>. If a box says anything else, send it to Claude. Once it works you can delete the last action (Show Result) so scheduled runs stay silent.</p>'
       +'<button class="btn ghost wide" style="margin-top:6px" onclick="closeSheet()">Close</button>');
   });
 }
