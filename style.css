@@ -637,3 +637,11 @@ button.room2{width:100%;text-align:left;color:inherit;font:inherit}
 .mapwrap .chips .townchip{width:auto;display:inline-flex;align-items:baseline;gap:6px;padding:7px 11px;border-radius:8px;font:700 13px 'Barlow',system-ui,sans-serif;background:rgba(230,165,48,.95);color:#2a1a00;border:1px solid #ffd27a;box-shadow:0 2px 8px rgba(0,0,0,.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .mapwrap .chips .townchip b{color:#2a1a00} .mapwrap .chips .townchip small{margin-left:0;opacity:.8;color:#2a1a00}
 .mebtn{position:absolute;right:10px;top:8px;z-index:900;width:40px;height:40px;border-radius:50%;background:rgba(20,20,26,.92);border:1px solid var(--line);color:var(--bone);display:grid;place-items:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.4);cursor:pointer}
+
+
+/* v7.51 - a fast double-tap zoomed the whole page. Worst in combat, where two
+   quick taps on Attack is the normal thing to do. touch-action:manipulation
+   removes ONLY double-tap-to-zoom; pinch and scroll still work, and Leaflet's
+   own map zoom is a JS handler and is untouched. iOS ignores user-scalable
+   in the viewport meta, so this is the fix that actually holds on a phone. */
+html,body{touch-action:manipulation}

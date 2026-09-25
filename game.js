@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.50';
+const VERSION='7.51';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1341,7 +1341,10 @@ function rollDay(){
   loseHydro(20);if(hydroState()==='empty'){S.hp=Math.max(1,S.hp-5);log('You woke up dried out. Find water.');}
   for(const c of S.crew){if(c.hp!==undefined&&c.hp<crewMax(c)){c.hp=Math.min(crewMax(c),c.hp+18+(S.base&&S.base.rooms.clinic?18:0));}}
   const y=new Date();y.setDate(y.getDate()-1);const yd=todayStr(y);
-  if(S.streak&&S.streak.days>0&&S.streak.last!==yd&&S.streak.last!==t){const lost=Math.min(15,Math.floor(S.stock.scrap*0.1));S.stock.scrap-=lost;log('You skipped a day. Streak of '+S.streak.days+' broken'+(lost?', and a walker got into the scrap pile: -'+lost+' scrap':'')+'.');S.streak.days=0;}
+  if(S.streak&&S.streak.days>0&&S.streak.last!==yd&&S.streak.last!==t){const lost=Math.min(15,Math.floor(S.stock.scrap*0.1));S.stock.scrap-=lost;log('You skipped a day. Streak of '+S.streak.days+' broken'+(lost?', and a walker got into the scrap pile: -'+lost+' scrap':'')+'.');
+    // Remember what broke and why, because "yesterday looked short" is often
+    // "yesterday's last steps had not arrived yet" - see backfillYesterday().
+    S.streak.broke={on:t,days:S.streak.days,lost};S.streak.days=0;}
   S.today={date:t,kills:0,places:0};
   petFetch();
   log('Morning in Hollow County. You slept some.');
@@ -2799,6 +2802,14 @@ function death(){
   if(where==='boss')bossAfter(false);if(where==='horde')resolveHorde(true,false);if(where==='rival')nemWon();
   if(where==='liveraid'&&typeof liveRaidAfter==='function')liveRaidAfter(false);
   if(where==='seal')sealAfter(false);
+  // v7.51 - "when you die when infected, you wake up still infected." You did:
+  // nothing on this path touched S.infect, so a death at 40% HP with a max
+  // still shrunk by the fever was a spiral. Waking up at base means the crew
+  // got antibiotics into you. Cleared FIRST, so the 40% below is of your real
+  // maximum, not the infected one. (A squad drag-out is deliberately not this:
+  // it costs nothing and treats nothing.)
+  const wasInfected=!!S.infect;
+  if(wasInfected){S.infect=null;S.infectStep=0;log('The fever broke while you were out. Somebody found antibiotics.');}
   const keepFrac=sk('fieldsurgeon')*0.25;const kept=keepFrac?S.pack.slice(0,Math.floor(S.pack.length*keepFrac)):[];S.pack=kept;S.run=0;S.loc=null;newDistance();S.hp=Math.round(maxHp()*(0.4+sk('fieldsurgeon')*0.15));
   const lostCrew=woundedCrew();if(lostCrew.length){const ids=lostCrew.map(c=>c.id);S.crew=S.crew.filter(c=>!ids.includes(c.id));S.active=S.active.filter(id=>!ids.includes(id));log('You went down and could not carry them out. '+lostCrew.map(c=>c.name).join(' and ')+' did not make it.');}
   // Only ordinary gear can be taken off you. An epic or legendary survives a
@@ -2816,7 +2827,7 @@ function death(){
     for(const k in S.eq)if(S.eq[k]===gearLost.uid)S.eq[k]=null;}
   log('You went down. Your crew dragged you back to base. Pack lost ('+fmt(lost)+' pts)'+(gearLost?', and your '+gearLost.n+' is gone':'')+'.');
   save();render();
-  openSheet(`<h2>You went down</h2><div class="big">${ART.avatarSVG(S.av,70,{mood:'dead'})}</div><p>Your crew dragged you out before they finished you. Everything in the pack is gone${gearLost?', and you lost your '+esc(gearLost.n):''}${lostCrew.length?'. '+esc(lostCrew.map(c=>c.name).join(' and '))+' did not make it out at all':''}. You wake up at base at ${Math.round(maxHp()*0.4)} HP.</p><button class="btn r wide" onclick="closeSheet()">Get up</button>`);
+  openSheet(`<h2>You went down</h2><div class="big">${ART.avatarSVG(S.av,70,{mood:'dead'})}</div><p>Your crew dragged you out before they finished you. Everything in the pack is gone${gearLost?', and you lost your '+esc(gearLost.n):''}${lostCrew.length?'. '+esc(lostCrew.map(c=>c.name).join(' and '))+' did not make it out at all':''}. You wake up at base at ${Math.round(maxHp()*0.4)} HP${wasInfected?', and the infection is gone - they got antibiotics into you':''}.</p><button class="btn r wide" onclick="closeSheet()">Get up</button>`);
   C=null;
 }
 function endCombat(won){
@@ -4272,19 +4283,32 @@ function isTestPost(o,t,n){
   const ms=(typeof t==='number')?t:new Date(t).getTime();
   return !isNaN(ms)&&Math.abs(ms-o.testAt)<180000;
 }
+/* STEPS LOST AT MIDNIGHT (v7.51). Her report: "if I don't put my steps in
+   before 12am the next day I lose those steps." Exactly right, and structural:
+   this pulled posts since TODAY's midnight, and the shortcut sends "Start Date
+   is today". At 12:01 both sides have moved on to the new day, so whatever she
+   walked between her last run and midnight was never sent by anything.
+   Now: pull two days, bucket by HER local date, and let yesterday's bucket
+   raise yesterday. With round thirteen the shortcut also sends yesterday's
+   total, so a run at any time the next morning backfills the whole day. */
 async function pullSteps(){
-  const o=O();if(!o.ok)return;const since=new Date();since.setHours(0,0,0,0);
+  const o=O();if(!o.ok)return;const since=new Date();since.setHours(0,0,0,0);since.setDate(since.getDate()-1);
   try{const rows=await rpc('get_steps',{p_handle:o.handle,p_token:o.token,p_since:since.toISOString()});o.lastPull=Date.now();
-    if(rows&&rows.length){
-      const real=rows.filter(r=>!isTestPost(o,r.posted_at,r.steps));
+    const t0=todayStr();const yd=(function(){const y=new Date();y.setDate(y.getDate()-1);return todayStr(y);})();
+    const dayOf=r=>todayStr(new Date(r.posted_at));
+    const today=(rows||[]).filter(r=>dayOf(r)===t0), yest=(rows||[]).filter(r=>dayOf(r)===yd);
+    if(today.length){
+      const real=today.filter(r=>!isTestPost(o,r.posted_at,r.steps));
       const t=real.length?new Date(real[0].posted_at).getTime():0;
       o.lastPost=(real.length&&!isNaN(t))?t:0;
       /* Keep the posts themselves. "highest = 14" is a dead end; "11:04am 14,
          12:04pm 14, 1:04pm 14" names the fault out loud. She should not have to
          read a diagnostic to me over chat for the game to say what it received. */
-      o.posts=rows.slice(0,24).map(r=>({t:r.posted_at,n:r.steps}));o.postsDate=todayStr();
+      o.posts=today.slice(0,24).map(r=>({t:r.posted_at,n:r.steps}));o.postsDate=t0;
       if(real.length)syncCounted(Math.max(...real.map(r=>r.steps)),'phone');  // idempotent: same reading twice changes nothing
-    } else if(rows){o.posts=[];o.postsDate=todayStr();o.lastPost=0;}
+    } else if(rows){o.posts=[];o.postsDate=t0;o.lastPost=0;}
+    const yreal=yest.filter(r=>!isTestPost(o,r.posted_at,r.steps));
+    if(yreal.length)backfillYesterday(Math.max(...yreal.map(r=>r.steps)),yd);
     o.err='';}catch(e){o.err=e.message;}
   save();if(typeof C==='undefined'||!C)render();else renderOnline();
 }
@@ -4665,6 +4689,33 @@ function stepsApply(src){
   return delta;
 }
 // A counter reported its running total for today.
+// Yesterday's count can only ever go UP. Idempotent: the same reading twice
+// changes nothing, because after the first backfill the history already holds
+// it. If the corrected day reaches the target, the streak is credited - and if
+// this morning's rollover had broken it for looking short, it is put back,
+// scrap penalty and all.
+function backfillYesterday(v,yd){
+  rollDay();v=Math.max(0,Math.round(v||0));
+  const hist=S.steps.hist||(S.steps.hist=[]);
+  let h=hist.find(x=>x.d===yd);
+  if(!h){h={d:yd,n:0};hist.unshift(h);hist.splice(30);}
+  const had=h.n||0;if(v<=had)return 0;
+  const delta=v-had;h.n=v;S.steps.total=(S.steps.total||0)+delta;
+  O().yBack={d:yd,n:v,added:delta,at:Date.now()};
+  log('Yesterday\'s final count came through: '+fmt(v)+' steps, '+fmt(delta)+' of them walked after your last sync.');
+  if(v>=(S.goal||6000)&&S.streak&&!h.credited){
+    h.credited=true;const t=todayStr();const b=S.streak.broke;
+    const base=(b&&b.on===t)?(b.days||0):0;
+    const hitToday=S.streak.last===t;
+    S.streak.days=base+1+(hitToday?1:0);
+    S.streak.last=hitToday?t:yd;
+    if(b&&b.on===t){if(b.lost)S.stock.scrap+=b.lost;delete S.streak.broke;}
+    S.stock.food+=2;S.stock.water+=2;addXp(15);
+    log('Yesterday hit the target after all. Streak '+S.streak.days+(b&&b.lost?', and the '+b.lost+' scrap is back':'')+'.');
+    toast('Streak '+S.streak.days+' - yesterday counted','l');SFX.play('win');
+  } else toast('+'+fmt(delta)+' steps for yesterday','z');
+  save();return delta;
+}
 function syncCounted(v,src){
   rollDay();
   v=Math.max(0,Math.round(v||0));
@@ -5200,6 +5251,13 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.51',d:'Sep 25',t:'Steps stop vanishing at midnight',
+  i:['Whatever you walked after your last shortcut run used to be lost the moment the clock hit 12. The shortcut can now also send yesterday, and the game backfills it - so a run any time the next morning counts the whole day.',
+     'If yesterday hit your target once the late steps arrived, the streak is credited - and if the morning had already broken it for looking short, it is put back, scrap and all.',
+     'The Steps card shows "Yesterday is in" with the number, so you can see it land.',
+     'Dying while infected no longer wakes you up still infected. Your crew got antibiotics into you.',
+     'Fast double-taps no longer zoom the page.',
+     'Needs round thirteen of the setup page run once, then the rebuild prompt pasted into the Shortcuts AI. Shortcuts built before this keep working.']},
  {v:'7.50',d:'Sep 23',t:'The road keeps walking while you are away',
   i:['OPEN THE GAME AND THE DAY PLAYS OUT. Until now, if you closed the game while standing at a place on the road, every step you walked was saved up behind that one door - walk 6,000 steps, nothing moved. Now, when you have been away an hour or more, the steps that come in replay the road: your crew clears the door, searches the rooms, and walks on to the next place.',
      'ONE REPORT. What was found, what was fought, what it cost, what was left behind - in the While You Were Out card.',
@@ -5962,14 +6020,18 @@ async function fetchStepKey(){
    So the prompt is a button now, generated with her real address and key. */
 function rebuildPrompt(){
   const o=O();
-  return 'Rebuild this shortcut to have exactly these three actions, in this order:\n\n'
+  return 'Rebuild this shortcut to have exactly these five actions, in this order:\n\n'
     +'1. Find Health Samples\n   Type: Steps\n   Filter: Start Date is today\n   Unit: count\n'
     +'   Group by: Day\n   Fill Missing: OFF\n   Limit: OFF\n\n'
     +'2. Calculate Statistics\n   Operation: Sum\n   Input: the Health Samples from step 1\n\n'
-    +'3. Get Contents of URL\n   URL: '+SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key+'\n'
-    +'   Method: POST\n   Request Body: JSON\n   One text field:\n     Key: p\n'
-    +'     Value: '+stepCode()+' immediately followed by the Sum from step 2,\n'
-    +'            with no space between the | and the number\n\n'
+    +'3. Find Health Samples\n   Type: Steps\n   Filter: Start Date is yesterday\n   Unit: count\n'
+    +'   Group by: Day\n   Fill Missing: OFF\n   Limit: OFF\n\n'
+    +'4. Calculate Statistics\n   Operation: Sum\n   Input: the Health Samples from step 3\n\n'
+    +'5. Get Contents of URL\n   URL: '+SB.url+'/rest/v1/rpc/post_steps_link?apikey='+SB.key+'\n'
+    +'   Method: POST\n   Request Body: JSON\n   Two text fields:\n'
+    +'     Key: p\n     Value: '+stepCode()+' immediately followed by the Sum from step 2,\n'
+    +'            with no space between the | and the number\n'
+    +'     Key: y\n     Value: the Sum from step 4, nothing else\n\n'
     +'Do not add any other actions. Do not add a notification.\n'
     +'Name the shortcut exactly: '+(S.scName||SC_NAME);
 }
@@ -6247,6 +6309,10 @@ function renderStepSync(){
   if(!o.ok){el.innerHTML='<p class="help">Sign in above first. Your shortcut code lives on the server, so the game has to be online to show it to you.</p>';return;}
   const posted=o.lastPost?('Your phone last sent steps at <b>'+esc(timeStr(o.lastPost))+'</b>.')
     :'<span style="color:#ffb35c">Your phone has not sent any steps today.</span>';
+  const ydStr=(function(){const y=new Date();y.setDate(y.getDate()-1);return todayStr(y);})();
+  const yline=(o.yBack&&o.yBack.d===ydStr)
+    ?'<div class="note" style="margin-top:8px;border-left-color:var(--rot)"><b>Yesterday is in:</b> '+fmt(o.yBack.n)+' steps'
+      +(o.yBack.added?' <span class="help">(+'+fmt(o.yBack.added)+' came through after midnight)</span>':'')+'</div>':'';
   const nu=stepOpenUrl();const pre=stepCode();
   el.innerHTML='<div class="note" style="border-left-color:var(--blood)"><b style="color:var(--blood)">First: which shortcut do you have?</b>'
     +'<div class="help" style="margin-top:4px">Open <b>'+esc(S.scName||SC_NAME)+'</b> in the Shortcuts app and scroll to the <b>last action</b>. Use the box below that matches it and ignore the other one - they need opposite things.</div></div>'
@@ -6279,6 +6345,8 @@ function renderStepSync(){
     +'<div id="stepTestOut" style="margin-top:8px">'+STEP_TEST+'</div>'
     +'<div class="help" style="margin-top:8px">Inside the shortcut: the address goes in the <b>Get Contents of URL</b> field. Then <b>Show More</b> &rarr; Method <b>POST</b> &rarr; Request Body <b>JSON</b> &rarr; a <b>Text</b> field with Key <b>p</b>, holding your code and then the blue <b>Sum</b> bubble. The code already ends in a <b>|</b> - do not add another, and leave no space before the bubble.</div>'
     +'<div class="help" style="margin-top:6px">Also check <b style="color:var(--blood)">Fill Missing is OFF</b> in <b>Find Health Samples</b>. That one setting is the only thing that has ever made this kind time out.</div>'
+    +yline
+    +'<div class="help" style="margin-top:6px"><b>Steps after your last run used to vanish at midnight.</b> The rebuild prompt below now also sends <b>yesterday</b> (a second field, <b>y</b>), so a run at any time the next morning still counts them. Needs <b>round thirteen</b> of the setup page run once; older shortcuts keep working as they are.</div>'
     +'<details style="margin-top:8px"><summary class="help" style="cursor:pointer"><b style="color:#5fd08a">It all looks right and still nothing arrives</b></summary><div style="margin-top:6px">'
     +'<div class="help">Then stop reading it. A shortcut can look correct in every field and still be broken by something no screenshot shows - a stray space, a variable pointing at the wrong action, leftover state from an iOS upgrade. <b>Rebuilding beats inspecting.</b></div>'
     +'<div class="help" style="margin-top:6px">Open the shortcut, ask the <b>Shortcuts AI</b> to edit it, and paste this in. It has your address and your key already in it.</div>'
