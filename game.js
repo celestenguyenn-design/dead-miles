@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.51';
+const VERSION='7.52';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -5251,6 +5251,8 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.52',d:'Sep 25',t:'The rebuild prompt is on the Road tab',
+  i:['Copy the rebuild prompt now sits right under Run my Health shortcut on the Road Steps card. It used to be three folds deep in Base, Settings.']},
  {v:'7.51',d:'Sep 25',t:'Steps stop vanishing at midnight',
   i:['Whatever you walked after your last shortcut run used to be lost the moment the clock hit 12. The shortcut can now also send yesterday, and the game backfills it - so a run any time the next morning counts the whole day.',
      'If yesterday hit your target once the late steps arrived, the streak is credited - and if the morning had already broken it for looking short, it is put back, scrap and all.',
@@ -6392,6 +6394,24 @@ function renderStepSync(){
     +'<button class="btn sm ghost" onclick="renameShortcut()">Rename</button></div>'
     +stepPostLog();
 }
+/* v7.52 - "there's no copy the rebuild prompt in the game. I don't see it."
+   She was right: it lived on Base > Settings > Steps > "It all looks right and
+   still nothing arrives" - three collapsed folds deep, the exact failure her
+   standing rule names. It is now one tap from the Road Steps card, where she
+   actually looks. A sheet, not a direct copy: iOS only lets a page write the
+   clipboard inside the tap itself, and fetchStepKey() is a network round trip. */
+function rebuildSheet(){
+  const o=O();if(!o.ok){toast('Go online first','d');return;}
+  fetchStepKey().then(()=>{
+    openSheet('<h2>Rebuild my shortcut</h2>'
+      +'<p><b>1.</b> Run <b>round thirteen</b> on the Supabase setup page first, once.</p>'
+      +'<p><b>2.</b> Open <b>'+esc(S.scName||SC_NAME)+'</b> in the Shortcuts app, ask the <b>Shortcuts AI</b> to edit it, and paste this in. Your address and key are already in it.</p>'
+      +'<textarea id="rebuildSheetTxt" readonly rows="8" style="width:100%;margin:8px 0;font-size:11px;font-family:monospace">'+esc(rebuildPrompt())+'</textarea>'
+      +'<button class="btn r wide" onclick="copyText($(\'#rebuildSheetTxt\').value,\'rebuildSheetTxt\')">Copy the rebuild prompt</button>'
+      +'<p class="help" style="margin-top:8px"><b>3.</b> Afterwards check: the second <b>Find Health Samples</b> says <b>Start Date is yesterday</b>, the last action has two fields <b>p</b> and <b>y</b>, and it is still named <b>'+esc(S.scName||SC_NAME)+'</b>. Run it once - the reply should end with <b>(yesterday ...)</b>.</p>'
+      +'<button class="btn ghost wide" style="margin-top:6px" onclick="closeSheet()">Close</button>');
+  });
+}
 function fixShortcut(){
   const o=O();if(!o.ok){toast('Go online first','d');return;}
   fetchStepKey().then(()=>{
@@ -6521,6 +6541,7 @@ function renderStepsHelp(){
           +'<div class="help" style="margin-top:6px">If it runs and nothing arrives, the code inside it is out of date - that happens after you recover your account. <a href="#" onclick="fixShortcut();return false;" style="color:var(--steel);text-decoration:underline">Fix my shortcut</a></div>'
           +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run my Health shortcut</button>'
           +'<button class="btn sm ghost" onclick="syncNow()">Just check again</button></div>'
+          +'<div class="row" style="margin-top:6px"><button class="btn sm" onclick="rebuildSheet()">Copy the rebuild prompt</button></div>'
           +'<div class="help" style="margin-top:6px">Or type today\'s total from the Health app in the box above and tap Sync - that always works. '
           +'<a href="#" onclick="renameShortcut();return false;" style="color:var(--steel);text-decoration:underline">Shortcut named something else?</a></div></div>'
           +'<span class="help" style="display:block;margin-top:6px">Checked the server '+esc(when)+'. To make this automatic: Shortcuts app, Automation tab, Time of Day, a few times a day, Run Immediately.</span>';
@@ -6536,6 +6557,7 @@ function renderStepsHelp(){
         sHelp.innerHTML='<b style="color:var(--bone)">Checked the server '+esc(when)+'.</b> Your phone last sent steps at '+esc(timeStr(o.lastPost))+'.'
           +'<div class="row" style="margin-top:8px"><button class="btn sm r" onclick="runShortcut()">Run my Health shortcut</button>'
           +'<button class="btn sm ghost" onclick="syncNow()">Just check again</button></div>'
+          +'<div class="row" style="margin-top:6px"><button class="btn sm" onclick="rebuildSheet()">Copy the rebuild prompt</button></div>'
           +'<span class="help">It checks on its own every minute and the moment you open the game. You never need to delete the icon. <a href="#" onclick="fixShortcut();return false;" style="color:var(--steel);text-decoration:underline">Fix my shortcut</a></span>';
       }}
   }
