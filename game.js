@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.53';
+const VERSION='7.54';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -145,9 +145,51 @@ const ROLES={
   scout:{n:'Scout',e:'🔭',d:(l)=>'You always strike first, ambushes drop by '+(20+l*8)+'%, and one room is scouted before you enter'},
   engineer:{n:'Engineer',e:'🛠️',d:(l)=>'Builds cost '+(15+l*5)+'% less scrap; repairs melee gear at base'},
   hunter:{n:'Hunter',e:'🏹',d:(l)=>'Finds '+(1+Math.floor(l/2))+' extra round(s) per ammo box and shoots for '+(10+l*3)+' every round if you carry ammo'},
-  quartermaster:{n:'Quartermaster',e:'📦',d:(l)=>'+'+(3+l)+' pack capacity and +'+(8+l*4)+'% stash value'}
+  quartermaster:{n:'Quartermaster',e:'📦',d:(l)=>'+'+(3+l)+' pack capacity and +'+(8+l*4)+'% stash value'},
+  /* v7.54 - "it's always the same couple." Six roles meant every crew was the
+     same three people with different names. Seven more, and each one changes
+     a DIFFERENT part of the day - the fight, the rooms, the stash, the walk, the
+     fence - so who you bring along is a real choice. */
+  bodyguard:{n:'Bodyguard',e:'🛡️',d:(l)=>'Steps in front of '+(10+l*4)+'% of the hits meant for you'},
+  firebug:{n:'Firebug',e:'🔥',d:(l)=>'Every third round, a bottle of fire: '+(6+l*2)+' to EVERY enemy'},
+  scavenger:{n:'Scavenger',e:'🧲',d:(l)=>(10+l*5)+'% chance a searched room gives up '+(1+l)+' extra scrap'},
+  forager:{n:'Forager',e:'🌿',d:(l)=>'Brings '+(1+Math.floor(l/2))+' food and '+(1+Math.floor(l/2))+' water home every stash'},
+  trapper:{n:'Trapper',e:'🪤',d:(l)=>'+'+(2+l*2)+' base defense against raids and horde night'},
+  pathfinder:{n:'Pathfinder',e:'🧭',d:(l)=>'Knows the shortcuts: places are '+(3+l*2)+'% closer'},
+  teacher:{n:'Teacher',e:'📚',d:(l)=>'+'+(5+l*3)+'% XP for you, and the rest of the crew learn faster'}
 };
-const CREW_NAMES=['Jules','Dev','Marisol','Kenji','Ada','Booker','Tam','Rosa','Isaiah','Yuki','Cal','Nadine','Omar','Sasha','Wren','Elias','Priya','Dom','Lena','Rook'];
+/* Every survivor also has a TRAIT - one thing about them that is not their job -
+   and a weapon they like seeing you use. Two Brawlers are not the same Brawler. */
+const TRAITS={
+  tough:   {n:'Tough',       e:'💪',d:'+20 max HP'},
+  quick:   {n:'Quick study', e:'⚡',d:'Levels up a third faster'},
+  nightowl:{n:'Night owl',   e:'🦉',d:'A level higher after dark'},
+  earlybird:{n:'Early bird', e:'🐓',d:'A level higher before noon'},
+  lucky:   {n:'Lucky',       e:'🍀',d:'Shrugs off 1 in 3 hits'},
+  sentry:  {n:'Light sleeper',e:'👂',d:'+3 base defense while they stay home'},
+  hardy:   {n:'Hardy',       e:'🩹',d:'Mends twice as fast overnight'},
+  loyal:   {n:'Loyal',       e:'🤝',d:'If you go down, they always make it out'},
+  veteran: {n:'Veteran',     e:'🎖️',d:'Joined at level 2'}
+};
+/* v7.54 - "once people get Old Reliable they only use that weapon." Weapons
+   have a KIND now. Enemies are soft to some kinds, and each survivor fights a
+   level better beside the kind they like. A wrench is still a fine wrench - it
+   is just not the answer to a Bloater, and your Bladesman sulks. */
+const WEAPON_KINDS={blunt:{n:'blunt',e:'🔨'},blade:{n:'blades',e:'🗡️'},pierce:{n:'spears & bows',e:'🏹'},gun:{n:'guns',e:'🔫'}};
+const WEAPON_KIND={pipe:'blunt',bat:'blunt',crowbar:'blunt',sledge:'blunt',barbed:'blunt',lastword:'blunt',oldreliable:'blunt',saintjude:'blunt',
+  machete:'blade',axe:'blade',hatchet:'blade',cleaver:'blade',sickle:'blade',katana:'blade',harvest:'blade',
+  spear:'pierce',bow:'pierce',crossbow:'pierce',
+  pistol:'gun',shotgun:'gun',mercy:'gun',whisper:'gun',longwinter:'gun'};
+function wKind(w){return w?(WEAPON_KIND[w.id]||(w.slot==='ranged'?'gun':'blunt')):null;}
+// +30% against what an enemy is soft to. The Bloater also squelches around a club.
+const ENEMY_WEAK={runner:'blade',bloater:'pierce',screamer:'pierce',raider:'blunt',gunner:'blade',butcher:'pierce',matron:'blade',hollow:'blunt',cellar:'gun'};
+const ENEMY_TOUGH={bloater:'blunt'};
+function kindMod(e,kind){if(!e||!kind)return 1;if(ENEMY_WEAK[e.k]===kind)return 1.3;if(ENEMY_TOUGH[e.k]===kind)return 0.8;return 1;}
+const CREW_NAMES=['Jules','Dev','Marisol','Kenji','Ada','Booker','Tam','Rosa','Isaiah','Yuki','Cal','Nadine','Omar','Sasha','Wren','Elias','Priya','Dom','Lena','Rook',
+  'Hollis','Bea','Mateo','Juniper','Ezra','Noor','Otis','Imani','Casper','Delia','Ruben','Tove','Anika','Gus','Farah','Jonah','Mae','Silas','Kofi','Lupe','Ansel','Rhea','Tobias','Ines','Pax','Vera','Nico','Odette','Bram','Suki'];
+/* Where they were before. Just a line on their card - but it is what makes a
+   list of names into people you remember. */
+const CREW_PAST=['used to deliver mail on this route','taught third grade at Hollow Elementary','ran the night shift at the Gas & Go','was a line cook at the diner on Main','coached Little League','drove a tow truck','was two weeks from retiring','fixed phones at the mall kiosk','was a paramedic','sold insurance, and will not talk about it','was a park ranger','played bass in a bar band','worked the rail yard','was a hospital janitor','repaired church organs','ran a food truck','was a nursing student','hunted every fall with their dad','was a locksmith','managed the hardware store'];
 const PETS={dog:{n:'Dog',e:'🐕',d:'Takes hits for you, and goes scavenging every night while you sleep'},cat:{n:'Cat',e:'🐈',d:'Bonus XP, and brings you gifts every morning. Sometimes a trophy.'}};
 const PET_NAMES={dog:['Biscuit','Scout','Waffles','Pepper','Moose'],cat:['Mochi','Salem','Noodle','Miso','Pumpkin']};
 function petLevel(){return Math.min(10,Math.floor((S.petXp||0)/4000)+1);}
@@ -402,7 +444,7 @@ function migrateGear(){
   if(changed)save();
 }
 function ensureState(){if(!S)return;try{migrateGear();}catch(e){}try{migrateHandsFeet();}catch(e){}S.bossPity=S.bossPity||0;S.dust=S.dust||0;S.scrolls=S.scrolls||0;S.pins=S.pins||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
-  if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
+  if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;crewBackfill();for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
   if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};if(S.eq&&S.eq.hands===undefined)S.eq.hands=null;if(S.eq&&S.eq.feet===undefined)S.eq.feet=null;
   // free any slot a downed crew member is still sitting in (they never gave it
   // back before v6.70), so an existing save is not stuck a fighter short
@@ -816,12 +858,18 @@ const fistLvlBonus=()=>Math.round(((S.lvl||1)-1)*FIST_LVL_SHARE);
 const baseDmg=()=>[3,6];
 // What fists ACTUALLY land, level included - so the button can stop lying.
 const fistDmg=()=>{const b=baseDmg(),x=fistLvlBonus();return [b[0]+x,b[1]+x];};
-function addXp(n){if(setPerk('xp'))n=Math.round(n*(1+setPerk('xp')));if(S.pet==='cat')n=Math.round(n*petXpMult());if(bg('gamer'))n=Math.round(n*(1.25+sk('metaknowledge')*0.05));S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
+function addXp(n){if(setPerk('xp'))n=Math.round(n*(1+setPerk('xp')));if(roleLvl('teacher'))n=Math.round(n*(1+(5+roleLvl('teacher')*3)/100));if(S.pet==='cat')n=Math.round(n*petXpMult());if(bg('gamer'))n=Math.round(n*(1.25+sk('metaknowledge')*0.05));S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
 const activeCrew=()=>S.active.map(id=>S.crew.find(c=>c.id===id)).filter(c=>c&&(c.hp===undefined||c.hp>0));
 const woundedCrew=()=>S.crew.filter(c=>c.hp!==undefined&&c.hp<=0);
-function roleLvl(role){let b=0;for(const c of activeCrew())if(c.role===role)b=Math.max(b,c.lvl+sk('leader'));return b;}
+function crewLvl(c){let l=c.lvl+sk('leader');const h=new Date().getHours();
+  if(c.trait==='nightowl'&&isNight())l++;if(c.trait==='earlybird'&&h>=5&&h<12)l++;
+  // beside the weapon they like, they fight a level better (only in a fight)
+  if(typeof C!=='undefined'&&C&&!C.over&&C.usedKind&&c.fav===C.usedKind)l++;
+  return l;}
+function roleLvl(role){let b=0;for(const c of activeCrew())if(c.role===role)b=Math.max(b,crewLvl(c));return b;}
+function roleBy(role){let best=null;for(const c of activeCrew())if(c.role===role&&(!best||crewLvl(c)>crewLvl(best)))best=c;return best;}
 function crewSlots(){return 1+(S.base&&S.base.rooms.bunk?S.base.rooms.bunk:0);}
-function crewXp(n){for(const c of activeCrew()){c.xp+=n;if(c.xp>=c.lvl*6&&c.lvl<5){c.xp-=c.lvl*6;c.lvl++;log(c.name+' is now level '+c.lvl+'.');}}}
+function crewXp(n){const tb=roleLvl('teacher')?1:0;for(const c of activeCrew()){c.xp+=n+(c.role!=='teacher'?tb:0);const need=c.trait==='quick'?c.lvl*4:c.lvl*6;if(c.xp>=need&&c.lvl<5){c.xp-=need;c.lvl++;log(c.name+' is now level '+c.lvl+'.');}}}
 const HYDRO_STEPS=900;
 /* ================= DRINKS AND SNACKS (v6.37) =================
    Water used to be one undifferentiated counter. These are individual things
@@ -987,8 +1035,16 @@ function loseHydro(n){
 const was=hydroState();S.hydro=Math.max(0,(S.hydro===undefined?100:S.hydro)-n);
   if(S.hydro<=10&&S.stock.water>0){S.stock.water--;S.hydro=Math.min(100,S.hydro+35);log('You stopped for water without thinking about it.');}
   const now=hydroState();if(now!==was&&now!=='ok'){toast(hydroLabel()+(now==='thirsty'?'. Drink soon.':'. Your hits are weaker.'),'d');}}
-function crewMax(c){return 40+12*(c.lvl||1);}
-function newCrew(role){const used=S.crew.map(c=>c.name);const names=CREW_NAMES.filter(n=>!used.includes(n));const c={id:uid(),name:names.length?pick(names):pick(CREW_NAMES),av:ART.randomAv(),role:role||pick(Object.keys(ROLES)),lvl:1,xp:0};c.hp=crewMax(c);return c;}
+function crewMax(c){return 40+12*(c.lvl||1)+(c.trait==='tough'?20:0);}
+function newCrew(role){const used=S.crew.map(c=>c.name);const names=CREW_NAMES.filter(n=>!used.includes(n));
+  // lean away from roles you already have, so the fourth survivor is not a third Medic
+  const have=S.crew.map(c=>c.role);const fresh=Object.keys(ROLES).filter(r=>!have.includes(r));
+  const r=role||(fresh.length&&Math.random()<0.75?pick(fresh):pick(Object.keys(ROLES)));
+  const trait=pick(Object.keys(TRAITS));
+  const c={id:uid(),name:names.length?pick(names):pick(CREW_NAMES),av:ART.randomAv(),role:r,lvl:trait==='veteran'?2:1,xp:0,trait,fav:pick(Object.keys(WEAPON_KINDS)),past:pick(CREW_PAST)};c.hp=crewMax(c);return c;}
+// Crew who joined before v7.54 get a trait, a weapon they like and a past, once.
+function crewBackfill(){for(const c of (S.crew||[])){if(!ROLES[c.role])c.role='brawler';if(!c.trait){const rng=mulberry(hash(c.id+'trait'));const tk=Object.keys(TRAITS).filter(k=>k!=='veteran');c.trait=tk[Math.floor(rng()*tk.length)];c.fav=Object.keys(WEAPON_KINDS)[Math.floor(rng()*4)];c.past=CREW_PAST[Math.floor(rng()*CREW_PAST.length)];}}}
+function crewCard(c){const t=TRAITS[c.trait],k=WEAPON_KINDS[c.fav];return (t?'<span class="chip" title="'+esc(t.d)+'">'+t.e+' '+esc(t.n)+'</span> ':'')+(k?'<span class="chip" title="Fights a level better when you use '+esc(k.n)+'">likes '+k.e+' '+esc(k.n)+'</span>':'')+(t?'<div class="help" style="font-size:11px;margin-top:3px">'+esc(t.d)+(c.past?' · Before: '+esc(c.past):'')+'</div>':'');}
 function hurtCrew(c,n){c.hp=Math.max(0,(c.hp===undefined?crewMax(c):c.hp)-n);
   if(c.hp<=0){clog(c.name+' goes down and drags themselves out of the fight.','hit');
     const i=S.active.indexOf(c.id);
@@ -1150,7 +1206,7 @@ const VET_STEP=500000;
 function vetRank(){return Math.floor((S.steps.total||0)/VET_STEP);}
 const VET_TITLES=['','Veteran','Ranger','Pathfinder','Outrider','Long Walker','Legend of the Road'];
 function vetTitle(){const r=vetRank();return r?(VET_TITLES[Math.min(r,VET_TITLES.length-1)]+(r>=VET_TITLES.length?' '+(r-VET_TITLES.length+2):'')):'';}
-function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05-setPerk('dist')));if(wxKind()==='snow')dist=Math.round(dist*1.1);S.walk.dist=dist;S.walk.progress=0;S.walk.toNext=dist;}
+function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05-setPerk('dist')-(roleLvl('pathfinder')?(3+roleLvl('pathfinder')*2)/100:0)));if(wxKind()==='snow')dist=Math.round(dist*1.1);S.walk.dist=dist;S.walk.progress=0;S.walk.toNext=dist;}
 function bossName(){if(eventNow()==='halloween')return 'The Gourd King';return BOSS_NAMES[hash(weekId()+'boss')%BOSS_NAMES.length];}
 function makeLoc(force,nameOverride,far){
   let type;
@@ -1339,7 +1395,7 @@ function rollDay(){
   if(S.base){const br=S.base.rooms.barrel||0;if(br){const w=br+(wxKind()==='rain'||wxKind()==='storm'?3:0);S.stock.water+=w;log('The rain barrel gave '+w+' water.');}
     const g=S.base.rooms.garden||0;if(g){const per=3+(bg('farmer')?2:0)+sk('greenthumb');S.stock.food+=per*g;log('The garden gave '+(per*g)+' food.');}if(S.base.t==='diner'){S.stock.food+=2;}}
   loseHydro(20);if(hydroState()==='empty'){S.hp=Math.max(1,S.hp-5);log('You woke up dried out. Find water.');}
-  for(const c of S.crew){if(c.hp!==undefined&&c.hp<crewMax(c)){c.hp=Math.min(crewMax(c),c.hp+18+(S.base&&S.base.rooms.clinic?18:0));}}
+  for(const c of S.crew){if(c.hp!==undefined&&c.hp<crewMax(c)){c.hp=Math.min(crewMax(c),c.hp+(18+(S.base&&S.base.rooms.clinic?18:0))*(c.trait==='hardy'?2:1));}}
   const y=new Date();y.setDate(y.getDate()-1);const yd=todayStr(y);
   if(S.streak&&S.streak.days>0&&S.streak.last!==yd&&S.streak.last!==t){const lost=Math.min(15,Math.floor(S.stock.scrap*0.1));S.stock.scrap-=lost;log('You skipped a day. Streak of '+S.streak.days+' broken'+(lost?', and a walker got into the scrap pile: -'+lost+' scrap':'')+'.');
     // Remember what broke and why, because "yesterday looked short" is often
@@ -1968,7 +2024,7 @@ function codexSheet(){
   const tile=(art,known,title,sub,body)=>'<div class="room2" style="align-items:flex-start'+(known?'':';opacity:.7')+'"><div class="e" style="width:52px;flex:none;line-height:0'+(known?'':';filter:brightness(0) opacity(.55)')+'">'+art+'</div>'
     +'<div class="t"><b>'+title+'</b>'+(sub?'<span style="display:block;color:var(--bone2)">'+sub+'</span>':'')+'<span style="display:block;margin-top:2px">'+body+'</span></div></div>';
   const foes=CODEX_FOES.map(([k,d])=>{const known=!!c.seen[k];const e=ENEMIES[k];const n=c.kills[k]||0;
-    return tile(ART.zombieSVG(k,52),known,known?esc(e.n):'???',known?(n+' put down · '+e.hp+' HP · hits for '+e.dmg[0]+'-'+e.dmg[1]):'',known?esc(d):'You have not met this one yet.');}).join('');
+    return tile(ART.zombieSVG(k,52),known,known?esc(e.n):'???',known?(n+' put down · '+e.hp+' HP · hits for '+e.dmg[0]+'-'+e.dmg[1]+(ENEMY_WEAK[k]?' · soft to '+WEAPON_KINDS[ENEMY_WEAK[k]].e+' '+WEAPON_KINDS[ENEMY_WEAK[k]].n:'')+(ENEMY_TOUGH[k]?' · shrugs off '+WEAPON_KINDS[ENEMY_TOUGH[k]].n:'')):'',known?esc(d):'You have not met this one yet.');}).join('');
   const metFoes=CODEX_FOES.filter(([k])=>c.seen[k]).length;
   const bosses=BOSS_NAMES.map(n=>{const beat=codexBossBeaten(n);const g=BOSS_GIMMICK[n];const times=c.bosses[n]||0;
     return tile(foeSVG({n:n,k:'boss'},52),beat,beat?esc(n):'???',beat?(times?times+' time'+(times===1?'':'s')+' brought down':'brought down - their trophy is on your shelf'):'',
@@ -2524,11 +2580,11 @@ function swapSheet(){
     return;
   }
   openSheet('<h2>Switch weapon</h2>'
-    +'<p class="help">'+(free?'Your hands are empty, so this one is free.':'This takes your turn - they get a swing while you switch.')+'</p>'
+    +'<p class="help">'+(free?'Your hands are empty, so this one is free.':'This takes your turn - they get a swing while you switch.')+(()=>{const t=targetEnemy();return t&&ENEMY_WEAK[t.k]?' <b style="color:var(--amber)">'+esc(t.n)+' is soft to '+WEAPON_KINDS[ENEMY_WEAK[t.k]].e+' '+WEAPON_KINDS[ENEMY_WEAK[t.k]].n+'.</b>':'';})()+'</p>'
     +'<div class="stack" style="margin-top:8px">'
     +opts.map(g=>'<button class="room2" onclick="doSwap(\''+g.uid+'\')"><div class="e">'+esc(g.e)+'</div>'
       +'<div class="t"><b class="rc-'+esc(g.r||'common')+'">'+esc(g.n)+'</b>'
-      +'<span>'+(g.dmg?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · ':'')+(temperOf(g)?esc(temperOf(g).n)+' · ':'')+(g.dur+' swing'+(g.dur===1?'':'s')+' left')+(g.norepair?' · <b style="color:var(--amber)">no rebuild</b>':'')+'</span></div></button>').join('')
+      +'<span>'+(g.dmg?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · ':'')+(temperOf(g)?esc(temperOf(g).n)+' · ':'')+(g.dur+' swing'+(g.dur===1?'':'s')+' left')+(g.norepair?' · <b style="color:var(--amber)">no rebuild</b>':'')+(WEAPON_KINDS[wKind(g)]?' · '+WEAPON_KINDS[wKind(g)].e+' '+WEAPON_KINDS[wKind(g)].n:'')+'</span></div></button>').join('')
     +'</div>'
     +'<button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet();renderCombat()">Never mind</button>',true);
 }
@@ -2591,20 +2647,26 @@ function breakWeapon(w){if(w.dur===undefined||w.dur>0)return;
     toast(w.n+(armour?' is worn out. Repair it in Gear.':' wrecked, not lost. Repair it in Gear.'),'d');
   }else{clog('The '+w.n+(slot==='ranged'?' jams for good.':' breaks.'),'sys');
     S.gear=S.gear.filter(g=>g.uid!==w.uid);if(S.eq[slot]===w.uid)S.eq[slot]=null;}}
+/* Applies what the target is soft (or tough) to. The first time it matters in a
+   fight it says so, so the lesson is learned in the fight, not in a menu. */
+function kindHit(t,kind,d){const m=kindMod(t,kind);if(m===1)return d;C.kindSeen=C.kindSeen||{};const key=t.k+kind;
+  if(!C.kindSeen[key]){C.kindSeen[key]=1;clog(m>1?t.n+' is soft to '+WEAPON_KINDS[kind].n+'. That one went deep.':t.n+' soaks up '+WEAPON_KINDS[kind].n+'. Try something else on it.',m>1?'good':'hit');}
+  return Math.max(1,Math.round(d*m));}
 function act(kind){
-  if(!C||C.over)return;C.brace=false;C.countered=false;C.actor=-1;   // `actor` only means something on THEIR turn
+  if(!C||C.over)return;C.brace=false;C.countered=false;C.actor=-1;C.usedKind=null;   // `actor` only means something on THEIR turn
   C.fxq=[];C.fxNew=false;C.hp0=S.hp;for(const e of C.enemies)e.hp0=e.hp;   // the stage replays this round from here
   const t=targetEnemy();if(!t){endCombat(true);return;}
   // "Fists" is the same swing with the weapon deliberately left out of it. She
   // asked for this so a legendary is not spent on a walker: less damage, but
   // nothing wears down.
-  if(kind==='attack'||kind==='fists'){const w=kind==='fists'?null:eqItem('melee');const dm=w?wDmg(w):baseDmg();
+  if(kind==='attack'||kind==='fists'){const w=kind==='fists'?null:eqItem('melee');const dm=w?wDmg(w):baseDmg();C.usedKind=wKind(w);
     if(Math.random()<t.dodge){clog(t.n+' sidesteps your swing.','');SFX.play('miss');fxPush({k:'miss',i:C.target});}
     else if(Math.random()<(buffOn('numb')?0.72:0.9)){let d=Math.round((rint(dm[0],dm[1])+(w?(S.lvl-1):fistLvlBonus())+(w?dmgBonus():0))*hydroDmg()*(buffOn('wired')?1.15:1));
       if(buffOn('sharp')&&!C.sharpUsed){C.sharpUsed=true;d=Math.round(d*1.5);clog('Cold brew. That one landed properly.','good');}
       // Saint Jude pays you for being nearly dead: up to +60% at 1 HP, nothing
       // at full. It is a comeback weapon, not a better weapon.
       if(w&&w.id==='saintjude'){const hurt=1-(S.hp/maxHp());d=Math.round(d*(1+0.6*hurt));if(hurt>0.4)clog('Saint Jude finds its weight.','good');}
+      d=kindHit(t,C.usedKind,d);
       dealTo(t,d,'You hit '+t.n+(w?' with the '+w.n:' bare-handed'),'slash');SFX.play('hit');
       if(w&&w.id==='lastword'&&Math.random()<0.3){t.stun=1;clog(t.n+' is knocked flat. It loses its next turn.','good');}
       // The Harvest trades single-target damage for hitting the whole room.
@@ -2619,14 +2681,14 @@ function act(kind){
         breakWeapon(w);}}
     else{clog('You miss.','');SFX.play('miss');fxPush({k:'miss',i:C.target});}
   }
-  else if(kind==='heavy'){const w=eqItem('melee');if(!w){toast('Need a melee weapon');return;}const hd=wDmg(w);
+  else if(kind==='heavy'){const w=eqItem('melee');if(!w){toast('Need a melee weapon');return;}const hd=wDmg(w);C.usedKind=wKind(w);
     if(Math.random()<t.dodge+0.1){clog(t.n+' ducks the big swing.','');SFX.play('miss');fxPush({k:'miss',i:C.target});}
-    else if(Math.random()<0.6+sk('bruiser')*0.12){const d=Math.round((rint(hd[0],hd[1])+dmgBonus())*1.6*hydroDmg())+(S.lvl-1);dealTo(t,d,'Heavy swing lands','heavy');SFX.play('hit');}
+    else if(Math.random()<0.6+sk('bruiser')*0.12){const d=kindHit(t,C.usedKind,Math.round((rint(hd[0],hd[1])+dmgBonus())*1.6*hydroDmg())+(S.lvl-1));dealTo(t,d,'Heavy swing lands','heavy');SFX.play('hit');}
     else{clog('The heavy swing goes wide.','');SFX.play('miss');fxPush({k:'miss',i:C.target});}
     w.dur=Math.max(0,w.dur-2);breakWeapon(w);
     if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+(w.quiet?3:8));
   }
-  else if(kind==='shoot'){const g=eqItem('ranged');if(!g){toast('No gun');return;}const ammoItem=S.pack.find(p=>p.cat==='ammo'&&p.id===g.ammo);const stockAmmo=ammoStock(g.ammo);
+  else if(kind==='shoot'){const g=eqItem('ranged');if(!g){toast('No gun');return;}C.usedKind=wKind(g);const ammoItem=S.pack.find(p=>p.cat==='ammo'&&p.id===g.ammo);const stockAmmo=ammoStock(g.ammo);
     const free=g.id==='mercy'&&Math.random()<0.35;
     if(!free&&!ammoItem&&stockAmmo<1){toast('No '+ammoWord(g.ammo));return;}
     const noAmmo=Math.random()<sk('ammosense')*0.12;if(noAmmo)clog('Ammo Sense: the chamber had one you forgot about.','good');
@@ -2634,7 +2696,7 @@ function act(kind){
     SFX.play('shot');
     const shots=1+((Math.random()<sk('doubletap')*0.1)?1:0);if(shots>1)clog('Double tap.','good');
     for(let s=0;s<shots;s++){const tt=targetEnemy();if(!tt)break;
-      if(Math.random()<(buffOn('numb')?0.74:0.92)){let d=Math.round((rint(wDmg(g)[0],wDmg(g)[1])+(S.lvl-1)+sk('steadyaim')*3)*hydroDmg()*(buffOn('wired')?1.15:1));if(sk('coldbarrel')&&!C.fired){d=Math.round(d*1.5);clog('Cold barrel. The first shot bites.','good');}if(Math.random()<sk('headshot')*0.1){d*=2;clog('Headshot.','good');}C.fired=true;tt.shot=true;C.muzzle=Date.now();dealTo(tt,d,'You fire the '+g.n,'shot');
+      if(Math.random()<(buffOn('numb')?0.74:0.92)){let d=Math.round((rint(wDmg(g)[0],wDmg(g)[1])+(S.lvl-1)+sk('steadyaim')*3)*hydroDmg()*(buffOn('wired')?1.15:1));if(sk('coldbarrel')&&!C.fired){d=Math.round(d*1.5);clog('Cold barrel. The first shot bites.','good');}if(Math.random()<sk('headshot')*0.1){d*=2;clog('Headshot.','good');}d=kindHit(tt,C.usedKind,d);C.fired=true;tt.shot=true;C.muzzle=Date.now();dealTo(tt,d,'You fire the '+g.n,'shot');
         // Long Winter does not hit harder, it takes their turns away.
         if(g.id==='longwinter'&&!tt.dead&&Math.random()<0.34){tt.stun=1;clog(tt.n+' stiffens up. It loses its next turn.','good');}}else{C.fired=true;clog('The shot goes wide.','');fxPush({k:'miss',i:C.target});}}
     if(S.loc&&g.id!=='whisper')S.loc.noise=Math.min(100,S.loc.noise+Math.round(Math.max(5,25-sk('silencer')*8)*(g.quiet?0.3:1)));
@@ -2698,9 +2760,11 @@ function act(kind){
     else clog('You stumble. They close in.','hit');
   }
   const a=alive();
-  if(a.length){const bl=roleLvl('brawler');if(bl){const tt=targetEnemy();C.fxBy='crew:brawler';dealTo(tt,rint(9+bl*2,15+bl*3),activeCrew().find(c=>c.role==='brawler').name+' punches '+tt.n);C.fxBy=null;}
-    const hl=roleLvl('hunter');if(hl&&(S.pack.some(p=>p.cat==='ammo')||ammoTotal()>0)){const tt=targetEnemy();if(tt){C.fxBy='crew:hunter';dealTo(tt,10+hl*3,activeCrew().find(c=>c.role==='hunter').name+' fires');C.fxBy=null;}}}
-  const ml=roleLvl('medic');if(ml&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+6+ml*3);fxPush({k:'heal',n:6+ml*3,by:'crew:medic'});clog(activeCrew().find(c=>c.role==='medic').name+' patches you: +'+(6+ml*3)+'.','good');}
+  if(a.length){const bl=roleLvl('brawler');if(bl){const tt=targetEnemy();C.fxBy='crew:brawler';dealTo(tt,rint(9+bl*2,15+bl*3),roleBy('brawler').name+' punches '+tt.n);C.fxBy=null;}
+    const hl=roleLvl('hunter');if(hl&&(S.pack.some(p=>p.cat==='ammo')||ammoTotal()>0)){const tt=targetEnemy();if(tt){C.fxBy='crew:hunter';dealTo(tt,10+hl*3,roleBy('hunter').name+' fires');C.fxBy=null;}}
+    // Firebug: every third round, fire across the whole room. Made for horde night.
+    const fb=roleLvl('firebug');if(fb&&C.turn%3===0){const fbn=roleBy('firebug').name;clog(fbn+' lobs a bottle of fire.','good');C.fxBy='crew:firebug';for(const o of alive())dealTo(o,6+fb*2,'The fire catches '+o.n,'heavy');C.fxBy=null;}}
+  const ml=roleLvl('medic');if(ml&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+6+ml*3);fxPush({k:'heal',n:6+ml*3,by:'crew:medic'});clog(roleBy('medic').name+' patches you: +'+(6+ml*3)+'.','good');}
   if(sk('triage')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('triage')*4);}
   if(eqItem('armor')&&eqItem('armor').id==='nightingale'&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+5);}
   const reap=()=>{for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;fxPush({k:'die',i:C.enemies.indexOf(e)});codexKill(e);S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);if(sk('transfusion')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('transfusion')*3);clog('You patch up as '+e.n+' drops. +'+(sk('transfusion')*3)+' HP.','good');}clog(e.n+' goes down. +'+e.xp+' XP.','good');
@@ -2781,7 +2845,8 @@ function enemyPhase(){
     const swings=(e.fast&&C.turn%2===0?2:1)+(frenzied?1:0);
     for(let i=0;i<swings;i++){if(Math.random()<e.hit-sk('adrenaline')*0.06-(e.human?sk('intimidate')*0.08:0)){let d=rint(e.dmg[0],e.dmg[1]);if(e.g==='crit'&&Math.random()<0.2){d*=2;clog('A brutal swing.','hit');}
       if(C.duck)continue;                      // it is swinging at her squadmate, not at her
-      const guards=activeCrew();if(guards.length&&Math.random()<0.3){const gc=pick(guards);clog(e.n+' turns on '+gc.name+'.','hit');fxPush({k:'crewhurt',from:C.actor,who:gc.id,d:Math.max(1,d-2)});hurtCrew(gc,Math.max(1,d-2));continue;}
+      const guards=activeCrew();if(guards.length&&Math.random()<0.3){const gc=pick(guards);if(gc.trait==='lucky'&&Math.random()<1/3){clog(e.n+' goes for '+gc.name+' and somehow misses.','');fxPush({k:'emiss',from:C.actor});continue;}clog(e.n+' turns on '+gc.name+'.','hit');fxPush({k:'crewhurt',from:C.actor,who:gc.id,d:Math.max(1,d-2)});hurtCrew(gc,Math.max(1,d-2));continue;}
+      {const gl=roleLvl('bodyguard');if(gl&&Math.random()<(10+gl*4)/100){const bg2=roleBy('bodyguard');const bd=Math.max(1,d-4);clog(bg2.name+' steps in front of it.','good');fxPush({k:'crewhurt',from:C.actor,who:bg2.id,d:bd});hurtCrew(bg2,bd);continue;}}
       if(!e.human&&Math.random()<infectChance())catchInfection(e.n);
       hurt(d,e.n);
         if(e.g==='bleed'){C.bleed=Math.max(1,3-sk('clotting'));}if(e.g==='poison'){C.poison=Math.max(1,3-sk('clotting'));}
@@ -2811,7 +2876,7 @@ function death(){
   const wasInfected=!!S.infect;
   if(wasInfected){S.infect=null;S.infectStep=0;log('The fever broke while you were out. Somebody found antibiotics.');}
   const keepFrac=sk('fieldsurgeon')*0.25;const kept=keepFrac?S.pack.slice(0,Math.floor(S.pack.length*keepFrac)):[];S.pack=kept;S.run=0;S.loc=null;newDistance();S.hp=Math.round(maxHp()*(0.4+sk('fieldsurgeon')*0.15));
-  const lostCrew=woundedCrew();if(lostCrew.length){const ids=lostCrew.map(c=>c.id);S.crew=S.crew.filter(c=>!ids.includes(c.id));S.active=S.active.filter(id=>!ids.includes(id));log('You went down and could not carry them out. '+lostCrew.map(c=>c.name).join(' and ')+' did not make it.');}
+  const lostCrew=woundedCrew().filter(c=>c.trait!=='loyal');if(lostCrew.length){const ids=lostCrew.map(c=>c.id);S.crew=S.crew.filter(c=>!ids.includes(c.id));S.active=S.active.filter(id=>!ids.includes(id));log('You went down and could not carry them out. '+lostCrew.map(c=>c.name).join(' and ')+' did not make it.');}
   // Only ordinary gear can be taken off you. An epic or legendary survives a
   // death the same way it survives breaking - anything else makes one bad fight
   // cost the rarest thing you own.
@@ -3046,7 +3111,7 @@ function renderCombat(){
   ${battleStage()}${C.night?`<div class="help" style="margin-top:6px;color:var(--steel)">${esc(nightLine())}</div>`:''}
   ${C.where==='liveraid'&&typeof squadStrip==='function'?squadStrip():''}
   ${S.buff&&S.buff.fights>0?`<div class="help" style="margin-top:6px;color:var(--amber)">${esc(BUFF_TEXT[S.buff.k]||'')}</div>`:''}
-  <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy slim${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${e.shield>0?' · shield '+e.shield:''}${e.plate&&!e.cracked?' · <b style="color:var(--steel)">plated - a heavy swing cracks it</b>':''}${e.enraged?' · <b style="color:#ff8a92">enraged</b>':''}${e.caller?' · calls more':''}${e.frenzy?' · frenzies low':''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div></button>`;}).join('')}</div>
+  <div class="stack" style="margin:12px 0">${C.enemies.map((e,i)=>{const hit=e.fx&&now-e.fx.t<600;return `<button class="enemy slim${e===t?' target':''}${e.dead?' dead':''}${hit?' hit':''}" onclick="C.target=${i};renderCombat()"><div><div class="n">${esc(e.n)}${e.wanted?' · WANTED':e.boss?' ☠':''}</div><div class="hpbar en"><i style="width:${e.hp/e.max*100}%"></i></div><div class="d">${e.hp}/${e.max} · hits for ${e.dmg[0]}-${e.dmg[1]}${e.fast?' · fast':''}${e.burst?' · bursts when killed up close':''}${e.scream?' · calls more':''}${e.dodge?' · dodgy':''}${e.stun?' · down':''}${ENEMY_WEAK[e.k]?' · soft to '+WEAPON_KINDS[ENEMY_WEAK[e.k]].e:''}${ENEMY_TOUGH[e.k]?' · shrugs off '+WEAPON_KINDS[ENEMY_TOUGH[e.k]].e:''}${e.shield>0?' · shield '+e.shield:''}${e.plate&&!e.cracked?' · <b style="color:var(--steel)">plated - a heavy swing cracks it</b>':''}${e.enraged?' · <b style="color:#ff8a92">enraged</b>':''}${e.caller?' · calls more':''}${e.frenzy?' · frenzies low':''}${e.g?' · '+GIMMICK_TEXT[e.g]:''}</div></div></button>`;}).join('')}</div>
   <div class="acts">
     <button class="btn r" onclick="attackGuard()">${w?w.e+' '+esc(w.n)+(temperOf(w)?' <span class="chip s">'+esc(temperOf(w).n)+'</span>':''):'👊 Fists'}<small>${w?(wDmg(w)[0]+dmgBonus())+'-'+(wDmg(w)[1]+dmgBonus())+' · '+w.dur+' left':fistDmg()[0]+'-'+fistDmg()[1]+' dmg'}</small></button>
     <button class="btn" onclick="heavyGuard()" ${w?'':'disabled'}>💢 Heavy swing<small>x1.6 dmg · ${60+sk('bruiser')*12}% hit · costs 2 durability</small></button>
@@ -3106,8 +3171,9 @@ function searchRoom(i){pushSoon();
   if(r.sealed){breakSeal(i);return;}if(loc.stronghold&&r.stage>loc.stage){toast('Push deeper first');return;}r.done=true;S.roomsSearched=(S.roomsSearched||0)+1;
   for(const it of r.items)takeItem(it,loc);
   ctEvent('rooms',1);
+  {const sl=roleLvl('scavenger');if(sl&&Math.random()<(10+sl*5)/100){S.stock.scrap+=1+sl;log(roleBy('scavenger').name+' pried '+(1+sl)+' scrap out of the '+r.n.toLowerCase()+'.');toast('+'+(1+sl)+' scrap from '+roleBy('scavenger').name);}}
   if(typeof landmarkPayout==='function')try{landmarkPayout(loc);}catch(e){}
-  if(!loc.stronghold&&S.crew.length<8&&Math.random()<0.07){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was hiding in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was hiding in the ${esc(r.n.toLowerCase())}. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(1)}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
+  if(!loc.stronghold&&S.crew.length<12&&Math.random()<0.07){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was hiding in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was hiding in the ${esc(r.n.toLowerCase())}. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(c.lvl)}.</p><p class="help">They ${esc(c.past)}. ${TRAITS[c.trait].e} <b>${TRAITS[c.trait].n}</b>: ${TRAITS[c.trait].d}. Fights a level better when you use ${WEAPON_KINDS[c.fav].e} ${WEAPON_KINDS[c.fav].n}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
   else if(!S.pet&&(Math.random()<0.03||(S.roomsSearched||0)>=40)){petJoin(Math.random()<0.6?'dog':'cat');}
   else if(S.pet&&Math.random()<0.012){petJoin(Math.random()<0.5?'dog':'cat');}
   /* Light Step was a flat -4 per rank against room noise of 18-44, so at rank 3
@@ -3392,7 +3458,10 @@ function claimBase(confirmed){
   // separable: the perk follows the BUILDING, the stash spot follows the PIN.
   if(S.base.geo&&typeof STREET!=='undefined'&&STREET.on)setTimeout(basePinOffer,500);
 }
-function defense(){if(!S.base)return 0;let d=0;for(const [k,l] of Object.entries(S.base.rooms)){if(!l)continue;d+=BUILD[k].def[l-1]||0;}d+=(S.base.rooms.walls||0)*(sk('framing')*3+sk('fortify')*2)+(S.base.rooms.traps||0)*sk('trapmaker')*2;return d;}
+function defense(){if(!S.base)return 0;let d=0;for(const [k,l] of Object.entries(S.base.rooms)){if(!l)continue;d+=BUILD[k].def[l-1]||0;}d+=(S.base.rooms.walls||0)*(sk('framing')*3+sk('fortify')*2)+(S.base.rooms.traps||0)*sk('trapmaker')*2;d+=crewDefense();return d;}
+// v7.54: a Trapper rigs the fence before you leave, so they count home or away; a
+// Light sleeper only counts while they are actually home. Nobody who is down counts.
+function crewDefense(){let d=0,tl=0;for(const c of (S.crew||[])){if(c.hp!==undefined&&c.hp<=0)continue;if(c.role==='trapper')tl=Math.max(tl,c.lvl+sk('leader'));if(c.trait==='sentry'&&!(S.active||[]).includes(c.id))d+=3;}return d+(tl?2+tl*2:0);}
 function buildCost(k){const b=BUILD[k];const l=S.base.rooms[k]||0;if(l>=b.lv)return null;let c=b.cost[l];const el=roleLvl('engineer');if(el)c=Math.round(c*(1-(0.15+el*0.05)));if(S.base.t==='hardware')c=Math.round(c*0.9);if(bg('engineer'))c=Math.round(c*0.9);if(bg('carpenter')&&(k==='walls'||k==='traps'))c=Math.round(c*0.8);return c;}
 function buildLabor(k){const b=BUILD[k];const l=S.base.rooms[k]||0;if(l>=b.lv)return null;let n=b.labor[l];const el=roleLvl('engineer');if(el)n=Math.round(n*(1-(0.1+el*0.05)));if(bg('engineer'))n=Math.round(n*0.85);n=Math.round(n*(1-sk('efficient')*0.08));if(bg('carpenter')&&(k==='walls'||k==='traps'))n=Math.round(n*0.8);return n;}
 function build(k){if(!S.base)return;if(S.work){toast('Finish '+BUILD[S.work.k].n+' first, or cancel it');return;}const c=buildCost(k);if(c===null)return;if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}
@@ -3410,6 +3479,7 @@ function bank(){
     else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;}}
   rollWeek();S.league.score+=pts;ctEvent('stash',pts);if(meds)ctEvent('meds',meds);
   let eat=activeCrew().length;if(sk('rationing'))eat=Math.ceil(eat/2);S.stock.food=Math.max(0,S.stock.food-eat);if(sk('harvest'))S.stock.food+=sk('harvest');
+  const fl=roleLvl('forager');if(fl){const fn=1+Math.floor(fl/2);S.stock.food+=fn;S.stock.water+=fn;log(roleBy('forager').name+' brought home '+fn+' food and '+fn+' water.');}
   S.hp=Math.min(maxHp(),S.hp+Math.max(15,Math.round(maxHp()*0.10)));if(roleLvl('medic'))S.hp=Math.min(maxHp(),S.hp+Math.max(20,Math.round(maxHp()*0.13)));
   if(S.base.rooms.clinic&&medsTotal()>0&&S.hp<maxHp()){medsTake(MED_ORDER.find(id=>medsHeld(id)>0));S.hp=maxHp();}
   log('Stashed '+fmt(raw)+' x'+runMult().toFixed(1)+' = '+fmt(pts)+' league points.'+(eat?' Crew ate '+eat+' food.':''));toast('+'+fmt(pts)+' league points','a');SFX.play('win');
@@ -4004,7 +4074,7 @@ function reportTick(){
   const title=horde?(held?(fought?'You held the walls':'The walls held the horde'):'The horde broke in'):(held?(fought?'You held the gate':'The walls held'):'They got in');
   const who=horde?ART.zombieSVG('walker',54)+ART.zombieSVG('runner',54)+ART.zombieSVG('bloater',54):(r.n>=3?ART.zombieSVG('gunner',54):'')+ART.zombieSVG('raider',54)+(r.n>=2?ART.zombieSVG('raider',54):'');
   const items=Object.entries(r.stolen||{}).map(([k,v])=>{const d=STOLE_N[k]||['',k];return '<div class="kv" style="grid-template-columns:auto 1fr"><span>'+d[0]+'</span><b>'+(k==='walls'||k==='traps'?d[1]:v+' '+d[1])+'</b></div>';}).join('');
-  const when=horde?'Horde night '+r.by.replace(/\D/g,'')+', 9 pm':'They came at '+String(r.hour).padStart(2,'0')+':00';
+  const when=horde?'Horde night '+r.by.replace(/\D/g,'')+', '+hourText(r.hour===undefined?21:r.hour):'They came at '+String(r.hour).padStart(2,'0')+':00';
   const how=r.how==='waited'?'You never came back that day, so the walls decided on their own.':r.how==='fence'?'They waited at the fence from '+String(r.hour).padStart(2,'0')+':00 until you got back.':fought?'You met them yourself.':'';
   openSheet('<h2>'+title+'</h2><div class="big">'+who+'</div>'
     +'<p><b style="color:var(--bone)">'+when+'</b>'+(horde||fought?'':' with a crew of '+r.n)+' - <b>'+r.power+'</b> against your <b>'+r.def+'</b>.'+(how?'<br><span class="help">'+how+'</span>':'')+'</p>'
@@ -4025,7 +4095,28 @@ function resolveRaid(power,hour,date,how){
 }
 function resolveRaidFight(won){if(!S.raidPending)return;const p=S.raidPending;const e={t:p.date+' '+String(p.hour).padStart(2,'0')+':00',power:p.power,def:defense(),repelled:true,stolen:{},fought:true};S.raids.unshift(e);S.raidPending=null;S.flags.lastRaidCheck=p.date;log('You held the base yourself. Raiders driven off.');addXp(30);const sc=rint(4,10);S.stock.scrap+=sc;S.raidReport=Object.assign({},e,{hour:p.hour,n:p.power>25?4:p.power>18?3:2,scrap:sc});}
 /* ================= horde night (every 7 days) ================= */
-function hordeAt(fromMs){const d=new Date(fromMs);d.setHours(21,0,0,0);d.setDate(d.getDate()+7);return d.getTime();}
+/* v7.54 - PICK YOUR HOUR. It was always 9 pm, and "sometimes people are busy."
+   The DAY is still fixed - every seventh day, it comes for you - but you choose
+   the hour, the same way raiders wait for you on the day they come. The choice
+   sticks for every horde after, and you can change it until they arrive. */
+const HORDE_HOURS=[6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23];
+function hordeHour(){const h=S.hordeHour;return (typeof h==='number'&&h>=0&&h<24)?h:21;}
+function hourText(h){return (h%12||12)+(h<12?'am':'pm');}
+function hordeAt(fromMs){const d=new Date(fromMs);d.setHours(hordeHour(),0,0,0);d.setDate(d.getDate()+7);return d.getTime();}
+function hordeDeadline(h){const e=new Date(h.next);e.setHours(23,59,59,999);return Math.max(e.getTime(),h.next+12*3600000);}
+function hordeTimeSheet(){const h=hordeState();if(!h)return;
+  if(h.pending||Date.now()>=h.next){toast('They are already here.','d');return;}
+  const day=new Date(h.next);const today=day.toDateString()===new Date().toDateString();
+  openSheet('<h2>When does the horde come?</h2><p>Horde night '+(h.n+1)+' is on <b>'+day.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})+'</b>. The day is set - pick the hour you can be here to hold the gate. It sticks for every horde after this one.</p>'
+    +'<div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px">'
+    +HORDE_HOURS.map(hr=>{const at=new Date(h.next);at.setHours(hr,0,0,0);const past=at.getTime()<=Date.now();const cur=hr===new Date(h.next).getHours();
+      return '<button class="btn sm'+(cur?' r':'')+'" '+(past?'disabled':'')+' onclick="setHordeHour('+hr+')">'+hourText(hr)+'</button>';}).join('')
+    +'</div>'+(today?'<p class="help" style="margin-top:8px">It is today, so hours already gone are greyed out.</p>':'')
+    +'<button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet()">Keep it</button>');}
+function setHordeHour(hr){const h=hordeState();if(!h)return;if(h.pending||Date.now()>=h.next){closeSheet();toast('They are already here.','d');return;}
+  const at=new Date(h.next);at.setHours(hr,0,0,0);if(at.getTime()<=Date.now()){toast('That hour has already gone. Pick a later one.','d');return;}
+  S.hordeHour=hr;h.next=at.getTime();log('Horde night set for '+hourText(hr)+'.');toast('Horde night: '+hourText(hr)+' on '+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][at.getDay()],'a');
+  closeSheet();save();render();if(typeof pushPlayer==='function')try{pushPlayer();}catch(e){}}
 function hordeState(){if(!S.base)return null;if(!S.horde||!S.horde.next){let nx=hordeAt(S.base.claimed||Date.now());while(nx<Date.now())nx=hordeAt(nx);S.horde={n:0,next:nx,pending:false};}return S.horde;}
 function hordePower(){const h=hordeState();return Math.round((28+12*(h?h.n:0)+S.walk.district*10+S.league.tier*5)*dealMod('raid'));}
 function hordeDefense(){return defense()+activeCrew().length*3+(S.base&&S.base.rooms.bell?activeCrew().length*2:0);}
@@ -4034,7 +4125,7 @@ function resolveHorde(fought,won){const h=hordeState();if(!h)return;const power=
     for(const k of ['food','water','meds','scrap','ammo']){const n=Math.floor(S.stock[k]*frac);if(n){S.stock[k]-=n;stolen[k]=n;}}
     if(S.base.rooms.walls){S.base.rooms.walls--;stolen.walls=1;}if(S.base.rooms.traps&&Math.random()<0.5){S.base.rooms.traps--;stolen.traps=1;}}
   else if(fought){S.stock.scrap+=25;S.keys++;addXp(40);}
-  const he={t:todayStr()+' 21:00',power,def,repelled,stolen,fought,by:'Horde night '+(h.n+1)};S.raids.unshift(he);S.raids=S.raids.slice(0,12);S.raidReport=Object.assign({},he,{hour:21,n:0});
+  const hh=new Date(h.next).getHours();const he={t:todayStr()+' '+String(hh).padStart(2,'0')+':00',power,def,repelled,stolen,fought,by:'Horde night '+(h.n+1)};S.raids.unshift(he);S.raids=S.raids.slice(0,12);S.raidReport=Object.assign({},he,{hour:hh,n:0});
   log(repelled?(fought?'You held the walls against horde night '+(h.n+1)+' yourself. +25 scrap, +1 key.':'Horde night '+(h.n+1)+': '+def+' defense against '+power+'. The walls held.'):'Horde night '+(h.n+1)+' broke through ('+power+' vs '+def+') and took '+Object.entries(stolen).map(([k,v])=>v+' '+k).join(', ')+'.');
   toast(repelled?'Horde repelled':'The horde broke in','d');if(!repelled)SFX.play('hurt');else SFX.play('win');
   h.n++;h.next=hordeAt(h.next);h.pending=false;save();render();}
@@ -4042,8 +4133,8 @@ function fightHorde(){gearCheck(()=>{const h=hordeState();const n=Math.min(6,4+M
 function hordeTick(){const h=hordeState();if(!h)return;if(Date.now()<h.next)return;
   if(document.visibilityState==='visible'&&!S.combat&&!S.loc&&!$('#modal').classList.contains('on')){h.pending=true;save();
     openSheet(`<h2>Horde night</h2><div class="big">${ART.zombieSVG('walker',60)}${ART.zombieSVG('runner',60)}${ART.zombieSVG('bloater',60)}</div><p>Day ${7*(h.n+1)}. They come every seven days and they come all at once. Your walls: <b>${hordeDefense()}</b> vs the horde's <b>${hordePower()}</b>. Fight at the gate, or let the walls decide. Lose and they take the stockpile.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveHorde(false)">Let the walls decide</button><button class="btn r" onclick="closeSheet();fightHorde()">Fight at the gate</button></div>`);}
-  else if(Date.now()-h.next>12*3600000){resolveHorde(false);}}   // v7.42: waits for you up to 12 h; never resolves just because the screen is off
-function hordeCountdown(){const h=hordeState();if(!h)return '';const ms=h.next-Date.now();if(ms<=0)return 'Horde night is here.';const d=Math.floor(ms/86400000),hr=Math.floor(ms%86400000/3600000);const dt=new Date(h.next);return 'Horde night '+(h.n+1)+' in '+(d?d+'d ':'')+hr+'h ('+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()]+' 9pm) · they bring '+hordePower()+', you have '+hordeDefense()+'.';}
+  else if(Date.now()>hordeDeadline(h)){resolveHorde(false);}}   // v7.42: waits for you (v7.54: the rest of that day, at least 12 h); never resolves just because the screen is off
+function hordeCountdown(){const h=hordeState();if(!h)return '';const ms=h.next-Date.now();if(ms<=0)return 'Horde night is here.';const d=Math.floor(ms/86400000),hr=Math.floor(ms%86400000/3600000);const dt=new Date(h.next);return 'Horde night '+(h.n+1)+' in '+(d?d+'d ':'')+hr+'h ('+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()]+' '+hourText(dt.getHours())+') · they bring '+hordePower()+', you have '+hordeDefense()+'.';}
 function raidTick(){
   if(!S.raidPending)return;const p=S.raidPending;const now=new Date();
   if(todayStr()!==p.date){resolveRaid(p.power,p.hour,p.date,'waited');S.flags.lastRaidCheck=todayStr();save();return;}
@@ -4980,7 +5071,7 @@ function render(){
     ra.textContent='Repair '+broke.length+' worn piece'+(broke.length===1?'':'s')+' for '+bill+'🔩'+(atBench()?' (bench price)':'');
     ra.classList.toggle('off',S.stock.scrap<Math.min(...broke.map(repairCost).concat([Infinity])));
   }
-  $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=(g.slot==='melee'||g.slot==='ranged')&&g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+(g.dur+'/'+repairMax(g)+' durability')):g.slot==='ranged'?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+g.dur+'/'+repairMax(g)+' · uses '+(g.ammo==='shells'?'shells':'rounds'):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';const sh=(g.r==='legendary'||g.r==='epic')?' shine'+(g.r==='legendary'?' leg':''):'';
+  $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=(g.slot==='melee'||g.slot==='ranged')&&g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+(g.dur+'/'+repairMax(g)+' durability')+(WEAPON_KINDS[wKind(g)]?' · '+WEAPON_KINDS[wKind(g)].e+' '+WEAPON_KINDS[wKind(g)].n:'')):g.slot==='ranged'?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+g.dur+'/'+repairMax(g)+' · uses '+(g.ammo==='shells'?'shells':g.ammo==='bolts'?'bolts':'rounds')+(WEAPON_KINDS[wKind(g)]?' · '+WEAPON_KINDS[wKind(g)].e+' '+WEAPON_KINDS[wKind(g)].n:''):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';const sh=(g.r==='legendary'||g.r==='epic')?' shine'+(g.r==='legendary'?' leg':''):'';
     return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''}${temperOf(g)?` <span class="chip${g.temper==='perfect'?' a':g.temper==='crude'?' d':''}">${esc(temperOf(g).n)}</span>`:''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${repairMax(g)&&repairMissing(g)?`<button class="btn sm${g.broken?' r':''}${S.stock.scrap<repairCost(g)?' off':''}" onclick="repair('${g.uid}')">Repair ${repairCost(g)}🔩</button>`:''}${benchable(g)?`<button class="btn sm" onclick="benchSheet('${g.uid}')">🛠️ Workbench</button>`:''}<button class="btn sm ghost${giftBlocked(g)?' off':''}" onclick="giftSheet('${g.uid}')">Gift ${giftCost(g)}</button><button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
   // you
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',alive:true});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
@@ -4993,13 +5084,13 @@ function render(){
   $('#skills').innerHTML=skOpen.map(s=>skRow(s,false)).join('')+(skLocked.length?`<div class="section-label" style="margin-top:12px">Locked · keep levelling</div>`+skLocked.map(s=>skRow(s,true)).join(''):'')+`<p class="help" style="margin-top:10px">${spent} of ${total} ranks learned${skLocked.length?' · next unlock at level '+skLocked[0].req:''}.</p>`;
   {const down=S.crew.filter(c=>c.hp!==undefined&&c.hp<=0).length;
    $('#crewSub').textContent=S.active.length+' / '+crewSlots()+' active · '+S.crew.length+' total'+(down?' · '+down+' down':'');}
-  $('#crewList').innerHTML=S.crew.length?S.crew.map(c=>{const act=S.active.includes(c.id);return `<div class="crew${act?' active':''}"><div class="av">${ART.avatarSVG(c.av,70,{alive:true,phase:(S.crew.indexOf(c)%4)})}</div><div><div class="nm">${esc(c.name)} <span class="chip a">Lv ${c.lvl}</span></div><div class="role">${ROLES[c.role].e} ${ROLES[c.role].n}</div><div class="tr">${ROLES[c.role].d(c.lvl+sk('leader'))}</div><div class="hpbar2" style="margin-top:6px"><i style="width:${Math.max(0,(c.hp===undefined?crewMax(c):c.hp)/crewMax(c)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${(c.hp||0)<=0?'<b style="color:#ff8a92">Down. Cannot fight.</b> Mends '+(18+(S.base&&S.base.rooms.clinic?18:0))+' HP a night, or patch them up now.':'HP '+(c.hp===undefined?crewMax(c):c.hp)+' / '+crewMax(c)+((c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?' · mends '+(18+(S.base&&S.base.rooms.clinic?18:0))+' a night'+(S.base&&S.base.rooms.clinic?' (clinic)':''):'')}</div>
-    <div class="xp" style="margin-top:6px"><i style="width:${Math.min(100,c.lvl>=5?100:c.xp/(c.lvl*6)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${c.lvl>=5?'Fully trained':'Experience '+c.xp+' / '+(c.lvl*6)+' to level '+(c.lvl+1)}</div>
+  $('#crewList').innerHTML=S.crew.length?S.crew.map(c=>{const act=S.active.includes(c.id);return `<div class="crew${act?' active':''}"><div class="av">${ART.avatarSVG(c.av,70,{alive:true,phase:(S.crew.indexOf(c)%4)})}</div><div><div class="nm">${esc(c.name)} <span class="chip a">Lv ${c.lvl}</span></div><div class="role">${ROLES[c.role].e} ${ROLES[c.role].n}</div><div class="tr">${ROLES[c.role].d(crewLvl(c))}</div><div style="margin-top:4px">${crewCard(c)}</div><div class="hpbar2" style="margin-top:6px"><i style="width:${Math.max(0,(c.hp===undefined?crewMax(c):c.hp)/crewMax(c)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${(c.hp||0)<=0?'<b style="color:#ff8a92">Down. Cannot fight.</b> Mends '+(18+(S.base&&S.base.rooms.clinic?18:0))+' HP a night, or patch them up now.':'HP '+(c.hp===undefined?crewMax(c):c.hp)+' / '+crewMax(c)+((c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?' · mends '+(18+(S.base&&S.base.rooms.clinic?18:0))+' a night'+(S.base&&S.base.rooms.clinic?' (clinic)':''):'')}</div>
+    <div class="xp" style="margin-top:6px"><i style="width:${Math.min(100,c.lvl>=5?100:c.xp/(c.lvl*6)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${c.lvl>=5?'Fully trained':'Experience '+c.xp+' / '+(c.lvl*(c.trait==='quick'?4:6))+' to level '+(c.lvl+1)}</div>
     <div class="a2">${(c.hp||0)<=0?`<button class="btn sm r" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>${S.active.length<crewSlots()?'<div class="help" style="font-size:11px;margin-top:4px">Their slot is free - bring someone else along meanwhile.</div>':''}`:`<button class="btn sm ${act?'':'r'}" onclick="toggleCrew('${c.id}')">${act?'Leave at base':'Bring along'}</button>${(c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?`<button class="btn sm ghost" style="margin-top:4px" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>`:''}`}</div></div></div>`;}).join(''):'<p class="help">Nobody yet. Survivors hide in the places you search.</p>';
   // base
   const bh=$('#baseHead');
   if(!S.base){bh.className='card blood';bh._html='';bh.innerHTML='<h2>No base yet</h2><p>Clear any place, then tap <b>Claim as base</b> on it. Where you set up matters: a police station comes with an armory and walls, a pharmacy with a clinic, a gas station with a generator. You can move later for 20 scrap.</p>';}
-  else{bh.className='card';const bhHtml=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2>${baseScene()}<p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div><div class="help" style="margin-top:4px;color:var(--amber)">${hordeCountdown()}</div>
+  else{bh.className='card';const bhHtml=`<h2>${S.base.e} ${esc(S.base.n)} <span class="sub">${esc(S.base.district)}</span></h2>${baseScene()}<p>${BASE_PERK[S.base.t]||''}</p><div class="def" style="margin-top:10px"><div class="big">${defense()}</div><div><div class="section-label">Defense</div><div class="help">${S.raidPending?(S.base.rooms.tower?'Watchtower spotted raiders. They hit at '+S.raidPending.hour+':00 today with strength '+S.raidPending.power+'.':'Something feels off today.'):'Raiders scale with your stash. Walls, towers and traps hold them off.'}</div><div class="help" style="margin-top:4px;color:var(--amber)">${hordeCountdown()}</div>${(()=>{const h=hordeState();return h&&!h.pending&&Date.now()<h.next?'<button class="btn xs" style="margin-top:6px" onclick="hordeTimeSheet()">🕘 Change horde time</button>':'';})()}
     <div class="help" style="margin-top:4px">Held ${baseDays()} day${baseDays()===1?'':'s'}${baseAgePower()?` · raiders hit ${baseAgePower()} harder for it. Moving resets that.`:''}</div>
     <div class="help" style="margin-top:4px">${S.base.geo?'This is also your <b>home</b> on the live map - same place, one pin. Stand within 60 m of it to stash.':'No map pin yet. Set one from the live map if you want to stash out walking.'}</div></div></div>`;
     // Rebuilding this on every render() restarted every animation in the yard, several times a minute.
@@ -5251,6 +5342,12 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.54',d:'Sep 25',t:'A bigger, stranger crew - and you pick when the horde comes',
+  i:['SEVEN NEW CREW ROLES. Bodyguard steps in front of hits meant for you. Firebug throws fire across the whole room every third round - made for horde night. Scavenger pries extra scrap out of rooms. Forager brings food and water home when you stash. Trapper adds base defense. Pathfinder makes places closer. Teacher gives you more XP and trains the rest of the crew. New survivors lean toward roles you do not have yet.',
+     'EVERY SURVIVOR IS SOMEONE NOW. Each has a trait (Tough, Quick study, Night owl, Early bird, Lucky, Light sleeper, Hardy, Loyal, Veteran), a line about who they were before, and a weapon they like. Your crew from before got theirs too. Fifty more names, and room for twelve.',
+     'WEAPONS HAVE A KIND: blunt, blades, spears and bows, guns. Runners and raider gunners are soft to blades, Bloaters and Screamers to spears and bows, raiders to blunt. Soft means +30% damage. Bloaters also shrug off blunt. The fight screen shows it on every enemy, and so does the Codex.',
+     'Your crew fight a level better when you use the kind they like. Old Reliable is still a great wrench, but it is not the answer to everything any more.',
+     'HORDE NIGHT: PICK YOUR HOUR. It was always 9 pm. The day is still every seventh day, but on the Base tab you can now pick the hour, 6am to 11pm, the same way raiders wait for you on their day. It sticks for every horde after. And they wait for you until the end of that day.']},
  {v:'7.53',d:'Sep 25',t:'A rebuild prompt the Shortcuts AI can actually follow',
   i:['iPhone Shortcuts has no "Start Date is yesterday" filter, so the old prompt made the AI guess. The new one uses the date steps it can build, names every number (Today, Yesterday) so nothing points at the wrong Sum, keeps your run times, and ends with a box that shows the server\'s reply.']},
  {v:'7.52',d:'Sep 25',t:'The rebuild prompt is on the Road tab',
