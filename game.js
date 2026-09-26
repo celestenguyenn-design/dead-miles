@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.54';
+const VERSION='7.55';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1050,9 +1050,27 @@ function hurtCrew(c,n){c.hp=Math.max(0,(c.hp===undefined?crewMax(c):c.hp)-n);
     const i=S.active.indexOf(c.id);
     if(i>=0){S.active.splice(i,1);log(c.name+' was hurt badly and is out until they heal. Their slot is free - bring someone else along.');}
     else log(c.name+' was hurt badly and is out until they heal.');
-    SFX.play('hurt');}
+    toast(c.name+' is down - patch them up or you could lose them','d');SFX.play('hurt');}
   else clog(c.name+' takes '+n+'.','hit');}
-function healCrew(id){const c=S.crew.find(x=>x.id===id);if(!c)return;if(c.hp>=crewMax(c)){toast(c.name+' is fine');return;}if(medsTotal()<1){toast('No meds in the stash');return;}medsTake(MED_ORDER.find(id=>medsHeld(id)>0));c.hp=crewMax(c);log('Patched up '+c.name+'.');toast(c.name+' is back on their feet','a');SFX.play('win');save();render();}
+/* v7.55 - "when your crew needs to be patched, make it known somewhere, otherwise
+   we lose out on the crew." A crew member who is down is lost for good if YOU go
+   down before they heal - and the only place that said so was the Crew list, three
+   taps deep under You. Now it is on the Road page, on the You tab badge, on the
+   door of every place you are about to walk into, and a toast the moment it happens. */
+function crewNeedsCare(){return (S.crew||[]).filter(c=>c.hp!==undefined&&(c.hp<=0||(S.active.includes(c.id)&&c.hp<crewMax(c)*0.35)));}
+function crewMend(){return 18+(S.base&&S.base.rooms.clinic?18:0);}
+function crewMedsHave(){return medsTotal()+S.pack.filter(x=>x.cat==='meds').length;}
+function renderCrewDown(){const el=$('#crewDown');if(!el)return;const need=crewNeedsCare();if(!need.length){el.hidden=true;return;}
+  const down=need.filter(c=>c.hp<=0),low=need.filter(c=>c.hp>0);const meds=crewMedsHave();el.hidden=false;
+  el.innerHTML='<h2>🩹 '+(down.length?(down.length===1?esc(down[0].name)+' is down':down.length+' of your crew are down'):'Your crew are hurt')+'</h2>'
+    +(down.length?'<p><b style="color:#ff8a92">If you go down before they heal, '+(down.length===1?'they are':'they are all')+' gone for good.</b>'+(down.some(c=>c.trait==='loyal')?' (Loyal ones always make it out.)':'')+'</p>':'<p>Low enough that one bad fight puts them down.</p>')
+    +'<div class="stack" style="margin-top:8px">'+need.map(c=>'<div class="row" style="align-items:center;gap:8px"><span style="flex:1">'+ROLES[c.role].e+' <b>'+esc(c.name)+'</b> <span class="help">'+(c.hp<=0?'down · mends '+crewMend()+' HP a night':'HP '+c.hp+' / '+crewMax(c))+'</span></span>'
+      +'<button class="btn sm r" '+(meds?'':'disabled')+' onclick="healCrew(\''+c.id+'\')">Patch up (1 meds)</button></div>').join('')+'</div>'
+    +(meds?'':'<p class="help" style="margin-top:6px">No meds in your pack or stash. Pharmacies and clinics have them - or play it safe until they heal.</p>');}
+function crewDownWarn(){const d=woundedCrew().filter(c=>c.trait!=='loyal');return d.length?'<p class="help" style="color:#ff8a92;margin-top:6px">⚠️ '+esc(d.map(c=>c.name).join(' and '))+(d.length===1?' is':' are')+' down. If you go down in there, '+(d.length===1?'they are':'they are')+' gone for good.</p>':'';}
+function healCrew(id){const c=S.crew.find(x=>x.id===id);if(!c)return;if(c.hp>=crewMax(c)){toast(c.name+' is fine');return;}
+  // v7.55: a med in your pack counts too - you are usually out on the road when it matters
+  if(medsTotal()>0)medsTake(MED_ORDER.find(id=>medsHeld(id)>0));else{const pm=S.pack.find(x=>x.cat==='meds');if(!pm){toast('No meds in the stash or your pack','d');return;}S.pack=S.pack.filter(x=>x!==pm);}c.hp=crewMax(c);log('Patched up '+c.name+'.');toast(c.name+' is back on their feet','a');SFX.play('win');save();render();}
 /* ================= SKILLS GO DEEPER (v7.30) =================
    Her words: "people are running out of skill upgrades, so we have to make it
    progressive - one point for the first level, then two, then three - add more
@@ -5077,7 +5095,7 @@ function render(){
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',alive:true});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
   $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):fistDmg()[0]+'-'+fistDmg()[1]} ${eqItem('melee')?'+'+(S.lvl-1):''}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
   $('#cosmeticCount').textContent=S.cosmetics.length+' looks unlocked';
-  $('#spSub').textContent=S.sp+' point'+(S.sp===1?'':'s')+' to spend';$('#youAlert').hidden=!skillList().some(x=>(!x.req||S.lvl>=x.req)&&sk(x.id)<x.max&&S.sp>=sk(x.id)+1);$('#clsDesc').textContent=(CLASSES[S.cls]?CLASSES[S.cls].e+' '+CLASSES[S.cls].n:'')+(S.bg&&BACKGROUNDS[S.bg]?' · '+BACKGROUNDS[S.bg].e+' '+BACKGROUNDS[S.bg].n+' background':'')+'. One point per level and per county milestone. Rank 1 of a skill costs 1 point, rank 2 costs 2, rank 3 costs 3, and so on. General skills are open to every class.';
+  $('#spSub').textContent=S.sp+' point'+(S.sp===1?'':'s')+' to spend';$('#youAlert').hidden=!(skillList().some(x=>(!x.req||S.lvl>=x.req)&&sk(x.id)<x.max&&S.sp>=sk(x.id)+1)||woundedCrew().length);$('#clsDesc').textContent=(CLASSES[S.cls]?CLASSES[S.cls].e+' '+CLASSES[S.cls].n:'')+(S.bg&&BACKGROUNDS[S.bg]?' · '+BACKGROUNDS[S.bg].e+' '+BACKGROUNDS[S.bg].n+' background':'')+'. One point per level and per county milestone. Rank 1 of a skill costs 1 point, rank 2 costs 2, rank 3 costs 3, and so on. General skills are open to every class.';
   const skAll=skillList();const skOpen=skAll.filter(s=>!s.req||S.lvl>=s.req);const skLocked=skAll.filter(s=>s.req&&S.lvl<s.req).sort((a,b)=>a.req-b.req);
   const skRow=(s,locked)=>{const r=sk(s.id);const cost=r+1;const can=!locked&&S.sp>=cost&&r<s.max;return `<div class="skill${r>=s.max?' max':''}${locked?' locked':''}"><div><b>${s.n} ${SKILLS.general.includes(s)?'<span class="chip" style="font-size:10px">general</span>':''}${locked?'<span class="chip a" style="font-size:10px">level '+s.req+'</span>':''}</b><span>${r>=s.max?s.d(r):(r?'Now: '+s.d(r)+' · next: '+s.d(r+1):s.d(1))}</span><div class="pips">${Array.from({length:s.max},(_,i)=>`<i class="${i<r?'on':''}"></i>`).join('')}</div></div><button class="btn sm ${can?'a':''}" onclick="learn('${s.id}')" ${can?'':'disabled'}>${locked?'🔒':r>=s.max?'Max':(S.sp>=cost?'Learn · '+cost:'Needs '+cost)}</button></div>`;};
   const spent=Object.values(S.skills||{}).reduce((a,b)=>a+b,0);const total=skAll.reduce((a,s)=>a+s.max,0);
@@ -5135,7 +5153,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
+  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5154,7 +5172,7 @@ function renderLoc(){
   const tierLine=(loc.geo?'<div class="note" style="margin-top:8px">'
       +(_lmk?'<b>'+esc(_lmk.n)+'.</b> '+esc(_lmk.pay)+'<br>':'')
       +'<b>'+esc(_ft.n)+'.</b> '+esc(_ft.d)+'</div>':'');
-  if(!loc.cleared){el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.geo?esc(_ft.n):'unknown'}</span></h2><p>Door is ajar. No telling what is inside. Threat here: ${'☠'.repeat(Math.min(5,Math.round(district().threat*loc.threat+(isNight()?1:0))))}${isNight()?' · horde night':''}</p>${tierLine}${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn r" onclick="enterLoc()">Go in</button><button class="btn" onclick="leaveLoc()">Keep walking</button></div>`;return;}
+  if(!loc.cleared){el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.geo?esc(_ft.n):'unknown'}</span></h2><p>Door is ajar. No telling what is inside. Threat here: ${'☠'.repeat(Math.min(5,Math.round(district().threat*loc.threat+(isNight()?1:0))))}${isNight()?' · horde night':''}</p>${tierLine}${bankedLine()}${crewDownWarn()}<div class="grid2" style="margin-top:12px"><button class="btn r" onclick="enterLoc()">Go in</button><button class="btn" onclick="leaveLoc()">Keep walking</button></div>`;return;}
   const done=loc.rooms.every(r=>r.done);
   el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.rooms.filter(r=>r.done).length}/${loc.rooms.length} searched</span></h2>${tierLine}
   <div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span><span class="help">${loc.noise>=70?'Something is stirring':loc.noise>=40?'Keep it down':'Quiet'}</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div>
@@ -5342,6 +5360,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.55',d:'Sep 26',t:'You can see when your crew need patching',
+  i:['A crew member who is down is lost for good if you go down before they heal - and the only place that said so was the Crew list under You. Now: a card at the top of the Road page with a Patch up button, a red dot on the You tab, a warning on the door of every place before you go in, and a toast the moment someone goes down.',
+     'The card also flags active crew under a third of their health, before one bad fight puts them down.',
+     'Patch up now uses a med from your pack if the stash is empty - you are usually out on the road when it matters.']},
  {v:'7.54',d:'Sep 25',t:'A bigger, stranger crew - and you pick when the horde comes',
   i:['SEVEN NEW CREW ROLES. Bodyguard steps in front of hits meant for you. Firebug throws fire across the whole room every third round - made for horde night. Scavenger pries extra scrap out of rooms. Forager brings food and water home when you stash. Trapper adds base defense. Pathfinder makes places closer. Teacher gives you more XP and trains the rest of the crew. New survivors lean toward roles you do not have yet.',
      'EVERY SURVIVOR IS SOMEONE NOW. Each has a trait (Tough, Quick study, Night owl, Early bird, Lucky, Light sleeper, Hardy, Loyal, Veteran), a line about who they were before, and a weapon they like. Your crew from before got theirs too. Fifty more names, and room for twelve.',
