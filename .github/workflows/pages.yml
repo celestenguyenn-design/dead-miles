@@ -11,7 +11,30 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
+  # STOP-GUARD. For now this repo is where the game is edited, not autostudy/games/.
+  # autostudy is behind (it stops at v7.53). If a build from autostudy lands here
+  # before it has been synced, it would silently wipe out v7.54+ on the live site.
+  # This job refuses to deploy an older or out-of-sync copy, and says why.
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to deploy an out-of-date copy
+        run: |
+          NEW=$(grep -o "const VERSION='[0-9.]*'" game.js | grep -o '[0-9.]*')
+          LIVE=$(curl -fsS https://celestenguyenn-design.github.io/dead-miles/version.txt 2>/dev/null | tr -d '[:space:]' || true)
+          echo "This push: v$NEW   Live site: v${LIVE:-unknown}"
+          fail(){ echo "::error title=NO - not deploying::$1"; echo; echo "=========================================================="; echo " NO. NOT DEPLOYING."; echo " $1"; echo " The live site was left alone."; echo " Fix: copy the newer game.js / index.html / version.txt from"; echo " the dead-miles repo into autostudy/games/ first, then build."; echo "=========================================================="; exit 1; }
+          if [ -n "$LIVE" ] && [ "$(printf '%s\n%s\n' "$LIVE" "$NEW" | sort -V | head -1)" != "$LIVE" ]; then
+            fail "This copy is v$NEW but the live game is already v$LIVE. It looks like an old build (autostudy?) - deploying it would erase newer work."
+          fi
+          # Features that only exist in this repo until autostudy is synced.
+          for f in 'function crewNeedsCare' 'function hordeTimeSheet' 'const WEAPON_KIND='; do
+            grep -q "$f" game.js || fail "game.js is missing '$f' (added in v7.54/7.55 in the dead-miles repo). This build came from a copy that was never synced."
+          done
+          echo "OK - this copy is up to date."
   apk:
+    needs: guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
