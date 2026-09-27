@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.57';
+const VERSION='7.58';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -839,7 +839,7 @@ const dr=()=>ARMOR_SLOTS.reduce((a,k)=>a+((eqItem(k)&&eqItem(k).dr)||0),0);
 // piece. Bare: 0%. One jacket (2): 8%. A full common set (5): 18%.
 // A full rare set (17): 43%. Everything legendary (19): 46%.
 const drSoak=()=>{const d=dr();return d/(d+22);};
-const capacity=()=>10+(eqItem('bag')?eqItem('bag').cap:0)+(roleLvl('quartermaster')?3+roleLvl('quartermaster'):0)+sk('deeppockets')*2+sk('packrat')*2;
+const capacity=()=>10+(eqItem('bag')?eqItem('bag').cap:0)+(roleLvl('quartermaster')?3+roleLvl('quartermaster'):0)+(veteran('quartermaster')?4:0)+sk('deeppockets')*2+sk('packrat')*2;
 /* FISTS (fixed v6.77). baseDmg added her FULL level, and then act() added
    (lvl-1) again on top - so bare hands got her level twice while every weapon
    in the game got it once. At level 20 that is fists 42-45 against a baseball
@@ -871,7 +871,12 @@ const baseDmg=()=>[3,6];
 // What fists ACTUALLY land, level included - so the button can stop lying.
 const fistDmg=()=>{const b=baseDmg(),x=fistLvlBonus();return [b[0]+x,b[1]+x];};
 function addXp(n){if(setPerk('xp'))n=Math.round(n*(1+setPerk('xp')));if(roleLvl('teacher'))n=Math.round(n*(1+(5+roleLvl('teacher')*3)/100));if(S.pet==='cat')n=Math.round(n*petXpMult());if(bg('gamer'))n=Math.round(n*(1.25+sk('metaknowledge')*0.05));S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
-const activeCrew=()=>S.active.map(id=>S.crew.find(c=>c.id===id)).filter(c=>c&&(c.hp===undefined||c.hp>0));
+const activeCrew=()=>S.active.map(id=>S.crew.find(c=>c.id===id)).filter(c=>c&&(c.hp===undefined||c.hp>0)&&!c.out&&c.rest!==todayStr());
+const CREW_CAP=8;
+function crewNeed(c){return c.lvl*(c.trait==='quick'?4:6);}
+// v7.58: level 8 is Veteran - a perk on top of the role, for everyone who kept them alive that long
+function veteran(role){return activeCrew().some(c=>c.role===role&&c.lvl>=CREW_CAP);}
+const VET_PERK={brawler:'Haymaker: one punch in five knocks the target out of its next turn',medic:'Field medic: patches the whole crew for 4 every round too',scout:'Eyes everywhere: every room is scouted before you go in',engineer:'Tinkerer: your weapon gets a swing back after every fight you win',hunter:'Quick draw: fires twice on the first round',quartermaster:'Packmule: +4 more pack capacity',bodyguard:'Wall: steps in front of 15% more hits',firebug:'Arsonist: a bottle every other round instead of every third',scavenger:'Magpie: sometimes finds a weapon part too',forager:'Herbalist: brings a bandage home with every stash',trapper:'Snarework: +6 more base defense',pathfinder:'Old roads: places another 10% closer',teacher:'Mentor: the crew learn twice as fast'};
 const woundedCrew=()=>S.crew.filter(c=>c.hp!==undefined&&c.hp<=0);
 function crewLvl(c){let l=c.lvl+sk('leader');const h=new Date().getHours();
   if(c.trait==='nightowl'&&isNight())l++;if(c.trait==='earlybird'&&h>=5&&h<12)l++;
@@ -881,7 +886,7 @@ function crewLvl(c){let l=c.lvl+sk('leader');const h=new Date().getHours();
 function roleLvl(role){let b=0;for(const c of activeCrew())if(c.role===role)b=Math.max(b,crewLvl(c));return b;}
 function roleBy(role){let best=null;for(const c of activeCrew())if(c.role===role&&(!best||crewLvl(c)>crewLvl(best)))best=c;return best;}
 function crewSlots(){return 1+(S.base&&S.base.rooms.bunk?S.base.rooms.bunk:0);}
-function crewXp(n){const tb=roleLvl('teacher')?1:0;for(const c of activeCrew()){c.xp+=n+(c.role!=='teacher'?tb:0);const need=c.trait==='quick'?c.lvl*4:c.lvl*6;if(c.xp>=need&&c.lvl<5){c.xp-=need;c.lvl++;log(c.name+' is now level '+c.lvl+'.');}}}
+function crewXp(n){const tb=(roleLvl('teacher')?1:0)*(veteran('teacher')?2:1);for(const c of activeCrew()){c.xp+=n+(c.role!=='teacher'?tb:0);const need=crewNeed(c);if(c.xp>=need&&c.lvl<CREW_CAP){c.xp-=need;c.lvl++;log(c.name+' is now level '+c.lvl+'.');if(c.lvl>=CREW_CAP){toast(c.name+' is a Veteran '+ROLES[c.role].n,'l');log(c.name+' is a Veteran now. '+VET_PERK[c.role]);SFX.play('legend');}}}}
 const HYDRO_STEPS=900;
 /* ================= DRINKS AND SNACKS (v6.37) =================
    Water used to be one undifferentiated counter. These are individual things
@@ -1075,28 +1080,95 @@ function sendCrew(id,job){const c=S.crew.find(x=>x.id===id);if(!c||c.out||!EXPED
   S.active=S.active.filter(x=>x!==id);const steps=Math.round(EXPED_STEPS*(c.role==='pathfinder'?0.8:1));
   c.out={job,left:steps,total:steps};log(c.name+' heads out to '+EXPED[job].n.toLowerCase()+'.');toast(c.name+' is out: '+EXPED[job].n,'a');closeSheet();save();render();}
 function expedSteps(n){for(const c of crewOut()){c.out.left-=n;if(c.out.left<=0)expedReturn(c);}}
-function expedReturn(c){const job=EXPED[c.out.job];const lvl=c.lvl+sk('leader');const m=(c.role===job.best?1.5:1)*(1+0.1*(lvl-1));const got=[];
+function expedReturn(c){const job=EXPED[c.out.job]||{n:'the rescue',best:''};const lvl=c.lvl+sk('leader');const m=(c.role===job.best?1.5:1)*(1+0.1*(lvl-1));const got=[];
   if(c.out.job==='scavenge'){const sc=Math.round(rint(8,14)*m);S.stock.scrap+=sc;got.push(sc+' scrap');if(Math.random()<0.3*m){S.parts=(S.parts||0)+2;got.push('2 parts');}}
   if(c.out.job==='forage'){const f=Math.round(rint(3,5)*m),w=Math.round(rint(2,4)*m);S.stock.food+=f;S.stock.water+=w;got.push(f+' food',w+' water');}
   if(c.out.job==='hunt'){const a=Math.round(rint(5,9)*m);addAmmoStock('ammo',a);got.push(a+' rounds');if(Math.random()<0.25*m){const g=pick(['bat','crowbar','hatchet','cleaver','bow','spear']);S.gear.push({uid:uid(),id:g,...GEAR[g]});got.push('a '+GEAR[g].n.toLowerCase());}}
   if(c.out.job==='scout'){S.walk.scouted=3;got.push('the next three places marked');}
+  if(c.out.job==='rescue'){if(Math.random()<0.6&&S.crew.length<12){const n=newCrew();S.crew.push(n);got.push(n.name+' - alive, and a '+ROLES[n.role].n.toLowerCase());loyAdd(c,2);}else{got.push('nobody. They were too late');loyAdd(c,1);}}
   c.xp+=2;crewXp(0);
   let hurt='';const risk=0.15*(c.trait==='lucky'?0.5:1)*(c.role==='bodyguard'||c.role==='brawler'?0.5:1);
   if(Math.random()<risk){const d=Math.round(crewMax(c)*0.35);c.hp=Math.max(1,(c.hp===undefined?crewMax(c):c.hp)-d);hurt=' They came back hurt (-'+d+' HP).';}
   c.out=null;const line=c.name+' is back from '+job.n.toLowerCase()+' with '+got.join(', ')+'.'+hurt;log(line);toast(c.name+' is back: '+got[0],'a');SFX.play('win');
   S.expedNews=(S.expedNews||[]).concat([line]).slice(-4);}
 function renderExped(){const el=$('#expedCard');if(!el)return;const out=crewOut();const news=S.expedNews||[];if(!out.length&&!news.length){el.hidden=true;return;}el.hidden=false;
-  el.innerHTML='<h2>🧭 Out on a job</h2>'+(out.length?'<div class="stack">'+out.map(c=>'<div class="row"><span>'+EXPED[c.out.job].e+' <b>'+esc(c.name)+'</b> · '+esc(EXPED[c.out.job].n)+'</span><span class="help">'+fmt(Math.max(0,c.out.left))+' steps to go</span></div>').join('')+'</div>':'')
+  el.innerHTML='<h2>🧭 Out on a job</h2>'+(out.length?'<div class="stack">'+out.map(c=>'<div class="row"><span>'+(EXPED[c.out.job]||{e:'🏃'}).e+' <b>'+esc(c.name)+'</b> · '+esc((EXPED[c.out.job]||{n:'going back for someone'}).n)+'</span><span class="help">'+fmt(Math.max(0,c.out.left))+' steps to go</span></div>').join('')+'</div>':'')
     +(news.length?'<div class="help" style="margin-top:6px">'+news.map(esc).join('<br>')+'</div><button class="btn xs ghost" style="margin-top:6px" onclick="S.expedNews=[];save();render()">Clear</button>':'');}
+
+/* ================= crew asks and base events (v7.58) =================
+   The crew had jobs and traits but never wanted anything. Now, some mornings,
+   one of them asks for something - a day off, a real weapon, a med for a
+   friend, to go back for someone. Say yes and they warm to you; say no and
+   they cool. Cold enough and one morning they are gone. Warm enough and they
+   push themselves a level. Loyal ones never leave.
+   And the base has mornings of its own: a stranger at the gate, a kitchen
+   fire, the dog digging something up. A card on the Base tab, a choice. */
+function loy(c){return c.loy===undefined?3:c.loy;}
+function loyChip(c){const l=loy(c);return ' <span class="chip" title="How they feel about you">'+(l>=5?'💛':l>=3?'🤍':l>=1?'🖤':'💔')+' '+['leaving','cold','wary','fine','warm','close','devoted'][Math.max(0,Math.min(6,l))]+'</span>';}
+function loyAdd(c,n){c.loy=Math.max(0,Math.min(6,loy(c)+n));
+  if(c.loy>=6&&!c.loyBonus&&c.lvl<CREW_CAP){c.loyBonus=1;c.lvl++;log(c.name+' would walk through fire for you. Level '+c.lvl+'.');toast(c.name+': level '+c.lvl,'a');}}
+const ASKS=[
+  {id:'rest',txt:c=>c.name+' asks for a day off. "One day. I will be here tomorrow."',yes:c=>{c.rest=todayStr();return c.name+' sleeps in. Back tomorrow.';},no:c=>c.name+' says nothing and picks up their pack.',cost:'they sit today out'},
+  {id:'weapon',need:c=>S.gear.some(g=>(g.slot==='melee'||g.slot==='ranged')&&!g.broken&&S.eq[g.slot]!==g.uid&&wKind(g)===c.fav),txt:c=>c.name+' eyes the spare '+WEAPON_KINDS[c.fav].n+' in your gear. "I could do a lot more with that than it does in your bag."',
+    yes:c=>{const g=S.gear.find(g=>(g.slot==='melee'||g.slot==='ranged')&&!g.broken&&S.eq[g.slot]!==g.uid&&wKind(g)===c.fav);S.gear=S.gear.filter(x=>x!==g);if(c.lvl<CREW_CAP)c.lvl++;return c.name+' takes the '+g.n+'. Level '+c.lvl+'.';},no:c=>c.name+' shrugs. "Your call."',cost:'give them the spare · +1 level'},
+  {id:'meds',need:c=>medsTotal()>0,txt:c=>c.name+' asks quietly for a med. "Not for me. Someone in the bunkhouse."',yes:c=>{medsTake(MED_ORDER.find(id=>medsHeld(id)>0));return c.name+' nods once and does not say who it was for.';},no:c=>c.name+' does not ask twice.',cost:'costs 1 meds'},
+  {id:'food',need:c=>S.stock.food>=2,txt:c=>c.name+' asks for double rations tonight. "I am running on nothing."',yes:c=>{S.stock.food-=2;c.hp=crewMax(c);return c.name+' eats like it is the last meal. Back to full health.';},no:c=>c.name+' goes to bed hungry.',cost:'costs 2 food · they heal to full'},
+  {id:'goback',need:c=>S.crew.length<12&&!c.out,txt:c=>c.name+' wants to go back for someone. "Two blocks from where you found me. I should have gone already."',yes:c=>{S.active=S.active.filter(x=>x!==c.id);c.out={job:'rescue',left:2000,total:2000};return c.name+' is gone before you finish saying yes. Back after 2,000 steps.';},no:c=>c.name+' looks at the road for a long time.',cost:'out 2,000 steps · may bring someone'},
+  {id:'spar',txt:c=>c.name+' wants to spar. "You swing like you are scared of it."',yes:c=>{S.hp=Math.max(1,S.hp-8);c.xp+=4;addXp(15);return 'Twenty minutes in the yard. -8 HP, +15 XP, and '+c.name+' learned something too.';},no:c=>c.name+' shadowboxes alone.',cost:'-8 HP · +15 XP · crew XP'},
+  {id:'story',txt:c=>c.name+' wants to tell you about before. "You never asked what I did."',yes:c=>'Before all this, '+c.name+' '+(c.past||'kept to themselves')+'. It takes an hour. Worth it.',no:c=>c.name+' says maybe another time.',cost:'just listen'},
+];
+const BASE_EVENTS=[
+  {id:'gate',need:()=>S.crew.length<12,n:'A stranger at the gate',e:'🚪',txt:()=>'Someone at the fence at first light, hands where you can see them. "I can work. I just need a wall."',
+    a:{t:'Let them in',sub:'2 food · 25% a thief',go:()=>{if(S.stock.food<2)return 'Not enough food to feed another mouth. They move on.';S.stock.food-=2;if(Math.random()<0.25){const l=Math.min(12,S.stock.scrap);S.stock.scrap-=l;return 'Gone by noon, and '+l+' scrap with them.';}const c=evtRecruit();return c?c.name+' is in. '+ROLES[c.role].n+', '+TRAITS[c.trait].n.toLowerCase()+'.':'No room in the crew. They move on.';}},
+    b:{t:'Send them on',sub:'',go:()=>'They go. You do not watch them leave.'}},
+  {id:'fire',n:'Fire in the kitchen',e:'🔥',txt:()=>'Smoke under the door. Somebody left the stove going.',
+    a:{t:'Douse it',sub:'costs 3 water',go:()=>{if(S.stock.water<3){S.stock.food=Math.max(0,S.stock.food-4);return 'Not enough water. You beat it out with a blanket, and lose 4 food to the smoke.';}S.stock.water-=3;return 'Out in a minute. 3 water gone, nothing else.';}},
+    b:{t:'Let it burn out',sub:'lose 4 food',go:()=>{S.stock.food=Math.max(0,S.stock.food-4);return 'It burns down to the pan. 4 food gone, and the kitchen smells for a week.';}}},
+  {id:'dig',need:()=>S.pet==='dog',n:'The dog dug something up',e:'🐕',txt:()=>(S.petName||'The dog')+' has been at the corner of the yard all night.',
+    a:{t:'See what it is',sub:'',go:()=>{if(Math.random()<0.4){S.keys++;return 'A chest key on a length of chain. Good dog.';}S.stock.scrap+=8;return 'A coffee can with 8 scrap in it. Somebody\'s savings.';}}},
+  {id:'leak',need:()=>S.base.rooms.barrel,n:'The rain barrel cracked',e:'🛢️',txt:()=>'Overnight frost. A seam went, and the yard is mud.',
+    a:{t:'Patch it',sub:'costs 5 scrap',go:()=>{if(S.stock.scrap<5){S.stock.water=Math.max(0,S.stock.water-4);return 'No scrap for it. 4 water lost before you got a bucket under it.';}S.stock.scrap-=5;return 'Patched with tape and a plate. Holds.';}},
+    b:{t:'Let it drain',sub:'lose 4 water',go:()=>{S.stock.water=Math.max(0,S.stock.water-4);return '4 water in the dirt. You fix it properly tomorrow.';}}},
+  {id:'fence',n:'A walker in the fence',e:'🧟',txt:()=>'Tangled in the wire, still reaching. It has been there for hours.',
+    a:{t:'Put it down',sub:'+1 kill, +8 XP',go:()=>{S.kills++;addXp(8);ctEvent('kills',1);return 'One swing. You leave it for the crows.';}},
+    b:{t:'Leave it',sub:'it draws others',go:()=>{S.flags.fenceWalker=todayStr();return 'It moans all day. Something will hear it.';}}},
+  {id:'truck',n:'Marlow\'s truck',e:'🚚',txt:()=>'The trader\'s truck is on the shoulder outside your fence with a flat. He is looking at your scrap pile.',
+    a:{t:'Help him',sub:'costs 4 scrap',go:()=>{if(S.stock.scrap<4)return 'You have nothing to help with. He gets it done alone, eventually.';S.stock.scrap-=4;medsGive(pick(['abx','kit','pain']),1);return 'Wheel on, he tosses you something from the back. Meds, and a nod.';}},
+    b:{t:'Watch',sub:'',go:()=>'He manages. He does not stop at your base for a day.'}},
+  {id:'argue',need:()=>S.crew.filter(c=>!c.out).length>=2,n:'Two of the crew are at it',e:'🗯️',txt:()=>{const [a,b]=S.crew.filter(c=>!c.out);return a.name+' and '+b.name+' have been shouting since dawn. Something about the last bunk.';},
+    a:{t:'Make them spar it out',sub:'both get crew XP',go:()=>{const [a,b]=S.crew.filter(c=>!c.out);a.xp+=3;b.xp+=3;return 'Ten minutes in the yard and they are laughing. Crew XP for both.';}},
+    b:{t:'Ignore it',sub:'',go:()=>{const [a,b]=S.crew.filter(c=>!c.out);loyAdd(a,-1);loyAdd(b,-1);return 'It burns out on its own. Neither of them looks at you all day.';}}},
+  {id:'chatter',need:()=>S.base.rooms.radio,n:'Chatter on the radio',e:'📻',txt:()=>'The ham radio picked up the Tolls all night. They are moving crews to the east side.',
+    a:{t:'Note it',sub:'no raid tomorrow',go:()=>{const d=new Date();d.setDate(d.getDate()+1);S.flags.noRaid=todayStr(d);return 'Whoever they are hitting tomorrow, it is not you.';}}},
+];
+function dailyCrew(){const t=todayStr();
+  // yesterday's ask, never answered, counts as a no
+  if(S.ask&&!S.ask.done&&S.ask.date!==t){const c=S.crew.find(x=>x.id===S.ask.who);if(c){loyAdd(c,-1);log(c.name+' never got an answer.');}S.ask=null;}
+  if(S.bevt&&!S.bevt.done&&S.bevt.date!==t)S.bevt=null;
+  if(S.ask&&S.ask.done)S.ask=null;if(S.bevt&&S.bevt.done)S.bevt=null;
+  // the cold ones leave
+  for(const c of S.crew.slice()){if(loy(c)<=0&&c.trait!=='loyal'&&!c.out){S.crew=S.crew.filter(x=>x!==c);S.active=S.active.filter(x=>x!==c.id);log(c.name+' left in the night. Their bunk is made.');toast(c.name+' has left the crew','d');}}
+  const home=S.crew.filter(c=>!c.out&&(c.hp===undefined||c.hp>0));
+  if(home.length&&Math.random()<0.35){const c=pick(home);const pool=ASKS.filter(a=>!a.need||a.need(c));if(pool.length)S.ask={who:c.id,id:pick(pool).id,date:t,done:null};}
+  if(S.base&&Math.random()<0.3){const pool=BASE_EVENTS.filter(e=>!e.need||e.need());if(pool.length)S.bevt={id:pick(pool).id,date:t,done:null};}}
+function askAnswer(yes){const a=S.ask&&ASKS.find(x=>x.id===S.ask.id);const c=a&&S.crew.find(x=>x.id===S.ask.who);if(!a||!c)return;
+  const r=yes?a.yes(c):a.no(c);loyAdd(c,yes?1:-1);S.ask.done=r;log(c.name+': '+r);SFX.play('ui');save();render();}
+function bevtAnswer(k){const e=S.bevt&&BASE_EVENTS.find(x=>x.id===S.bevt.id);if(!e||!e[k])return;const r=e[k].go();S.bevt.done=r;log(e.n+': '+r);SFX.play('ui');save();render();}
+function renderAsk(){const el=$('#askCard');if(!el)return;const a=S.ask&&ASKS.find(x=>x.id===S.ask.id);const c=a&&S.crew.find(x=>x.id===S.ask.who);if(!a||!c){el.hidden=true;return;}el.hidden=false;el.className='card steel';
+  if(S.ask.done){el.innerHTML='<h2>'+ROLES[c.role].e+' '+esc(c.name)+'</h2><p>'+esc(S.ask.done)+'</p><button class="btn ghost wide" onclick="S.ask=null;save();render()">Okay</button>';return;}
+  el.innerHTML='<div class="row" style="gap:10px;align-items:flex-start"><div style="flex:none">'+ART.avatarSVG(c.av,56)+'</div><div><h2 style="margin:0">'+esc(c.name)+' has a question</h2><p style="margin:4px 0 0">'+esc(a.txt(c))+'</p></div></div><div class="grid2" style="margin-top:10px"><button class="btn r" onclick="askAnswer(true)">Yes<small>'+esc(a.cost||'')+'</small></button><button class="btn" onclick="askAnswer(false)">No<small>they cool toward you</small></button></div>';}
+function renderBevt(){const el=$('#baseEvent');if(!el)return;const e=S.bevt&&BASE_EVENTS.find(x=>x.id===S.bevt.id);if(!e||!S.base){el.hidden=true;return;}el.hidden=false;el.className='card amber';
+  if(S.bevt.done){el.innerHTML='<h2>'+e.e+' '+esc(e.n)+'</h2><p>'+esc(S.bevt.done)+'</p><button class="btn ghost wide" onclick="S.bevt=null;save();render()">Okay</button>';return;}
+  el.innerHTML='<h2>'+e.e+' '+esc(e.n)+' <span class="sub">this morning</span></h2><p>'+esc(e.txt())+'</p><div class="'+(e.b?'grid2':'')+'" style="margin-top:10px"><button class="btn r'+(e.b?'':' wide')+'" onclick="bevtAnswer(\'a\')">'+esc(e.a.t)+'<small>'+esc(e.a.sub||'')+'</small></button>'+(e.b?'<button class="btn" onclick="bevtAnswer(\'b\')">'+esc(e.b.t)+'<small>'+esc(e.b.sub||'')+'</small></button>':'')+'</div>';}
 function crewMax(c){return 40+12*(c.lvl||1)+(c.trait==='tough'?20:0);}
 function newCrew(role){const used=S.crew.map(c=>c.name);const names=CREW_NAMES.filter(n=>!used.includes(n));
   // lean away from roles you already have, so the fourth survivor is not a third Medic
   const have=S.crew.map(c=>c.role);const fresh=Object.keys(ROLES).filter(r=>!have.includes(r));
   const r=role||(fresh.length&&Math.random()<0.75?pick(fresh):pick(Object.keys(ROLES)));
   const trait=pick(Object.keys(TRAITS));
-  const c={id:uid(),name:names.length?pick(names):pick(CREW_NAMES),av:ART.randomAv(),role:r,lvl:trait==='veteran'?2:1,xp:0,trait,fav:pick(Object.keys(WEAPON_KINDS)),past:pick(CREW_PAST)};c.hp=crewMax(c);return c;}
+  const c={id:uid(),name:names.length?pick(names):pick(CREW_NAMES),av:ART.randomAv(),role:r,lvl:trait==='veteran'?2:1,xp:0,trait,fav:pick(Object.keys(WEAPON_KINDS)),past:pick(CREW_PAST),loy:3};c.hp=crewMax(c);return c;}
 // Crew who joined before v7.54 get a trait, a weapon they like and a past, once.
-function crewBackfill(){for(const c of (S.crew||[])){if(!ROLES[c.role])c.role='brawler';if(!c.trait){const rng=mulberry(hash(c.id+'trait'));const tk=Object.keys(TRAITS).filter(k=>k!=='veteran');c.trait=tk[Math.floor(rng()*tk.length)];c.fav=Object.keys(WEAPON_KINDS)[Math.floor(rng()*4)];c.past=CREW_PAST[Math.floor(rng()*CREW_PAST.length)];}}}
+function crewBackfill(){for(const c of (S.crew||[])){if(!ROLES[c.role])c.role='brawler';if(c.loy===undefined)c.loy=3;if(!c.trait){const rng=mulberry(hash(c.id+'trait'));const tk=Object.keys(TRAITS).filter(k=>k!=='veteran');c.trait=tk[Math.floor(rng()*tk.length)];c.fav=Object.keys(WEAPON_KINDS)[Math.floor(rng()*4)];c.past=CREW_PAST[Math.floor(rng()*CREW_PAST.length)];}}}
 function crewCard(c){const t=TRAITS[c.trait],k=WEAPON_KINDS[c.fav];return (t?'<span class="chip" title="'+esc(t.d)+'">'+t.e+' '+esc(t.n)+'</span> ':'')+(k?'<span class="chip" title="Fights a level better when you use '+esc(k.n)+'">likes '+k.e+' '+esc(k.n)+'</span>':'')+(t?'<div class="help" style="font-size:11px;margin-top:3px">'+esc(t.d)+(c.past?' · Before: '+esc(c.past):'')+'</div>':'');}
 function hurtCrew(c,n){c.hp=Math.max(0,(c.hp===undefined?crewMax(c):c.hp)-n);
   if(c.hp<=0){clog(c.name+' goes down and drags themselves out of the fight.','hit');
@@ -1277,7 +1349,7 @@ const VET_STEP=500000;
 function vetRank(){return Math.floor((S.steps.total||0)/VET_STEP);}
 const VET_TITLES=['','Veteran','Ranger','Pathfinder','Outrider','Long Walker','Legend of the Road'];
 function vetTitle(){const r=vetRank();return r?(VET_TITLES[Math.min(r,VET_TITLES.length-1)]+(r>=VET_TITLES.length?' '+(r-VET_TITLES.length+2):'')):'';}
-function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05-setPerk('dist')-(roleLvl('pathfinder')?(3+roleLvl('pathfinder')*2)/100:0)));if(wxKind()==='snow')dist=Math.round(dist*1.1);if(S.walk.nextMul){dist=Math.round(dist*S.walk.nextMul);S.walk.nextMul=0;}if(S.walk.scouted>0){dist=Math.round(dist*0.7);S.walk.scouted--;}S.walk.dist=Math.max(60,dist);S.walk.progress=0;S.walk.toNext=S.walk.dist;}
+function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05-setPerk('dist')-(roleLvl('pathfinder')?(3+roleLvl('pathfinder')*2)/100:0)-(veteran('pathfinder')?0.1:0)));if(wxKind()==='snow')dist=Math.round(dist*1.1);if(S.walk.nextMul){dist=Math.round(dist*S.walk.nextMul);S.walk.nextMul=0;}if(S.walk.scouted>0){dist=Math.round(dist*0.7);S.walk.scouted--;}S.walk.dist=Math.max(60,dist);S.walk.progress=0;S.walk.toNext=S.walk.dist;}
 function bossName(){if(eventNow()==='halloween')return 'The Gourd King';return BOSS_NAMES[hash(weekId()+'boss')%BOSS_NAMES.length];}
 
 /* ================= rooms with something about them (v7.57) =================
@@ -1315,7 +1387,7 @@ function roomTagLoot(r){const t=r.tag;let items=r.items;let noise=0;
   if(t==='untouched'){items=items.concat(rollRoom(r,S.loc));noise=12;}
   if(t==='ransacked'){items=items.slice(0,1);noise=-10;}
   if(t==='dark'){if(roleLvl('scout')){log(roleBy('scout').name+' has a light. Nothing missed in the '+r.n.toLowerCase()+'.');}else{const lost=items.length-Math.ceil(items.length/2);items=items.slice(0,Math.ceil(items.length/2));if(lost)log('Too dark to see everything in the '+r.n.toLowerCase()+'. '+lost+' thing'+(lost>1?'s':'')+' left behind.');}}
-  if(t==='barricaded'){if(S.crew.length<12&&Math.random()<0.35){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was behind the barricade in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was behind the barricade, awake, and armed with a chair leg. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(c.lvl)}.</p><p class="help">They ${esc(c.past)}. ${TRAITS[c.trait].e} <b>${TRAITS[c.trait].n}</b>: ${TRAITS[c.trait].d}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
+  if(t==='barricaded'){if(S.crew.length<12&&Math.random()<0.35){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was behind the barricade in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was behind the barricade, awake, and armed with a chair leg. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(c.lvl)}.</p><p class="help">Before all this, ${esc(c.name)} ${esc(c.past)}. ${TRAITS[c.trait].e} <b>${TRAITS[c.trait].n}</b>: ${TRAITS[c.trait].d}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
     else{items=items.concat([{id:'key',...ITEMS.key}]);log('Whoever barricaded the '+r.n.toLowerCase()+' left a key behind.');}}
   r.tag=null;return {items,noise};}
 function makeLoc(force,nameOverride,far){
@@ -1335,7 +1407,7 @@ function makeLoc(force,nameOverride,far){
     const k=pick(SEALS);
     loc.rooms.push({n:k.n,noise:0,cats:[],shelf:0,gear:0,keyish:false,stage:0,done:false,items:[],peek:null,sealed:k.id});
   }
-  if(roleLvl('scout')&&wxKind()!=='fog'){const r=rooms[rint(0,rooms.length-1)];const best=r.items.slice().sort((a,b)=>b.pts-a.pts)[0];r.peek=best?best.e+' '+best.n:'looks empty';}
+  if(roleLvl('scout')&&wxKind()!=='fog'){for(const r of (veteran('scout')?rooms:[rooms[rint(0,rooms.length-1)]])){const best=r.items.slice().sort((a,b)=>b.pts-a.pts)[0];r.peek=best?best.e+' '+best.n:'looks empty';}}
   return loc;
 }
 const SEAL_ODDS=0.025;
@@ -1506,6 +1578,7 @@ function rollDay(){
     const g=S.base.rooms.garden||0;if(g){const per=3+(bg('farmer')?2:0)+sk('greenthumb');S.stock.food+=per*g;log('The garden gave '+(per*g)+' food.');}if(S.base.t==='diner'){S.stock.food+=2;}}
   loseHydro(20);if(hydroState()==='empty'){S.hp=Math.max(1,S.hp-5);log('You woke up dried out. Find water.');}
   for(const c of S.crew){if(c.hp!==undefined&&c.hp<crewMax(c)){c.hp=Math.min(crewMax(c),c.hp+(18+(S.base&&S.base.rooms.clinic?18:0))*(c.trait==='hardy'?2:1));}}
+  try{dailyCrew();}catch(e){}
   const y=new Date();y.setDate(y.getDate()-1);const yd=todayStr(y);
   if(S.streak&&S.streak.days>0&&S.streak.last!==yd&&S.streak.last!==t){const lost=Math.min(15,Math.floor(S.stock.scrap*0.1));S.stock.scrap-=lost;log('You skipped a day. Streak of '+S.streak.days+' broken'+(lost?', and a walker got into the scrap pile: -'+lost+' scrap':'')+'.');
     // Remember what broke and why, because "yesterday looked short" is often
@@ -2968,11 +3041,12 @@ function act(kind){
     else clog('You stumble. They close in.','hit');
   }
   const a=alive();
-  if(a.length){const bl=roleLvl('brawler');if(bl){const tt=targetEnemy();C.fxBy='crew:brawler';dealTo(tt,rint(9+bl*2,15+bl*3),roleBy('brawler').name+' punches '+tt.n);C.fxBy=null;}
-    const hl=roleLvl('hunter');if(hl&&(S.pack.some(p=>p.cat==='ammo')||ammoTotal()>0)){const tt=targetEnemy();if(tt){C.fxBy='crew:hunter';dealTo(tt,10+hl*3,roleBy('hunter').name+' fires');C.fxBy=null;}}
+  if(a.length){const bl=roleLvl('brawler');if(bl){const tt=targetEnemy();C.fxBy='crew:brawler';dealTo(tt,rint(9+bl*2,15+bl*3),roleBy('brawler').name+' punches '+tt.n);C.fxBy=null;if(veteran('brawler')&&tt&&!tt.dead&&tt.hp>0&&Math.random()<0.2){tt.stun=1;clog('Haymaker. '+tt.n+' is out cold for a turn.','good');}}
+    const hl=roleLvl('hunter');if(hl&&(S.pack.some(p=>p.cat==='ammo')||ammoTotal()>0)){const tt=targetEnemy();if(tt){C.fxBy='crew:hunter';dealTo(tt,10+hl*3,roleBy('hunter').name+' fires');if(veteran('hunter')&&C.turn===1){const t2=targetEnemy();if(t2)dealTo(t2,10+hl*3,roleBy('hunter').name+' fires again');}C.fxBy=null;}}
     // Firebug: every third round, fire across the whole room. Made for horde night.
-    const fb=roleLvl('firebug');if(fb&&C.turn%3===0){const fbn=roleBy('firebug').name;clog(fbn+' lobs a bottle of fire.','good');C.fxBy='crew:firebug';for(const o of alive())dealTo(o,6+fb*2,'The fire catches '+o.n,'heavy');C.fxBy=null;}}
+    const fb=roleLvl('firebug');if(fb&&C.turn%(veteran('firebug')?2:3)===0){const fbn=roleBy('firebug').name;clog(fbn+' lobs a bottle of fire.','good');C.fxBy='crew:firebug';for(const o of alive())dealTo(o,6+fb*2,'The fire catches '+o.n,'heavy');C.fxBy=null;}}
   const ml=roleLvl('medic');if(ml&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+6+ml*3);fxPush({k:'heal',n:6+ml*3,by:'crew:medic'});clog(roleBy('medic').name+' patches you: +'+(6+ml*3)+'.','good');}
+  if(veteran('medic'))for(const cc of activeCrew())if(cc.role!=='medic'&&cc.hp<crewMax(cc))cc.hp=Math.min(crewMax(cc),cc.hp+4);
   if(sk('triage')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('triage')*4);}
   if(eqItem('armor')&&eqItem('armor').id==='nightingale'&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+5);}
   const reap=()=>{for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;fxPush({k:'die',i:C.enemies.indexOf(e)});codexKill(e);S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);if(sk('transfusion')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('transfusion')*3);clog('You patch up as '+e.n+' drops. +'+(sk('transfusion')*3)+' HP.','good');}clog(e.n+' goes down. +'+e.xp+' XP.','good');
@@ -3054,7 +3128,7 @@ function enemyPhase(){
     for(let i=0;i<swings;i++){if(Math.random()<e.hit-sk('adrenaline')*0.06-(e.human?sk('intimidate')*0.08:0)){let d=rint(e.dmg[0],e.dmg[1]);if(e.g==='crit'&&Math.random()<0.2){d*=2;clog('A brutal swing.','hit');}
       if(C.duck)continue;                      // it is swinging at her squadmate, not at her
       const guards=activeCrew();if(guards.length&&Math.random()<0.3){const gc=pick(guards);if(gc.trait==='lucky'&&Math.random()<1/3){clog(e.n+' goes for '+gc.name+' and somehow misses.','');fxPush({k:'emiss',from:C.actor});continue;}clog(e.n+' turns on '+gc.name+'.','hit');fxPush({k:'crewhurt',from:C.actor,who:gc.id,d:Math.max(1,d-2)});hurtCrew(gc,Math.max(1,d-2));continue;}
-      {const gl=roleLvl('bodyguard');if(gl&&Math.random()<(10+gl*4)/100){const bg2=roleBy('bodyguard');const bd=Math.max(1,d-4);clog(bg2.name+' steps in front of it.','good');fxPush({k:'crewhurt',from:C.actor,who:bg2.id,d:bd});hurtCrew(bg2,bd);continue;}}
+      {const gl=roleLvl('bodyguard');if(gl&&Math.random()<(10+gl*4+(veteran('bodyguard')?15:0))/100){const bg2=roleBy('bodyguard');const bd=Math.max(1,d-4);clog(bg2.name+' steps in front of it.','good');fxPush({k:'crewhurt',from:C.actor,who:bg2.id,d:bd});hurtCrew(bg2,bd);continue;}}
       if(!e.human&&Math.random()<infectChance()*(e.crawler?2:1)*(buffOn('calm')?0.5:1))catchInfection(e.n);
       hurt(d,e.n);
         if(e.g==='bleed'){C.bleed=Math.max(1,3-sk('clotting'));}if(e.g==='poison'){C.poison=Math.max(1,3-sk('clotting'));}
@@ -3106,7 +3180,7 @@ function death(){
 function endCombat(won){
   if(!C)return;if(typeof squadStop==='function')squadStop();C.over=true;S.combat=false;buffClear();
   const where=C.where;
-  if(won){SFX.play('win');nightBonus();if(sk('secondwind'))S.hp=Math.min(maxHp(),S.hp+sk('secondwind')*6);
+  if(won){SFX.play('win');nightBonus();if(veteran('engineer')){const w=eqItem('melee');if(w&&w.dur!==undefined&&!w.broken){w.dur++;clog(roleBy('engineer').name+' tightens the '+w.n+' up. +1 swing.','good');}}if(sk('secondwind'))S.hp=Math.min(maxHp(),S.hp+sk('secondwind')*6);
     log('Cleared '+C.enemies.length+' hostiles'+(where==='enter'&&S.loc?' inside '+S.loc.n:where==='road'?' on the road':'')+'.');
     if(where==='enter'||where==='wave'){if(S.loc.stronghold&&where==='enter'){S.loc.stage++;S.loc.cleared=true;if(S.loc.stage>=3){S.campCleared=weekId();log('Stronghold cleared. The county is quieter for a while.');ctEvent('stronghold',1);}}else{S.loc.cleared=true;rollWanderer(S.loc);}if(where==='enter')ctEvent('places',1);}
     if(where==='raid'){resolveRaidFight(true);}
@@ -3381,9 +3455,9 @@ function searchRoom(i){pushSoon();
   const tl=roomTagLoot(r);r.done=true;S.roomsSearched=(S.roomsSearched||0)+1;
   for(const it of tl.items)takeItem(it,loc);
   ctEvent('rooms',1);
-  {const sl=roleLvl('scavenger');if(sl&&Math.random()<(10+sl*5)/100){S.stock.scrap+=1+sl;log(roleBy('scavenger').name+' pried '+(1+sl)+' scrap out of the '+r.n.toLowerCase()+'.');toast('+'+(1+sl)+' scrap from '+roleBy('scavenger').name);}}
+  {const sl=roleLvl('scavenger');if(veteran('scavenger')&&Math.random()<0.15){S.parts=(S.parts||0)+1;log(roleBy('scavenger').name+' found a weapon part.');}if(sl&&Math.random()<(10+sl*5)/100){S.stock.scrap+=1+sl;log(roleBy('scavenger').name+' pried '+(1+sl)+' scrap out of the '+r.n.toLowerCase()+'.');toast('+'+(1+sl)+' scrap from '+roleBy('scavenger').name);}}
   if(typeof landmarkPayout==='function')try{landmarkPayout(loc);}catch(e){}
-  if(!loc.stronghold&&S.crew.length<12&&Math.random()<0.07){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was hiding in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was hiding in the ${esc(r.n.toLowerCase())}. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(c.lvl)}.</p><p class="help">They ${esc(c.past)}. ${TRAITS[c.trait].e} <b>${TRAITS[c.trait].n}</b>: ${TRAITS[c.trait].d}. Fights a level better when you use ${WEAPON_KINDS[c.fav].e} ${WEAPON_KINDS[c.fav].n}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
+  if(!loc.stronghold&&S.crew.length<12&&Math.random()<0.07){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was hiding in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was hiding in the ${esc(r.n.toLowerCase())}. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(c.lvl)}.</p><p class="help">Before all this, ${esc(c.name)} ${esc(c.past)}. ${TRAITS[c.trait].e} <b>${TRAITS[c.trait].n}</b>: ${TRAITS[c.trait].d}. Fights a level better when you use ${WEAPON_KINDS[c.fav].e} ${WEAPON_KINDS[c.fav].n}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
   else if(!S.pet&&(Math.random()<0.03||(S.roomsSearched||0)>=40)){petJoin(Math.random()<0.6?'dog':'cat');}
   else if(S.pet&&Math.random()<0.012){petJoin(Math.random()<0.5?'dog':'cat');}
   /* Light Step was a flat -4 per rank against room noise of 18-44, so at rank 3
@@ -3671,7 +3745,7 @@ function claimBase(confirmed){
 function defense(){if(!S.base)return 0;let d=0;for(const [k,l] of Object.entries(S.base.rooms)){if(!l)continue;d+=BUILD[k].def[l-1]||0;}d+=(S.base.rooms.walls||0)*(sk('framing')*3+sk('fortify')*2)+(S.base.rooms.traps||0)*sk('trapmaker')*2;d+=crewDefense();return d;}
 // v7.54: a Trapper rigs the fence before you leave, so they count home or away; a
 // Light sleeper only counts while they are actually home. Nobody who is down counts.
-function crewDefense(){let d=0,tl=0;for(const c of (S.crew||[])){if(c.hp!==undefined&&c.hp<=0)continue;if(c.out)continue;if(c.role==='trapper')tl=Math.max(tl,c.lvl+sk('leader'));if(c.trait==='sentry'&&!(S.active||[]).includes(c.id))d+=3;}return d+(tl?2+tl*2:0);}
+function crewDefense(){let d=0,tl=0;for(const c of (S.crew||[])){if(c.hp!==undefined&&c.hp<=0)continue;if(c.out)continue;if(c.role==='trapper')tl=Math.max(tl,c.lvl+sk('leader'));if(c.trait==='sentry'&&!(S.active||[]).includes(c.id))d+=3;if(c.role==='trapper'&&c.lvl>=CREW_CAP)d+=6;}return d+(tl?2+tl*2:0);}
 function buildCost(k){const b=BUILD[k];const l=S.base.rooms[k]||0;if(l>=b.lv)return null;let c=b.cost[l];const el=roleLvl('engineer');if(el)c=Math.round(c*(1-(0.15+el*0.05)));if(S.base.t==='hardware')c=Math.round(c*0.9);if(bg('engineer'))c=Math.round(c*0.9);if(bg('carpenter')&&(k==='walls'||k==='traps'))c=Math.round(c*0.8);return c;}
 function buildLabor(k){const b=BUILD[k];const l=S.base.rooms[k]||0;if(l>=b.lv)return null;let n=b.labor[l];const el=roleLvl('engineer');if(el)n=Math.round(n*(1-(0.1+el*0.05)));if(bg('engineer'))n=Math.round(n*0.85);n=Math.round(n*(1-sk('efficient')*0.08));if(bg('carpenter')&&(k==='walls'||k==='traps'))n=Math.round(n*0.8);return n;}
 function build(k){if(!S.base)return;if(S.work){toast('Finish '+BUILD[S.work.k].n+' first, or cancel it');return;}const c=buildCost(k);if(c===null)return;if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}
@@ -3689,7 +3763,7 @@ function bank(){
     else if(S.stock[it.cat]!==undefined){S.stock[it.cat]++;}}
   rollWeek();S.league.score+=pts;ctEvent('stash',pts);if(meds)ctEvent('meds',meds);
   let eat=activeCrew().length;if(sk('rationing'))eat=Math.ceil(eat/2);S.stock.food=Math.max(0,S.stock.food-eat);if(sk('harvest'))S.stock.food+=sk('harvest');
-  const fl=roleLvl('forager');if(fl){const fn=1+Math.floor(fl/2);S.stock.food+=fn;S.stock.water+=fn;log(roleBy('forager').name+' brought home '+fn+' food and '+fn+' water.');}
+  const fl=roleLvl('forager');if(fl){const fn=1+Math.floor(fl/2);S.stock.food+=fn;S.stock.water+=fn;if(veteran('forager'))medsGive('bandage',1);log(roleBy('forager').name+' brought home '+fn+' food and '+fn+' water'+(veteran('forager')?', and a bandage':'')+'.');}
   S.hp=Math.min(maxHp(),S.hp+Math.max(15,Math.round(maxHp()*0.10)));if(roleLvl('medic'))S.hp=Math.min(maxHp(),S.hp+Math.max(20,Math.round(maxHp()*0.13)));
   if(S.base.rooms.clinic&&medsTotal()>0&&S.hp<maxHp()){medsTake(MED_ORDER.find(id=>medsHeld(id)>0));S.hp=maxHp();}
   log('Stashed '+fmt(raw)+' x'+runMult().toFixed(1)+' = '+fmt(pts)+' league points.'+(eat?' Crew ate '+eat+' food.':''));toast('+'+fmt(pts)+' league points','a');SFX.play('win');
@@ -4253,10 +4327,11 @@ function checkRaids(){
   if(!S.base)return;const t=todayStr();
   if(S.raidPending&&S.raidPending.date!==t){const p=S.raidPending;resolveRaid(p.power,p.hour,p.date,'waited');}
   if(S.flags.lastRaidCheck===t)return;
+  if(S.flags.noRaid===t){S.flags.lastRaidCheck=t;log('The Tolls went east, like the radio said. No raid today.');return;}
   const rng=mulberry(hash(t+'raid'+S.created));
   const daysSince=Math.floor((Date.now()-S.base.claimed)/86400000);
   if(daysSince<1){S.flags.lastRaidCheck=t;return;}
-  let odds=0.18+Math.min(0.4,stockValue()/600)+S.league.tier*0.05;
+  let odds=0.18+Math.min(0.4,stockValue()/600)+S.league.tier*0.05;if(S.flags.fenceWalker===t)odds+=0.25;
   if(S.base.rooms.generator)odds*=(S.base.rooms.generator>=2?0.55:0.7)*(1-sk('gennie')*0.05);if(S.base.t==='stronghold')odds*=1.4;if(S.campCleared===weekId())odds*=0.5;
   const hour=quietShift(8+Math.floor(rng()*13));
   if(rng()<odds){const power=Math.round((10+rng()*20+S.league.tier*6+daysSince*0.5+(S.bossKills||0)*2)*dealMod('raid'));
@@ -5318,9 +5393,9 @@ function render(){
   $('#skills').innerHTML=skOpen.map(s=>skRow(s,false)).join('')+(skLocked.length?`<div class="section-label" style="margin-top:12px">Locked · keep levelling</div>`+skLocked.map(s=>skRow(s,true)).join(''):'')+`<p class="help" style="margin-top:10px">${spent} of ${total} ranks learned${skLocked.length?' · next unlock at level '+skLocked[0].req:''}.</p>`;
   {const down=S.crew.filter(c=>c.hp!==undefined&&c.hp<=0).length;
    $('#crewSub').textContent=S.active.length+' / '+crewSlots()+' active · '+S.crew.length+' total'+(down?' · '+down+' down':'');}
-  $('#crewList').innerHTML=S.crew.length?S.crew.map(c=>{const act=S.active.includes(c.id);return `<div class="crew${act?' active':''}"><div class="av">${ART.avatarSVG(c.av,70,{alive:true,phase:(S.crew.indexOf(c)%4)})}</div><div><div class="nm">${esc(c.name)} <span class="chip a">Lv ${c.lvl}</span></div><div class="role">${ROLES[c.role].e} ${ROLES[c.role].n}</div><div class="tr">${ROLES[c.role].d(crewLvl(c))}</div><div style="margin-top:4px">${crewCard(c)}</div><div class="hpbar2" style="margin-top:6px"><i style="width:${Math.max(0,(c.hp===undefined?crewMax(c):c.hp)/crewMax(c)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${(c.hp||0)<=0?'<b style="color:#ff8a92">Down. Cannot fight.</b> Mends '+(18+(S.base&&S.base.rooms.clinic?18:0))+' HP a night, or patch them up now.':'HP '+(c.hp===undefined?crewMax(c):c.hp)+' / '+crewMax(c)+((c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?' · mends '+(18+(S.base&&S.base.rooms.clinic?18:0))+' a night'+(S.base&&S.base.rooms.clinic?' (clinic)':''):'')}</div>
-    <div class="xp" style="margin-top:6px"><i style="width:${Math.min(100,c.lvl>=5?100:c.xp/(c.lvl*6)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${c.lvl>=5?'Fully trained':'Experience '+c.xp+' / '+(c.lvl*(c.trait==='quick'?4:6))+' to level '+(c.lvl+1)}</div>
-    <div class="a2">${c.out?`<div class="help" style="font-size:11px">${EXPED[c.out.job].e} Out: ${esc(EXPED[c.out.job].n)}<br>${fmt(Math.max(0,c.out.left))} steps to go</div>`:(c.hp||0)<=0?`<button class="btn sm r" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>${S.active.length<crewSlots()?'<div class="help" style="font-size:11px;margin-top:4px">Their slot is free - bring someone else along meanwhile.</div>':''}`:`<button class="btn sm ${act?'':'r'}" onclick="toggleCrew('${c.id}')">${act?'Leave at base':'Bring along'}</button><button class="btn sm ghost" style="margin-top:4px" onclick="expedSheet('${c.id}')">Send out</button>${(c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?`<button class="btn sm ghost" style="margin-top:4px" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>`:''}`}</div></div></div>`;}).join(''):'<p class="help">Nobody yet. Survivors hide in the places you search.</p>';
+  $('#crewList').innerHTML=S.crew.length?S.crew.map(c=>{const act=S.active.includes(c.id);return `<div class="crew${act?' active':''}"><div class="av">${ART.avatarSVG(c.av,70,{alive:true,phase:(S.crew.indexOf(c)%4)})}</div><div><div class="nm">${esc(c.name)} <span class="chip a">Lv ${c.lvl}</span>${c.lvl>=CREW_CAP?' <span class="chip s">🎖️ Veteran</span>':''}${loyChip(c)}</div><div class="role">${ROLES[c.role].e} ${ROLES[c.role].n}</div><div class="tr">${ROLES[c.role].d(crewLvl(c))}</div><div style="margin-top:4px">${crewCard(c)}</div><div class="hpbar2" style="margin-top:6px"><i style="width:${Math.max(0,(c.hp===undefined?crewMax(c):c.hp)/crewMax(c)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${(c.hp||0)<=0?'<b style="color:#ff8a92">Down. Cannot fight.</b> Mends '+(18+(S.base&&S.base.rooms.clinic?18:0))+' HP a night, or patch them up now.':'HP '+(c.hp===undefined?crewMax(c):c.hp)+' / '+crewMax(c)+((c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?' · mends '+(18+(S.base&&S.base.rooms.clinic?18:0))+' a night'+(S.base&&S.base.rooms.clinic?' (clinic)':''):'')}</div>
+    <div class="xp" style="margin-top:6px"><i style="width:${Math.min(100,c.lvl>=CREW_CAP?100:c.xp/crewNeed(c)*100)}%"></i></div><div class="help" style="font-size:11px;margin-top:3px">${c.lvl>=CREW_CAP?'🎖️ Veteran: '+esc(VET_PERK[c.role]):'Experience '+c.xp+' / '+crewNeed(c)+' to level '+(c.lvl+1)+(c.lvl===CREW_CAP-1?' - Veteran':'')}</div>
+    <div class="a2">${c.out?`<div class="help" style="font-size:11px">${(EXPED[c.out.job]||{e:'🏃'}).e} Out: ${esc((EXPED[c.out.job]||{n:'going back for someone'}).n)}<br>${fmt(Math.max(0,c.out.left))} steps to go</div>`:(c.hp||0)<=0?`<button class="btn sm r" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>${S.active.length<crewSlots()?'<div class="help" style="font-size:11px;margin-top:4px">Their slot is free - bring someone else along meanwhile.</div>':''}`:`<button class="btn sm ${act?'':'r'}" onclick="toggleCrew('${c.id}')">${act?'Leave at base':'Bring along'}</button><button class="btn sm ghost" style="margin-top:4px" onclick="expedSheet('${c.id}')">Send out</button>${(c.hp===undefined?crewMax(c):c.hp)<crewMax(c)?`<button class="btn sm ghost" style="margin-top:4px" onclick="healCrew('${c.id}')">Patch up (1 meds)</button>`:''}`}</div></div></div>`;}).join(''):'<p class="help">Nobody yet. Survivors hide in the places you search.</p>';
   // base
   const bh=$('#baseHead');
   if(!S.base){bh.className='card blood';bh._html='';bh.innerHTML='<h2>No base yet</h2><p>Clear any place, then tap <b>Claim as base</b> on it. Where you set up matters: a police station comes with an armory and walls, a pharmacy with a clinic, a gas station with a generator. You can move later for 20 scrap.</p>';}
@@ -5329,7 +5404,7 @@ function render(){
     <div class="help" style="margin-top:4px">${S.base.geo?'This is also your <b>home</b> on the live map - same place, one pin. Stand within 60 m of it to stash.':'No map pin yet. Set one from the live map if you want to stash out walking.'}</div></div></div>`;
     // Rebuilding this on every render() restarted every animation in the yard, several times a minute.
     if(bh._html!==bhHtml){bh._html=bhHtml;bh.innerHTML=bhHtml;}}
-  $('#baseAlert').hidden=!(S.raidPending&&S.base&&S.base.rooms.tower);
+  $('#baseAlert').hidden=!((S.raidPending&&S.base&&S.base.rooms.tower)||(S.bevt&&!S.bevt.done));
   $('#stock').innerHTML=['food','water','meds','scrap','ammo'].concat(AMMO_KINDS.filter(k=>k!=='ammo'&&(S.stock[k]||0)>0)).concat(eventNow()==='halloween'?['candy']:[]).map(k=>`<div class="s"><div class="e">${{food:'🥫',water:'💧',meds:'💊',scrap:'🔩',ammo:'📦',shells:'🟥',bolts:'🎯',candy:'🍬'}[k]}</div><b>${k==='meds'?medsTotal():(S.stock[k]||0)}</b><span>${CAT_LABEL[k]||'Candy'}</span></div>`).join('')+`<div class="s"><div class="e">🛡️</div><b>${defense()}</b><span>Defense</span></div>`
     /* v7.6 - THE CHEST BUTTON WAS A DANGLING EXPRESSION. It lived on its own
        line as `+(S.stock.chests>0? ... )` SIXTEEN lines below the assignment it
@@ -5369,7 +5444,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
+  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}try{renderAsk();}catch(e){}try{renderBevt();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5577,6 +5652,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.58',d:'Sep 27',t:'Your crew want things, your base has mornings, and level 8 is Veteran',
+  i:['CREW ASKS. Some mornings one of them wants something: a day off, that spare weapon they like, a med for a friend, double rations, to go back for someone they left behind, to spar, or just to tell you about before. Yes and no both cost something. Say yes and they warm to you; say no and they cool. There is a heart on every crew card now. Cold enough and one morning they are gone. Warm enough and they push themselves up a level. Loyal ones never leave.',
+     'BASE MORNINGS. A card on the Base tab, some days: a stranger at the gate who might join or might rob you, a fire in the kitchen, the dog digging something up, the rain barrel cracked, a walker in the fence, Marlow with a flat tyre, two of the crew arguing, chatter on the ham radio that means no raid tomorrow.',
+     'LEVEL 8: VETERAN. Crew level past 5 now, up to 8, and at 8 each role gets a perk on top: the Brawler\'s Haymaker knocks things out cold, the Medic patches the whole crew, the Scout has every room peeked, the Engineer gives your weapon a swing back after every win, the Hunter fires twice on round one, the Firebug throws every other round, the Teacher trains the crew twice as fast, and more. It is on their card when they get there.']},
  {v:'7.57',d:'Sep 27',t:'Water is for something now, and rooms are not all the same',
   i:['THE KITCHEN (Base tab). "Water is basically useless." Now it is an ingredient: stash water plus food or scrap makes things you cannot find on the road, and they go in your pack. A Sports drink halves your thirst for the rest of the day. Hot coffee sharpens your first hit. Trail stew is a real meal, +32 HP. A full canteen is three bottles in one. Boiled bandages turn water and scrap into meds. Garden tea (needs a garden) makes a bite half as likely to turn in your next fight.',
      'ROOMS WITH SOMETHING ABOUT THEM. "Looting a house is kind of boring." About four rooms in ten now say something on the door. Locked: a key, a crowbar, an Engineer, or kick it in loudly - a key gets you extra. Dark: half the loot goes unseen without a Scout. Untouched: double, but noisier. Ransacked: less, but quiet. Blood on the floor: it might not be dead. Barricaded: someone held out in here, and sometimes they are still there and join you.',
