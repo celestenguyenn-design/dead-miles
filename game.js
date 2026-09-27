@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.63';
+const VERSION='7.64';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1171,7 +1171,8 @@ function newCrew(role){const used=S.crew.map(c=>c.name);const names=CREW_NAMES.f
   const trait=pick(Object.keys(TRAITS));
   const c={id:uid(),name:names.length?pick(names):pick(CREW_NAMES),av:ART.randomAv(),role:r,lvl:trait==='veteran'?2:1,xp:0,trait,fav:pick(Object.keys(WEAPON_KINDS)),past:pick(CREW_PAST),loy:3};c.hp=crewMax(c);return c;}
 // Crew who joined before v7.54 get a trait, a weapon they like and a past, once.
-function crewBackfill(){for(const c of (S.crew||[])){if(!ROLES[c.role])c.role='brawler';if(c.loy===undefined)c.loy=3;if(!c.trait){const rng=mulberry(hash(c.id+'trait'));const tk=Object.keys(TRAITS).filter(k=>k!=='veteran');c.trait=tk[Math.floor(rng()*tk.length)];c.fav=Object.keys(WEAPON_KINDS)[Math.floor(rng()*4)];c.past=CREW_PAST[Math.floor(rng()*CREW_PAST.length)];}}}
+function masterKeyRefund(){if(S.masterKey){S.masterKey=0;S.keys=(S.keys||0)+60;log('The master key was too good to be true. Marlow took it back and refunded your 60 keys.');}}
+function crewBackfill(){masterKeyRefund();for(const c of (S.crew||[])){if(!ROLES[c.role])c.role='brawler';if(c.loy===undefined)c.loy=3;if(!c.trait){const rng=mulberry(hash(c.id+'trait'));const tk=Object.keys(TRAITS).filter(k=>k!=='veteran');c.trait=tk[Math.floor(rng()*tk.length)];c.fav=Object.keys(WEAPON_KINDS)[Math.floor(rng()*4)];c.past=CREW_PAST[Math.floor(rng()*CREW_PAST.length)];}}}
 function crewCard(c){const t=TRAITS[c.trait],k=WEAPON_KINDS[c.fav];return (t?'<span class="chip" title="'+esc(t.d)+'">'+t.e+' '+esc(t.n)+'</span> ':'')+(k?'<span class="chip" title="Fights a level better when you use '+esc(k.n)+'">likes '+k.e+' '+esc(k.n)+'</span>':'')+(t?'<div class="help" style="font-size:11px;margin-top:3px">'+esc(t.d)+(c.past?' · Before: '+esc(c.past):'')+'</div>':'');}
 function hurtCrew(c,n){c.hp=Math.max(0,(c.hp===undefined?crewMax(c):c.hp)-n);
   if(c.hp<=0){clog(c.name+' goes down and drags themselves out of the fight.','hit');
@@ -1396,7 +1397,7 @@ function roomTagBefore(i){const loc=S.loc,r=loc.rooms[i];const t=r.tag;if(!t)ret
   if(t==='locked'){const free=S.gear.some(g=>g.id==='crowbar'&&!g.broken)||roleLvl('engineer');
     openSheet('<h2>🔒 '+esc(r.n)+' is locked</h2><p>A real lock, not a latch.</p><div class="stack">'
       +(free?'<button class="btn r" onclick="closeSheet();roomTagClear('+i+',\'pried\');searchRoom('+i+')">Pry it<small>'+(roleLvl('engineer')?roleBy('engineer').name+' has it open in a minute':'crowbar')+' · quiet</small></button>':'')
-      +'<button class="btn'+(S.keys>0||S.masterKey?' r':'')+'" '+(S.keys>0||S.masterKey?'':'disabled')+' onclick="closeSheet();if(!S.masterKey)S.keys--;roomTagClear('+i+',\'key\');searchRoom('+i+')">'+(S.masterKey?'Master key':'Use a chest key')+'<small>'+(S.masterKey?'opens anything · extra loot':S.keys>0?'you have '+S.keys+' · the lock was worth it: extra loot':'no keys')+'</small></button>'
+      +'<button class="btn'+(S.keys>0?' r':'')+'" '+(S.keys>0?'':'disabled')+' onclick="closeSheet();S.keys--;roomTagClear('+i+',\'key\');searchRoom('+i+')">Use a chest key<small>'+(S.keys>0?'you have '+S.keys+' · the lock was worth it: extra loot':'no keys')+'</small></button>'
       +'<button class="btn" onclick="closeSheet();S.loc.noise=Math.min(100,S.loc.noise+25);roomTagClear('+i+',\'forced\');searchRoom('+i+')">Kick it in<small>noise +25</small></button>'
       +'<button class="btn ghost" onclick="closeSheet()">Leave it</button></div>',true);return true;}
   if(t==='bloody'){r.tag=null;if(Math.random()<0.45){toast('It was not dead.','d');startCombat([worldEnemy('crawler')].concat(Math.random()<0.4?[worldEnemy('walker')]:[]),'wave');clog('The '+r.n.toLowerCase()+' was not empty.','sys');renderCombat();return true;}
@@ -2624,7 +2625,7 @@ const ROAD_EVENTS=[
   ]},
  {id:'van',n:'A pharmacy delivery van',e:'🚐',txt:()=>'On its side in the intersection, cargo door padlocked. The lock is the only clean thing on it.',
   opts:[
-   {t:'Use a key',sub:'costs 1 chest key · 3 meds',ok:()=>(S.keys>0||S.masterKey)||'No keys',go:()=>{if(!S.masterKey)S.keys--;evtGive('abx');evtGive('pain');evtGive(pick(['kit','bandage','abx']));return 'The padlock is a cheap one. The cargo is not.';}},
+   {t:'Use a key',sub:'costs 1 chest key · 3 meds',ok:()=>(S.keys>0)||'No keys',go:()=>{S.keys--;evtGive('abx');evtGive('pain');evtGive(pick(['kit','bandage','abx']));return 'The padlock is a cheap one. The cargo is not.';}},
    {t:'Break the lock',sub:'loud · 50% a hazmat',ok:()=>true,go:()=>{evtGive('pain');if(Math.random()<0.5){evtFight([worldEnemy(S.walk.district>=1?'hazmat':'walker')],'The driver was still in the back.');return null;}return 'Twenty minutes of hammering for one box. Worth it.';}},
   ]},
  {id:'bike',n:'A bicycle on a rack',e:'🚲',need:()=>!S.vehicle&&S.walk.district>=1,txt:()=>'Chained to a rack outside a shut-up cafe. Tyres still hard. The chain is the only thing wrong with it.',
@@ -3642,7 +3643,6 @@ function sealAfter(won){
 // one of only two places a legendary can come from. It goes in the stash now,
 // and opens from there, so there are two ways in and one set of rewards.
 function chestUnlock(){
-  if(S.masterKey)return true;
   if(S.keys>0){S.keys--;return true;}
   if(Math.random()<sk('lockpick')*0.3){toast('Lock picked','z');return true;}
   toast(sk('lockpick')?'The pick slipped. Try again or find a key.':'Needs a key','d');SFX.play('miss');
@@ -3900,13 +3900,13 @@ const LOCKSMITH=[
   {id:'parts',n:'A box of weapon parts',e:'⚙️',k:6,d:'+12 parts for upgrades.',go:()=>{S.parts=(S.parts||0)+12;}},
   {id:'meds',n:'A medic\'s bag',e:'🧰',k:8,d:'A trauma kit, 2 antibiotics and an adrenaline shot into the stash.',go:()=>{medsGive('kit',1);medsGive('abx',2);medsGive('adrena',1);}},
   {id:'legend',n:'Something from under the seat',e:'✨',k:40,weekly:true,d:'A legendary. Guaranteed. One a week.',go:()=>{S.lockLegendWeek=weekId();dropLegend('Marlow reaches under the seat.');}},
-  {id:'master',n:'The master key',e:'🗝️',k:60,once:true,d:'Opens every locked room, chest and van in the county, free, forever.',go:()=>{S.masterKey=1;}},
+  {id:'quiet',n:'A quiet week',e:'🤫',k:20,d:'Marlow has a word with the Tolls. No raids on your base for 7 days.',go:()=>{S.flags.noRaidUntil=Date.now()+7*86400000;}},
 ];
-function locksmith(id){const l=LOCKSMITH.find(x=>x.id===id);if(!l||!S.base)return;if(l.once&&S.masterKey){toast('You already have it');return;}if(l.weekly&&S.lockLegendWeek===weekId()){toast('Marlow has nothing else under the seat this week','d');return;}if(S.keys<l.k){toast('Needs '+l.k+' keys','d');return;}
+function locksmith(id){const l=LOCKSMITH.find(x=>x.id===id);if(!l||!S.base)return;if(l.weekly&&S.lockLegendWeek===weekId()){toast('Marlow has nothing else under the seat this week','d');return;}if(l.id==='quiet'&&S.flags.noRaidUntil>Date.now()){toast('It is already quiet. Buy again when it runs out.','d');return;}if(S.keys<l.k){toast('Needs '+l.k+' keys','d');return;}
   if(l.id==='chest'&&S.pack.length>=capacity()-2){toast('Make room in your pack first','d');return;}
   S.keys-=l.k;l.go();log('Locksmith: '+l.n.toLowerCase()+' for '+l.k+' keys.');toast(l.e+' '+l.n,'a');SFX.play('chest');save();render();}
 function renderLocksmith(){const el=$('#locksmith');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first.</p>';return;}
-  el.innerHTML='<p class="help">You have <b>'+(S.keys||0)+'</b> chest keys'+(S.masterKey?' and the master key':'')+'.</p><div class="stack" style="margin-top:8px">'+LOCKSMITH.filter(l=>!(l.once&&S.masterKey)).map(l=>{const ok=S.keys>=l.k&&!(l.weekly&&S.lockLegendWeek===weekId());return '<button class="btn'+(ok?' r':' ghost')+'" '+(ok?'':'disabled')+' onclick="locksmith(\''+l.id+'\')">'+l.e+' '+esc(l.n)+'<small>'+l.k+' keys · '+esc(l.weekly&&S.lockLegendWeek===weekId()?'Bought this week. Back next week.':l.d)+'</small></button>';}).join('')+'</div>';
+  el.innerHTML='<p class="help">You have <b>'+(S.keys||0)+'</b> chest keys'+(S.flags.noRaidUntil>Date.now()?' · quiet week: '+Math.ceil((S.flags.noRaidUntil-Date.now())/86400000)+' day(s) left':'')+'.</p><div class="stack" style="margin-top:8px">'+LOCKSMITH.map(l=>{const ok=S.keys>=l.k&&!(l.weekly&&S.lockLegendWeek===weekId())&&!(l.id==='quiet'&&S.flags.noRaidUntil>Date.now());return '<button class="btn'+(ok?' r':' ghost')+'" '+(ok?'':'disabled')+' onclick="locksmith(\''+l.id+'\')">'+l.e+' '+esc(l.n)+'<small>'+l.k+' keys · '+esc(l.weekly&&S.lockLegendWeek===weekId()?'Bought this week. Back next week.':l.id==='quiet'&&S.flags.noRaidUntil>Date.now()?'Already quiet. Buy again when it runs out.':l.d)+'</small></button>';}).join('')+'</div>';
   const f=$('#locksmithFold');if(f)f.textContent=(S.keys||0)+' keys';}
 function renderTrader(){const el=$('#trader');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first. The trader only stops where there are walls.</p>';return;}
   el.innerHTML=TRADE.map(t=>{let c=Math.max(1,Math.round(t.c*(1-sk('haggler')*0.1-sk('trader')*0.15)));return `<button class="tr${S.stock.scrap<c?' off':''}" onclick="trade('${t.id}')"><span class="e">${t.e}</span><b>${t.n}</b><span class="chip a">${c}🔩</span></button>`;}).join('');}
@@ -4425,6 +4425,7 @@ function checkRaids(){
   if(S.raidPending&&S.raidPending.date!==t){const p=S.raidPending;resolveRaid(p.power,p.hour,p.date,'waited');}
   if(S.flags.lastRaidCheck===t)return;
   if(S.flags.noRaid===t){S.flags.lastRaidCheck=t;log('The Tolls went east, like the radio said. No raid today.');return;}
+  if(S.flags.noRaidUntil>Date.now()){S.flags.lastRaidCheck=t;return;}
   const rng=mulberry(hash(t+'raid'+S.created));
   const daysSince=Math.floor((Date.now()-S.base.claimed)/86400000);
   if(daysSince<1){S.flags.lastRaidCheck=t;return;}
@@ -5777,6 +5778,8 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.64',d:'Sep 27',t:'The master key is gone',
+  i:['One purchase that made every lock in the county free forever was too much - it ended the whole point of keys. It is out. If you bought it, Marlow took it back and your 60 keys are refunded. In its place: A QUIET WEEK, 20 keys - Marlow has a word with the Tolls and there are no raids on your base for 7 days. Buy it again when it runs out.']},
  {v:'7.63',d:'Sep 27',t:'Weapons are rarer, and the Locksmith is not a legendary vending machine',
   i:['"We have unlimited weapons. I never run out, and I never feel like I need my legendaries." Weapons turn up in rooms half as often, raiders drop gear a quarter of the time instead of half, and a Hunt brings one home less often. A weapon breaking should mean something again.',
      'Locksmith prices: a chest is 3 keys, the guaranteed legendary is 40 keys and one a week, the master key is 60.']},
