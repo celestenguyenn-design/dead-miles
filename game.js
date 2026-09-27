@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.58';
+const VERSION='7.59';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1310,7 +1310,7 @@ function thirstMult(){
   if(t!==null){ if(t>=30)m*=1.5; else if(t>=25)m*=1.25; else if(t<=5)m*=0.85; }
   return Math.round(m*100)/100;
 }
-function lootMult(){let m=district().loot*modLoot();if(wxKind()==='snow')m*=1.1;if(wxKind()==='storm')m*=1.3;if(isNight())m*=1.5+sk('nightowl')*0.1;return m;}
+function lootMult(){let m=district().loot*modLoot()*(1+0.1*county());if(wxKind()==='snow')m*=1.1;if(wxKind()==='storm')m*=1.3;if(isNight())m*=1.5+sk('nightowl')*0.1;return m;}
 
 /* ================= world ================= */
 // ---- the road does not end (v6.20) ----
@@ -1335,10 +1335,12 @@ function districtAt(i){
     far:true};
 }
 const district=()=>districtAt(Math.max(0,S.walk.district|0));
+function countySteps(){return Math.max(0,(S.steps.total||0)-(S.countyStart||0));}
+function county(){return S.county||0;}
 function unlockedDistrict(){
   let d=0;
-  for(let i=0;i<DISTRICTS.length;i++)if(S.steps.total>=DISTRICTS[i].steps)d=i;
-  if(S.steps.total>=DISTRICTS[DISTRICTS.length-1].steps){
+  for(let i=0;i<DISTRICTS.length;i++)if(countySteps()>=DISTRICTS[i].steps)d=i;
+  if(countySteps()>=DISTRICTS[DISTRICTS.length-1].steps){
     const past=Math.floor((S.steps.total-DISTRICTS[DISTRICTS.length-1].steps)/DIST_STEP);
     d=DISTRICTS.length-1+past;
   }
@@ -1349,7 +1351,19 @@ const VET_STEP=500000;
 function vetRank(){return Math.floor((S.steps.total||0)/VET_STEP);}
 const VET_TITLES=['','Veteran','Ranger','Pathfinder','Outrider','Long Walker','Legend of the Road'];
 function vetTitle(){const r=vetRank();return r?(VET_TITLES[Math.min(r,VET_TITLES.length-1)]+(r>=VET_TITLES.length?' '+(r-VET_TITLES.length+2):'')):'';}
-function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05-setPerk('dist')-(roleLvl('pathfinder')?(3+roleLvl('pathfinder')*2)/100:0)-(veteran('pathfinder')?0.1:0)));if(wxKind()==='snow')dist=Math.round(dist*1.1);if(S.walk.nextMul){dist=Math.round(dist*S.walk.nextMul);S.walk.nextMul=0;}if(S.walk.scouted>0){dist=Math.round(dist*0.7);S.walk.scouted--;}S.walk.dist=Math.max(60,dist);S.walk.progress=0;S.walk.toNext=S.walk.dist;}
+
+/* ================= a vehicle (v7.59) =================
+   A bicycle off a rack in Main Street or beyond, and later the truck from the
+   rail yard. Places get closer. The bike gets flats; the truck drinks scrap. */
+const VEHICLES={bike:{n:'Bicycle',e:'🚲',closer:0.25,d:'Places 25% closer. Gets a flat now and then: 3 scrap to fix.'},truck:{n:'The yard truck',e:'🛻',closer:0.45,d:'Places 45% closer. Burns 2 scrap a place; parked when the scrap is gone.'}};
+function vehicleDist(dist){const v=S.vehicle;if(!v||!VEHICLES[v.k])return dist;const V=VEHICLES[v.k];
+  if(v.k==='bike'){if(v.flat)return dist;if(Math.random()<0.06){v.flat=true;log('The bike has a flat. 3 scrap fixes it.');toast('Flat tyre','d');return dist;}return Math.round(dist*(1-V.closer));}
+  if(v.k==='truck'){if((S.stock.scrap||0)<2){if(!v.parked){v.parked=true;log('The truck is out of scrap to burn. Parked.');}return dist;}S.stock.scrap-=2;v.parked=false;return Math.round(dist*(1-V.closer));}
+  return dist;}
+function fixVehicle(){const v=S.vehicle;if(!v||!v.flat)return;if((S.stock.scrap||0)<3){toast('Needs 3 scrap','d');return;}S.stock.scrap-=3;v.flat=false;log('Patched the bike.');toast('Rolling again','a');save();render();}
+function renderVehicle(){const el=$('#vehicleCard');if(!el)return;const v=S.vehicle;if(!v||!VEHICLES[v.k]){el.hidden=true;return;}el.hidden=false;el.className='card';const V=VEHICLES[v.k];
+  el.innerHTML='<div class="row" style="align-items:center;gap:8px"><span style="font-size:26px">'+V.e+'</span><div style="flex:1"><b>'+esc(V.n)+'</b><div class="help">'+(v.flat?'<b style="color:#ff8a92">Flat tyre.</b> Walking until it is fixed.':v.parked?'<b style="color:var(--amber)">Parked</b> - no scrap to burn. Stash some.':esc(V.d))+'</div></div>'+(v.flat?'<button class="btn sm r" onclick="fixVehicle()">Fix (3 scrap)</button>':'')+'</div>';}
+function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05-setPerk('dist')-(roleLvl('pathfinder')?(3+roleLvl('pathfinder')*2)/100:0)-(veteran('pathfinder')?0.1:0)));if(wxKind()==='snow')dist=Math.round(dist*1.1);if(S.walk.nextMul){dist=Math.round(dist*S.walk.nextMul);S.walk.nextMul=0;}if(S.walk.scouted>0){dist=Math.round(dist*0.7);S.walk.scouted--;}dist=vehicleDist(dist);S.walk.dist=Math.max(60,dist);S.walk.progress=0;S.walk.toNext=S.walk.dist;}
 function bossName(){if(eventNow()==='halloween')return 'The Gourd King';return BOSS_NAMES[hash(weekId()+'boss')%BOSS_NAMES.length];}
 
 /* ================= rooms with something about them (v7.57) =================
@@ -1477,6 +1491,7 @@ function worldCrowd(en){
 }
 function encounterFor(loc){
   const th=district().threat*loc.threat;const rng=Math.random();
+  if(loc.quest){const q=QUESTS.find(x=>x.id===loc.quest);if(q)return q.enemies();}
   if(loc.stronghold){return strongholdStage(loc.stage+1);}
   /* v7.4 - A LEVELLED SCOUT WAS EMPTYING THE COUNTY. `quiet` is the chance a
      place has NO enemies at all, and the scout's bonus was added straight into
@@ -1496,7 +1511,7 @@ function encounterFor(loc){
   return worldCrowd(out);
 }
 function strongholdStage(st){if(st===1)return [mk('raider'),mk('raider')];if(st===2)return [mk('raider'),mk('gunner'),mk('raider')];const b=mk('boss');b.n=bossName();b.hp=Math.round(b.hp*1.5);b.max=b.hp;b.wanted=true;b.g=BOSS_GIMMICK[b.n]||'crit';if(b.g==='shield')b.shield=30;if(b.g==='dodgy'){b.dodge=0.45;b.hp=Math.round(b.hp*0.7);b.max=b.hp;}if(b.g==='slow'){b.dmg=b.dmg.map(x=>Math.round(x*1.4));}return [mk('gunner'),b];}
-function mk(k){const e=ENEMIES[k];const scale=(1+S.walk.district*0.12+S.league.tier*0.06+Math.max(0,S.lvl-5)*0.075)*diff().enemy;return {k,n:e.n,hp:Math.round(e.hp*scale),max:Math.round(e.hp*scale),dmg:e.dmg.map(x=>Math.round(x*scale)),hit:e.hit+(isNight()?0.04:0),xp:e.xp,dodge:e.dodge||0,fast:!!e.fast,burst:e.burst||0,scream:e.scream||0,human:!!e.human,boss:!!e.boss,dead:false,stun:0,crawler:!!e.crawler,plate:!!e.plate};}
+function mk(k){const e=ENEMIES[k];const scale=(1+S.walk.district*0.12+S.league.tier*0.06+Math.max(0,S.lvl-5)*0.075)*diff().enemy*(1+0.15*county());return {k,n:e.n,hp:Math.round(e.hp*scale),max:Math.round(e.hp*scale),dmg:e.dmg.map(x=>Math.round(x*scale)),hit:e.hit+(isNight()?0.04:0),xp:e.xp,dodge:e.dodge||0,fast:!!e.fast,burst:e.burst||0,scream:e.scream||0,human:!!e.human,boss:!!e.boss,dead:false,stun:0,crawler:!!e.crawler,plate:!!e.plate};}
 
 /* ================= steps ================= */
 const WATCH_JOBS={
@@ -2425,7 +2440,7 @@ const AWAY_MIN_MS=3600000, AWAY_WINDOW_MS=5*60000, AWAY_LOOT=0.7, AWAY_FLOOR=0.2
 let AWAY_UNTIL=0;
 function awayArm(awayMs){if(awayMs>=AWAY_MIN_MS)AWAY_UNTIL=Date.now()+AWAY_WINDOW_MS;}
 function awayMode(){return Date.now()<AWAY_UNTIL&&!C&&!S.combat;}
-function awayCanResolve(loc){return !!loc&&!loc.geo&&!loc.stronghold&&!loc.rival&&!loc.landmark&&!loc.boss;}
+function awayCanResolve(loc){if(loc&&loc.quest)return false;return !!loc&&!loc.geo&&!loc.stronghold&&!loc.rival&&!loc.landmark&&!loc.boss;}
 function awayRep(){if(!S.awayRep)S.awayRep={at:Date.now(),steps:0,places:0,skipped:0,kills:0,dmg:0,heal:0,items:[],lines:[],waiting:''};return S.awayRep;}
 // A fight as an estimate: average damage each side, hit rates, crew roles, your armour.
 // Deliberately a little worse than playing it yourself, and it can never kill you.
@@ -2600,6 +2615,10 @@ const ROAD_EVENTS=[
    {t:'Use a key',sub:'costs 1 chest key · 3 meds',ok:()=>(S.keys>0)||'No keys',go:()=>{S.keys--;evtGive('abx');evtGive('pain');evtGive(pick(['kit','bandage','abx']));return 'The padlock is a cheap one. The cargo is not.';}},
    {t:'Break the lock',sub:'loud · 50% a hazmat',ok:()=>true,go:()=>{evtGive('pain');if(Math.random()<0.5){evtFight([worldEnemy(S.walk.district>=1?'hazmat':'walker')],'The driver was still in the back.');return null;}return 'Twenty minutes of hammering for one box. Worth it.';}},
   ]},
+ {id:'bike',n:'A bicycle on a rack',e:'🚲',need:()=>!S.vehicle&&S.walk.district>=1,txt:()=>'Chained to a rack outside a shut-up cafe. Tyres still hard. The chain is the only thing wrong with it.',
+  opts:[
+   {t:'Cut the chain',sub:'crowbar, Engineer, or 10 scrap',ok:()=>(S.gear.some(g=>g.id==='crowbar'&&!g.broken)||roleLvl('engineer')||(S.stock.scrap>=10))||'Needs a crowbar, an Engineer, or 10 scrap',go:()=>{if(!(S.gear.some(g=>g.id==='crowbar'&&!g.broken)||roleLvl('engineer')))S.stock.scrap-=10;S.vehicle={k:'bike',flat:false};return 'It is yours. Places are a quarter closer from here on.';}},
+  ]},
  {id:'friend',n:'A familiar face',e:'👋',need:()=>activeCrew().length>0,txt:()=>{const c=activeCrew()[0];return c.name+' stops dead. Someone across the street, sitting on a porch. "I know them. From before - they '+(c.past||'lived on my street')+'."';},
   opts:[
    {t:'Let them talk',sub:'crew XP',ok:()=>true,go:()=>{const c=activeCrew()[0];crewXp(3);if(Math.random()<0.5){S.stock.scrap+=5;return 'Ten minutes on the porch. '+c.name+' comes back quieter, with a bag of scrap "for old times". +5 scrap, crew XP.';}return 'Ten minutes on the porch. '+c.name+' does not say much after, but walks straighter. Crew XP.';}},
@@ -2618,9 +2637,55 @@ function evtChoose(i){const ev=S.evt&&ROAD_EVENTS.find(e=>e.id===S.evt.id);if(!e
   const o=ev.opts[i];if(!o||evtOk(o)!==true)return;const r=o.go();
   if(r===null){return;}   // a fight took over; the event is already cleared
   log(ev.n+': '+r);S.evt.done=r;SFX.play('ui');save();render();}
+
+/* ================= Marisol's jobs (v7.59) =================
+   The radio told a story you could only listen to. Now four of the messages
+   are places you can go: the cathedral bell tower, the rail yard, Ward 6 and
+   the boats at the Marina. Each is its own building with its own fight at the
+   door, and each changes something for good. Finish the boats and Marisol
+   asks the question that starts the next county. */
+const QUESTS=[
+ {id:'bell',n:'Take the bell down',e:'⛪',need:s=>(s.story||[]).includes('s6'),
+  brief:'"Old Town cathedral. The Tolls watch every road from the bell tower. Three of them up there with rifles. Somebody with a wrench could take the bell down, and then they are blind."',
+  loc:{n:'Hollow Cathedral',e:'⛪',rooms:[{n:'Nave',noise:30,cats:['food','water','meds'],shelf:.8},{n:'Vestry',noise:26,cats:['scrap','meds'],shelf:1.2,keyish:true},{n:'Bell tower',noise:40,cats:['ammo','scrap'],shelf:2,gear:2}]},
+  enemies:()=>[worldEnemy('gunner'),worldEnemy('gunner'),worldEnemy('gunner')],
+  done:'The bell is on the floor of the nave in three pieces. Marisol: "They are blind now. You will notice." Raids come 20% less often, for good. +1 key.',
+  reward:()=>{S.flags.bellDown=1;S.keys+=1;}},
+ {id:'manifest',n:'The rail yard manifest',e:'🚂',need:s=>(s.story||[]).includes('s7'),
+  brief:'"The manifest is in the yardmaster\'s office. Forty crates, and I want to know where they went. The yardmaster is still there - he works for the Tolls now. And there is a truck in the engine shed that still turns over."',
+  loc:{n:'Hollow rail yard',e:'🚂',rooms:[{n:'Yardmaster\'s office',noise:28,cats:['scrap','ammo'],shelf:1.5,keyish:true},{n:'Loading dock',noise:38,cats:['food','water','scrap'],shelf:.6},{n:'Engine shed',noise:42,cats:['scrap','ammo'],shelf:1,gear:2.5}]},
+  enemies:()=>{const b=mk('boss');b.n='The Yardmaster';b.hp=Math.round(b.hp*1.3);b.max=b.hp;b.g='reinforce';return [worldEnemy('raider'),b,worldEnemy('raider')];},
+  done:'The manifest: forty crates, medical, signed out to "S. Vega, county hospital". Marisol goes quiet on the radio for a long time. "That is my sister\'s name." And the truck in the shed starts on the second try.',
+  reward:()=>{S.vehicle={k:'truck',flat:false};}},
+ {id:'ward6',n:'Ward 6',e:'🏥',need:s=>(s.story||[]).includes('s8'),
+  brief:'"Third floor of the county hospital. The Tolls sealed Ward 6 and put something on the door. Whatever is in there, the crates are in there with it. Bring antibiotics for after."',
+  loc:{n:'County hospital, third floor',e:'🏥',rooms:[{n:'Nurses\' station',noise:26,cats:['meds'],shelf:.8},{n:'Ward 6',noise:34,cats:['meds','meds'],shelf:1.5,keyish:true},{n:'Supply room',noise:32,cats:['meds','scrap'],shelf:.6,gear:1}]},
+  enemies:()=>{const m=mk('matron');m.n='The Matron of Ward 6';return [worldEnemy('walker'),m,worldEnemy('crawler')];},
+  done:'The crates are empty. Every one. A clipboard on the last one: "Distributed - S.V." Marisol: "She gave them out. She gave them all out, and then she got sick." You take what is left on the shelves: 4 antibiotics, and something folded in the top drawer.',
+  reward:()=>{medsGive('abx',4);const id=S.gear.some(g=>g.id==='nightingale')?'vigil':'nightingale';S.gear.push({uid:uid(),id,...GEAR[id]});log('Found the legendary '+GEAR[id].n+' in Ward 6.');}},
+ {id:'boats',n:'The boats',e:'⚓',need:s=>(s.story||[]).includes('s9'),
+  brief:'"They are loading the boats tonight. If the Tolls leave with fuel and guns, this county is theirs for good. The Harbormaster runs the docks. He does not run from anything. Sink what you can."',
+  loc:{n:'The Marina docks',e:'⚓',rooms:[{n:'Fuel dock',noise:40,cats:['scrap','scrap'],shelf:.8},{n:'Harbormaster\'s office',noise:28,cats:['ammo','meds'],shelf:2,keyish:true},{n:'Boat 4',noise:36,cats:['ammo','food','water'],shelf:1.5,gear:2}]},
+  enemies:()=>{const b=mk('boss');b.n='The Harbormaster';b.hp=Math.round(b.hp*1.6);b.max=b.hp;b.g='crit';return [worldEnemy('gunner'),b,worldEnemy('raider')];},
+  done:'Two boats burning, one sinking, the Harbormaster face down on the fuel dock. Marisol: "That is the county. That is all of it. Come across the bridge when you are ready - and when you are, I have a question for you." +3 keys, and he was carrying something.',
+  reward:()=>{S.keys+=3;dropLegend('The Harbormaster was carrying something.');}},
+];
+function questsDone(){return S.quests||(S.quests=[]);}
+function questAvail(){return QUESTS.find(q=>!questsDone().includes(q.id)&&q.need(S));}
+function questGo(id){const q=QUESTS.find(x=>x.id===id);if(!q||questsDone().includes(id))return;if(S.loc){toast('Finish here first, then walk on','d');return;}S.quest=id;S.walk.forceLoc='quest';log('Marisol: '+q.n+'. The next place you reach is it.');toast(q.e+' Next stop: '+q.loc.n,'a');save();render();}
+function questLoc(){const q=QUESTS.find(x=>x.id===S.quest);if(!q)return makeLoc();
+  const rooms=q.loc.rooms.map(r=>({n:r.n,noise:r.noise,cats:r.cats,shelf:r.shelf,gear:r.gear||0,keyish:!!r.keyish,stage:0,done:false,items:null,peek:null,tag:null}));
+  const loc={t:'quest',e:q.loc.e,n:q.loc.n,rooms,noise:0,found:[],cleared:false,wave:0,threat:2,stronghold:false,stage:0,far:1,quest:q.id};
+  for(const r of rooms)r.items=rollRoom(r,loc);return loc;}
+function questDone(){const q=QUESTS.find(x=>x.id===S.loc.quest);if(!q||questsDone().includes(q.id))return;questsDone().push(q.id);S.quest=null;
+  try{q.reward();}catch(e){}addXp(120);log('Marisol: '+q.n+' - done.');SFX.play('legend');
+  const last=QUESTS.every(x=>questsDone().includes(x.id));
+  setTimeout(()=>openSheet('<h2>'+q.e+' '+esc(q.n)+'</h2><p>'+esc(q.done)+'</p><p class="help">+120 XP.'+(last?' Every job on the radio is done. Cross the bridge: see the County tab.':'')+'</p><button class="btn r wide" onclick="closeSheet()">Back to the road</button>'),600);}
+function renderQuest(){const el=$('#questCard');if(!el)return;const q=questAvail();if(!q||(S.loc&&S.loc.quest)){el.hidden=true;return;}el.hidden=false;el.className='card steel';const going=S.quest===q.id&&S.walk.forceLoc==='quest';
+  el.innerHTML='<h2>📻 Marisol: '+esc(q.n)+'</h2><p>'+esc(q.brief)+'</p>'+(going?'<p class="help">The next place you reach is '+esc(q.loc.n)+'. Keep walking.</p>':'<button class="btn r wide" onclick="questGo(\''+q.id+'\')">'+q.e+' Go: '+esc(q.loc.n)+'<small>your next stop, however far that is</small></button>');}
 function arrive(){
-  S.loc=makeLoc(S.walk.forceLoc||undefined);S.walk.forceLoc=null;S.walk.houses++;
-  if(!S.loc.stronghold&&typeof awayMode==='function'&&!awayMode()&&Math.random()<0.22)rollEvent();
+  S.loc=(S.walk.forceLoc==='quest'&&S.quest)?questLoc():makeLoc(S.walk.forceLoc||undefined);S.walk.forceLoc=null;S.walk.houses++;
+  if(!S.loc.stronghold&&!S.loc.quest&&typeof awayMode==='function'&&!awayMode()&&Math.random()<0.22)rollEvent();
   if(!S.loc.stronghold&&S.walk.houses>2&&Math.random()<0.12){S.loc.rival=pick(RIVALS).id;}
   log('Reached '+S.loc.n+' ('+district().n+').');toast('Reached '+S.loc.e+' '+S.loc.n,'a');SFX.play('arrive');
   if(navigator.vibrate)try{navigator.vibrate([60,40,60]);}catch(e){}
@@ -3182,7 +3247,7 @@ function endCombat(won){
   const where=C.where;
   if(won){SFX.play('win');nightBonus();if(veteran('engineer')){const w=eqItem('melee');if(w&&w.dur!==undefined&&!w.broken){w.dur++;clog(roleBy('engineer').name+' tightens the '+w.n+' up. +1 swing.','good');}}if(sk('secondwind'))S.hp=Math.min(maxHp(),S.hp+sk('secondwind')*6);
     log('Cleared '+C.enemies.length+' hostiles'+(where==='enter'&&S.loc?' inside '+S.loc.n:where==='road'?' on the road':'')+'.');
-    if(where==='enter'||where==='wave'){if(S.loc.stronghold&&where==='enter'){S.loc.stage++;S.loc.cleared=true;if(S.loc.stage>=3){S.campCleared=weekId();log('Stronghold cleared. The county is quieter for a while.');ctEvent('stronghold',1);}}else{S.loc.cleared=true;rollWanderer(S.loc);}if(where==='enter')ctEvent('places',1);}
+    if(where==='enter'||where==='wave'){if(S.loc.stronghold&&where==='enter'){S.loc.stage++;S.loc.cleared=true;if(S.loc.stage>=3){S.campCleared=weekId();log('Stronghold cleared. The county is quieter for a while.');ctEvent('stronghold',1);}}else{S.loc.cleared=true;rollWanderer(S.loc);if(S.loc.quest&&where==='enter')questDone();}if(where==='enter')ctEvent('places',1);}
     if(where==='raid'){resolveRaidFight(true);}
     if(where==='watch'){watchReward(C.job);}
     if(where==='horde'){resolveHorde(true,true);}
@@ -4331,7 +4396,7 @@ function checkRaids(){
   const rng=mulberry(hash(t+'raid'+S.created));
   const daysSince=Math.floor((Date.now()-S.base.claimed)/86400000);
   if(daysSince<1){S.flags.lastRaidCheck=t;return;}
-  let odds=0.18+Math.min(0.4,stockValue()/600)+S.league.tier*0.05;if(S.flags.fenceWalker===t)odds+=0.25;
+  let odds=0.18+Math.min(0.4,stockValue()/600)+S.league.tier*0.05;if(S.flags.fenceWalker===t)odds+=0.25;if(S.flags.bellDown)odds*=0.8;
   if(S.base.rooms.generator)odds*=(S.base.rooms.generator>=2?0.55:0.7)*(1-sk('gennie')*0.05);if(S.base.t==='stronghold')odds*=1.4;if(S.campCleared===weekId())odds*=0.5;
   const hour=quietShift(8+Math.floor(rng()*13));
   if(rng()<odds){const power=Math.round((10+rng()*20+S.league.tier*6+daysSince*0.5+(S.bossKills||0)*2)*dealMod('raid'));
@@ -5383,7 +5448,7 @@ function render(){
   $('#gearList').innerHTML=S.gear.length?(gearShown.length?gearShown:[]).map(g=>{const eq=S.eq[g.slot]===g.uid;const d=(g.slot==='melee'||g.slot==='ranged')&&g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':g.slot==='melee'?(g.broken?'<b style="color:#ff8a92">WRECKED</b> · repair it to use it again':wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+(g.dur+'/'+repairMax(g)+' durability')+(WEAPON_KINDS[wKind(g)]?' · '+WEAPON_KINDS[wKind(g)].e+' '+WEAPON_KINDS[wKind(g)].n:'')):g.slot==='ranged'?wDmg(g)[0]+'-'+wDmg(g)[1]+' dmg · '+g.dur+'/'+repairMax(g)+' · uses '+(g.ammo==='shells'?'shells':g.ammo==='bolts'?'bolts':'rounds')+(WEAPON_KINDS[wKind(g)]?' · '+WEAPON_KINDS[wKind(g)].e+' '+WEAPON_KINDS[wKind(g)].n:''):g.slot==='bag'?'+'+g.cap+' capacity':'-'+g.dr+' damage taken';const sh=(g.r==='legendary'||g.r==='epic')?' shine'+(g.r==='legendary'?' leg':''):'';
     return `<div class="gear${eq?' eq':''}${sh}" style="border-left-color:${RAR[g.r||'common'].c}"><div class="e">${g.e}</div><div><div class="n">${esc(g.n)}${g.up?' <span style="color:var(--amber)">+'+g.up+'</span>':''}${temperOf(g)?` <span class="chip${g.temper==='perfect'?' a':g.temper==='crude'?' d':''}">${esc(temperOf(g).n)}</span>`:''} <span class="chip s">${g.slot}</span>${eq?' <span class="chip a">equipped</span>':''}</div><div class="d"><span class="rc-${g.r||'common'}">${RAR[g.r||'common'].n}</span> · ${d}${g.legend?' · '+g.legend:''}</div></div><div class="stack" style="gap:4px">${g.broken?'':`<button class="btn sm ${eq?'':'r'}" onclick="equip('${g.uid}')">${eq?'Unequip':'Equip'}</button>`}${repairMax(g)&&repairMissing(g)?`<button class="btn sm${g.broken?' r':''}${S.stock.scrap<repairCost(g)?' off':''}" onclick="repair('${g.uid}')">Repair ${repairCost(g)}🔩</button>`:''}${benchable(g)?`<button class="btn sm" onclick="benchSheet('${g.uid}')">🛠️ Workbench</button>`:''}<button class="btn sm ghost${giftBlocked(g)?' off':''}" onclick="giftSheet('${g.uid}')">Gift ${giftCost(g)}</button><button class="btn sm ghost" onclick="salvage('${g.uid}')">Salvage ${salvageValue(g)}🔩</button></div></div>`;}).join('')||'<p class="help">Nothing in this tab.</p>':'<p class="help">Bare hands. Garages, hardware stores and the police station have gear.</p>';
   // you
-  $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',alive:true});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl;
+  $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',alive:true});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl+(county()?' · County '+(county()+1):'');
   $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):fistDmg()[0]+'-'+fistDmg()[1]} ${eqItem('melee')?'+'+(S.lvl-1):''}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
   $('#cosmeticCount').textContent=S.cosmetics.length+' looks unlocked';
   $('#spSub').textContent=S.sp+' point'+(S.sp===1?'':'s')+' to spend';$('#youAlert').hidden=!(skillList().some(x=>(!x.req||S.lvl>=x.req)&&sk(x.id)<x.max&&S.sp>=sk(x.id)+1)||woundedCrew().length);$('#clsDesc').textContent=(CLASSES[S.cls]?CLASSES[S.cls].e+' '+CLASSES[S.cls].n:'')+(S.bg&&BACKGROUNDS[S.bg]?' · '+BACKGROUNDS[S.bg].e+' '+BACKGROUNDS[S.bg].n+' background':'')+'. One point per level and per county milestone. Rank 1 of a skill costs 1 point, rank 2 costs 2, rank 3 costs 3, and so on. General skills are open to every class.';
@@ -5444,7 +5509,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}try{renderAsk();}catch(e){}try{renderBevt();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
+  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}try{renderAsk();}catch(e){}try{renderBevt();}catch(e){}try{renderQuest();}catch(e){}try{renderVehicle();}catch(e){}try{renderPrestige();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5619,6 +5684,33 @@ function baseScene(st){st=st||S;if(!st.base)return '';
 }
 function renderEvent(){const el=$('#eventCard');if(!el)return;const ev=eventNow();if(ev!=='halloween'){el.hidden=true;return;}el.hidden=false;el.className='card amber';const candy=S.stock.candy||0;
   el.innerHTML=`<h2>🎃 Hollow-een <span class="sub">until Nov 2</span></h2><p>Candy turns up in rooms all event long, and the Gourd King holds every stronghold. Spend candy on costumes that stay forever.</p><div class="row" style="margin:8px 0"><span class="chip a">🍬 ${candy} candy</span></div><div class="stack">${HALLOWEEN_SHOP.map(x=>`<div class="room2${S.cosmetics.includes(x.id)?' own':''}"><div class="e">🎃</div><div class="t"><b>${x.n}</b><span>${S.cosmetics.includes(x.id)?'yours':x.c+' candy'}</span></div>${S.cosmetics.includes(x.id)?'<span class="chip z">owned</span>':`<button class="btn sm a" onclick="buyCandy('${x.id}',${x.c})">Buy</button>`}</div>`).join('')}</div>`;}
+
+/* ================= crossing the county (v7.59) =================
+   The game had no ending, only more road. Now, once every job on the radio is
+   done and the Overpass message has come in, Marisol asks: do you want to go
+   on? Cross the bridge and the county starts over - harder, richer - and you
+   take one crew member, one legendary, your pets, your level and your skills.
+   Everything built stays behind. The lifetime steps are yours forever. */
+function canPrestige(){return QUESTS.every(q=>questsDone().includes(q.id))&&(S.story||[]).includes('s10');}
+function prestigeSheet(){if(!canPrestige())return;
+  const legends=S.gear.filter(g=>g.r==='legendary'&&!g.broken);const crew=S.crew.filter(c=>!c.out);
+  openSheet('<h2>🌉 Cross the bridge</h2><p>Marisol, on the bridge: "There is more county past this one. Worse, and worth more. You cannot carry a base across a bridge. Who is coming with you?"</p>'
+    +'<p class="help"><b style="color:var(--bone)">You keep:</b> your level, skills and XP, your pets, your outfits and trophies, your lifetime steps, one legendary, and one crew member.<br><b style="color:#ff8a92">You leave:</b> the base and everything built, the stash, the pack, the rest of the crew and gear, keys, the vehicle, your league score.<br><b style="color:var(--amber)">County '+(county()+2)+':</b> enemies +15%, loot +10%, over what they are now.</p>'
+    +(crew.length?'<div class="section-label" style="margin-top:8px">Who comes</div><div class="stack">'+crew.map(c=>'<button class="btn" onclick="doPrestige(\''+c.id+'\',\''+(legends[0]?legends[0].uid:'')+'\')">'+ROLES[c.role].e+' '+esc(c.name)+' · Lv '+c.lvl+'<small>'+esc(ROLES[c.role].n)+' · '+esc(TRAITS[c.trait]?TRAITS[c.trait].n:'')+'</small></button>').join('')+'</div>':'<button class="btn r wide" onclick="doPrestige(\'\',\''+(legends[0]?legends[0].uid:'')+'\')">Cross alone</button>')
+    +(legends.length?'<p class="help" style="margin-top:8px">Legendary you carry: '+esc(legends[0].n)+'.</p>':'')
+    +'<button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet()">Not yet</button>');}
+function doPrestige(crewId,legendUid){if(!canPrestige())return;snapshot('before crossing the county');
+  const keepCrew=S.crew.find(c=>c.id===crewId);const keepLegend=S.gear.find(g=>g.uid===legendUid);
+  S.county=county()+1;S.countyStart=S.steps.total;
+  S.base=null;S.work=null;S.stock={food:5,water:5,meds:1,scrap:0,ammo:0,shells:0,bolts:0,chests:0};S.pack=[];S.keys=0;S.run=0;S.vehicle=null;S.horde=null;S.raidPending=null;S.raids=[];
+  S.crew=keepCrew?[keepCrew]:[];S.active=keepCrew?[keepCrew.id]:[];S.gear=keepLegend?[keepLegend]:[];S.eq={melee:null,ranged:null,armor:null,head:null,hands:null,feet:null,bag:null};if(keepLegend)S.eq[keepLegend.slot]=keepLegend.uid;
+  S.walk={toNext:0,dist:500,district:0,houses:0,progress:0,banked:0};S.loc=null;S.evt=null;S.quest=null;S.quests=[];S.campCleared='';S.league.score=0;S.ask=null;S.bevt=null;S.expedNews=[];
+  newDistance();S.hp=maxHp();
+  log('You crossed the bridge. County '+(S.county+1)+'.'+(keepCrew?' '+keepCrew.name+' came with you.':'')+(keepLegend?' You carried the '+keepLegend.n+'.':''));
+  closeSheet();SFX.play('legend');save();render();
+  setTimeout(()=>openSheet('<h2>🌉 County '+(S.county+1)+'</h2><p>The road on the far side looks the same. It is not. Marisol, behind you: "Everyone who gets here says they were going to stop. Nobody stops."</p><p class="help">Enemies hit '+Math.round(15*S.county)+'% harder and places pay '+Math.round(10*S.county)+'% more. Find a place, clear it, claim it. Start again.</p><button class="btn r wide" onclick="closeSheet()">Walk</button>'),400);}
+function renderPrestige(){const el=$('#prestigeCard');if(!el)return;if(!canPrestige()){el.hidden=true;return;}el.hidden=false;el.className='card amber';
+  el.innerHTML='<h2>🌉 The bridge is open</h2><p>Every job on the radio is done and the north side is holding. Marisol has a question for you. Crossing starts a new county: harder, richer, and you take one crew member and one legendary with you.'+(county()?' You are on county '+(county()+1)+' now.':'')+'</p><button class="btn r wide" onclick="prestigeSheet()">Cross the bridge</button>';}
 function renderStory(){const el=$('#story');if(!el)return;const got=STORY.filter(s=>(S.story||[]).includes(s.id));el.innerHTML=got.length?got.slice().reverse().map(s=>`<li><time>${esc(s.t)}</time><span>${esc(s.txt)}</span></li>`).join(''):'<li><span class="help">Only static so far.</span></li>';$('#storySub').textContent=got.length+' / '+STORY.length;}
 function renderRaidCard(){const el=$('#raidCard');if(!S.raidPending||!S.base||!S.base.rooms.tower){el.hidden=true;return;}el.hidden=false;el.className='card blood';el.innerHTML=`<h2>🗼 Raiders spotted</h2><p>The watchtower saw a crew heading for ${esc(S.base.n)}. Expected around ${S.raidPending.hour}:00 today, strength ${S.raidPending.power} against your ${defense()} defense. Build now, or be home to fight.</p>`;}
 function renderContracts(){
@@ -5652,6 +5744,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.59',d:'Sep 27',t:'Marisol has jobs for you, there is a bike, and the county has an ending',
+  i:['MARISOL\'S JOBS. Four of the radio messages are places you can go now, one at a time as the story reaches them: take the bell down at the cathedral (three gunners; raids come 20% less often forever), the rail yard manifest (the Yardmaster, and a truck), Ward 6 at the hospital (the Matron, antibiotics and a legendary), and the boats at the Marina (the Harbormaster). A card on the Road page says Go; the next place you reach is it.',
+     'A VEHICLE. From Main Street on, a bicycle on a rack can turn up on the road: cut the chain and places are 25% closer, with the odd flat to fix. The rail yard job gives you a truck: 45% closer, burns 2 scrap a place.',
+     'CROSS THE BRIDGE. Once every job is done and the Overpass message has come in, the County tab lets you cross into the next county. You take your level, skills, pets, outfits, trophies, lifetime steps, one legendary and one crew member. Everything built stays behind. The next county hits 15% harder and pays 10% more, and you start again with a title to show for it.']},
  {v:'7.58',d:'Sep 27',t:'Your crew want things, your base has mornings, and level 8 is Veteran',
   i:['CREW ASKS. Some mornings one of them wants something: a day off, that spare weapon they like, a med for a friend, double rations, to go back for someone they left behind, to spar, or just to tell you about before. Yes and no both cost something. Say yes and they warm to you; say no and they cool. There is a heart on every crew card now. Cold enough and one morning they are gone. Warm enough and they push themselves up a level. Loyal ones never leave.',
      'BASE MORNINGS. A card on the Base tab, some days: a stranger at the gate who might join or might rob you, a fire in the kitchen, the dog digging something up, the rain barrel cracked, a walker in the fence, Marlow with a flat tyre, two of the crew arguing, chatter on the ham radio that means no raid tomorrow.',
