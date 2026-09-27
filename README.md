@@ -4,10 +4,10 @@ A zombie-survival walking game. Real steps move you down the road; loot, fight, 
 
 Play: https://celestenguyenn-design.github.io/dead-miles/
 
-## ⚠️ Where to edit (read this first)
+## Where the game lives
 
-**For now, edit the game HERE, in this repo.** The copy in the private autostudy repo (`games/`) is **out of date**. It stops at v7.53, and this repo has v7.54+ (new crew roles and traits, weapon kinds, the horde-hour picker, crew-down warnings).
+**This repo is the one and only home of Dead Miles.** All game code is edited, built and deployed from here.
 
-- **Do not build or push from autostudy** until its `games/` folder has been synced from this repo. It would overwrite the newer game.
-- The deploy workflow has a guard that **refuses to publish** a copy older than the live site, or one missing the v7.54/7.55 code, and says why.
-- To sync: copy `game.js`, `index.html`, `style.css`, `art.js`, `street.js`, `version.txt` from here into autostudy `games/`, then remove this notice.
+The private autostudy repo is for school work only. Its old `games/` folder is a stale copy that stops at v7.53. **Never build or push the game from autostudy.**
+
+The deploy workflow has a guard that refuses to publish a copy that is older than the live site, or that is missing code added here (v7.54+), and says why.
