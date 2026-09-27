@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.56';
+const VERSION='7.57';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -30,6 +30,12 @@ const ITEMS={
   soda:{n:'Can of soda',e:'🧃',pts:6,cat:'drink',w:8,r:'common',drink:'soda'},
   wine:{n:'Bottle of wine',e:'🍷',pts:14,cat:'drink',w:3,r:'rare',drink:'wine'},
   brew:{n:'Cold brew',e:'☕',pts:10,cat:'drink',w:4,r:'uncommon',drink:'brew'},
+  // v7.57 - made in the Kitchen, never found
+  sport:{n:'Sports drink',e:'🧴',pts:12,cat:'drink',w:0,r:'uncommon',drink:'sport'},
+  canteen:{n:'Full canteen',e:'🫙',pts:14,cat:'drink',w:0,r:'rare',drink:'canteen'},
+  hotcoffee:{n:'Hot coffee',e:'☕',pts:10,cat:'drink',w:0,r:'uncommon',drink:'hotcoffee'},
+  stew:{n:'Trail stew',e:'🍲',pts:14,cat:'snack',w:0,r:'uncommon',snack:'stew'},
+  tea:{n:'Garden tea',e:'🍵',pts:12,cat:'drink',w:0,r:'rare',drink:'tea'},
   bar:{n:'Protein bar',e:'🍫',pts:5,cat:'snack',w:9,r:'common',snack:'bar'},
   chips:{n:'Bag of chips',e:'🍟',pts:4,cat:'snack',w:9,r:'common',snack:'chips'},
   nuts:{n:'Trail mix',e:'🥜',pts:6,cat:'snack',w:7,r:'common',snack:'nuts'},
@@ -886,15 +892,20 @@ const DRINKS={
   soda:  {n:'Can of soda', e:'🧃',hyd:32,buff:'sugar',d:'+32 water now, but you get thirsty faster for the rest of the day'},
   wine:  {n:'Bottle of wine',e:'🍷',hyd:12,hp:22,buff:'numb',d:'+12 water, +22 HP, and you miss more in your next fight'},
   brew:  {n:'Cold brew',   e:'☕',hyd:16,buff:'sharp',d:'+16 water, and your first hit next fight lands 50% harder'},
+  sport: {n:'Sports drink',e:'🧴',hyd:45,buff:'steady',d:'+45 water, and you lose water half as fast for the rest of the day'},
+  canteen:{n:'Full canteen',e:'🫙',hyd:70,d:'+70 water. For the long walks'},
+  hotcoffee:{n:'Hot coffee',e:'☕',hyd:12,buff:'sharp',hp:5,d:'+12 water, +5 HP, and your first hit next fight lands 50% harder'},
+  tea:   {n:'Garden tea',  e:'🍵',hyd:25,buff:'calm',hp:10,d:'+25 water, +10 HP, and a bite is half as likely to turn in your next fight'},
 };
 const SNACKS={
   bar:  {n:'Protein bar',e:'🍫',hp:9,d:'+9 HP'},
   nuts: {n:'Trail mix',  e:'🥜',hp:7,hyd:4,d:'+7 HP and a little water'},
   chips:{n:'Bag of chips',e:'🍟',hp:5,hyd:-6,d:'+5 HP, but salty - costs you water'},
   gum:  {n:'Stick of gum',e:'🍬',hp:2,hyd:6,d:'+2 HP, +6 water. Better than nothing'},
+  stew: {n:'Trail stew',  e:'🍲',hp:32,hyd:12,d:'+32 HP and +12 water. A real meal'},
 };
 const BUFF_TEXT={wired:'Wired: +15% damage',sharp:'Sharp: your first hit lands 50% harder',
-  numb:'Numb: you miss more often',sugar:'Sugar crash: thirsty faster today'};
+  numb:'Numb: you miss more often',sugar:'Sugar crash: thirsty faster today',steady:'Steady: thirst halved today',calm:'Calm: bites turn half as often'};
 function buffOn(k){return S.buff&&S.buff.k===k&&(S.buff.fights>0);}
 function setBuff(k){S.buff={k,fights:1};}
 function buffClear(){if(S.buff&&S.buff.fights>0){S.buff.fights--;if(S.buff.fights<=0)S.buff=null;}}
@@ -904,7 +915,7 @@ function useDrink(uidv){
   S.pack=S.pack.filter(x=>x.uid!==uidv);
   S.hydro=Math.max(0,Math.min(100,(S.hydro===undefined?100:S.hydro)+d.hyd));
   if(d.hp)S.hp=Math.min(maxHp(),S.hp+d.hp);
-  if(d.buff==='sugar')S.sugarDay=S.steps.date; else if(d.buff)setBuff(d.buff);
+  if(d.buff==='sugar')S.sugarDay=S.steps.date; else if(d.buff==='steady')S.steadyDay=S.steps.date; else if(d.buff)setBuff(d.buff);
   log('You drink the '+d.n.toLowerCase()+'. '+d.d);
   toast(d.n+' · '+(d.buff&&d.buff!=='sugar'?BUFF_TEXT[d.buff]:'water '+Math.round(S.hydro)+'%'),'z');
   SFX.play('ui');save();render();
@@ -1038,6 +1049,7 @@ function hydroLabel(){const s=hydroState();return s==='ok'?'Hydrated':s==='thirs
 function drink(n){if(S.stock.water<1){toast('No water in the stash');return false;}S.stock.water--;S.hydro=Math.min(100,(S.hydro||0)+(n||35));log('You drink. Hydration '+Math.round(S.hydro)+'%.');toast('Water: '+Math.round(S.hydro)+'%','z');SFX.play('ui');save();render();return true;}
 function loseHydro(n){
   if(S.sugarDay===S.steps.date)n=Math.round(n*1.25);   // soda: thirstier all day
+  if(S.steadyDay===S.steps.date)n=Math.round(n*0.5);    // sports drink: thirst halved all day
 const was=hydroState();S.hydro=Math.max(0,(S.hydro===undefined?100:S.hydro)-n);
   if(S.hydro<=10&&S.stock.water>0){S.stock.water--;S.hydro=Math.min(100,S.hydro+35);log('You stopped for water without thinking about it.');}
   const now=hydroState();if(now!==was&&now!=='ok'){toast(hydroLabel()+(now==='thirsty'?'. Drink soon.':'. Your hits are weaker.'),'d');}}
@@ -1267,10 +1279,49 @@ const VET_TITLES=['','Veteran','Ranger','Pathfinder','Outrider','Long Walker','L
 function vetTitle(){const r=vetRank();return r?(VET_TITLES[Math.min(r,VET_TITLES.length-1)]+(r>=VET_TITLES.length?' '+(r-VET_TITLES.length+2):'')):'';}
 function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05-setPerk('dist')-(roleLvl('pathfinder')?(3+roleLvl('pathfinder')*2)/100:0)));if(wxKind()==='snow')dist=Math.round(dist*1.1);if(S.walk.nextMul){dist=Math.round(dist*S.walk.nextMul);S.walk.nextMul=0;}if(S.walk.scouted>0){dist=Math.round(dist*0.7);S.walk.scouted--;}S.walk.dist=Math.max(60,dist);S.walk.progress=0;S.walk.toNext=S.walk.dist;}
 function bossName(){if(eventNow()==='halloween')return 'The Gourd King';return BOSS_NAMES[hash(weekId()+'boss')%BOSS_NAMES.length];}
+
+/* ================= rooms with something about them (v7.57) =================
+   "Looting a house is kind of boring. We just fight and loot each room."
+   Now about four rooms in ten have something about them, and it shows on the
+   door before you go in. A locked room asks for a key, a crowbar or noise. A
+   dark one hides half its loot unless a Scout is with you. An untouched one is
+   worth double and louder. A bloody one may not be empty. A barricaded one was
+   somebody's last stand, and sometimes they are still there. */
+const ROOM_TAGS=[
+  {id:'locked',    n:'Locked',     e:'🔒',w:5,d:'a key, a crowbar, an Engineer - or force it, loudly'},
+  {id:'dark',      n:'Dark',       e:'🕯️',w:4,d:'half the loot goes unseen without a Scout'},
+  {id:'untouched', n:'Untouched',  e:'✨',w:3,d:'double loot, but noisier'},
+  {id:'ransacked', n:'Ransacked',  e:'🗑️',w:4,d:'picked over, but quiet'},
+  {id:'bloody',    n:'Blood on the floor',e:'🩸',w:3,d:'something died here. Or did not.'},
+  {id:'barricaded',n:'Barricaded', e:'🚪',w:2,d:'someone held out in here'},
+];
+function roomTag(r){return r.tag?ROOM_TAGS.find(t=>t.id===r.tag):null;}
+function roomTagLine(r){const t=roomTag(r);return t?'<span class="peek" style="color:var(--amber)">'+t.e+' '+esc(t.n)+' · '+esc(t.d)+'</span>':'';}
+// returns true if the tag has taken over this tap (a sheet or a fight), false to search as normal
+function roomTagBefore(i){const loc=S.loc,r=loc.rooms[i];const t=r.tag;if(!t)return false;
+  if(t==='locked'){const free=S.gear.some(g=>g.id==='crowbar'&&!g.broken)||roleLvl('engineer');
+    openSheet('<h2>🔒 '+esc(r.n)+' is locked</h2><p>A real lock, not a latch.</p><div class="stack">'
+      +(free?'<button class="btn r" onclick="closeSheet();roomTagClear('+i+',\'pried\');searchRoom('+i+')">Pry it<small>'+(roleLvl('engineer')?roleBy('engineer').name+' has it open in a minute':'crowbar')+' · quiet</small></button>':'')
+      +'<button class="btn'+(S.keys>0?' r':'')+'" '+(S.keys>0?'':'disabled')+' onclick="closeSheet();S.keys--;roomTagClear('+i+',\'key\');searchRoom('+i+')">Use a chest key<small>'+(S.keys>0?'you have '+S.keys+' · the lock was worth it: extra loot':'no keys')+'</small></button>'
+      +'<button class="btn" onclick="closeSheet();S.loc.noise=Math.min(100,S.loc.noise+25);roomTagClear('+i+',\'forced\');searchRoom('+i+')">Kick it in<small>noise +25</small></button>'
+      +'<button class="btn ghost" onclick="closeSheet()">Leave it</button></div>',true);return true;}
+  if(t==='bloody'){r.tag=null;if(Math.random()<0.45){toast('It was not dead.','d');startCombat([worldEnemy('crawler')].concat(Math.random()<0.4?[worldEnemy('walker')]:[]),'wave');clog('The '+r.n.toLowerCase()+' was not empty.','sys');renderCombat();return true;}
+    toast('Whatever died here is gone.','z');return false;}
+  return false;}
+function roomTagClear(i,how){const r=S.loc.rooms[i];if(how==='key')r.tagBonus=1;r.tag=null;}
+// applied while searching: changes what a room gives up
+function roomTagLoot(r){const t=r.tag;let items=r.items;let noise=0;
+  if(r.tagBonus){items=items.concat(rollRoom(r,S.loc).slice(0,2));r.tagBonus=0;}
+  if(t==='untouched'){items=items.concat(rollRoom(r,S.loc));noise=12;}
+  if(t==='ransacked'){items=items.slice(0,1);noise=-10;}
+  if(t==='dark'){if(roleLvl('scout')){log(roleBy('scout').name+' has a light. Nothing missed in the '+r.n.toLowerCase()+'.');}else{const lost=items.length-Math.ceil(items.length/2);items=items.slice(0,Math.ceil(items.length/2));if(lost)log('Too dark to see everything in the '+r.n.toLowerCase()+'. '+lost+' thing'+(lost>1?'s':'')+' left behind.');}}
+  if(t==='barricaded'){if(S.crew.length<12&&Math.random()<0.35){const c=newCrew();S.crew.push(c);if(S.active.length<crewSlots())S.active.push(c.id);log(c.name+' was behind the barricade in the '+r.n.toLowerCase()+'. '+ROLES[c.role].n+' joins the crew.');openSheet(`<h2>Survivor</h2><div class="big">${ART.avatarSVG(c.av,80)}</div><p><b style="color:var(--bone)">${c.name}</b> was behind the barricade, awake, and armed with a chair leg. ${ROLES[c.role].e} ${ROLES[c.role].n}: ${ROLES[c.role].d(c.lvl)}.</p><p class="help">They ${esc(c.past)}. ${TRAITS[c.trait].e} <b>${TRAITS[c.trait].n}</b>: ${TRAITS[c.trait].d}.</p><button class="btn r wide" onclick="closeSheet()">Welcome to the crew</button>`);}
+    else{items=items.concat([{id:'key',...ITEMS.key}]);log('Whoever barricaded the '+r.n.toLowerCase()+' left a key behind.');}}
+  r.tag=null;return {items,noise};}
 function makeLoc(force,nameOverride,far){
   let type;
   if(force)type=LOCS.find(l=>l.t===force)||LOCS[0];else if(S.walk.district>=1&&Math.random()<0.12&&S.campCleared!==weekId())type=LOCS.find(l=>l.t==='stronghold');else type=wpick(LOCS.filter(l=>l.w>0),'w');
-  const rooms=type.rooms.map(r=>({n:r.n,noise:r.noise,cats:r.cats,shelf:r.shelf,gear:r.gear||0,keyish:!!r.keyish,stage:r.stage||0,done:false,items:null,peek:null}));
+  const rooms=type.rooms.map(r=>({n:r.n,noise:r.noise,cats:r.cats,shelf:r.shelf,gear:r.gear||0,keyish:!!r.keyish,stage:r.stage||0,done:false,items:null,peek:null,tag:(!type.stronghold&&Math.random()<0.4)?wpick(ROOM_TAGS,'w').id:null}));
   const loc={t:type.t,e:type.e,n:nameOverride||pick(type.n),rooms,noise:0,found:[],cleared:false,wave:0,threat:type.threat,stronghold:!!type.stronghold,stage:0,far:(far===undefined?1:far)};
   for(const r of rooms)r.items=rollRoom(r,loc);
   if(loc.far===3&&!loc.stronghold&&rooms.length&&Math.random()<0.15){const id=pick(DEEP_TROPHIES);pick(rooms).items.push({id,n:ITEMS[id].n,e:ITEMS[id].e,pts:ITEMS[id].pts,cat:'shelf',r:ITEMS[id].r});}
@@ -3004,7 +3055,7 @@ function enemyPhase(){
       if(C.duck)continue;                      // it is swinging at her squadmate, not at her
       const guards=activeCrew();if(guards.length&&Math.random()<0.3){const gc=pick(guards);if(gc.trait==='lucky'&&Math.random()<1/3){clog(e.n+' goes for '+gc.name+' and somehow misses.','');fxPush({k:'emiss',from:C.actor});continue;}clog(e.n+' turns on '+gc.name+'.','hit');fxPush({k:'crewhurt',from:C.actor,who:gc.id,d:Math.max(1,d-2)});hurtCrew(gc,Math.max(1,d-2));continue;}
       {const gl=roleLvl('bodyguard');if(gl&&Math.random()<(10+gl*4)/100){const bg2=roleBy('bodyguard');const bd=Math.max(1,d-4);clog(bg2.name+' steps in front of it.','good');fxPush({k:'crewhurt',from:C.actor,who:bg2.id,d:bd});hurtCrew(bg2,bd);continue;}}
-      if(!e.human&&Math.random()<infectChance()*(e.crawler?2:1))catchInfection(e.n);
+      if(!e.human&&Math.random()<infectChance()*(e.crawler?2:1)*(buffOn('calm')?0.5:1))catchInfection(e.n);
       hurt(d,e.n);
         if(e.g==='bleed'){C.bleed=Math.max(1,3-sk('clotting'));}if(e.g==='poison'){C.poison=Math.max(1,3-sk('clotting'));}
         if(e.g==='steal'&&S.pack.length&&Math.random()<0.3){const it=S.pack.splice(rint(0,S.pack.length-1),1)[0];clog(e.n+' lifts your '+it.n+' mid-swing.','hit');}}
@@ -3325,8 +3376,10 @@ function takeItem(it,loc){
 }
 function searchRoom(i){pushSoon();
   const loc=S.loc;if(!loc||!loc.cleared)return;const r=loc.rooms[i];if(r.done)return;
-  if(r.sealed){breakSeal(i);return;}if(loc.stronghold&&r.stage>loc.stage){toast('Push deeper first');return;}r.done=true;S.roomsSearched=(S.roomsSearched||0)+1;
-  for(const it of r.items)takeItem(it,loc);
+  if(r.sealed){breakSeal(i);return;}if(loc.stronghold&&r.stage>loc.stage){toast('Push deeper first');return;}
+  if(roomTagBefore(i))return;
+  const tl=roomTagLoot(r);r.done=true;S.roomsSearched=(S.roomsSearched||0)+1;
+  for(const it of tl.items)takeItem(it,loc);
   ctEvent('rooms',1);
   {const sl=roleLvl('scavenger');if(sl&&Math.random()<(10+sl*5)/100){S.stock.scrap+=1+sl;log(roleBy('scavenger').name+' pried '+(1+sl)+' scrap out of the '+r.n.toLowerCase()+'.');toast('+'+(1+sl)+' scrap from '+roleBy('scavenger').name);}}
   if(typeof landmarkPayout==='function')try{landmarkPayout(loc);}catch(e){}
@@ -3338,7 +3391,7 @@ function searchRoom(i){pushSoon();
      wave needs 100. The perk did not reduce waves, it ABOLISHED them: no place
      in the game could reach the threshold. It is a percentage now, so it always
      helps and can never zero the mechanic out. */
-  let noise=Math.max(4,Math.round((r.noise+rint(-6,8))*(1-sk('lightstep')*0.12)*(wxKind()==='rain'?0.75:1)*(dayMod().noise||1)));loc.noise=Math.min(100,loc.noise+noise);
+  let noise=Math.max(4,Math.round((r.noise+tl.noise+rint(-6,8))*(1-sk('lightstep')*0.12)*(wxKind()==='rain'?0.75:1)*(dayMod().noise||1)));loc.noise=Math.min(100,loc.noise+noise);
   crewXp(1);save();render();
   if(loc.noise>=100){loc.noise=55;loc.wave++;setTimeout(()=>startCombat([mk('walker'),mk(Math.random()<0.4?'runner':'walker')].concat(loc.wave>1?[mk('bloater')]:[]),'wave'),350);}
 }
@@ -3660,6 +3713,30 @@ const TRADE=[{id:'bandage',n:'Bandages',e:'🩹',c:10,give:s=>s.meds++},
   {id:'bolts',n:'Bundle of bolts (x8)',e:'🎯',c:10,give:()=>addAmmoStock('bolts',8)},
   {id:'key',n:'Chest key',e:'🗝️',c:25,give:()=>S.keys++}];
 function trade(id){const t=TRADE.find(x=>x.id===id);if(!t)return;if(!S.base){toast('The trader only comes to a base');return;}let c=t.c;c=Math.max(1,Math.round(c*(1-sk('haggler')*0.1-sk('trader')*0.15)));if(S.stock.scrap<c){toast('Need '+c+' scrap');return;}S.stock.scrap-=c;t.give(S.stock);log('Bought '+t.n+' from the trader for '+c+' scrap.');toast(t.e+' '+t.n,'a');SFX.play('chest');save();render();}
+
+/* ================= the kitchen (v7.57) =================
+   "Water is basically useless, especially if people are super big walkers."
+   True: past a full hydration bar, every bottle just sat in the stash. Now the
+   stash water is an ingredient. Everything made here is a thing you cannot
+   find on the road, and goes in your pack to use when it counts. */
+const RECIPES=[
+  {id:'sport',n:'Sports drink',e:'🧴',cost:{water:2,food:1},give:'sport',d:'+45 water, and thirst halved for the rest of the day. For the long days.'},
+  {id:'hotcoffee',n:'Hot coffee',e:'☕',cost:{water:1,food:1},give:'hotcoffee',d:'+12 water, +5 HP, first hit next fight lands 50% harder.'},
+  {id:'stew',n:'Trail stew',e:'🍲',cost:{water:1,food:2},give:'stew',d:'+32 HP and +12 water. A real meal, in the pack.'},
+  {id:'canteen',n:'Fill a canteen',e:'🫙',cost:{water:3,scrap:2},give:'canteen',d:'+70 water in one go. Three bottles made into one.'},
+  {id:'bandage',n:'Boil bandages',e:'🩹',cost:{water:2,scrap:1},give:'meds:bandage',d:'+1 bandages to the stash. Clean water and a strip of shirt.'},
+  {id:'tea',n:'Garden tea',e:'🍵',cost:{water:1},needs:'garden',give:'tea',d:'+25 water, +10 HP, and bites turn half as often in your next fight. Needs a garden.'},
+];
+function canCook(r){if(r.needs&&!(S.base&&S.base.rooms[r.needs]))return 'Needs a '+BUILD[r.needs].n.toLowerCase();for(const [k,v] of Object.entries(r.cost)){if((S.stock[k]||0)<v)return 'Needs '+v+' '+k;}return true;}
+function cook(id){const r=RECIPES.find(x=>x.id===id);if(!r||!S.base)return;const ok=canCook(r);if(ok!==true){toast(ok,'d');return;}
+  if(r.give.indexOf('meds:')===0){for(const [k,v] of Object.entries(r.cost))S.stock[k]-=v;medsGive(r.give.slice(5),1);log('Made '+r.n.toLowerCase()+'.');toast('+1 '+r.n.toLowerCase(),'a');}
+  else{if(S.pack.length>=capacity()){toast('Pack is full - nowhere to put it','d');return;}for(const [k,v] of Object.entries(r.cost))S.stock[k]-=v;const it={id:r.give,...ITEMS[r.give],uid:uid()};S.pack.push(it);log('Made a '+it.n.toLowerCase()+'. It is in your pack.');toast(it.e+' '+it.n+' - in your pack','a');}
+  SFX.play('loot');save();render();}
+function renderKitchen(){const el=$('#kitchen');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first.</p>';return;}
+  el.innerHTML='<p class="help">Stash water: <b>'+(S.stock.water||0)+'</b> · food: <b>'+(S.stock.food||0)+'</b> · scrap: <b>'+(S.stock.scrap||0)+'</b>. What you make goes in your pack.</p><div class="stack" style="margin-top:8px">'
+    +RECIPES.map(r=>{const ok=canCook(r);const cost=Object.entries(r.cost).map(([k,v])=>v+' '+{water:'💧',food:'🥫',scrap:'🔩'}[k]).join(' + ');
+      return '<button class="btn'+(ok===true?'':' ghost')+'" '+(ok===true?'':'disabled')+' onclick="cook(\''+r.id+'\')">'+r.e+' '+esc(r.n)+'<small>'+cost+' · '+esc(ok===true?r.d:ok)+'</small></button>';}).join('')+'</div>';
+  const f=$('#kitchenFold');if(f)f.textContent=RECIPES.filter(r=>canCook(r)===true).length+' you can make';}
 function renderTrader(){const el=$('#trader');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first. The trader only stops where there are walls.</p>';return;}
   el.innerHTML=TRADE.map(t=>{let c=Math.max(1,Math.round(t.c*(1-sk('haggler')*0.1-sk('trader')*0.15)));return `<button class="tr${S.stock.scrap<c?' off':''}" onclick="trade('${t.id}')"><span class="e">${t.e}</span><b>${t.n}</b><span class="chip a">${c}🔩</span></button>`;}).join('');}
 function heal(){
@@ -5292,7 +5369,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
+  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5316,7 +5393,7 @@ function renderLoc(){
   const done=loc.rooms.every(r=>r.done);
   el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.rooms.filter(r=>r.done).length}/${loc.rooms.length} searched</span></h2>${tierLine}
   <div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span><span class="help">${loc.noise>=70?'Something is stirring':loc.noise>=40?'Keep it down':'Quiet'}</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div>
-  <div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done?'disabled':''}><span class="n">${r.sealed?'🔒 ':''}${esc(r.n)}</span><span class="m">${r.done?'searched':r.sealed?'<b style="color:var(--blood)">SEALED - something is in there</b>':'noise +'+r.noise}</span>${r.peek&&!r.done?`<span class="peek">🔭 ${esc(r.peek)}</span>`:''}</button>`).join('')}</div>
+  <div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done?'disabled':''}><span class="n">${r.sealed?'🔒 ':''}${esc(r.n)}</span><span class="m">${r.done?'searched':r.sealed?'<b style="color:var(--blood)">SEALED - something is in there</b>':'noise +'+r.noise}</span>${r.peek&&!r.done?`<span class="peek">🔭 ${esc(r.peek)}</span>`:''}${!r.done?roomTagLine(r):''}</button>`).join('')}</div>
   ${loc.found.length?`<div class="section-label" style="margin-top:12px">Found here</div><div class="loot" style="margin-top:6px">${loc.found.map(it=>`<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span>${esc(it.n)}<span class="pt">+${it.pts}</span></div>`).join('')}</div>`:''}
   ${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn ${done?'r':''}" onclick="leaveLoc()">${done?'Move on':'Leave the rest'}</button><button class="btn" onclick="claimBase()">${S.base?'Move base here · compare first':'Claim as base'}</button></div>`;
 }
@@ -5500,6 +5577,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.57',d:'Sep 27',t:'Water is for something now, and rooms are not all the same',
+  i:['THE KITCHEN (Base tab). "Water is basically useless." Now it is an ingredient: stash water plus food or scrap makes things you cannot find on the road, and they go in your pack. A Sports drink halves your thirst for the rest of the day. Hot coffee sharpens your first hit. Trail stew is a real meal, +32 HP. A full canteen is three bottles in one. Boiled bandages turn water and scrap into meds. Garden tea (needs a garden) makes a bite half as likely to turn in your next fight.',
+     'ROOMS WITH SOMETHING ABOUT THEM. "Looting a house is kind of boring." About four rooms in ten now say something on the door. Locked: a key, a crowbar, an Engineer, or kick it in loudly - a key gets you extra. Dark: half the loot goes unseen without a Scout. Untouched: double, but noisier. Ransacked: less, but quiet. Blood on the floor: it might not be dead. Barricaded: someone held out in here, and sometimes they are still there and join you.',
+     'Gardens and rain barrels already make food and water on their own each morning - build them up in Base if you have not.']},
  {v:'7.56',d:'Sep 27',t:'Things happen on the road now',
   i:['ROAD ENCOUNTERS. About one arrival in five, something is on the road before the door: a man asking for water, a locked car, a body with a full pack, a fork through the backyards, a dog behind a fence, Marisol on the radio, two of Nadia\'s people wanting a toll, a vending machine, someone hurt, a garden gone wild, a tripwire, a pharmacy van, a face your crew knows. Each one is a choice, and who you brought along opens more of them - an Engineer pries the car, a Medic checks the body, a Teacher talks the raiders down.',
      'SEND YOUR CREW OUT. Anyone staying at base can go on a job from their card: Scavenge (scrap), Forage (food and water), Hunt (rounds, sometimes a weapon) or Scout ahead (your next three places closer). They are back after you walk 3,000 steps, and it pays half again if it is their line of work. Now and then they come home hurt; they never die out there. A card on the Road page shows who is out.',
