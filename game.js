@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.65';
+const VERSION='7.66';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1397,6 +1397,7 @@ function roomTagBefore(i){const loc=S.loc,r=loc.rooms[i];const t=r.tag;if(!t)ret
   if(t==='locked'){const free=S.gear.some(g=>g.id==='crowbar'&&!g.broken)||roleLvl('engineer');
     openSheet('<h2>🔒 '+esc(r.n)+' is locked</h2><p>A real lock, not a latch.</p><div class="stack">'
       +(free?'<button class="btn r" onclick="closeSheet();'+(roleLvl('engineer')?'':'S.loc.noise=Math.min(100,S.loc.noise+10);')+'roomTagClear('+i+',\'pried\');searchRoom('+i+')">'+(roleLvl('engineer')?'Pick it<small>'+esc(roleBy('engineer').name)+' has it open in a minute · quiet</small>':'Pry it<small>crowbar · noise +10, quieter than kicking it</small>')+'</button>':'')
+      +(toolN('picks')>0?'<button class="btn r" onclick="closeSheet();toolUse(\'picks\');roomTagClear('+i+',\'picked\');searchRoom('+i+')">🪛 Lockpicks<small>'+toolN('picks')+' on your belt · silent</small></button>':'')
       +'<button class="btn'+(S.keys>0?' r':'')+'" '+(S.keys>0?'':'disabled')+' onclick="closeSheet();S.keys--;roomTagClear('+i+',\'key\');searchRoom('+i+')">Use a chest key<small>'+(S.keys>0?'you have '+S.keys+' · the lock was worth it: extra loot':'no keys')+'</small></button>'
       +'<button class="btn" onclick="closeSheet();S.loc.noise=Math.min(100,S.loc.noise+25);roomTagClear('+i+',\'forced\');searchRoom('+i+')">Kick it in<small>noise +25</small></button>'
       +'<button class="btn ghost" onclick="closeSheet()">Leave it</button></div>',true);return true;}
@@ -2282,7 +2283,28 @@ const ACHV=[
   {id:'week',    n:'A Week in the Dead',d:'Finish a full week',         f:S=>(S.weeks||[]).length>=1},
   {id:'tier',    n:'Moving Up',        d:'Climb a league tier',         f:S=>(S.league.history||[]).some(h=>h.delta>0)},
   {id:'nem',     n:'Settled It',       d:'Beat your nemesis',           f:S=>(S.nem&&S.nem.beaten)>=1},
+  // v7.66 - more to earn, and every one of them is a title you can wear
+  {id:'s500k',   n:'Half a Million',   d:'500,000 lifetime steps',      f:S=>S.steps.total>=500000},
+  {id:'s1m',     n:'The Long Road',    d:'1,000,000 lifetime steps',    f:S=>S.steps.total>=1000000},
+  {id:'day20k',  n:'Twenty Thousand',  d:'20,000 steps in one day',     f:S=>(S.steps.today||0)>=20000||((S.steps.hist||[]).some(h=>h.n>=20000))},
+  {id:'k1000',   n:'Unstoppable',      d:'Put down 1,000 walkers',      f:S=>S.kills>=1000},
+  {id:'lvl40',   n:'Old Hand',         d:'Reach level 40',              f:S=>S.lvl>=40},
+  {id:'craft10', n:'Tinkerer',         d:'Make 10 things in the workshop', f:S=>(S.crafted||0)>=10},
+  {id:'craft50', n:'Mad Scientist',    d:'Make 50 things in the workshop', f:S=>(S.crafted||0)>=50},
+  {id:'town10',  n:'Local',            d:'Walk 10% of your town',       f:S=>townPctNow()>=10},
+  {id:'town50',  n:'Knows the Shortcuts',d:'Walk 50% of your town',     f:S=>townPctNow()>=50},
+  {id:'town90',  n:'Every Last Street',d:'Walk 90% of your town',       f:S=>townPctNow()>=90},
+  {id:'block1',  n:'Block Party',      d:'Clear the fog off a whole block', f:S=>((S.town&&S.town.blocks)||0)>=1},
+  {id:'block10', n:'Cartographer',     d:'Clear 10 blocks',             f:S=>((S.town&&S.town.blocks)||0)>=10},
 ];
+// The town share, or 0 before the street count exists. Cheap: 1,600 squares.
+function townPctNow(){try{const t=(typeof townStats==='function')?townStats():null;return t&&t.pct!=null?t.pct:0;}catch(e){return 0;}}
+/* TITLES (v7.66). "Achievements with titles" - the wall existed but paid nothing
+   and nobody else ever saw it. Now each milestone is also a title. Wear one and it
+   shows under your name on the County board. Only the words travel; the town ones
+   say "walked 50% of your town", never where your town is. */
+function titleNow(){const a=S.title&&S.achv&&S.achv[S.title]?ACHV.find(x=>x.id===S.title):null;return a?a.n:'';}
+function wearTitle(id){if(id&&!(S.achv&&S.achv[id]))return;S.title=id||'';save();pushPlayer();toast(id?'Now wearing: '+titleNow():'Title taken off','a');SFX.play('ui');achvSheet();}
 function checkAchv(){
   if(!S.achv)S.achv={};let fresh=[];
   for(const a of ACHV){ if(S.achv[a.id])continue;
@@ -2302,9 +2324,11 @@ function achvSheet(){
     return '<div style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);opacity:'+(on?1:.55)+'">'
       +'<div style="width:26px;text-align:center;font-size:18px">'+(on?'🏅':'🔒')+'</div>'
       +'<div style="flex:1"><div style="font-weight:700;color:'+(on?'var(--bone)':'var(--bone2)')+'">'+esc(a.n)+'</div>'
-      +'<div class="help">'+esc(a.d)+(on?' · '+esc(S.achv[a.id]):'')+'</div></div></div>';};
+      +'<div class="help">'+esc(a.d)+(on?' · '+esc(S.achv[a.id]):'')+'</div></div>'
+      +(on?(S.title===a.id?'<button class="btn xs r" onclick="wearTitle(\'\')">Wearing</button>':'<button class="btn xs" onclick="wearTitle(\''+a.id+'\')">Wear</button>'):'')+'</div>';};
   openSheet('<h2>The wall</h2>'
-    +'<p class="help">'+got+' of '+ACHV.length+' · things you have actually done out there.</p>'
+    +'<p class="help">'+got+' of '+ACHV.length+' · things you have actually done out there. Every one is a <b style="color:var(--bone)">title</b>: tap Wear and it shows under your name on the County board.</p>'
+    +'<p class="help">Wearing: <b style="color:var(--amber)">'+(titleNow()?esc(titleNow()):'nothing')+'</b></p>'
     +'<div class="progress" style="margin:8px 0 12px"><div class="bar"><i style="width:'+Math.round(got/ACHV.length*100)+'%;background:linear-gradient(90deg,var(--rot2),var(--rot))"></i></div></div>'
     +ACHV.map(row).join('')
     +'<button class="btn r wide" style="margin-top:12px" onclick="closeSheet()">Close</button>',true);
@@ -3075,6 +3099,13 @@ function act(kind){
       breakWeapon(g);
     }
   }
+  else if(kind==='molotov'){
+    if((C.molos||0)>=2){toast('Two molotovs a fight - the room is already on fire','d');return;}
+    if(!toolUse('molotov')){toast('No molotov','d');return;}
+    C.molos=(C.molos||0)+1;SFX.play('shatter');clog('You light the rag and throw. The whole room goes up.','good');
+    for(const o of alive())dealTo(o,rint(10,16)+(S.lvl-1),'The fire catches '+o.n,'heavy');
+    if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+30);
+  }
   else if(kind==='brace'){C.brace=true;clog('You set your feet and wait for it.','you');fxPush({k:'brace'});}
   else if(kind==='med'){
     // Unlimited patch-ups meant ten meds were 400 extra HP and no boss could
@@ -3478,6 +3509,7 @@ function renderCombat(){
     ${w?`<button class="btn" onclick="act('fists')">👊 Fists<small>${fistDmg()[0]}-${fistDmg()[1]} dmg · saves your ${esc(w.n)}</small></button>`:''}
     <button class="btn" onclick="swapSheet()">🔄 Switch weapon<small>${swapOptions().length} in your gear${w?' · costs your turn':' · free, hands empty'}</small></button>
     <button class="btn" onclick="shootGuard()" ${g&&(ammoN||g.id==='mercy')?'':'disabled'}>${g?g.e+' '+esc(g.n)+(temperOf(g)?' <span class="chip s">'+esc(temperOf(g).n)+'</span>':''):'🔫 No gun'}<small>${g?(wDmg(g)[0]+sk('steadyaim')*3)+'-'+(wDmg(g)[1]+sk('steadyaim')*3)+' · '+ammoN+' rounds'+(g.dur!==undefined?' · '+g.dur+' left':''):'find one'}</small></button>
+    ${toolN('molotov')>0?`<button class="btn" onclick="act('molotov')" ${(C.molos||0)>=2?'disabled':''}>🍾 Molotov<small>hits all ${alive().length} · ${toolN('molotov')} on your belt · loud</small></button>`:''}
     <button class="btn" onclick="act('brace')">⚔️ Counter<small>take ${sk('steady')?60+sk('steady')*10:50}% less · hit back everyone who lands one</small></button>
     <button class="btn" onclick="act('med')" ${meds?'':'disabled'}>${meds?MEDS[bestMed()].e:'🩹'} Patch up<small>${meds?esc(MEDS[bestMed()].n)+' · +'+Math.min(medHeal(bestMed()),maxHp()-S.hp):'no meds'}</small></button>
     <button class="btn ghost" onclick="act('flee')" ${C.where==='raid'?'disabled':''}>🏃 Run<small>70% · drop 25% pack</small></button>
@@ -3889,6 +3921,49 @@ function renderKitchen(){const el=$('#kitchen');if(!el)return;if(!S.base){el.inn
     +RECIPES.map(r=>{const ok=canCook(r);const cost=Object.entries(r.cost).map(([k,v])=>v+' '+{water:'💧',food:'🥫',scrap:'🔩'}[k]).join(' + ');
       return '<button class="btn'+(ok===true?'':' ghost')+'" '+(ok===true?'':'disabled')+' onclick="cook(\''+r.id+'\')">'+r.e+' '+esc(r.n)+'<small>'+cost+' · '+esc(ok===true?r.d:ok)+'</small></button>';}).join('')+'</div>';
   const f=$('#kitchenFold');if(f)f.textContent=RECIPES.filter(r=>canCook(r)===true).length+' you can make';}
+
+
+/* ================= the workshop (v7.66) =================
+   "Crafting at base" - her pick. Scrap mostly went on repairs and rooms, so the
+   workshop turns it into tools you choose WHEN to spend. They live on a toolbelt
+   (S.tools), not in the pack: stashing turns the whole pack into points, and a
+   molotov you made on purpose must not get melted into league score by accident.
+   Five of each at most, so a big scrap pile cannot make fights free. */
+const TOOL_CAP=5;
+const TOOLS={
+  molotov:{n:'Molotov',e:'🍾',d:'In a fight: hits EVERY enemy for 10-16 (+ your level). Loud: noise +30 indoors. Two a fight.'},
+  picks:  {n:'Lockpicks',e:'🪛',d:'Opens a locked room with no noise at all, like a key but without the extra loot.'},
+  lure:   {n:'Noisemaker',e:'⏰',d:'Wind it up and throw it down the street: noise -30 where you are looting.'},
+};
+const WORKSHOP=[
+  {id:'molotov',cost:{scrap:6,water:1},tool:'molotov',d:TOOLS.molotov.d},
+  {id:'picks',  cost:{scrap:4,parts:1},tool:'picks',  d:TOOLS.picks.d},
+  {id:'lure',   cost:{scrap:5},        tool:'lure',   d:TOOLS.lure.d},
+  {id:'bolts',  cost:{scrap:3},        n:'Whittle bolts',e:'🎯',d:'+8 bolts to the stash, for a bow or crossbow.'},
+];
+function tools(){return S.tools||(S.tools={});}
+function toolN(k){return tools()[k]||0;}
+function toolUse(k){if(toolN(k)<1)return false;S.tools[k]--;return true;}
+function haveOf(k){return k==='parts'?(S.parts||0):(S.stock[k]||0);}
+function canCraft(r){if(!S.base)return 'Claim a base first';if(r.tool&&toolN(r.tool)>=TOOL_CAP)return 'Toolbelt holds '+TOOL_CAP;
+  for(const [k,v] of Object.entries(r.cost))if(haveOf(k)<v)return 'Needs '+v+' '+k;return true;}
+function craft(id){const r=WORKSHOP.find(x=>x.id===id);if(!r)return;const ok=canCraft(r);if(ok!==true){toast(ok,'d');return;}
+  for(const [k,v] of Object.entries(r.cost)){if(k==='parts')S.parts-=v;else S.stock[k]-=v;}
+  if(r.tool){const t=TOOLS[r.tool];tools()[r.tool]=toolN(r.tool)+1;log('Made a '+t.n.toLowerCase()+'. It is on your toolbelt.');toast(t.e+' '+t.n+' · '+toolN(r.tool)+' on your belt','a');}
+  else{addAmmoStock('bolts',8);log('Whittled 8 bolts.');toast('🎯 +8 bolts','a');}
+  S.crafted=(S.crafted||0)+1;SFX.play('salvage');save();render();}
+function toolbeltLine(){const on=Object.keys(TOOLS).filter(k=>toolN(k)>0);
+  return on.length?on.map(k=>TOOLS[k].e+' '+TOOLS[k].n+' x'+toolN(k)).join(' · '):'Nothing on your toolbelt yet.';}
+function renderWorkshop(){const el=$('#workshop');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first.</p>';return;}
+  const icon={scrap:'🔩',water:'💧',parts:'⚙️'};
+  el.innerHTML='<p class="help">Scrap: <b>'+(S.stock.scrap||0)+'</b> · water: <b>'+(S.stock.water||0)+'</b> · parts: <b>'+(S.parts||0)+'</b></p>'
+    +'<p class="help" style="margin-top:4px"><b style="color:var(--bone)">Toolbelt:</b> '+toolbeltLine()+'</p><div class="stack" style="margin-top:8px">'
+    +WORKSHOP.map(r=>{const ok=canCraft(r);const t=r.tool?TOOLS[r.tool]:r;const cost=Object.entries(r.cost).map(([k,v])=>v+' '+icon[k]).join(' + ');
+      return '<button class="btn'+(ok===true?'':' ghost')+'" '+(ok===true?'':'disabled')+' onclick="craft(\''+r.id+'\')">'+t.e+' '+esc(t.n)+(r.tool?' <span class="sub">'+toolN(r.tool)+'/'+TOOL_CAP+'</span>':'')+'<small>'+cost+' · '+esc(ok===true?r.d:ok)+'</small></button>';}).join('')+'</div>';
+  const f=$('#workshopFold');if(f)f.textContent=toolbeltLine().indexOf('Nothing')===0?'':Object.keys(TOOLS).reduce((a,k)=>a+toolN(k),0)+' on your belt';}
+function useLure(){const loc=S.loc;if(!loc)return;if(!toolUse('lure')){toast('No noisemaker','d');return;}
+  loc.noise=Math.max(0,loc.noise-30);log('You wind the noisemaker and throw it down the street. Whatever was listening goes after it.');toast('⏰ Noise -30','a');SFX.play('ui');save();render();}
+function lureBtn(loc){return toolN('lure')>0&&loc.noise>0?'<button class="btn sm" style="margin-top:6px" onclick="useLure()">⏰ Throw a noisemaker<small>noise -30 · '+toolN('lure')+' left</small></button>':'';}
 
 /* ================= the locksmith (v7.62) =================
    "I have 144 chest keys and barely use them." Keys drop half as often now,
@@ -4744,7 +4819,7 @@ function compactSave(){const c=JSON.parse(JSON.stringify(S));delete c.town;delet
 function visitState(){const crew=(S.active||[]).map(id=>(S.crew||[]).find(c=>c.id===id)).filter(Boolean).slice(0,3).map(c=>({id:c.id,n:c.n,av:c.av,role:c.role,cls:c.cls}));
   return {shelf:(S.shelf||[]).map(x=>({id:x.id})),pet:S.pet||null,petCoat:S.petCoat||null,petName:S.petName||'',petXp:S.petXp||0,petCount:(S.pets||[]).length,crew,active:crew.map(c=>c.id)};}
 function cloudSaveOf(st){return st&&((st.private&&st.private.save)||(st.public&&st.public.save))||null;}
-function publicState(){return {private:{save:compactSave()},public:Object.assign(visitState(),{name:S.name,av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code,raiding:(S.raidCur?{id:S.raidCur.id,n:S.raidCur.n,tier:S.raidCur.tier,at:Date.now()}:null),flare:(S.flare&&S.flare.endsAt>Date.now())?S.flare:null,
+function publicState(){return {private:{save:compactSave()},public:Object.assign(visitState(),{name:S.name,title:titleNow(),av:S.av,cls:S.cls,base:S.base?{n:S.base.n,e:S.base.e,t:S.base.t,district:S.base.district,rooms:S.base.rooms}:null,defense:defense(),lvl:S.lvl,kills:S.kills,crew:activeCrew().length,weapon:eqItem('melee')?eqItem('melee').n:'fists',goal:S.goal,rival:S.rival||'',horde_next:(S.horde&&S.horde.next)||0,raid_hour:(S.raidPending&&S.raidPending.date===todayStr())?S.raidPending.hour:-1,defense:defense(),steps_today:S.steps.today,steps_week:(S.steps.weekId===weekId()?S.steps.week||0:0),steps_total:S.steps.total,src:S.steps.src||{},crowns:S.crowns||0,bossdmg:(S.boss&&S.boss.week===weekId()?S.boss.my||0:0),streak:S.streak.days,party:S.party.code,raiding:(S.raidCur?{id:S.raidCur.id,n:S.raidCur.n,tier:S.raidCur.tier,at:Date.now()}:null),flare:(S.flare&&S.flare.endsAt>Date.now())?S.flare:null,
     // The muster rides here for the same reason the flare does: every client
     // already polls this board, so a ready-check needs no new table.
     muster:(S.muster&&!S.muster.started&&(S.muster.at||0)+90000>Date.now())?
@@ -5543,7 +5618,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}try{renderAsk();}catch(e){}try{renderBevt();}catch(e){}try{renderQuest();}catch(e){}try{renderVehicle();}catch(e){}try{renderPrestige();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}try{renderLocksmith();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
+  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}try{renderAsk();}catch(e){}try{renderBevt();}catch(e){}try{renderQuest();}catch(e){}try{renderVehicle();}catch(e){}try{renderPrestige();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}try{renderWorkshop();}catch(e){}try{renderLocksmith();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5566,7 +5641,7 @@ function renderLoc(){
   if(!loc.cleared){el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.geo?esc(_ft.n):'unknown'}</span></h2><p>Door is ajar. No telling what is inside. Threat here: ${'☠'.repeat(Math.min(5,Math.round(district().threat*loc.threat+(isNight()?1:0))))}${isNight()?' · horde night':''}</p>${tierLine}${bankedLine()}${crewDownWarn()}<div class="grid2" style="margin-top:12px"><button class="btn r" onclick="enterLoc()">Go in</button><button class="btn" onclick="leaveLoc()">Keep walking</button></div>`;return;}
   const done=loc.rooms.every(r=>r.done);
   el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.rooms.filter(r=>r.done).length}/${loc.rooms.length} searched</span></h2>${tierLine}
-  <div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span><span class="help">${loc.noise>=70?'Something is stirring':loc.noise>=40?'Keep it down':'Quiet'}</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div>
+  <div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span><span class="help">${loc.noise>=70?'Something is stirring':loc.noise>=40?'Keep it down':'Quiet'}</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div>${lureBtn(loc)}
   <div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done?'disabled':''}><span class="n">${r.sealed?'🔒 ':''}${esc(r.n)}</span><span class="m">${r.done?'searched':r.sealed?'<b style="color:var(--blood)">SEALED - something is in there</b>':'noise +'+r.noise}</span>${r.peek&&!r.done?`<span class="peek">🔭 ${esc(r.peek)}</span>`:''}${!r.done?roomTagLine(r):''}</button>`).join('')}</div>
   ${loc.found.length?`<div class="section-label" style="margin-top:12px">Found here</div><div class="loot" style="margin-top:6px">${loc.found.map(it=>`<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span>${esc(it.n)}<span class="pt">+${it.pts}</span></div>`).join('')}</div>`:''}
   ${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn ${done?'r':''}" onclick="leaveLoc()">${done?'Move on':'Leave the rest'}</button><button class="btn" onclick="claimBase()">${S.base?'Move base here · compare first':'Claim as base'}</button></div>`;
@@ -5778,6 +5853,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.66',d:'Sep 27',t:'The workshop, titles, and fog on your town',
+  i:['THE WORKSHOP (Base tab, under the Kitchen). Scrap into tools you pick when to spend: a MOLOTOV (6 scrap + a water bottle) hits every enemy in a fight at once, two a fight, loud. LOCKPICKS (4 scrap + a part) open a locked room silently. A NOISEMAKER (5 scrap) knocks 30 off the noise where you are looting. Or whittle 8 bolts for 3 scrap. Tools sit on a TOOLBELT, five of each - not in your pack, so stashing never melts them into points.',
+     'TITLES. Every milestone on The wall (You tab) is now a title. Tap Wear and it shows under your name on the County board for your friends. 13 new milestones to earn, including a million steps, 20,000 in a day, workshop ones and town ones.',
+     'FOG OF WAR on Paint the town. Turn it on from the town chip on the map and everything you have not walked goes dark. The town is cut into 250 m BLOCKS: walk 90% of a block\'s streets and its fog lifts for good, paying 15 scrap and a weapon part, with a chest key every fifth block. Still stays on your phone only.']},
  {v:'7.65',d:'Sep 27',t:'A crowbar is not quiet',
   i:['"How is prying a door with a crowbar considered quiet LOL." It was silent - as silent as a key. Now prying a locked room with a crowbar makes noise +10: quieter than kicking it in (+25), louder than a key. An Engineer still picks the lock quietly, and a chest key is still the best way in (silent, plus extra loot).']},
  {v:'7.64',d:'Sep 27',t:'The master key is gone',
@@ -7240,7 +7319,7 @@ function renderFriends(){
   $('#lbTabs').innerHTML=LB_TABS.map(([k,n])=>`<button class="${LB_TAB===k?'on':''}" onclick="lbTab('${k}')">${n}</button>`).join('');
   el.innerHTML=shown.map((f)=>{const me=f.handle===o.handle;const pub=f.pub||{};const idx=friends.indexOf(f);const ts=typedShare(pub);
     return `<div class="lbrow${me?' me':''}${S.rival===f.handle?' rival':''}"><div class="rk">${shown.indexOf(f)+1}</div><div class="av">${pub.av?ART.avatarSVG(pub.av,40):'🧍'}</div>
-    <div class="nm"><button class="linkish" onclick="${me?'':`setRival('${f.handle}')`}">${esc(f.name)}${me?' (you)':''}${pub.crowns?' 👑'+pub.crowns:''}${S.rival===f.handle?' · rival':''}${f.quiet?' <span class="chip s">not out this week</span>':''}</button><small>@${esc(f.handle)} · lvl ${pub.lvl||1} · ${fmt(pub.steps_today||0)} today · ${fmt(pub.steps_week||0)} this week${pub.streak?' · streak '+pub.streak:''}${ts&&ts.typed?` · <span style="color:var(--amber)">${fmt(ts.typed)} typed in (${ts.pct}%)</span>`:ts?' · phone-synced':''}</small></div>
+    <div class="nm"><button class="linkish" onclick="${me?'':`setRival('${f.handle}')`}">${esc(f.name)}${me?' (you)':''}${pub.crowns?' 👑'+pub.crowns:''}${S.rival===f.handle?' · rival':''}${f.quiet?' <span class="chip s">not out this week</span>':''}</button>${pub.title?`<small style="color:var(--amber)">«${esc(String(pub.title).slice(0,30))}»</small>`:''}<small>@${esc(f.handle)} · lvl ${pub.lvl||1} · ${fmt(pub.steps_today||0)} today · ${fmt(pub.steps_week||0)} this week${pub.streak?' · streak '+pub.streak:''}${ts&&ts.typed?` · <span style="color:var(--amber)">${fmt(ts.typed)} typed in (${ts.pct}%)</span>`:ts?' · phone-synced':''}</small></div>
     <div class="sc">${fmt(lbVal(f))}${me?'':`<br><button class="btn xs" onclick="visitFriend(${idx})">Visit</button><br><button class="btn xs ghost" onclick="hideFriend('${f.handle}')">Hide</button>`}</div></div>`;}).join('')||'<p class="help">Nobody yet.</p>';
   if(hid.length)el.innerHTML+=`<div class="section-label" style="margin-top:12px">Hidden</div>`+hid.map(f=>`<div class="lbrow" style="opacity:.6"><div class="rk">·</div><div class="av">🚫</div><div class="nm">${esc(f.name)}<small>@${esc(f.handle)}</small></div><div class="sc"><button class="btn xs" onclick="unhideFriend('${f.handle}')">Unhide</button></div></div>`).join('');
 }

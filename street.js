@@ -1459,7 +1459,7 @@ function townReady(){
   if(S.town&&S.town.o&&geoDist(S.town.o,b)>TOWN_MOVE){
     // The pin moved to a different neighbourhood. The old squares describe somewhere
     // else, so they go - but what was already paid stays paid.
-    S.town={o:{lat:b.lat,lon:b.lon},w:'',st:null,paid:S.town.paid||0,hide:!!S.town.hide};STREET.town=null;
+    S.town={o:{lat:b.lat,lon:b.lon},w:'',st:null,paid:S.town.paid||0,hide:!!S.town.hide,fog:!!S.town.fog,blocks:S.town.blocks||0,bdone:[]};STREET.town=null;
     log('Your base pin moved to a new neighbourhood, so the town map starts fresh here. Rewards you already collected stay collected.');
   }
   if(!S.town||!S.town.o)S.town={o:{lat:b.lat,lon:b.lon},w:'',st:null,paid:0};
@@ -1481,6 +1481,10 @@ function townBounds(x0,x1,y){ // squares x0..x1 of row y, as Leaflet bounds
 // has no street of its own. GPS drifts 10-15 m sideways, so a walk down a street that
 // runs along a grid line lands half its fixes next door. The "no street of its own"
 // part is what stops one street from clearing the parallel street a block over.
+// 1 if this street square counts as walked (same rule as the percentage).
+function townGot(T,i){const N=TOWN_N;if(townGet(T.w,i))return 1;
+  const x=i%N,y=(i/N)|0;const nb=(xx,yy)=>{if(xx<0||yy<0||xx>=N||yy>=N)return 0;const j=yy*N+xx;return townGet(T.w,j)&&!townGet(T.st,j);};
+  return (nb(x-1,y)||nb(x+1,y)||nb(x,y-1)||nb(x,y+1))?1:0;}
 function townStats(){
   const T=townReady();if(!T)return null;
   let walked=0,streets=0,got=0;const N=TOWN_N;
@@ -1508,7 +1512,7 @@ function townMark(pos){
   T.last={lat:pos.lat,lon:pos.lon,t:now};
   let added=0;
   for(const p of pts){const i=townXY(p[0],p[1]);if(i>=0&&!townGet(T.w,i)){townSet(T.w,i);added++;}}
-  if(added){S.town.w=townB64(T.w);townMiles();save();townDraw();townRow();}
+  if(added){S.town.w=townB64(T.w);townMiles();townBlocks();save();townDraw();townRow();}
   return added;
 }
 function townMiles(){
@@ -1520,6 +1524,26 @@ function townMiles(){
     if(g.key){S.keys+=g.key;got.push(g.key+' chest key'+(g.key===1?'':'s'));}
     log('You have walked '+at+'% of your neighbourhood. '+got.join(', ')+'.');
     toast('\u{1F3A8} '+at+'% of your town walked · '+got.join(', '),'l');SFX.play(at>=50?'legend':'rare');
+  }
+}
+/* BLOCKS AND FOG (v7.66). "Fog of war on your real map" - her pick, on top of
+   paint the town. The 2 km grid is cut into 8 x 8 blocks of 250 m. Walk 90% of a
+   block's streets and the block is CLEARED: its fog lifts completely and it pays
+   15 scrap and a weapon part, plus a chest key every fifth block. 90% and not all
+   of it, because some mapped paths are behind a fence. A block needs at least 3
+   street squares to count, so an empty field is never a free reward. Everything
+   here stays on the phone, like the rest of S.town. */
+const TOWN_BLOCK=5, TOWN_BN=TOWN_N/TOWN_BLOCK, TOWN_BPCT=0.9;
+function townBlockStats(T,b){const bx=b%TOWN_BN,by=(b/TOWN_BN)|0;let st=0,got=0;
+  for(let y=by*TOWN_BLOCK;y<(by+1)*TOWN_BLOCK;y++)for(let x=bx*TOWN_BLOCK;x<(bx+1)*TOWN_BLOCK;x++){const i=y*TOWN_N+x;if(!townGet(T.st,i))continue;st++;got+=townGot(T,i);}
+  return {st,got};}
+function townBlocks(){
+  const T=townReady();if(!T||!T.st)return;if(!S.town.bdone)S.town.bdone=[];
+  for(let b=0;b<TOWN_BN*TOWN_BN;b++){if(S.town.bdone.includes(b))continue;const k=townBlockStats(T,b);
+    if(k.st<3||k.got<k.st*TOWN_BPCT)continue;
+    S.town.bdone.push(b);S.town.blocks=(S.town.blocks||0)+1;S.stock.scrap+=15;S.parts=(S.parts||0)+1;const key=S.town.blocks%5===0;if(key)S.keys++;
+    const got='15 scrap, 1 part'+(key?', a chest key':'');
+    log('Block cleared - the fog lifts off another 250 m of your town. '+got+'.');toast('\u{1F32B}\u{FE0F} Block cleared · '+got,'l');SFX.play('rare');
   }
 }
 function townGive(g){const a=[];if(g.scrap)a.push(g.scrap+' scrap');if(g.parts)a.push(g.parts+' parts');if(g.key)a.push(g.key+' key'+(g.key===1?'':'s'));return a.join(' · ');}
@@ -1548,7 +1572,7 @@ async function townStreets(force){
           if(!g[k])continue;let i=townXY(g[k].lat,g[k].lon);if(i>=0)townSet(st,i);
           if(k&&g[k-1]){const d=geoDist(g[k-1],g[k]),n=Math.ceil(d/15);for(let m=1;m<n;m++){i=townXY(g[k-1].lat+(g[k].lat-g[k-1].lat)*m/n,g[k-1].lon+(g[k].lon-g[k-1].lon)*m/n);if(i>=0)townSet(st,i);}}
         }}
-      T.st=st;S.town.st=townB64(st);delete S.town.tried;townMiles();save();
+      T.st=st;S.town.st=townB64(st);delete S.town.tried;townMiles();townBlocks();save();
     }
   }finally{STREET.townLoading=false;townDraw();townRow();}
 }
@@ -1563,8 +1587,14 @@ function townDraw(){
   const kind=i=>townGet(T.w,i)?2:(T.st&&townGet(T.st,i)?1:0);
   for(let y=0;y<N;y++){let x=0;while(x<N){const k=kind(y*N+x);if(!k){x++;continue;}let x1=x;while(x1+1<N&&kind(y*N+x1+1)===k)x1++;
     L.rectangle(townBounds(x,x1,y),{renderer:STREET.townCanvas,interactive:false,stroke:false,fillColor:k===2?'#e6a530':'#8fb3c9',fillOpacity:k===2?0.36:0.2}).addTo(G);x=x1+1;}}
+  // Fog: everything in the 2 km square you have not walked sits under a dark haze,
+  // and a cleared block has none at all.
+  if(S.town.fog){const bd=S.town.bdone||[];const fogged=i=>{const x=i%N,y=(i/N)|0;if(bd.includes(((y/TOWN_BLOCK)|0)*TOWN_BN+((x/TOWN_BLOCK)|0)))return 0;return townGet(T.w,i)?0:1;};
+    for(let y=0;y<N;y++){let x=0;while(x<N){if(!fogged(y*N+x)){x++;continue;}let x1=x;while(x1+1<N&&fogged(y*N+x1+1))x1++;
+      L.rectangle(townBounds(x,x1,y),{renderer:STREET.townCanvas,interactive:false,stroke:false,fillColor:'#07080c',fillOpacity:0.55}).addTo(G);x=x1+1;}}}
   STREET.townLayer=G.addTo(STREET.map);
 }
+function townFog(){if(!S.town)return;S.town.fog=!S.town.fog;save();townDraw();townSheet();}
 function townRow(){
   const el=$('#townRow');if(!el)return;
   if(!S.base||!S.base.geo){el.innerHTML='<span class="help">\u{1F3A8} Drop your base pin and the map starts remembering which streets around it you have walked.</span>';return;}
@@ -1583,7 +1613,9 @@ function townSheet(){
     +'<p>Every 50 m square you walk through on the live map turns <b style="color:var(--amber)">amber</b> and stays that way. Streets you have not walked yet show as a faint blue wash, so the map tells you where to go next. It only counts on foot, with a decent GPS fix.</p>'
     +'<p class="help"><b style="color:var(--bone)">This stays on your phone.</b> It is not sent to the server, it is not on the leaderboard, and friends who visit your base cannot see it. It is inside your own save file if you export one.</p>'
     +TOWN_MILES.map((m,i)=>'<div class="kv" style="grid-template-columns:auto 1fr auto;gap:10px;opacity:'+(i<paid?.55:1)+'"><b>'+m[0]+'%</b><span>'+townGive(m[1])+'</span><span>'+(i<paid?'✓ collected':'')+'</span></div>').join('')
+    +'<p style="margin-top:12px"><b>Blocks:</b> '+((S.town.bdone||[]).length)+' of this neighbourhood cleared'+(S.town.blocks?' · '+S.town.blocks+' ever':'')+'. Walk 90% of the streets in a 250 m block to clear it: 15 scrap and a part, and a chest key every fifth block.</p>'
     +(s.pct==null?'<button class="btn wide" style="margin-top:10px" onclick="closeSheet();townStreets(true)">Count my streets now</button>':'')
+    +'<button class="btn wide" style="margin-top:10px" onclick="townFog()">'+(S.town.fog?'Fog of war: ON · tap for paint only':'Fog of war: OFF · tap to hide what you have not walked')+'</button>'
     +'<div class="grid2" style="margin-top:10px"><button class="btn" onclick="townToggle()">'+(S.town.hide?'Show the paint on the map':'Hide the paint on the map')+'</button><button class="btn r" onclick="closeSheet()">Back</button></div>',true);
 }
 
