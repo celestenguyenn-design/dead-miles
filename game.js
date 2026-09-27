@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.62';
+const VERSION='7.63';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1086,7 +1086,7 @@ function expedSteps(n){for(const c of crewOut()){c.out.left-=n;if(c.out.left<=0)
 function expedReturn(c){const job=EXPED[c.out.job]||{n:'the rescue',best:''};const lvl=c.lvl+sk('leader');const m=(c.role===job.best?1.5:1)*(1+0.1*(lvl-1));const got=[];
   if(c.out.job==='scavenge'){const sc=Math.round(rint(8,14)*m);S.stock.scrap+=sc;got.push(sc+' scrap');if(Math.random()<0.3*m){S.parts=(S.parts||0)+2;got.push('2 parts');}}
   if(c.out.job==='forage'){const f=Math.round(rint(3,5)*m),w=Math.round(rint(2,4)*m);S.stock.food+=f;S.stock.water+=w;got.push(f+' food',w+' water');}
-  if(c.out.job==='hunt'){const a=Math.round(rint(5,9)*m);addAmmoStock('ammo',a);got.push(a+' rounds');if(Math.random()<0.25*m){const g=pick(['bat','crowbar','hatchet','cleaver','bow','spear']);S.gear.push({uid:uid(),id:g,...GEAR[g]});got.push('a '+GEAR[g].n.toLowerCase());}}
+  if(c.out.job==='hunt'){const a=Math.round(rint(5,9)*m);addAmmoStock('ammo',a);got.push(a+' rounds');if(Math.random()<0.12*m){const g=pick(['bat','crowbar','hatchet','cleaver','bow','spear']);S.gear.push({uid:uid(),id:g,...GEAR[g]});got.push('a '+GEAR[g].n.toLowerCase());}}
   if(c.out.job==='scout'){S.walk.scouted=3;got.push('the next three places marked');}
   if(c.out.job==='rescue'){if(Math.random()<0.6&&S.crew.length<12){const n=newCrew();S.crew.push(n);got.push(n.name+' - alive, and a '+ROLES[n.role].n.toLowerCase());loyAdd(c,2);}else{got.push('nobody. They were too late');loyAdd(c,1);}}
   c.xp+=2;crewXp(0);
@@ -1467,7 +1467,8 @@ function rollRoom(r,loc){
   const lm=lootMult()*(loc.stronghold?1.4:1)*ft.mult;
   // Distance buys RARITY, not just bigger numbers - a pile of more canned beans
   // is not a reason to walk a mile. Only rare-and-up are re-weighted.
-  const list=table(r.cats,r.shelf,r.gear*ft.mult).map(x=>({...x,w:x.w*rarW(x)*((RAR[x.r||'common'].w>=3)?ft.rar:1)}));
+  // v7.63: gear in rooms at half weight. "We have unlimited weapons - I never feel like I need my legendaries."
+  const list=table(r.cats,r.shelf,r.gear*ft.mult*0.5).map(x=>({...x,w:x.w*rarW(x)*((RAR[x.r||'common'].w>=3)?ft.rar:1)}));
   const n=rint(1,3);const out=[];
   for(let i=0;i<n;i++){const it=wpick(list,'w');if(it.gear)out.push({id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r});else out.push({id:it.id,n:it.n,e:it.e,pts:Math.round(it.pts*lm),cat:it.cat,qty:it.qty,r:it.r});}
   if(Math.random()<0.07*ft.mult)out.push({id:'chest',...ITEMS.chest});
@@ -3127,7 +3128,7 @@ function act(kind){
   if(eqItem('armor')&&eqItem('armor').id==='nightingale'&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+5);}
   const reap=()=>{for(const e of C.enemies){if(!e.dead&&e.hp<=0){e.dead=true;e.hp=0;fxPush({k:'die',i:C.enemies.indexOf(e)});codexKill(e);S.kills++;addXp(e.xp);crewXp(1);ctEvent('kills',1);if(sk('transfusion')&&S.hp<maxHp()){S.hp=Math.min(maxHp(),S.hp+sk('transfusion')*3);clog('You patch up as '+e.n+' drops. +'+(sk('transfusion')*3)+' HP.','good');}clog(e.n+' goes down. +'+e.xp+' XP.','good');
     if(e.burst&&!e.shot){hurt(Math.round((e.burst+dr())*(sk('lungs')?0.5:1)),'The bloater bursts and');}
-    if(e.human){if(Math.random()<0.5){const g=pick(['pipe','bat','jacket','helmet','crowbar']);S.gear.push({uid:uid(),id:g,...GEAR[g]});clog('It dropped a '+GEAR[g].n+'.','sys');}
+    if(e.human){if(Math.random()<0.25){const g=pick(['pipe','bat','jacket','helmet','crowbar']);S.gear.push({uid:uid(),id:g,...GEAR[g]});clog('It dropped a '+GEAR[g].n+'.','sys');}
       if(Math.random()<0.5){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:3,n:'Rounds (x3)'});clog('You take 3 rounds off the body.','sys');}
       if(e.boss){S.keys++;S.pack.push({id:'skull',...ITEMS.skull,uid:uid()});clog('The boss mask, and a key from the belt.','sys');
         if(e.wanted&&!e.fled){S.bossKilled=weekId();S.pack.push({id:'wanted',...ITEMS.wanted,uid:uid()});clog('Bounty claimed: '+e.n+'. The poster comes off the wall.','good');ctEvent('bounty',1);if(Math.random()<0.3)dropLegend('The boss was carrying something.');}}}
@@ -3895,17 +3896,17 @@ function renderKitchen(){const el=$('#kitchen');if(!el)return;if(!S.base){el.inn
    guaranteed legendary, and - once - a master key that opens every lock in
    the county for free. */
 const LOCKSMITH=[
-  {id:'chest',n:'Open a chest for you',e:'🧳',k:2,d:'Three rare-or-better things, straight into your pack.',go:()=>chestLoot()},
+  {id:'chest',n:'Open a chest for you',e:'🧳',k:3,d:'Three rare-or-better things, straight into your pack.',go:()=>chestLoot()},
   {id:'parts',n:'A box of weapon parts',e:'⚙️',k:6,d:'+12 parts for upgrades.',go:()=>{S.parts=(S.parts||0)+12;}},
   {id:'meds',n:'A medic\'s bag',e:'🧰',k:8,d:'A trauma kit, 2 antibiotics and an adrenaline shot into the stash.',go:()=>{medsGive('kit',1);medsGive('abx',2);medsGive('adrena',1);}},
-  {id:'legend',n:'Something from under the seat',e:'✨',k:15,d:'A legendary. Guaranteed.',go:()=>dropLegend('Marlow reaches under the seat.')},
-  {id:'master',n:'The master key',e:'🗝️',k:25,once:true,d:'Opens every locked room, chest and van in the county, free, forever.',go:()=>{S.masterKey=1;}},
+  {id:'legend',n:'Something from under the seat',e:'✨',k:40,weekly:true,d:'A legendary. Guaranteed. One a week.',go:()=>{S.lockLegendWeek=weekId();dropLegend('Marlow reaches under the seat.');}},
+  {id:'master',n:'The master key',e:'🗝️',k:60,once:true,d:'Opens every locked room, chest and van in the county, free, forever.',go:()=>{S.masterKey=1;}},
 ];
-function locksmith(id){const l=LOCKSMITH.find(x=>x.id===id);if(!l||!S.base)return;if(l.once&&S.masterKey){toast('You already have it');return;}if(S.keys<l.k){toast('Needs '+l.k+' keys','d');return;}
+function locksmith(id){const l=LOCKSMITH.find(x=>x.id===id);if(!l||!S.base)return;if(l.once&&S.masterKey){toast('You already have it');return;}if(l.weekly&&S.lockLegendWeek===weekId()){toast('Marlow has nothing else under the seat this week','d');return;}if(S.keys<l.k){toast('Needs '+l.k+' keys','d');return;}
   if(l.id==='chest'&&S.pack.length>=capacity()-2){toast('Make room in your pack first','d');return;}
   S.keys-=l.k;l.go();log('Locksmith: '+l.n.toLowerCase()+' for '+l.k+' keys.');toast(l.e+' '+l.n,'a');SFX.play('chest');save();render();}
 function renderLocksmith(){const el=$('#locksmith');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first.</p>';return;}
-  el.innerHTML='<p class="help">You have <b>'+(S.keys||0)+'</b> chest keys'+(S.masterKey?' and the master key':'')+'.</p><div class="stack" style="margin-top:8px">'+LOCKSMITH.filter(l=>!(l.once&&S.masterKey)).map(l=>'<button class="btn'+(S.keys>=l.k?' r':' ghost')+'" '+(S.keys>=l.k?'':'disabled')+' onclick="locksmith(\''+l.id+'\')">'+l.e+' '+esc(l.n)+'<small>'+l.k+' keys · '+esc(l.d)+'</small></button>').join('')+'</div>';
+  el.innerHTML='<p class="help">You have <b>'+(S.keys||0)+'</b> chest keys'+(S.masterKey?' and the master key':'')+'.</p><div class="stack" style="margin-top:8px">'+LOCKSMITH.filter(l=>!(l.once&&S.masterKey)).map(l=>{const ok=S.keys>=l.k&&!(l.weekly&&S.lockLegendWeek===weekId());return '<button class="btn'+(ok?' r':' ghost')+'" '+(ok?'':'disabled')+' onclick="locksmith(\''+l.id+'\')">'+l.e+' '+esc(l.n)+'<small>'+l.k+' keys · '+esc(l.weekly&&S.lockLegendWeek===weekId()?'Bought this week. Back next week.':l.d)+'</small></button>';}).join('')+'</div>';
   const f=$('#locksmithFold');if(f)f.textContent=(S.keys||0)+' keys';}
 function renderTrader(){const el=$('#trader');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first. The trader only stops where there are walls.</p>';return;}
   el.innerHTML=TRADE.map(t=>{let c=Math.max(1,Math.round(t.c*(1-sk('haggler')*0.1-sk('trader')*0.15)));return `<button class="tr${S.stock.scrap<c?' off':''}" onclick="trade('${t.id}')"><span class="e">${t.e}</span><b>${t.n}</b><span class="chip a">${c}🔩</span></button>`;}).join('');}
@@ -5776,6 +5777,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.63',d:'Sep 27',t:'Weapons are rarer, and the Locksmith is not a legendary vending machine',
+  i:['"We have unlimited weapons. I never run out, and I never feel like I need my legendaries." Weapons turn up in rooms half as often, raiders drop gear a quarter of the time instead of half, and a Hunt brings one home less often. A weapon breaking should mean something again.',
+     'Locksmith prices: a chest is 3 keys, the guaranteed legendary is 40 keys and one a week, the master key is 60.']},
  {v:'7.62',d:'Sep 27',t:'Chest keys are worth something',
   i:['"I have 144 chest keys and barely use them." Two fixes. Keys drop half as often from rooms and watch bounties. And there are places to spend them now: THE LOCKSMITH (Base tab, under the Trader) - 2 keys opens a chest on the spot, 6 buys a box of weapon parts, 8 a medic\'s bag, 15 a guaranteed legendary, and 25, once, the master key: every locked room, chest and pharmacy van in the county opens free, forever.',
      'Raiders at the walls can be PAID OFF with 5 keys - they leave, nothing taken, no fight. Nadia\'s toll on the road takes 2 keys instead of scrap.']},
