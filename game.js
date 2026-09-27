@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.64';
+const VERSION='7.65';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1383,7 +1383,7 @@ function bossName(){if(eventNow()==='halloween')return 'The Gourd King';return B
    worth double and louder. A bloody one may not be empty. A barricaded one was
    somebody's last stand, and sometimes they are still there. */
 const ROOM_TAGS=[
-  {id:'locked',    n:'Locked',     e:'🔒',w:5,d:'a key, a crowbar, an Engineer - or force it, loudly'},
+  {id:'locked',    n:'Locked',     e:'🔒',w:5,d:'a key or an Engineer (quiet), a crowbar (some noise) - or kick it in, loudly'},
   {id:'dark',      n:'Dark',       e:'🕯️',w:4,d:'half the loot goes unseen without a Scout'},
   {id:'untouched', n:'Untouched',  e:'✨',w:3,d:'double loot, but noisier'},
   {id:'ransacked', n:'Ransacked',  e:'🗑️',w:4,d:'picked over, but quiet'},
@@ -1396,7 +1396,7 @@ function roomTagLine(r){const t=roomTag(r);return t?'<span class="peek" style="c
 function roomTagBefore(i){const loc=S.loc,r=loc.rooms[i];const t=r.tag;if(!t)return false;
   if(t==='locked'){const free=S.gear.some(g=>g.id==='crowbar'&&!g.broken)||roleLvl('engineer');
     openSheet('<h2>🔒 '+esc(r.n)+' is locked</h2><p>A real lock, not a latch.</p><div class="stack">'
-      +(free?'<button class="btn r" onclick="closeSheet();roomTagClear('+i+',\'pried\');searchRoom('+i+')">Pry it<small>'+(roleLvl('engineer')?roleBy('engineer').name+' has it open in a minute':'crowbar')+' · quiet</small></button>':'')
+      +(free?'<button class="btn r" onclick="closeSheet();'+(roleLvl('engineer')?'':'S.loc.noise=Math.min(100,S.loc.noise+10);')+'roomTagClear('+i+',\'pried\');searchRoom('+i+')">'+(roleLvl('engineer')?'Pick it<small>'+esc(roleBy('engineer').name)+' has it open in a minute · quiet</small>':'Pry it<small>crowbar · noise +10, quieter than kicking it</small>')+'</button>':'')
       +'<button class="btn'+(S.keys>0?' r':'')+'" '+(S.keys>0?'':'disabled')+' onclick="closeSheet();S.keys--;roomTagClear('+i+',\'key\');searchRoom('+i+')">Use a chest key<small>'+(S.keys>0?'you have '+S.keys+' · the lock was worth it: extra loot':'no keys')+'</small></button>'
       +'<button class="btn" onclick="closeSheet();S.loc.noise=Math.min(100,S.loc.noise+25);roomTagClear('+i+',\'forced\');searchRoom('+i+')">Kick it in<small>noise +25</small></button>'
       +'<button class="btn ghost" onclick="closeSheet()">Leave it</button></div>',true);return true;}
@@ -2572,7 +2572,7 @@ const ROAD_EVENTS=[
   ]},
  {id:'car',n:'A locked car',e:'🚗',txt:()=>'A sedan with the windows up and bags on the back seat. The doors are locked and nobody has touched it.',
   opts:[
-   {t:'Pry it open',sub:'crowbar in your gear, or an Engineer',ok:()=>(S.gear.some(g=>g.id==='crowbar'&&!g.broken)||roleLvl('engineer'))||'Needs a crowbar or an Engineer',go:()=>{const a=evtGive(pick(['beans','ramen','jerky']));const b=evtGive(pick(['water','coffee','bandage']));const c=evtGive('scrap');return 'The door pops quietly. Bags full of the good stuff.'+(a&&b?'':' Some of it would not fit.');}},
+   {t:'Pry it open',sub:'crowbar in your gear, or an Engineer',ok:()=>(S.gear.some(g=>g.id==='crowbar'&&!g.broken)||roleLvl('engineer'))||'Needs a crowbar or an Engineer',go:()=>{const a=evtGive(pick(['beans','ramen','jerky']));const b=evtGive(pick(['water','coffee','bandage']));const c=evtGive('scrap');return 'The lock gives with a metal crunch - loud, but nothing like glass. Bags full of the good stuff.'+(a&&b?'':' Some of it would not fit.');}},
    {t:'Smash the window',sub:'loud · 50% something comes',ok:()=>true,go:()=>{evtGive(pick(['beans','water','pain']));if(Math.random()<0.5){evtFight(worldCrowd([worldEnemy('walker'),worldEnemy(isNight()?'stalker':'runner')]),'The glass brought them.');return null;}return 'Glass everywhere, and one bag. Nothing heard it.';}},
   ]},
  {id:'pack',n:'A body with a backpack',e:'🎒',txt:()=>'Face down in the gutter, a full pack still on the shoulders. It has not moved. Probably.',
@@ -5778,6 +5778,8 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.65',d:'Sep 27',t:'A crowbar is not quiet',
+  i:['"How is prying a door with a crowbar considered quiet LOL." It was silent - as silent as a key. Now prying a locked room with a crowbar makes noise +10: quieter than kicking it in (+25), louder than a key. An Engineer still picks the lock quietly, and a chest key is still the best way in (silent, plus extra loot).']},
  {v:'7.64',d:'Sep 27',t:'The master key is gone',
   i:['One purchase that made every lock in the county free forever was too much - it ended the whole point of keys. It is out. If you bought it, Marlow took it back and your 60 keys are refunded. In its place: A QUIET WEEK, 20 keys - Marlow has a word with the Tolls and there are no raids on your base for 7 days. Buy it again when it runs out.']},
  {v:'7.63',d:'Sep 27',t:'Weapons are rarer, and the Locksmith is not a legendary vending machine',
