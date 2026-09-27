@@ -373,9 +373,10 @@ function avatarSVG(av,size,opts){
 // zombies + raiders
 function zombieSVG(kind,size){
   const w=size||100,h=Math.round((size||100)*1.3);
-  const skin={walker:'#8fae6a',runner:'#a6c27a',bloater:'#8a9a6a',screamer:'#9fb27a',raider:'#e0a97e',gunner:'#c68a5d',boss:'#9a6543'}[kind]||'#8fae6a';
+  const skin={walker:'#8fae6a',runner:'#a6c27a',bloater:'#8a9a6a',screamer:'#9fb27a',raider:'#e0a97e',gunner:'#c68a5d',boss:'#9a6543',crawler:'#7a8a5a',stalker:'#5a6a7a',hazmat:'#9aa88a'}[kind]||'#8fae6a';
+  const crawler=kind==='crawler',hazmat=kind==='hazmat';
   const human=kind==='raider'||kind==='gunner'||kind==='boss';
-  const body=kind==='bloater'?`<ellipse cx="50" cy="96" rx="30" ry="20" fill="#5a6a4a"/><path d="M30 92 q10 -6 20 0 q10 6 20 0" stroke="#3a4a2a" stroke-width="2" fill="none"/>`:
+  const body=hazmat?`<rect x="28" y="78" width="44" height="32" rx="9" fill="#d9b23a"/><path d="M36 82 v24 M50 82 v24 M64 82 v24" stroke="#a8861f" stroke-width="2"/><circle cx="50" cy="94" r="5" fill="#3a3a44"/>`:kind==='bloater'?`<ellipse cx="50" cy="96" rx="30" ry="20" fill="#5a6a4a"/><path d="M30 92 q10 -6 20 0 q10 6 20 0" stroke="#3a4a2a" stroke-width="2" fill="none"/>`:
     human?`<rect x="30" y="78" width="40" height="30" rx="9" fill="${kind==='boss'?'#1a1a1e':'#4a3a2a'}"/>${kind==='boss'?'<path d="M32 80 l4 -6 l4 6 M44 80 l4 -6 l4 6 M56 80 l4 -6 l4 6" stroke="#bbb" stroke-width="2" fill="none"/>':''}`:
     `<rect x="30" y="78" width="40" height="30" rx="9" fill="#5a5a6a"/><path d="M34 102 l6 8 l4 -8 l6 8 l4 -8 l6 8 l4 -8" fill="#5a5a6a"/><path d="M40 82 l6 10 l6 -10" stroke="#3a3a4a" stroke-width="2" fill="none"/>`;
   const arms=human?`<rect x="21" y="82" width="11" height="22" rx="5" fill="${skin}"/><rect x="68" y="82" width="11" height="22" rx="5" fill="${skin}"/>`:
@@ -383,17 +384,18 @@ function zombieSVG(kind,size){
   const zhair=`<path d="M10 56 Q8 8 50 8 Q92 8 90 56 Q80 42 70 46 Q60 34 50 46 Q40 34 30 46 Q20 42 10 56z" fill="#3a4a2a" opacity=".9"/>`;
   const face=kind==='boss'?`<path d="M16 50 q0 -34 34 -34 q34 0 34 34 v10 q-4 16 -34 16 q-30 0 -34 -16z" fill="#e8e0d0"/><ellipse cx="36" cy="54" rx="9" ry="10" fill="#1a1a1e"/><ellipse cx="64" cy="54" rx="9" ry="10" fill="#1a1a1e"/><path d="M50 62 l-4 7 h8z" fill="#1a1a1e"/><path d="M36 73 h28 M41 71 v7 M50 71 v7 M59 71 v7" stroke="#1a1a1e" stroke-width="2"/>`:
     (kind==='raider'||kind==='gunner')?`${eyes('almond','angry')}<path d="M20 62 q30 -12 60 0 v12 q-30 12 -60 0z" fill="${kind==='gunner'?'#3a3a44':'#c22b3a'}"/>`:
-    `${eyes('round',kind==='runner'?'angry':kind==='screamer'?'glow':'dead')}${mouth(kind==='screamer'?'scream':'dead')}`;
+    `${eyes('round',kind==='runner'||kind==='crawler'?'angry':kind==='screamer'||kind==='stalker'?'glow':'dead')}${mouth(kind==='screamer'?'scream':'dead')}`;
   const extra=kind==='gunner'?`<rect x="73" y="90" width="22" height="7" rx="2" fill="#333"/><rect x="75" y="96" width="6" height="8" rx="2" fill="#333"/>`:kind==='raider'?`<path d="M77 100 l12 -30" stroke="#888" stroke-width="4" stroke-linecap="round"/>`:kind==='boss'?`<path d="M77 100 l14 -34" stroke="#7a5a3a" stroke-width="5" stroke-linecap="round"/><path d="M89 70 l6 -10" stroke="#aaa" stroke-width="9" stroke-linecap="round"/>`:'';
   const wound=!human?`<path d="M24 64 l7 4" stroke="#7a2a2a" stroke-width="2.5"/><circle cx="72" cy="40" r="3.5" fill="#7a2a2a" opacity=".7"/>`:'';
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 130" width="${w}" height="${h}" aria-hidden="true">
   ${human&&kind!=='boss'?hairBack('short','#2a1b14'):''}
-  <rect x="36" y="100" width="11" height="22" rx="5" fill="#2a2a30"/><rect x="53" y="100" width="11" height="22" rx="5" fill="#2a2a30"/>
-  <rect x="34" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/>${kind==='walker'?'':'<rect x="51" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/>'}
+  ${crawler?'<path d="M30 108 q20 8 40 0" stroke="#6a2a2a" stroke-width="5" stroke-linecap="round" fill="none"/><path d="M8 122 h84" stroke="#3a2a2a" stroke-width="2" stroke-dasharray="6 5"/>':'<rect x="36" y="100" width="11" height="22" rx="5" fill="'+(hazmat?'#d9b23a':'#2a2a30')+'"/><rect x="53" y="100" width="11" height="22" rx="5" fill="'+(hazmat?'#d9b23a':'#2a2a30')+'"/>'}
+  ${crawler?'':'<rect x="34" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/>'}${kind==='walker'||crawler?'':'<rect x="51" y="118" width="15" height="8" rx="4" fill="#1a1a1e"/>'}
   ${body}${arms}${extra}
   <path d="M12 50 q0 -40 38 -40 q38 0 38 40 v6 q0 26 -38 26 q-38 0 -38 -26z" fill="${skin}"/>
   ${wound}${face}
-  ${!human?zhair:''}
+  ${!human&&!hazmat?zhair:''}
+  ${hazmat?'<path d="M10 52 q0 -44 40 -44 q40 0 40 44 v6 q0 8 -6 10 h-68 q-6 -2 -6 -10z" fill="#d9b23a" opacity=".95"/><rect x="20" y="40" width="60" height="26" rx="10" fill="#2a3a44" opacity=".85"/><path d="M26 46 q24 -8 48 0" stroke="#8ab" stroke-width="2" fill="none" opacity=".6"/>':''}
   ${kind==='raider'?hatShape('bandana'):kind==='gunner'?hatShape('beanie'):''}
   </svg>`;
 }
