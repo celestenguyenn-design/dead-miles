@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.61';
+const VERSION='7.62';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1396,7 +1396,7 @@ function roomTagBefore(i){const loc=S.loc,r=loc.rooms[i];const t=r.tag;if(!t)ret
   if(t==='locked'){const free=S.gear.some(g=>g.id==='crowbar'&&!g.broken)||roleLvl('engineer');
     openSheet('<h2>🔒 '+esc(r.n)+' is locked</h2><p>A real lock, not a latch.</p><div class="stack">'
       +(free?'<button class="btn r" onclick="closeSheet();roomTagClear('+i+',\'pried\');searchRoom('+i+')">Pry it<small>'+(roleLvl('engineer')?roleBy('engineer').name+' has it open in a minute':'crowbar')+' · quiet</small></button>':'')
-      +'<button class="btn'+(S.keys>0?' r':'')+'" '+(S.keys>0?'':'disabled')+' onclick="closeSheet();S.keys--;roomTagClear('+i+',\'key\');searchRoom('+i+')">Use a chest key<small>'+(S.keys>0?'you have '+S.keys+' · the lock was worth it: extra loot':'no keys')+'</small></button>'
+      +'<button class="btn'+(S.keys>0||S.masterKey?' r':'')+'" '+(S.keys>0||S.masterKey?'':'disabled')+' onclick="closeSheet();if(!S.masterKey)S.keys--;roomTagClear('+i+',\'key\');searchRoom('+i+')">'+(S.masterKey?'Master key':'Use a chest key')+'<small>'+(S.masterKey?'opens anything · extra loot':S.keys>0?'you have '+S.keys+' · the lock was worth it: extra loot':'no keys')+'</small></button>'
       +'<button class="btn" onclick="closeSheet();S.loc.noise=Math.min(100,S.loc.noise+25);roomTagClear('+i+',\'forced\');searchRoom('+i+')">Kick it in<small>noise +25</small></button>'
       +'<button class="btn ghost" onclick="closeSheet()">Leave it</button></div>',true);return true;}
   if(t==='bloody'){r.tag=null;if(Math.random()<0.45){toast('It was not dead.','d');startCombat([worldEnemy('crawler')].concat(Math.random()<0.4?[worldEnemy('walker')]:[]),'wave');clog('The '+r.n.toLowerCase()+' was not empty.','sys');renderCombat();return true;}
@@ -1471,7 +1471,8 @@ function rollRoom(r,loc){
   const n=rint(1,3);const out=[];
   for(let i=0;i<n;i++){const it=wpick(list,'w');if(it.gear)out.push({id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r});else out.push({id:it.id,n:it.n,e:it.e,pts:Math.round(it.pts*lm),cat:it.cat,qty:it.qty,r:it.r});}
   if(Math.random()<0.07*ft.mult)out.push({id:'chest',...ITEMS.chest});
-  if(Math.random()<(r.keyish?0.06:0.025)*ft.mult)out.push({id:'key',...ITEMS.key});
+  // v7.62: keys were piling up (144 on one save). Halved here, the biggest source.
+  if(Math.random()<(r.keyish?0.03:0.012)*ft.mult)out.push({id:'key',...ITEMS.key});
   if(Math.random()<0.04){const c=rollCosmetic();if(c)out.push(c);}
   if(eventNow()==='halloween'&&Math.random()<0.3)out.push({id:'candy',n:'Halloween candy',e:'🍬',pts:3,cat:'candy',r:'uncommon',qty:rint(2,5)});
   return out;
@@ -1524,7 +1525,7 @@ function mk(k){const e=ENEMIES[k];const scale=(1+S.walk.district*0.12+S.league.t
 /* ================= steps ================= */
 const WATCH_JOBS={
   patrol:{n:'Patrol the block',e:'🔦',d:'Walk the fence line. A couple of dead ones, some loot they were chewing on.',enemies:()=>[mk(pick(['walker','walker','runner']))].concat(Math.random()<0.5?[mk('walker')]:[]),reward:{items:2,scrap:3}},
-  bounty:{n:'Bounty: a raider',e:'🎯',d:'One of Nadia\'s people is squatting nearby. Bring back what they carry.',enemies:()=>[mk(Math.random()<0.7?'raider':'gunner')],reward:{items:1,scrap:6,key:0.25}},
+  bounty:{n:'Bounty: a raider',e:'🎯',d:'One of Nadia\'s people is squatting nearby. Bring back what they carry.',enemies:()=>[mk(Math.random()<0.7?'raider':'gunner')],reward:{items:1,scrap:6,key:0.1}},
   horde:{n:'Hold the corner',e:'🧟',d:'Three at once. Big payout if you are still standing.',enemies:()=>[mk('walker'),mk(pick(['walker','runner','screamer'])),mk(Math.random()<0.3?'bloater':'walker')],reward:{items:4,scrap:8}},
   strays:{n:'Clear the strays',e:'🐕',d:'Runners have been circling the base at night. Two of them, quick ones.',enemies:()=>[mk('runner'),mk('runner')],reward:{items:2,scrap:4}}
 };
@@ -2595,6 +2596,7 @@ const ROAD_EVENTS=[
  {id:'toll',n:'Two of Nadia\'s people',e:'🏴',txt:()=>'They step out from behind a bus. "Ten scrap. Road tax." One of them is trying not to look at your weapon.',
   opts:[
    {t:'Pay the ten',sub:'costs 10 scrap',ok:()=>(S.stock.scrap>=10)||'Not enough scrap',go:()=>{S.stock.scrap-=10;return 'They count it twice and wave you through.';}},
+   {t:'Toss them keys',sub:'costs 2 chest keys',ok:()=>(S.keys>=2)||'Not enough keys',go:()=>{S.keys-=2;return 'Keys are worth more than scrap to the Tolls. They let you through and one of them says thanks.';}},
    {t:'Talk them down',sub:'Teacher, Intimidate, or 5 scars on Nadia',ok:()=>(roleLvl('teacher')||sk('intimidate')||((S.nem&&S.nem.scars)||0)>=5)||'Needs a Teacher, Intimidate, or a scarred Nadia',go:()=>{addXp(20);return 'You say her name and what happened last time. They find somewhere else to be. +20 XP.';}},
    {t:'Fight',sub:'two raiders',ok:()=>true,go:()=>{evtFight([worldEnemy('raider'),worldEnemy('raider')],'"Wrong answer."');return null;}},
   ]},
@@ -2621,7 +2623,7 @@ const ROAD_EVENTS=[
   ]},
  {id:'van',n:'A pharmacy delivery van',e:'🚐',txt:()=>'On its side in the intersection, cargo door padlocked. The lock is the only clean thing on it.',
   opts:[
-   {t:'Use a key',sub:'costs 1 chest key · 3 meds',ok:()=>(S.keys>0)||'No keys',go:()=>{S.keys--;evtGive('abx');evtGive('pain');evtGive(pick(['kit','bandage','abx']));return 'The padlock is a cheap one. The cargo is not.';}},
+   {t:'Use a key',sub:'costs 1 chest key · 3 meds',ok:()=>(S.keys>0||S.masterKey)||'No keys',go:()=>{if(!S.masterKey)S.keys--;evtGive('abx');evtGive('pain');evtGive(pick(['kit','bandage','abx']));return 'The padlock is a cheap one. The cargo is not.';}},
    {t:'Break the lock',sub:'loud · 50% a hazmat',ok:()=>true,go:()=>{evtGive('pain');if(Math.random()<0.5){evtFight([worldEnemy(S.walk.district>=1?'hazmat':'walker')],'The driver was still in the back.');return null;}return 'Twenty minutes of hammering for one box. Worth it.';}},
   ]},
  {id:'bike',n:'A bicycle on a rack',e:'🚲',need:()=>!S.vehicle&&S.walk.district>=1,txt:()=>'Chained to a rack outside a shut-up cafe. Tyres still hard. The chain is the only thing wrong with it.',
@@ -3639,6 +3641,7 @@ function sealAfter(won){
 // one of only two places a legendary can come from. It goes in the stash now,
 // and opens from there, so there are two ways in and one set of rewards.
 function chestUnlock(){
+  if(S.masterKey)return true;
   if(S.keys>0){S.keys--;return true;}
   if(Math.random()<sk('lockpick')*0.3){toast('Lock picked','z');return true;}
   toast(sk('lockpick')?'The pick slipped. Try again or find a key.':'Needs a key','d');SFX.play('miss');
@@ -3885,6 +3888,25 @@ function renderKitchen(){const el=$('#kitchen');if(!el)return;if(!S.base){el.inn
     +RECIPES.map(r=>{const ok=canCook(r);const cost=Object.entries(r.cost).map(([k,v])=>v+' '+{water:'💧',food:'🥫',scrap:'🔩'}[k]).join(' + ');
       return '<button class="btn'+(ok===true?'':' ghost')+'" '+(ok===true?'':'disabled')+' onclick="cook(\''+r.id+'\')">'+r.e+' '+esc(r.n)+'<small>'+cost+' · '+esc(ok===true?r.d:ok)+'</small></button>';}).join('')+'</div>';
   const f=$('#kitchenFold');if(f)f.textContent=RECIPES.filter(r=>canCook(r)===true).length+' you can make';}
+
+/* ================= the locksmith (v7.62) =================
+   "I have 144 chest keys and barely use them." Keys drop half as often now,
+   and Marlow buys them: a chest opened on the spot, weapon parts, meds, a
+   guaranteed legendary, and - once - a master key that opens every lock in
+   the county for free. */
+const LOCKSMITH=[
+  {id:'chest',n:'Open a chest for you',e:'🧳',k:2,d:'Three rare-or-better things, straight into your pack.',go:()=>chestLoot()},
+  {id:'parts',n:'A box of weapon parts',e:'⚙️',k:6,d:'+12 parts for upgrades.',go:()=>{S.parts=(S.parts||0)+12;}},
+  {id:'meds',n:'A medic\'s bag',e:'🧰',k:8,d:'A trauma kit, 2 antibiotics and an adrenaline shot into the stash.',go:()=>{medsGive('kit',1);medsGive('abx',2);medsGive('adrena',1);}},
+  {id:'legend',n:'Something from under the seat',e:'✨',k:15,d:'A legendary. Guaranteed.',go:()=>dropLegend('Marlow reaches under the seat.')},
+  {id:'master',n:'The master key',e:'🗝️',k:25,once:true,d:'Opens every locked room, chest and van in the county, free, forever.',go:()=>{S.masterKey=1;}},
+];
+function locksmith(id){const l=LOCKSMITH.find(x=>x.id===id);if(!l||!S.base)return;if(l.once&&S.masterKey){toast('You already have it');return;}if(S.keys<l.k){toast('Needs '+l.k+' keys','d');return;}
+  if(l.id==='chest'&&S.pack.length>=capacity()-2){toast('Make room in your pack first','d');return;}
+  S.keys-=l.k;l.go();log('Locksmith: '+l.n.toLowerCase()+' for '+l.k+' keys.');toast(l.e+' '+l.n,'a');SFX.play('chest');save();render();}
+function renderLocksmith(){const el=$('#locksmith');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first.</p>';return;}
+  el.innerHTML='<p class="help">You have <b>'+(S.keys||0)+'</b> chest keys'+(S.masterKey?' and the master key':'')+'.</p><div class="stack" style="margin-top:8px">'+LOCKSMITH.filter(l=>!(l.once&&S.masterKey)).map(l=>'<button class="btn'+(S.keys>=l.k?' r':' ghost')+'" '+(S.keys>=l.k?'':'disabled')+' onclick="locksmith(\''+l.id+'\')">'+l.e+' '+esc(l.n)+'<small>'+l.k+' keys · '+esc(l.d)+'</small></button>').join('')+'</div>';
+  const f=$('#locksmithFold');if(f)f.textContent=(S.keys||0)+' keys';}
 function renderTrader(){const el=$('#trader');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first. The trader only stops where there are walls.</p>';return;}
   el.innerHTML=TRADE.map(t=>{let c=Math.max(1,Math.round(t.c*(1-sk('haggler')*0.1-sk('trader')*0.15)));return `<button class="tr${S.stock.scrap<c?' off':''}" onclick="trade('${t.id}')"><span class="e">${t.e}</span><b>${t.n}</b><span class="chip a">${c}🔩</span></button>`;}).join('');}
 function heal(){
@@ -4518,12 +4540,13 @@ function hordeTick(){const h=hordeState();if(!h)return;if(Date.now()<h.next)retu
     openSheet(`<h2>Horde night</h2><div class="big">${ART.zombieSVG('walker',60)}${ART.zombieSVG('runner',60)}${ART.zombieSVG('bloater',60)}</div><p>Day ${7*(h.n+1)}. They come every seven days and they come all at once. Your walls: <b>${hordeDefense()}</b> vs the horde's <b>${hordePower()}</b>. Fight at the gate, or let the walls decide. Lose and they take the stockpile.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveHorde(false)">Let the walls decide</button><button class="btn r" onclick="closeSheet();fightHorde()">Fight at the gate</button></div>`);}
   else if(Date.now()>hordeDeadline(h)){resolveHorde(false);}}   // v7.42: waits for you (v7.54: the rest of that day, at least 12 h); never resolves just because the screen is off
 function hordeCountdown(){const h=hordeState();if(!h)return '';const ms=h.next-Date.now();if(ms<=0)return 'Horde night is here.';const d=Math.floor(ms/86400000),hr=Math.floor(ms%86400000/3600000);const dt=new Date(h.next);return 'Horde night '+(h.n+1)+' in '+(d?d+'d ':'')+hr+'h ('+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()]+' '+hourText(dt.getHours())+') · they bring '+hordePower()+', you have '+hordeDefense()+'.';}
+function payRaid(){const p=S.raidPending;if(!p||S.keys<5)return;S.keys-=5;const e={t:p.date+' '+String(p.hour).padStart(2,'0')+':00',power:p.power,def:defense(),repelled:true,stolen:{},fought:false,paid:true};S.raids.unshift(e);S.raids=S.raids.slice(0,12);S.raidPending=null;S.flags.lastRaidCheck=p.date;log('Paid the raiders off with 5 chest keys. They left.');toast('They took the keys and left','a');SFX.play('ui');save();render();}
 function raidTick(){
   if(!S.raidPending)return;const p=S.raidPending;const now=new Date();
   if(todayStr()!==p.date){resolveRaid(p.power,p.hour,p.date,'waited');S.flags.lastRaidCheck=todayStr();save();return;}
   if(now.getHours()>=p.hour){ if(document.visibilityState==='visible'&&!S.combat&&!S.loc&&!$('#modal').classList.contains('on')){
     const late=now.getHours()>p.hour||now.getMinutes()>=10;const how=late?'fence':'';
-    openSheet(`<h2>Raiders at the walls</h2><div class="big">${ART.zombieSVG('raider',70)}${ART.zombieSVG('gunner',70)}</div><p>A crew of ${p.power>25?'four':p.power>18?'three':'two'} ${late?'has been at the fence since '+String(p.hour).padStart(2,'0')+':00, waiting for someone to answer':'is coming over the fence'}. Your defenses: ${defense()} vs their ${p.power}. Fight them yourself, or let the walls decide.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveRaid(${p.power},${p.hour},'${p.date}','${how}');S.flags.lastRaidCheck='${p.date}';save();render()">Let the walls hold</button><button class="btn d" onclick="closeSheet();fightRaid()">Fight</button></div>`,true);}
+    openSheet(`<h2>Raiders at the walls</h2><div class="big">${ART.zombieSVG('raider',70)}${ART.zombieSVG('gunner',70)}</div><p>A crew of ${p.power>25?'four':p.power>18?'three':'two'} ${late?'has been at the fence since '+String(p.hour).padStart(2,'0')+':00, waiting for someone to answer':'is coming over the fence'}. Your defenses: ${defense()} vs their ${p.power}. Fight them yourself, or let the walls decide.</p><div class="grid2"><button class="btn" onclick="closeSheet();resolveRaid(${p.power},${p.hour},'${p.date}','${how}');S.flags.lastRaidCheck='${p.date}';save();render()">Let the walls hold</button><button class="btn d" onclick="closeSheet();fightRaid()">Fight</button></div>${S.keys>=5?`<button class="btn ghost wide" style="margin-top:8px" onclick="closeSheet();payRaid()">🗝️ Pay them off<small>5 chest keys · they leave, nothing taken</small></button>`:''}`,true);}
     // v7.42: no "else resolve while hidden". They wait.
   }
 }
@@ -5518,7 +5541,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}try{renderAsk();}catch(e){}try{renderBevt();}catch(e){}try{renderQuest();}catch(e){}try{renderVehicle();}catch(e){}try{renderPrestige();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
+  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}try{renderAsk();}catch(e){}try{renderBevt();}catch(e){}try{renderQuest();}catch(e){}try{renderVehicle();}catch(e){}try{renderPrestige();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}try{renderLocksmith();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5753,6 +5776,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.62',d:'Sep 27',t:'Chest keys are worth something',
+  i:['"I have 144 chest keys and barely use them." Two fixes. Keys drop half as often from rooms and watch bounties. And there are places to spend them now: THE LOCKSMITH (Base tab, under the Trader) - 2 keys opens a chest on the spot, 6 buys a box of weapon parts, 8 a medic\'s bag, 15 a guaranteed legendary, and 25, once, the master key: every locked room, chest and pharmacy van in the county opens free, forever.',
+     'Raiders at the walls can be PAID OFF with 5 keys - they leave, nothing taken, no fight. Nadia\'s toll on the road takes 2 keys instead of scrap.']},
  {v:'7.61',d:'Sep 27',t:'Nobody takes a downed crew member\'s seat',
   i:['When someone with you went down, their slot came free - and the next survivor you found in a room, behind a barricade or on the road walked straight into it. So when you patched your person up, a stranger was already in their seat. Now the seat is kept for them (and for anyone on a day off) until they are back. New recruits only take a slot that is truly empty; the Crew tab shows how many are kept.']},
  {v:'7.60',d:'Sep 27',t:'Patched-up crew come straight back',
