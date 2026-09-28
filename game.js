@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.68';
+const VERSION='7.69';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -117,7 +117,7 @@ const ENEMIES={
   /* v7.56 - three more things on the road. Every fight was walker/runner/bloater/
      screamer, and after a month that is wallpaper. Each of these asks for a
      different answer: stomp the crawler, shoot the stalker, crack the hazmat. */
-  crawler:{n:'Crawler',hp:16,dmg:[4,8],hit:.85,xp:9,w:3,crawler:true},
+  crawler:{n:'Crawler',hp:16,dmg:[4,8],hit:.85,xp:9,w:2,crawler:true},
   stalker:{n:'Stalker',hp:30,dmg:[9,14],hit:.75,xp:18,w:0,dodge:.3,night:true},
   hazmat: {n:'Hazmat', hp:40,dmg:[7,11],hit:.7,xp:20,w:1.5,plate:true},
   raider:{n:'Raider',hp:44,dmg:[11,17],hit:.8,xp:20,w:0,dodge:.2,human:true},
@@ -1020,7 +1020,7 @@ function armorCover(){
 // time, which made it the rational play. Her words: "I feel like that's too OP."
 // Teeth meeting plastic is the thing you cannot heal away afterwards.
 // Fully armoured is UNCHANGED at the old rate; it is being bare that got worse.
-const UNARMOURED_INFECT=4;
+const UNARMOURED_INFECT=3;   // v7.69: was 4. With armour rarer since 7.63, bare skin was turning far too often.
 function infectChance(){
   const base=INFECT_BASE*(DIFF[S.diff||'normal'].infect);
   return base*(UNARMOURED_INFECT-(UNARMOURED_INFECT-1)*armorCover())*(1-0.2*sk('antiseptic'));
@@ -1044,10 +1044,10 @@ function cureInfection(){
   if(!infect()){toast('You are not infected');return;}
   const inPack=S.pack.find(x=>x.id==='abx');
   const stockAbx=medsHeld('abx')>0;
-  if(!inPack&&!stockAbx&&S.stock.meds<4){toast('Antibiotics, or four bandages from the stash, will clear it','d');return;}
-  if(inPack)S.pack=S.pack.filter(x=>x!==inPack); else if(stockAbx)medsTake('abx'); else S.stock.meds-=4;
+  if(!inPack&&!stockAbx&&S.stock.meds<3){toast('Antibiotics, or three bandages from the stash, will clear it','d');return;}
+  if(inPack)S.pack=S.pack.filter(x=>x!==inPack); else if(stockAbx)medsTake('abx'); else S.stock.meds-=3;
   S.infect=null;S.infectStep=0;S.hp=Math.min(maxHp(),S.hp);
-  log('The fever breaks. '+(inPack?'The antibiotics did it.':'Four doses and a bad night, but it did it.'));
+  log('The fever breaks. '+(inPack?'The antibiotics did it.':'Three doses and a bad night, but it did it.'));
   toast('Infection cleared','z');SFX.play('legend');save();render();
 }
 function hydroState(){const h=S.hydro===undefined?100:S.hydro;return h>=60?'ok':h>=30?'thirsty':h>0?'parched':'empty';}
@@ -1084,7 +1084,7 @@ function sendCrew(id,job){const c=S.crew.find(x=>x.id===id);if(!c||c.out||!EXPED
   c.out={job,left:steps,total:steps};log(c.name+' heads out to '+EXPED[job].n.toLowerCase()+'.');toast(c.name+' is out: '+EXPED[job].n,'a');closeSheet();save();render();}
 function expedSteps(n){for(const c of crewOut()){c.out.left-=n;if(c.out.left<=0)expedReturn(c);}}
 function expedReturn(c){const job=EXPED[c.out.job]||{n:'the rescue',best:''};const lvl=c.lvl+sk('leader');const m=(c.role===job.best?1.5:1)*(1+0.1*(lvl-1));const got=[];
-  if(c.out.job==='scavenge'){const sc=Math.round(rint(8,14)*m);S.stock.scrap+=sc;got.push(sc+' scrap');if(Math.random()<0.3*m){S.parts=(S.parts||0)+2;got.push('2 parts');}}
+  if(c.out.job==='scavenge'){const sc=Math.round(rint(12,20)*m);S.stock.scrap+=sc;got.push(sc+' scrap');if(Math.random()<0.3*m){S.parts=(S.parts||0)+2;got.push('2 parts');}}
   if(c.out.job==='forage'){const f=Math.round(rint(3,5)*m),w=Math.round(rint(2,4)*m);S.stock.food+=f;S.stock.water+=w;got.push(f+' food',w+' water');}
   if(c.out.job==='hunt'){const a=Math.round(rint(5,9)*m);addAmmoStock('ammo',a);got.push(a+' rounds');if(Math.random()<0.12*m){const g=pick(['bat','crowbar','hatchet','cleaver','bow','spear']);S.gear.push({uid:uid(),id:g,...GEAR[g]});got.push('a '+GEAR[g].n.toLowerCase());}}
   if(c.out.job==='scout'){S.walk.scouted=3;got.push('the next three places marked');}
@@ -1384,10 +1384,10 @@ function vetTitle(){const r=vetRank();return r?(VET_TITLES[Math.min(r,VET_TITLES
 /* ================= a vehicle (v7.59) =================
    A bicycle off a rack in Main Street or beyond, and later the truck from the
    rail yard. Places get closer. The bike gets flats; the truck drinks scrap. */
-const VEHICLES={bike:{n:'Bicycle',e:'🚲',closer:0.25,d:'Places 25% closer. Gets a flat now and then: 3 scrap to fix.'},truck:{n:'The yard truck',e:'🛻',closer:0.45,d:'Places 45% closer. Burns 2 scrap a place; parked when the scrap is gone.'}};
+const VEHICLES={bike:{n:'Bicycle',e:'🚲',closer:0.25,d:'Places 25% closer. Gets a flat now and then: 3 scrap to fix.'},truck:{n:'The yard truck',e:'🛻',closer:0.45,d:'Places 45% closer. Burns 1 scrap a place; parked when the scrap is gone.'}};
 function vehicleDist(dist){const v=S.vehicle;if(!v||!VEHICLES[v.k])return dist;const V=VEHICLES[v.k];
   if(v.k==='bike'){if(v.flat)return dist;if(Math.random()<0.06){v.flat=true;log('The bike has a flat. 3 scrap fixes it.');toast('Flat tyre','d');return dist;}return Math.round(dist*(1-V.closer));}
-  if(v.k==='truck'){if((S.stock.scrap||0)<2){if(!v.parked){v.parked=true;log('The truck is out of scrap to burn. Parked.');}return dist;}S.stock.scrap-=2;v.parked=false;return Math.round(dist*(1-V.closer));}
+  if(v.k==='truck'){if((S.stock.scrap||0)<1){if(!v.parked){v.parked=true;log('The truck is out of scrap to burn. Parked.');}return dist;}S.stock.scrap-=1;v.parked=false;return Math.round(dist*(1-V.closer));}
   return dist;}
 function fixVehicle(){const v=S.vehicle;if(!v||!v.flat)return;if((S.stock.scrap||0)<3){toast('Needs 3 scrap','d');return;}S.stock.scrap-=3;v.flat=false;log('Patched the bike.');toast('Rolling again','a');save();render();}
 function renderVehicle(){const el=$('#vehicleCard');if(!el)return;const v=S.vehicle;if(!v||!VEHICLES[v.k]){el.hidden=true;return;}el.hidden=false;el.className='card';const V=VEHICLES[v.k];
@@ -1403,7 +1403,7 @@ const SEEDS={
   beans:    {n:'Beans',      e:'🫘',per:250,stages:['🌱','🌿','🫘'],d:'Quick. 3 food.',give:()=>{S.stock.food+=3;return '3 food';}},
   tomato:   {n:'Tomatoes',   e:'🍅',per:350,stages:['🌱','🌿','🍃','🍅'],d:'5 food.',give:()=>{S.stock.food+=5;return '5 food';}},
   sunflower:{n:'Sunflowers', e:'🌻',per:300,stages:['🌱','🌿','🌻'],d:'3 water, and 25 league points.',give:()=>{S.stock.water+=3;S.league.score+=25;return '3 water, 25 points';}},
-  herbs:    {n:'Herbs',      e:'🌾',per:400,stages:['🌱','🌿','🌾','🌾'],need:1,d:'2 bandages. Needs a garden.',give:()=>{medsGive('bandage',2);return '2 bandages';}},
+  herbs:    {n:'Herbs',      e:'🌾',per:400,stages:['🌱','🌿','🌾','🌾'],need:1,d:'Antibiotics and a bandage. Needs a garden.',give:()=>{medsGive('abx',1);medsGive('bandage',1);return 'antibiotics, 1 bandage';}},
   pumpkin:  {n:'Pumpkin',    e:'🎃',per:600,stages:['🌱','🌿','🍃','🟢','🎃'],need:2,d:'8 food and a chest key. Needs garden L2.',give:()=>{S.stock.food+=8;S.keys++;return '8 food, 1 key';}},
   poppies:  {n:'Poppies',    e:'🌸',per:500,stages:['🌱','🌿','🌷','🌸'],need:3,d:'Something to wear, or 30 scrap. Needs garden L3.',give:()=>{if(Math.random()<0.4){const c=rollCosmetic();if(c&&takeItem(c,null))return c.n;}S.stock.scrap+=30;return '30 scrap';}},
 };
@@ -1466,7 +1466,7 @@ function roomTagBefore(i){const loc=S.loc,r=loc.rooms[i];const t=r.tag;if(!t)ret
       +'<button class="btn'+(S.keys>0?' r':'')+'" '+(S.keys>0?'':'disabled')+' onclick="closeSheet();S.keys--;roomTagClear('+i+',\'key\');searchRoom('+i+')">Use a chest key<small>'+(S.keys>0?'you have '+S.keys+' · the lock was worth it: extra loot':'no keys')+'</small></button>'
       +'<button class="btn" onclick="closeSheet();S.loc.noise=Math.min(100,S.loc.noise+25);roomTagClear('+i+',\'forced\');searchRoom('+i+')">Kick it in<small>noise +25</small></button>'
       +'<button class="btn ghost" onclick="closeSheet()">Leave it</button></div>',true);return true;}
-  if(t==='bloody'){r.tag=null;if(Math.random()<0.45){toast('It was not dead.','d');startCombat([worldEnemy('crawler')].concat(Math.random()<0.4?[worldEnemy('walker')]:[]),'wave');clog('The '+r.n.toLowerCase()+' was not empty.','sys');renderCombat();return true;}
+  if(t==='bloody'){r.tag=null;if(Math.random()<0.3){toast('It was not dead.','d');startCombat([worldEnemy('crawler')].concat(Math.random()<0.4?[worldEnemy('walker')]:[]),'wave');clog('The '+r.n.toLowerCase()+' was not empty.','sys');renderCombat();return true;}
     toast('Whatever died here is gone.','z');return false;}
   return false;}
 function roomTagClear(i,how){const r=S.loc.rooms[i];if(how==='key')r.tagBonus=1;r.tag=null;}
@@ -1662,6 +1662,10 @@ function nextStreakReward(){
 function rollDay(){
   const t=todayStr();if(S.steps.date===t)return;
   snapshot('start of the day');
+  // v7.69 - a floor under the scrap pile. "She feels like she has no scrap." Under 8
+  // scrap at a base with walls, the crew turns up a few overnight. Not a wage,
+  // just enough that a repair or a bandage is never out of reach.
+  if(S.base&&(S.stock.scrap||0)<8){const f=8-(S.stock.scrap||0);S.stock.scrap+=f;log('The crew went through the yard overnight and turned up '+f+' scrap.');}
   if(S.steps.date&&S.steps.today>=0){S.steps.hist=(S.steps.hist||[]).filter(x=>x.d!==S.steps.date);
     S.steps.hist.unshift({d:S.steps.date,n:S.steps.today});S.steps.hist=S.steps.hist.slice(0,30);}
   S.steps.date=t;S.steps.today=0;S.steps.src={phone:0,typed:0,walk:0};S.steps.lastSync=0;S.steps.lastSyncDate='';S.flags.roadCheck=0;
@@ -3303,7 +3307,7 @@ function enemyPhase(){
       if(C.duck)continue;                      // it is swinging at her squadmate, not at her
       const guards=activeCrew();if(guards.length&&Math.random()<0.3){const gc=pick(guards);if(gc.trait==='lucky'&&Math.random()<1/3){clog(e.n+' goes for '+gc.name+' and somehow misses.','');fxPush({k:'emiss',from:C.actor});continue;}clog(e.n+' turns on '+gc.name+'.','hit');fxPush({k:'crewhurt',from:C.actor,who:gc.id,d:Math.max(1,d-2)});hurtCrew(gc,Math.max(1,d-2));continue;}
       {const gl=roleLvl('bodyguard');if(gl&&Math.random()<(10+gl*4+(veteran('bodyguard')?15:0))/100){const bg2=roleBy('bodyguard');const bd=Math.max(1,d-4);clog(bg2.name+' steps in front of it.','good');fxPush({k:'crewhurt',from:C.actor,who:bg2.id,d:bd});hurtCrew(bg2,bd);continue;}}
-      if(!e.human&&Math.random()<infectChance()*(e.crawler?2:1)*(buffOn('calm')?0.5:1))catchInfection(e.n);
+      if(!e.human&&Math.random()<infectChance()*(e.crawler?1.5:1)*(buffOn('calm')?0.5:1))catchInfection(e.n);
       hurt(d,e.n);
         if(e.g==='bleed'){C.bleed=Math.max(1,3-sk('clotting'));}if(e.g==='poison'){C.poison=Math.max(1,3-sk('clotting'));}
         if(e.g==='steal'&&S.pack.length&&Math.random()<0.3){const it=S.pack.splice(rint(0,S.pack.length-1),1)[0];clog(e.n+' lifts your '+it.n+' mid-swing.','hit');}}
@@ -5920,6 +5924,11 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.69',d:'Sep 28',t:'Fewer infections, more scrap',
+  i:['INFECTIONS WERE TURNING TOO OFTEN, and that was on us: the Crawler (new in 7.56) bit twice as infectiously and turned up too much, and with weapons and armour rarer since 7.63, bare skin was getting bitten more. Fixed: a bite on bare skin turns 3x the armoured rate instead of 4x, the Crawler bite is 1.5x instead of 2x and it is rarer, and a bloody room hides one 30% of the time instead of 45%.',
+     'CURING IS EASIER. Three bandages clear an infection instead of four. Herbs in your plot now grow ANTIBIOTICS (plus a bandage) - plant them, walk, and you have a cure. Garden tea from the Kitchen still halves the odds of a bite turning.',
+     'SCRAP. Under 8 scrap at a base, the crew turns up enough overnight to get you back to 8. The truck burns 1 scrap a place instead of 2. A Scavenge job brings home 12-20 scrap instead of 8-14.',
+     'If it still feels hard: Settings > Game > Difficulty. Hardened makes bites turn nearly twice as often and death takes 20% of your scrap; Hollow is 2.6x and 30%. Survivor is the fair one.']},
  {v:'7.68',d:'Sep 28',t:'A cleaner Road page',
   i:['THE ROAD PAGE IS IN ORDER NOW. The picture, then how far to the next place, then the place you are standing at - not buried under five cards. Everything that needs you (a crew member down, a question, Marisol, someone out on a job, a flat tyre) is one Notices card of one-line rows, and the details open when you tap. Contracts, Watch duty, Steps, Water, Street mode and the Log are folded below; tap to open.',
      'THE YOU TAB starts with you and your crew. The season and the boutique are folded at the bottom. On the Base tab, Build sits right under the Stash.',
