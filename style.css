@@ -645,3 +645,11 @@ button.room2{width:100%;text-align:left;color:inherit;font:inherit}
    own map zoom is a JS handler and is untouched. iOS ignores user-scalable
    in the viewport meta, so this is the fix that actually holds on a phone. */
 html,body{touch-action:manipulation}
+
+/* v7.68 notices */
+.notices{margin-top:6px}
+.notice{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.notice:first-child{border-top:0;padding-top:4px}
+.notice .ic{flex:none;font-size:18px;width:24px;text-align:center}
+.notice .t{flex:1;min-width:0;font-size:14px;line-height:1.35}
+.notice .btn{flex:none;white-space:nowrap}

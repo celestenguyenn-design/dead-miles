@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.67';
+const VERSION='7.68';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -749,7 +749,7 @@ function save(quiet){try{
 }catch(e){}}
 function load(){try{let r=localStorage.getItem('deadmiles.v3');if(r){const o=JSON.parse(r);if(o&&o.v===3)return o;}r=localStorage.getItem('deadmiles.v2');if(r){const o=migrate(JSON.parse(r));if(o)return o;}}catch(e){}return null;}
 function log(m){S.journal.unshift({t:Date.now(),m});S.journal=S.journal.slice(0,40);}
-function toast(m,c){const t=document.createElement('div');t.className='toast'+(c?' '+c:'');t.textContent=m;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),2600);}
+function toast(m,c){const box=$('#toasts');while(box.children.length>=3)box.firstChild.remove();const t=document.createElement('div');t.className='toast'+(c?' '+c:'');t.textContent=m;box.appendChild(t);setTimeout(()=>t.remove(),2600);}
 
 /* ================= sound ================= */
 const SFX={ctx:null,
@@ -1094,6 +1094,26 @@ function expedReturn(c){const job=EXPED[c.out.job]||{n:'the rescue',best:''};con
   if(Math.random()<risk){const d=Math.round(crewMax(c)*0.35);c.hp=Math.max(1,(c.hp===undefined?crewMax(c):c.hp)-d);hurt=' They came back hurt (-'+d+' HP).';}
   c.out=null;const line=c.name+' is back from '+job.n.toLowerCase()+' with '+got.join(', ')+'.'+hurt;log(line);toast(c.name+' is back: '+got[0],'a');SFX.play('win');
   S.expedNews=(S.expedNews||[]).concat([line]).slice(-4);}
+
+/* ================= notices (v7.68) =================
+   "Everything is all over the place." Five separate cards - crew down, a
+   question, a job out, Marisol, a flat tyre - each shouting from the top of the
+   Road page, with the place you were standing at buried under them. Now they
+   are one card of one-line rows, under the place, and the details open in a
+   sheet when you tap. */
+function askSheet(){const el=$('#askCard');if(!el||el.hidden)return;openSheet(el.innerHTML,true);}
+function bevtSheet(){const el=$('#baseEvent');if(!el||el.hidden)return;openSheet(el.innerHTML,true);}
+function renderNotices(){const el=$('#notices');if(!el)return;const rows=[];const R=(icon,txt,btn)=>rows.push('<div class="notice"><span class="ic">'+icon+'</span><span class="t">'+txt+'</span>'+(btn||'')+'</div>');
+  for(const c of crewNeedsCare()){const meds=crewMedsHave();R(c.hp<=0?'🩹':'🤕','<b>'+esc(c.name)+'</b> '+(c.hp<=0?'is down. <span class="help">Lost for good if you go down first.</span>':'is badly hurt. <span class="help">HP '+c.hp+' / '+crewMax(c)+'</span>'),'<button class="btn sm r" '+(meds?'':'disabled')+' onclick="healCrew(\''+c.id+'\')">Patch up</button>');}
+  if(S.ask){const a=ASKS.find(x=>x.id===S.ask.id);const c=a&&S.crew.find(x=>x.id===S.ask.who);if(c){if(S.ask.done)R('💬','<b>'+esc(c.name)+'</b>: '+esc(S.ask.done),'<button class="btn sm ghost" onclick="S.ask=null;save();render()">Okay</button>');else R('💬','<b>'+esc(c.name)+'</b> has a question.','<button class="btn sm r" onclick="askSheet()">Answer</button>');}}
+  if(S.bevt&&S.base){const e=BASE_EVENTS.find(x=>x.id===S.bevt.id);if(e){if(S.bevt.done)R(e.e,'<b>'+esc(e.n)+'</b>: '+esc(S.bevt.done),'<button class="btn sm ghost" onclick="S.bevt=null;save();render()">Okay</button>');else R(e.e,'<b>'+esc(e.n)+'</b> <span class="help">at the base this morning</span>','<button class="btn sm r" onclick="bevtSheet()">See</button>');}}
+  {const q=questAvail();if(q&&!(S.loc&&S.loc.quest)){const going=S.quest===q.id&&S.walk.forceLoc==='quest';R('📻','<b>Marisol:</b> '+esc(q.n)+(going?' <span class="help">- next stop</span>':''),going?'':'<button class="btn sm r" onclick="questGo(\''+q.id+'\')">Go</button>');}}
+  for(const c of crewOut()){const j=EXPED[c.out.job]||{e:'🏃',n:'going back for someone'};R(j.e,'<b>'+esc(c.name)+'</b> is out: '+esc(j.n)+' <span class="help">'+fmt(Math.max(0,c.out.left))+' steps to go</span>');}
+  for(const n of (S.expedNews||[]))R('🧺',esc(n),'<button class="btn sm ghost" onclick="S.expedNews=S.expedNews.filter(x=>x!==\''+n.replace(/'/g,"\\'")+'\');save();render()">Okay</button>');
+  if(S.vehicle&&S.vehicle.flat)R('🚲','<b>Flat tyre.</b> <span class="help">Walking until it is fixed.</span>','<button class="btn sm r" onclick="fixVehicle()">Fix · 3 scrap</button>');
+  if(S.vehicle&&S.vehicle.parked)R('🛻','<b>The truck is parked.</b> <span class="help">No scrap to burn.</span>');
+  if(!rows.length){el.hidden=true;return;}el.hidden=false;el.className='card';
+  el.innerHTML='<h2>Notices <span class="sub">'+rows.length+'</span></h2><div class="notices">'+rows.join('')+'</div>';}
 function renderExped(){const el=$('#expedCard');if(!el)return;const out=crewOut();const news=S.expedNews||[];if(!out.length&&!news.length){el.hidden=true;return;}el.hidden=false;
   el.innerHTML='<h2>🧭 Out on a job</h2>'+(out.length?'<div class="stack">'+out.map(c=>'<div class="row"><span>'+(EXPED[c.out.job]||{e:'🏃'}).e+' <b>'+esc(c.name)+'</b> · '+esc((EXPED[c.out.job]||{n:'going back for someone'}).n)+'</span><span class="help">'+fmt(Math.max(0,c.out.left))+' steps to go</span></div>').join('')+'</div>':'')
     +(news.length?'<div class="help" style="margin-top:6px">'+news.map(esc).join('<br>')+'</div><button class="btn xs ghost" style="margin-top:6px" onclick="S.expedNews=[];save();render()">Clear</button>':'');}
@@ -1155,8 +1175,8 @@ function dailyCrew(){const t=todayStr();
   if(home.length&&Math.random()<0.35){const c=pick(home);const pool=ASKS.filter(a=>!a.need||a.need(c));if(pool.length)S.ask={who:c.id,id:pick(pool).id,date:t,done:null};}
   if(S.base&&Math.random()<0.3){const pool=BASE_EVENTS.filter(e=>!e.need||e.need());if(pool.length)S.bevt={id:pick(pool).id,date:t,done:null};}}
 function askAnswer(yes){const a=S.ask&&ASKS.find(x=>x.id===S.ask.id);const c=a&&S.crew.find(x=>x.id===S.ask.who);if(!a||!c)return;
-  const r=yes?a.yes(c):a.no(c);loyAdd(c,yes?1:-1);S.ask.done=r;log(c.name+': '+r);SFX.play('ui');save();render();}
-function bevtAnswer(k){const e=S.bevt&&BASE_EVENTS.find(x=>x.id===S.bevt.id);if(!e||!e[k])return;const r=e[k].go();S.bevt.done=r;log(e.n+': '+r);SFX.play('ui');save();render();}
+  const r=yes?a.yes(c):a.no(c);loyAdd(c,yes?1:-1);S.ask.done=r;log(c.name+': '+r);SFX.play('ui');closeSheet();save();render();}
+function bevtAnswer(k){const e=S.bevt&&BASE_EVENTS.find(x=>x.id===S.bevt.id);if(!e||!e[k])return;const r=e[k].go();S.bevt.done=r;log(e.n+': '+r);SFX.play('ui');closeSheet();save();render();}
 function renderAsk(){const el=$('#askCard');if(!el)return;const a=S.ask&&ASKS.find(x=>x.id===S.ask.id);const c=a&&S.crew.find(x=>x.id===S.ask.who);if(!a||!c){el.hidden=true;return;}el.hidden=false;el.className='card steel';
   if(S.ask.done){el.innerHTML='<h2>'+ROLES[c.role].e+' '+esc(c.name)+'</h2><p>'+esc(S.ask.done)+'</p><button class="btn ghost wide" onclick="S.ask=null;save();render()">Okay</button>';return;}
   el.innerHTML='<div class="row" style="gap:10px;align-items:flex-start"><div style="flex:none">'+ART.avatarSVG(c.av,56)+'</div><div><h2 style="margin:0">'+esc(c.name)+' has a question</h2><p style="margin:4px 0 0">'+esc(a.txt(c))+'</p></div></div><div class="grid2" style="margin-top:10px"><button class="btn r" onclick="askAnswer(true)">Yes<small>'+esc(a.cost||'')+'</small></button><button class="btn" onclick="askAnswer(false)">No<small>they cool toward you</small></button></div>';}
@@ -5605,7 +5625,8 @@ function render(){
   $('#youAv').innerHTML=ART.avatarSVG(S.av,110,{weapon:eqItem('melee')?'melee':eqItem('ranged')?'gun':'',alive:true});$('#youName').textContent=(S.name||'Survivor')+' · '+(CLASSES[S.cls]?CLASSES[S.cls].n:'')+' '+S.lvl+(county()?' · County '+(county()+1):'');
   $('#youKv').innerHTML=`<span>HP</span><b>${S.hp} / ${maxHp()}</b><span>Damage</span><b>${eqItem('melee')?(eqItem('melee').dmg[0]+dmgBonus())+'-'+(eqItem('melee').dmg[1]+dmgBonus()):fistDmg()[0]+'-'+fistDmg()[1]} ${eqItem('melee')?'+'+(S.lvl-1):''}</b><span>Damage reduction</span><b>${dr()}</b><span>Kills</span><b>${S.kills}</b><span>Lifetime steps</span><b>${fmt(S.steps.total)}</b>${S.pet?`<span>Companion</span><b>${PETS[S.pet].e} ${PETS[S.pet].n}</b>`:''}`;$('#youXp').style.width=(S.xp/(S.lvl*40)*100)+'%';
   $('#cosmeticCount').textContent=S.cosmetics.length+' looks unlocked';
-  $('#spSub').textContent=S.sp+' point'+(S.sp===1?'':'s')+' to spend';$('#youAlert').hidden=!(skillList().some(x=>(!x.req||S.lvl>=x.req)&&sk(x.id)<x.max&&S.sp>=sk(x.id)+1)||woundedCrew().length);$('#clsDesc').textContent=(CLASSES[S.cls]?CLASSES[S.cls].e+' '+CLASSES[S.cls].n:'')+(S.bg&&BACKGROUNDS[S.bg]?' · '+BACKGROUNDS[S.bg].e+' '+BACKGROUNDS[S.bg].n+' background':'')+'. One point per level and per county milestone. Rank 1 of a skill costs 1 point, rank 2 costs 2, rank 3 costs 3, and so on. General skills are open to every class.';
+  $('#spSub').textContent=S.sp+' point'+(S.sp===1?'':'s')+' to spend';{const f=$('#walletSubFold'),w=$('#walletSub');if(f&&w)f.textContent=w.textContent;const sf=$('#seasonFoldSub');if(sf)sf.textContent=(S.season&&S.season.pts?S.season.pts+' points':'');}
+  $('#youAlert').hidden=!(skillList().some(x=>(!x.req||S.lvl>=x.req)&&sk(x.id)<x.max&&S.sp>=sk(x.id)+1)||woundedCrew().length);$('#clsDesc').textContent=(CLASSES[S.cls]?CLASSES[S.cls].e+' '+CLASSES[S.cls].n:'')+(S.bg&&BACKGROUNDS[S.bg]?' · '+BACKGROUNDS[S.bg].e+' '+BACKGROUNDS[S.bg].n+' background':'')+'. One point per level and per county milestone. Rank 1 of a skill costs 1 point, rank 2 costs 2, rank 3 costs 3, and so on. General skills are open to every class.';
   const skAll=skillList();const skOpen=skAll.filter(s=>!s.req||S.lvl>=s.req);const skLocked=skAll.filter(s=>s.req&&S.lvl<s.req).sort((a,b)=>a.req-b.req);
   const skRow=(s,locked)=>{const r=sk(s.id);const cost=r+1;const can=!locked&&S.sp>=cost&&r<s.max;return `<div class="skill${r>=s.max?' max':''}${locked?' locked':''}"><div><b>${s.n} ${SKILLS.general.includes(s)?'<span class="chip" style="font-size:10px">general</span>':''}${locked?'<span class="chip a" style="font-size:10px">level '+s.req+'</span>':''}</b><span>${r>=s.max?s.d(r):(r?'Now: '+s.d(r)+' · next: '+s.d(r+1):s.d(1))}</span><div class="pips">${Array.from({length:s.max},(_,i)=>`<i class="${i<r?'on':''}"></i>`).join('')}</div></div><button class="btn sm ${can?'a':''}" onclick="learn('${s.id}')" ${can?'':'disabled'}>${locked?'🔒':r>=s.max?'Max':(S.sp>=cost?'Learn · '+cost:'Needs '+cost)}</button></div>`;};
   const spent=Object.values(S.skills||{}).reduce((a,b)=>a+b,0);const total=skAll.reduce((a,s)=>a+s.max,0);
@@ -5663,7 +5684,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}try{renderAsk();}catch(e){}try{renderBevt();}catch(e){}try{renderQuest();}catch(e){}try{renderPlots();}catch(e){}try{renderVehicle();}catch(e){}try{renderPrestige();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}try{renderWorkshop();}catch(e){}try{renderLocksmith();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
+  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}try{renderAsk();}catch(e){}try{renderBevt();}catch(e){}try{renderQuest();}catch(e){}try{renderPlots();}catch(e){}try{renderNotices();}catch(e){}try{renderVehicle();}catch(e){}try{renderPrestige();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}try{renderWorkshop();}catch(e){}try{renderLocksmith();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5899,6 +5920,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.68',d:'Sep 28',t:'A cleaner Road page',
+  i:['THE ROAD PAGE IS IN ORDER NOW. The picture, then how far to the next place, then the place you are standing at - not buried under five cards. Everything that needs you (a crew member down, a question, Marisol, someone out on a job, a flat tyre) is one Notices card of one-line rows, and the details open when you tap. Contracts, Watch duty, Steps, Water, Street mode and the Log are folded below; tap to open.',
+     'THE YOU TAB starts with you and your crew. The season and the boutique are folded at the bottom. On the Base tab, Build sits right under the Stash.',
+     'Never more than three pop-up messages on screen at once.']},
  {v:'7.67',d:'Sep 28',t:'Plant something, then walk',
   i:['YOUR PLOT (Base tab). Plant a seed - beans, tomatoes, sunflowers, and with a garden herbs, a pumpkin, poppies - and it grows as you walk: a stage every few hundred steps, drawn in your base picture, sparkling when it is ripe. Harvest it for food, water, meds, points, a key, something to wear. A small walk still moves a seedling. Two plots to start, one more per garden level.',
      'YOUR DAY. When your steps come in, one screen shows what the walk did: how many steps, what grew, who came back, what the crew found on the road - with a Harvest button and a Plant button for tomorrow. The demo steps button shows it too.']},

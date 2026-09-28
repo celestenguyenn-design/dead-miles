@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=7.67">
+<link rel="stylesheet" href="style.css?v=7.68">
 </head>
 <body>
 <div id="app">
@@ -33,27 +33,40 @@
         <div class="card" id="dayModCard"></div></div>
       <div class="card" id="stuckCard" hidden></div>
       <div class="card amber" id="pushNudge" hidden></div>
-      <div class="card blood" id="crewDown" hidden></div>
-      <div class="card" id="expedCard" hidden></div>
-      <div class="card" id="askCard" hidden></div>
-      <div class="card" id="questCard" hidden></div>
-      <div class="card" id="vehicleCard" hidden></div>
+      <div class="card blood" id="infectCard" hidden></div>
       <div class="progress"><div class="bar"><i id="pbar"></i></div><div class="row"><span id="pleft"></span><span id="pright"></span></div></div>
-      <div class="card steel"><h2>Street mode <span class="sub">live map</span></h2><p>Out walking? Open the real map: the buildings around you become the places to loot, and your own home can be your base.</p><button class="btn z wide" style="margin-top:10px" id="streetBtn">Open the live map</button></div>
-      <div class="card blood"><h2>Watch duty <span class="sub" id="watchSub"></span></h2><p>No steps today? Take a job. Three fights a day that need no walking. Loot goes in your pack, scrap goes straight to the stash.</p><div class="stack" id="watch" style="margin-top:10px"></div></div>
+      <div class="card" id="locCard" hidden></div>
       <div class="card" id="packMeter" hidden></div>
+      <div class="card" id="raidCard" hidden></div>
+      <div class="card steel" id="rivalCard" hidden></div>
       <div class="card" id="musterCard" hidden></div>
       <div class="card" id="cacheCard" hidden></div>
       <div class="card" id="landmarkCard" hidden></div>
       <div class="card" id="npcCard" hidden></div>
-      <div class="card" id="locCard" hidden></div>
-      <div class="card steel" id="rivalCard" hidden></div>
-      <div class="card" id="raidCard" hidden></div>
-      <div class="card" id="checkinCard" hidden></div>
       <div class="card" id="callCard" hidden></div>
-      <div class="card" id="contractsCard"><h2>Contracts <span class="sub" id="contractsSub"></span></h2><div class="stack" id="contracts" style="margin-top:10px"></div></div>
+      <div class="card" id="checkinCard" hidden></div>
+      <div class="card" id="notices" hidden></div>
+      <div id="noticeSrc" hidden>      <div class="card blood" id="crewDown" hidden></div>
+      <div class="card" id="expedCard" hidden></div>
+      <div class="card" id="askCard" hidden></div>
+      <div class="card" id="questCard" hidden></div>
+      <div class="card" id="vehicleCard" hidden></div>
+</div>
       <div class="card">
-        <h2>Steps <span class="sub" id="syncHint"></span></h2>
+        <h2>Daily target <span class="sub" id="goalSub"></span></h2>
+        <div class="progress" style="margin-top:8px"><div class="bar"><i id="goalBar" style="background:linear-gradient(90deg,var(--rot2),var(--rot))"></i></div><div class="row"><span id="goalLeft"></span><span id="goalRight"></span></div></div>
+        <p class="help" id="streakLine" style="margin-top:8px"></p>
+        <div class="row" style="margin-top:8px"><button class="btn sm" id="shareBtn">Share today's card</button><span class="help">A picture of your day to send.</span></div>
+      </div>
+      <details class="fold"><summary><b>Contracts</b> <span class="sub" id="contractsSub"></span></summary><div class="foldbody">
+      <div id="contractsCard"><div class="stack" id="contracts" style="margin-top:10px"></div></div>
+      </div></details>
+      <details class="fold"><summary><b>Watch duty</b> <span class="sub" id="watchSub"></span></summary><div class="foldbody">
+      <div><p>No steps today? Take a job. Three fights a day that need no walking. Loot goes in your pack, scrap goes straight to the stash.</p><div class="stack" id="watch" style="margin-top:10px"></div></div>
+      </div></details>
+      <details class="fold"><summary><b>Steps</b> <span class="sub" id="syncHint"></span></summary><div class="foldbody">
+      <div>
+        
         <div class="row" style="margin-top:8px">
           <button class="btn z" id="pedoBtn">Walk mode</button>
           <button class="btn" id="clipBtn">Read clipboard</button>
@@ -70,19 +83,20 @@
         <button class="btn sm wide" style="margin-top:10px" onclick="syncDoctor()">Why aren't my steps syncing?</button>
         <p class="help" style="margin-top:8px" id="stepsHelp">Go online in Settings and set up the phone shortcut once: your Health steps then land here on their own.</p>
       </div>
-      <div class="card blood" id="infectCard" hidden></div>
-      <div class="card steel">
-        <h2>Water <span class="sub" id="hydroSub"></span></h2>
+      </div></details>
+      <details class="fold"><summary><b>Water</b> <span class="sub" id="hydroSub"></span></summary><div class="foldbody">
+      <div>
+        
         <div class="progress" style="margin-top:8px"><div class="bar"><i id="hydroBar"></i></div><div class="row"><span id="hydroLeft"></span><span id="hydroRight" style="color:#ff8a92"></span></div></div>
         <div class="row" style="margin-top:10px"><button class="btn z" id="drinkBtn">Drink a bottle</button><span class="help">Walking makes you thirsty. Dry means weaker hits.</span></div>
       </div>
-      <div class="card">
-        <h2>Daily target <span class="sub" id="goalSub"></span></h2>
-        <div class="progress" style="margin-top:8px"><div class="bar"><i id="goalBar" style="background:linear-gradient(90deg,var(--rot2),var(--rot))"></i></div><div class="row"><span id="goalLeft"></span><span id="goalRight"></span></div></div>
-        <p class="help" id="streakLine" style="margin-top:8px"></p>
-        <div class="row" style="margin-top:8px"><button class="btn sm" id="shareBtn">Share today's card</button><span class="help">A picture of your day to send.</span></div>
-      </div>
-      <div class="card"><h2>Log</h2><ul class="journal" id="journal" style="margin-top:8px"></ul></div>
+      </div></details>
+      <details class="fold"><summary><b>Street mode</b> <span class="sub">live map</span></summary><div class="foldbody">
+      <div><p>Out walking? Open the real map: the buildings around you become the places to loot, and your own home can be your base.</p><button class="btn z wide" style="margin-top:10px" id="streetBtn">Open the live map</button></div>
+      </div></details>
+      <details class="fold"><summary><b>Log</b> <span class="sub"></span></summary><div class="foldbody">
+      <div><ul class="journal" id="journal" style="margin-top:8px"></ul></div>
+      </div></details>
     </section>
 
     <section class="view" id="v-map">
@@ -108,8 +122,13 @@
     </section>
 
     <section class="view" id="v-you">
-      <div class="jumprow" id="youJump"><button class="chip" onclick="youJump('youSkills')">Skills</button><button class="chip" onclick="youJump('youCrew')">Crew</button><button class="chip" onclick="youJump('petCard')">Companion</button><button class="chip" onclick="youJump('youBoutique')">Boutique</button></div>
-      <div class="card season" id="seasonCard"></div>
+      <div class="jumprow" id="youJump"><button class="chip" onclick="youJump('youSkills')">Skills</button><button class="chip" onclick="youJump('youCrew')">Crew</button><button class="chip" onclick="youJump('petCard')">Companion</button><button class="chip" onclick="youJump('youSeason')">Season</button></div>
+      <div class="card"><div class="you"><div id="youAv"></div><div><h2 id="youName"></h2><div class="kv" style="margin-top:6px" id="youKv"></div><div class="xp"><i id="youXp"></i></div></div></div>
+        <div class="row" style="margin-top:10px"><button class="btn sm" id="lookBtn">Change look</button><span class="chip s" id="cosmeticCount"></span></div></div>
+      <div class="card blood" id="youCrew"><h2>Crew <span class="sub" id="crewSub"></span></h2><p>Survivors you meet on the road. Active crew fight beside you and take some of the hits meant for you. Everyone active eats 1 food when you stash. If one is down and you go down too, they are gone for good.</p></div>
+      <div class="stack" id="crewList"></div>
+      <div class="card amber" id="youSkills"><h2>Skills <span class="sub" id="spSub"></span></h2><p id="clsDesc"></p><div class="stack" id="skills" style="margin-top:10px"></div><div class="row" style="margin-top:10px"><button class="btn sm ghost" id="respecBtn">Reset skills (15 scrap)</button><button class="btn sm ghost" id="bgBtn">Change background (30 scrap)</button></div></div>
+      <div class="card" id="petCard"></div>
       <div class="card">
         <h2>Your record <span class="sub" id="wallSub"></span></h2>
         <div class="row" style="margin-top:8px">
@@ -121,13 +140,12 @@
         <p class="help" style="margin-top:8px" id="wallLine"></p>
       </div>
       <div class="card" id="nemCard" hidden></div>
-      <div class="card"><div class="you"><div id="youAv"></div><div><h2 id="youName"></h2><div class="kv" style="margin-top:6px" id="youKv"></div><div class="xp"><i id="youXp"></i></div></div></div>
-        <div class="row" style="margin-top:10px"><button class="btn sm" id="lookBtn">Change look</button><span class="chip s" id="cosmeticCount"></span></div></div>
-      <div class="card" id="petCard"></div>
-      <div class="card amber" id="youSkills"><h2>Skills <span class="sub" id="spSub"></span></h2><p id="clsDesc"></p><div class="stack" id="skills" style="margin-top:10px"></div><div class="row" style="margin-top:10px"><button class="btn sm ghost" id="respecBtn">Reset skills (15 scrap)</button><button class="btn sm ghost" id="bgBtn">Change background (30 scrap)</button></div></div>
-      <div class="card blood" id="youCrew"><h2>Crew <span class="sub" id="crewSub"></span></h2><p>Survivors you meet on the road. Active crew fight beside you and take some of the hits meant for you. Everyone active eats 1 food when you stash. If one is down and you go down too, they are gone for good.</p></div>
-      <div class="stack" id="crewList"></div>
+      <details class="fold" id="youSeason"><summary><b>Season</b> <span class="sub" id="seasonFoldSub"></span></summary><div class="foldbody">
+      <div class="card season" id="seasonCard"></div>
+      </div></details>
+      <details class="fold"><summary><b>Boutique</b> <span class="sub" id="walletSubFold"></span></summary><div class="foldbody">
       <div class="card steel" id="youBoutique"><h2>Boutique <span class="sub" id="walletSub"></span></h2><p>Every step you walk goes in the wallet, on top of everything else it does. Spend steps on looks. Tap one to try it on.</p><div id="shop"></div></div>
+      </div></details>
     </section>
 
     <section class="view" id="v-base">
@@ -139,14 +157,14 @@
         <div class="row" style="margin-top:10px"><button class="btn sm" id="healBtn">Patch up</button><button class="btn sm" id="eatBtn">Eat: +15 HP</button><span class="help">HP also recovers overnight.</span></div>
         <div class="row" style="margin-top:8px" id="dropRow" hidden><button class="btn sm z" id="dropBtn">📻 Call in today's supply drop</button><span class="help" id="dropHelp"></span></div>
       </div>
-      <details class="fold"><summary><b>Gumball machines</b> <span class="sub">spend your steps</span></summary><div class="foldbody"><div id="gachaBody"></div></div></details>
+      <details class="fold"><summary><b>Build</b> <span class="sub" id="buildFold"></span></summary><div class="foldbody"><div class="card"><h2>Build</h2><p>Scrap buys the materials, your steps are the labor. Every seven days a horde hits the base at 9pm: if the walls fail, they take the stockpile.</p><div class="stack" id="build" style="margin-top:10px"></div></div></div></details>
         <details class="fold"><summary><b>Kitchen</b> <span class="sub" id="kitchenFold"></span></summary><div class="foldbody"><div class="card steel"><h2>Kitchen</h2><p>Stash water is an ingredient. Make things you cannot find on the road; they go in your pack.</p><div id="kitchen" style="margin-top:10px"></div></div></div></details>
         <details class="fold"><summary><b>Workshop</b> <span class="sub" id="workshopFold"></span></summary><div class="foldbody"><div class="card steel"><h2>Workshop</h2><p>Scrap into tools you choose when to spend. They go on your toolbelt, not in your pack, so stashing never eats them.</p><div id="workshop" style="margin-top:10px"></div></div></div></details>
         <details class="fold"><summary><b>Locksmith</b> <span class="sub" id="locksmithFold"></span></summary><div class="foldbody"><div class="card steel"><h2>Locksmith</h2><p>Marlow buys chest keys. Spend them here.</p><div id="locksmith" style="margin-top:10px"></div></div></div></details>
         <details class="fold"><summary><b>Trader</b> <span class="sub" id="traderFold"></span></summary><div class="foldbody"><div class="card steel"><h2>Trader</h2><p>Marlow's truck stops at any base with walls. Scrap in, supplies out. Salvage spare gear under Pack to get scrap.</p><div class="trade" id="trader" style="margin-top:10px"></div></div></div></details>
+      <details class="fold"><summary><b>Gumball machines</b> <span class="sub">spend your steps</span></summary><div class="foldbody"><div id="gachaBody"></div></div></details>
         <div class="card" id="eventCard" hidden></div>
       <div class="card amber" id="workCard" hidden></div>
-      <details class="fold"><summary><b>Build</b> <span class="sub" id="buildFold"></span></summary><div class="foldbody"><div class="card"><h2>Build</h2><p>Scrap buys the materials, your steps are the labor. Every seven days a horde hits the base at 9pm: if the walls fail, they take the stockpile.</p><div class="stack" id="build" style="margin-top:10px"></div></div></div></details>
         <details class="fold"><summary><b>Raid log</b></summary><div class="foldbody">      <div class="card"><h2>Raid log</h2><ul class="journal" id="raidLog" style="margin-top:8px"></ul></div></div></details>
         <details class="fold"><summary><b>Trophies</b> <span class="sub" id="shelfSubFold"></span></summary><div class="foldbody"><div class="row" style="margin-bottom:8px"><button class="btn sm r" onclick="trophySheet()">Trophy room</button><span class="help" id="setsLine"></span></div>      <div class="card"><h2>Trophies <span class="sub" id="shelfSub"></span></h2><div class="shelf" id="shelf" style="margin-top:10px"></div></div></div></details>
         <details class="fold big" id="setFold">
@@ -210,8 +228,8 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=7.67"></script>
-<script src="street.js?v=7.67"></script>
-<script src="game.js?v=7.67"></script>
+<script src="art.js?v=7.68"></script>
+<script src="street.js?v=7.68"></script>
+<script src="game.js?v=7.68"></script>
 </body>
 </html>
