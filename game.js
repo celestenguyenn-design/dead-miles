@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.69';
+const VERSION='7.70';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -457,7 +457,7 @@ function migrateGear(){
 }
 function ensureState(){if(!S)return;try{migrateGear();}catch(e){}try{migrateHandsFeet();}catch(e){}S.bossPity=S.bossPity||0;S.dust=S.dust||0;S.scrolls=S.scrolls||0;S.pins=S.pins||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;crewBackfill();for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
-  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(!S.diff)S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};if(S.eq&&S.eq.hands===undefined)S.eq.hands=null;if(S.eq&&S.eq.feet===undefined)S.eq.feet=null;
+  if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(S.diff&&S.diff!=='normal'){log('Difficulty settings are gone: everyone plays the same county now. You were on '+(DIFF[S.diff]?DIFF[S.diff].n:S.diff)+'.');}S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};if(S.eq&&S.eq.hands===undefined)S.eq.hands=null;if(S.eq&&S.eq.feet===undefined)S.eq.feet=null;
   // free any slot a downed crew member is still sitting in (they never gave it
   // back before v6.70), so an existing save is not stuck a fighter short
   if(Array.isArray(S.active)&&Array.isArray(S.crew)){
@@ -995,8 +995,9 @@ function applyMapSkin(){
   if(typeof applyTiles==='function'){try{applyTiles();}catch(e){}}
 }
 function setMapSkin(k){if(!MAPSKINS[k])return;S.mapSkin=k;applyMapSkin();save();render();toast(MAPSKINS[k].n+' map','a');}
-function diff(){return DIFF[(typeof S!=='undefined'&&S&&S.diff)||'normal']||DIFF.normal;}
-function setDiff(k){if(!DIFF[k])return;S.diff=k;log('Difficulty set to '+DIFF[k].n+'.');toast(DIFF[k].n,'a');save();render();}
+// v7.70 - difficulty is gone. One county, one set of rules, for everyone.
+function diff(){return DIFF.normal;}
+function setDiff(k){}
 const INFECT_BASE=0.012, INFECT_PER_STEPS=600;
 /* Staging used to advance on CALENDAR DAYS, which meant a player who could not
    get out for two days came back at stage 3 with a third of their health gone.
@@ -1022,7 +1023,7 @@ function armorCover(){
 // Fully armoured is UNCHANGED at the old rate; it is being bare that got worse.
 const UNARMOURED_INFECT=3;   // v7.69: was 4. With armour rarer since 7.63, bare skin was turning far too often.
 function infectChance(){
-  const base=INFECT_BASE*(DIFF[S.diff||'normal'].infect);
+  const base=INFECT_BASE*diff().infect;
   return base*(UNARMOURED_INFECT-(UNARMOURED_INFECT-1)*armorCover())*(1-0.2*sk('antiseptic'));
 }
 function infectLabel(){return ['','Infected','Fevered','Failing'][infectStage()]||'';}
@@ -5128,7 +5129,7 @@ function renderMapSkin(){
     '<button class="btn xs'+(mapSkin()===k?' a':' ghost')+'" onclick="setMapSkin(\''+k+'\')">'+esc(m.n)+'</button>').join('');
 }
 function renderDiff(){
-  const el=$('#diffBody');if(!el)return;
+  const el=$('#diffBody');if(!el)return;el.innerHTML='';return;
   el.innerHTML='<p class="help">Change it whenever you like. Nothing you own is affected.</p>'
     +Object.entries(DIFF).map(([k,d])=>{const on=(S.diff||'normal')===k;
       return '<button class="btn wide'+(on?' r':' ghost')+'" style="margin-top:8px;text-align:left" onclick="setDiff(\''+k+'\')">'
@@ -5924,11 +5925,13 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.70',d:'Sep 28',t:'No more difficulty setting',
+  i:['Hardened and Hollow are gone. Everyone plays the same county with the same rules - the fair ones. If you were on a harder setting you have been moved over, and nothing you own changed.']},
  {v:'7.69',d:'Sep 28',t:'Fewer infections, more scrap',
   i:['INFECTIONS WERE TURNING TOO OFTEN, and that was on us: the Crawler (new in 7.56) bit twice as infectiously and turned up too much, and with weapons and armour rarer since 7.63, bare skin was getting bitten more. Fixed: a bite on bare skin turns 3x the armoured rate instead of 4x, the Crawler bite is 1.5x instead of 2x and it is rarer, and a bloody room hides one 30% of the time instead of 45%.',
      'CURING IS EASIER. Three bandages clear an infection instead of four. Herbs in your plot now grow ANTIBIOTICS (plus a bandage) - plant them, walk, and you have a cure. Garden tea from the Kitchen still halves the odds of a bite turning.',
      'SCRAP. Under 8 scrap at a base, the crew turns up enough overnight to get you back to 8. The truck burns 1 scrap a place instead of 2. A Scavenge job brings home 12-20 scrap instead of 8-14.',
-     'If it still feels hard: Settings > Game > Difficulty. Hardened makes bites turn nearly twice as often and death takes 20% of your scrap; Hollow is 2.6x and 30%. Survivor is the fair one.']},
+     'Difficulty settings are gone (7.70): everyone plays the same county.']},
  {v:'7.68',d:'Sep 28',t:'A cleaner Road page',
   i:['THE ROAD PAGE IS IN ORDER NOW. The picture, then how far to the next place, then the place you are standing at - not buried under five cards. Everything that needs you (a crew member down, a question, Marisol, someone out on a job, a flat tyre) is one Notices card of one-line rows, and the details open when you tap. Contracts, Watch duty, Steps, Water, Street mode and the Log are folded below; tap to open.',
      'THE YOU TAB starts with you and your crew. The season and the boutique are folded at the bottom. On the Base tab, Build sits right under the Stash.',
