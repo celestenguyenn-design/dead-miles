@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.66';
+const VERSION='7.67';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -1372,6 +1372,51 @@ function vehicleDist(dist){const v=S.vehicle;if(!v||!VEHICLES[v.k])return dist;c
 function fixVehicle(){const v=S.vehicle;if(!v||!v.flat)return;if((S.stock.scrap||0)<3){toast('Needs 3 scrap','d');return;}S.stock.scrap-=3;v.flat=false;log('Patched the bike.');toast('Rolling again','a');save();render();}
 function renderVehicle(){const el=$('#vehicleCard');if(!el)return;const v=S.vehicle;if(!v||!VEHICLES[v.k]){el.hidden=true;return;}el.hidden=false;el.className='card';const V=VEHICLES[v.k];
   el.innerHTML='<div class="row" style="align-items:center;gap:8px"><span style="font-size:26px">'+V.e+'</span><div style="flex:1"><b>'+esc(V.n)+'</b><div class="help">'+(v.flat?'<b style="color:#ff8a92">Flat tyre.</b> Walking until it is fixed.':v.parked?'<b style="color:var(--amber)">Parked</b> - no scrap to burn. Stash some.':esc(V.d))+'</div></div>'+(v.flat?'<button class="btn sm r" onclick="fixVehicle()">Fix (3 scrap)</button>':'')+'</div>';}
+
+/* ================= the plot (v7.67) =================
+   "I loved planting flowers as I walked in Pikmin Bloom." Steps were a fuel
+   gauge: walk 500, get a door. Now they also grow something you can SEE.
+   Plant a seed in a plot at your base; every few hundred steps it goes up a
+   stage in the base picture; when it is ripe, harvest it. A small walk still
+   moves a seedling. A big walk fills the yard. */
+const SEEDS={
+  beans:    {n:'Beans',      e:'🫘',per:250,stages:['🌱','🌿','🫘'],d:'Quick. 3 food.',give:()=>{S.stock.food+=3;return '3 food';}},
+  tomato:   {n:'Tomatoes',   e:'🍅',per:350,stages:['🌱','🌿','🍃','🍅'],d:'5 food.',give:()=>{S.stock.food+=5;return '5 food';}},
+  sunflower:{n:'Sunflowers', e:'🌻',per:300,stages:['🌱','🌿','🌻'],d:'3 water, and 25 league points.',give:()=>{S.stock.water+=3;S.league.score+=25;return '3 water, 25 points';}},
+  herbs:    {n:'Herbs',      e:'🌾',per:400,stages:['🌱','🌿','🌾','🌾'],need:1,d:'2 bandages. Needs a garden.',give:()=>{medsGive('bandage',2);return '2 bandages';}},
+  pumpkin:  {n:'Pumpkin',    e:'🎃',per:600,stages:['🌱','🌿','🍃','🟢','🎃'],need:2,d:'8 food and a chest key. Needs garden L2.',give:()=>{S.stock.food+=8;S.keys++;return '8 food, 1 key';}},
+  poppies:  {n:'Poppies',    e:'🌸',per:500,stages:['🌱','🌿','🌷','🌸'],need:3,d:'Something to wear, or 30 scrap. Needs garden L3.',give:()=>{if(Math.random()<0.4){const c=rollCosmetic();if(c&&takeItem(c,null))return c.n;}S.stock.scrap+=30;return '30 scrap';}},
+};
+function plotCount(){return Math.min(5,2+(S.base&&S.base.rooms.garden?S.base.rooms.garden:0));}
+function plots(){if(!S.plots)S.plots=[];while(S.plots.length<plotCount())S.plots.push({seed:null,steps:0});return S.plots.slice(0,plotCount());}
+function plotStage(pl){if(!pl.seed)return -1;const sd=SEEDS[pl.seed];return Math.min(sd.stages.length,Math.floor(pl.steps/sd.per));}
+function plotRipe(pl){return pl.seed&&plotStage(pl)>=SEEDS[pl.seed].stages.length;}
+function plotEmoji(pl){if(!pl.seed)return '';const sd=SEEDS[pl.seed];const st=plotStage(pl);return st>=sd.stages.length?sd.stages[sd.stages.length-1]:sd.stages[st];}
+function plotSteps(n){if(!S.base)return;for(const pl of plots()){if(pl.seed&&!plotRipe(pl))pl.steps+=n;}}
+function plantSheet(i){if(!S.base){toast('Claim a base first');return;}const g=S.base.rooms.garden||0;
+  openSheet('<h2>🌱 Plant something</h2><p class="help">It grows as you walk. Plot '+(i+1)+' of '+plotCount()+'.</p><div class="stack">'
+    +Object.entries(SEEDS).map(([k,sd])=>{const ok=!sd.need||g>=sd.need;return '<button class="btn'+(ok?' r':' ghost')+'" '+(ok?'':'disabled')+' onclick="plant('+i+',\''+k+'\')">'+sd.e+' '+esc(sd.n)+'<small>'+esc(ok?(sd.per*sd.stages.length).toLocaleString()+' steps to ripe · '+sd.d:sd.d)+'</small></button>';}).join('')
+    +'</div><button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet()">Not now</button>');}
+function plant(i,k){const pl=plots()[i];if(!pl||pl.seed||!SEEDS[k])return;pl.seed=k;pl.steps=0;log('Planted '+SEEDS[k].n.toLowerCase()+'.');toast(SEEDS[k].e+' Planted. Walk.','a');SFX.play('ui');closeSheet();save();render();}
+function harvest(i){const pl=plots()[i];if(!pl||!plotRipe(pl))return;const sd=SEEDS[pl.seed];const got=sd.give();pl.seed=null;pl.steps=0;log('Harvested '+sd.n.toLowerCase()+': '+got+'.');toast(sd.e+' '+got,'a');SFX.play('loot');save();render();}
+function harvestAll(){let n=0;plots().forEach((pl,i)=>{if(plotRipe(pl)){harvest(i);n++;}});return n;}
+function renderPlots(){const el=$('#plotCard');if(!el)return;if(!S.base){el.hidden=true;return;}el.hidden=false;el.className='card';const P=plots();
+  el.innerHTML='<h2>🌱 Your plot <span class="sub">grows as you walk</span></h2><div class="stack" style="margin-top:8px">'+P.map((pl,i)=>{
+    if(!pl.seed)return '<div class="row" style="align-items:center"><span style="flex:1"><span style="font-size:22px">🟫</span> <span class="help">Empty</span></span><button class="btn sm r" onclick="plantSheet('+i+')">Plant</button></div>';
+    const sd=SEEDS[pl.seed];const st=plotStage(pl);const ripe=plotRipe(pl);const total=sd.per*sd.stages.length;const pct=Math.min(100,Math.round(pl.steps/total*100));
+    return '<div><div class="row" style="align-items:center"><span style="flex:1"><span style="font-size:22px">'+plotEmoji(pl)+'</span> <b>'+esc(sd.n)+'</b> <span class="help">'+(ripe?'ripe':'stage '+(st+1)+' of '+(sd.stages.length+1))+'</span></span>'+(ripe?'<button class="btn sm r" onclick="harvest('+i+')">Harvest</button>':'<span class="help">'+fmt(Math.max(0,total-pl.steps))+' steps</span>')+'</div><div class="hpbar2" style="margin-top:4px"><i style="width:'+pct+'%;background:'+(ripe?'#e6a530':'#6aa84f')+'"></i></div></div>';}).join('')+'</div>'
+    +(plotCount()<5?'<p class="help" style="margin-top:6px">A garden adds a plot per level.</p>':'');}
+/* "Your day": the reveal when your steps come in. One screen, what the walk did. */
+function plotSnap(){return plots().map(pl=>pl.seed?plotStage(pl):-1);}
+function dayReveal(delta,before,newsBefore){if(!(delta>=100))return;const P=plots();const grew=[];P.forEach((pl,i)=>{if(pl.seed&&before[i]>=0&&plotStage(pl)>before[i]){const sd=SEEDS[pl.seed];grew.push(sd.stages[Math.min(sd.stages.length-1,before[i])]+' → '+plotEmoji(pl)+' '+sd.n+(plotRipe(pl)?' - <b style="color:var(--amber)">ripe</b>':''));}});
+  const news=(S.expedNews||[]).slice(newsBefore);const r=S.awayRep;const away=r&&(r.places||r.lines.length);
+  const lines=[];if(away){if(r.places)lines.push(r.places+' place'+(r.places===1?'':'s')+' searched by the crew');if(r.kills)lines.push(r.kills+' put down');lines.push(...r.lines.slice(0,6));if(r.items.length)lines.push('Brought back: '+r.items.slice(0,6).join(', ')+(r.items.length>6?' and more':''));if(r.waiting)lines.push(r.waiting+' is waiting for you.');S.awayRep=null;}
+  lines.push(...news);
+  const goal=S.goal||6000,today=S.steps.today||0;const ripe=P.filter(plotRipe).length;const empty=P.filter(pl=>!pl.seed).length;
+  openSheet('<h2>Your day</h2><div style="font-family:\'Bebas Neue\';font-size:44px;line-height:1;color:var(--amber);margin:6px 0">+'+fmt(delta)+'</div><p class="help">'+fmt(today)+' today'+(today>=goal?' · target hit':' · '+fmt(goal-today)+' to your target')+(S.streak.days?' · streak '+S.streak.days:'')+'</p>'
+    +(grew.length?'<div class="section-label" style="margin-top:8px">Grew</div><ul class="journal" style="margin:4px 0">'+grew.map(g=>'<li><span>'+g+'</span></li>').join('')+'</ul>':(P.some(pl=>pl.seed)?'<p class="help">The plot grew a little. Not a whole stage yet.</p>':''))
+    +(lines.length?'<div class="section-label" style="margin-top:8px">On the road</div><ul class="journal" style="margin:4px 0">'+lines.map(m=>'<li><span>'+esc(m)+'</span></li>').join('')+'</ul>':'')
+    +'<div class="stack" style="margin-top:10px">'+(ripe?'<button class="btn r" onclick="harvestAll();closeSheet();render()">🧺 Harvest '+ripe+' ripe plot'+(ripe>1?'s':'')+'</button>':'')+(empty&&S.base?'<button class="btn" onclick="closeSheet();plantSheet('+P.findIndex(pl=>!pl.seed)+')">🌱 Plant something for tomorrow<small>'+empty+' empty plot'+(empty>1?'s':'')+'</small></button>':'')+'<button class="btn ghost" onclick="closeSheet()">Back to the road</button></div>');}
 function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05-setPerk('dist')-(roleLvl('pathfinder')?(3+roleLvl('pathfinder')*2)/100:0)-(veteran('pathfinder')?0.1:0)));if(wxKind()==='snow')dist=Math.round(dist*1.1);if(S.walk.nextMul){dist=Math.round(dist*S.walk.nextMul);S.walk.nextMul=0;}if(S.walk.scouted>0){dist=Math.round(dist*0.7);S.walk.scouted--;}dist=vehicleDist(dist);S.walk.dist=Math.max(60,dist);S.walk.progress=0;S.walk.toNext=S.walk.dist;}
 function bossName(){if(eventNow()==='halloween')return 'The Gourd King';return BOSS_NAMES[hash(weekId()+'boss')%BOSS_NAMES.length];}
 
@@ -2559,7 +2604,7 @@ function addSteps(n,src){
   if(src==='demo'){const r=syncReads();r.manual=(r.manual||0)+n;}
   if(src!=='carry'&&infect()){S.infectStep=(S.infectStep||0)+n;
     while(S.infectStep>=INFECT_PER_STEPS){S.infectStep-=INFECT_PER_STEPS;S.hp=Math.max(1,S.hp-1-infectStage());}}
-  if(src!=='carry')try{expedSteps(n);}catch(e){}
+  if(src!=='carry')try{expedSteps(n);plotSteps(n);}catch(e){}
   if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(Math.max(3,Math.round(6*thirstMult())));}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip'||src==='clipboard'||src==='shortcut')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);checkLadder();if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
   if(src!=='carry'&&S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');streakReward();}
   // v7.50: steps that arrive in the first minutes after an hour or more away are AWAY STEPS.
@@ -5258,7 +5303,7 @@ function stepsApply(src){
     target=S.steps.today||0;
   }
   const delta=target-(S.steps.today||0);
-  if(delta>0){SFX.play('step');addSteps(delta,src);}
+  if(delta>0){SFX.play('step');const before=plotSnap();const nb=(S.expedNews||[]).length;addSteps(delta,src);if(src!=='live'&&src!=='demo')setTimeout(()=>{try{if(!C&&!$('#modal').classList.contains('on'))dayReveal(delta,before,nb);}catch(e){}},1600);}
   else{save();render();}
   return delta;
 }
@@ -5618,7 +5663,7 @@ function render(){
   $('#radio').innerHTML=radioLines().map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join('');
   $('#seasons').innerHTML=S.league.history.length?S.league.history.map(h=>`<li><time>${h.week.slice(5)}</time><span>#${h.rank} · ${fmt(h.score)} pts · ${TIERS[h.tier].n}${h.delta>0?' → promoted':h.delta<0?' → dropped':' → held'}</span></li>`).join(''):'<li><span class="help">First week still running.</span></li>';
   if(S.league.history.length&&S.league.seen!==S.league.history[0].week&&!S.combat){const h=S.league.history[0];S.league.seen=h.week;save();openSheet(`<h2>Week over</h2><div class="big">${h.delta>0?'🏆':h.delta<0?'📉':'⚔️'}</div><p>Week of ${h.week}: <b>#${h.rank}</b> with ${fmt(h.score)} points in ${TIERS[h.tier].n}. ${h.delta>0?'Promoted to '+TIERS[S.league.tier].n+'. Rivals and raiders get harder.':h.delta<0?'Dropped to '+TIERS[S.league.tier].n+'.':'You held your tier.'}</p><button class="btn r wide" onclick="closeSheet()">New week</button>`);}
-  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}try{renderAsk();}catch(e){}try{renderBevt();}catch(e){}try{renderQuest();}catch(e){}try{renderVehicle();}catch(e){}try{renderPrestige();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}try{renderWorkshop();}catch(e){}try{renderLocksmith();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
+  renderOnline();renderStepsHelp();renderWanderer();try{renderPushNudge();}catch(e){}try{renderCrewDown();}catch(e){}try{renderExped();}catch(e){}try{renderAsk();}catch(e){}try{renderBevt();}catch(e){}try{renderQuest();}catch(e){}try{renderPlots();}catch(e){}try{renderVehicle();}catch(e){}try{renderPrestige();}catch(e){}if(typeof renderMuster==='function')try{renderMuster();}catch(e){}renderFriends();renderPush();rivalRow();renderTrader();try{renderKitchen();}catch(e){}try{renderWorkshop();}catch(e){}try{renderLocksmith();}catch(e){}renderWatch();if(typeof renderStreet==='function')renderStreet();animate();raidTick();hordeTick();reportTick();if(typeof awayTick==='function')awayTick();renderQuiet();if(typeof renderChips==='function')try{renderChips();}catch(e){}
 }
 function renderLoc(){
   const el=$('#locCard');const loc=S.loc;if(!loc){el.hidden=true;return;}el.hidden=false;el.className='card amber';
@@ -5788,6 +5833,7 @@ function baseScene(st){st=st||S;if(!st.base)return '';
   if(wx==='rain'||wx==='storm'){s+='<g opacity=".35" stroke="#8fb3c9" stroke-width="1">'+bsAnim(A,'<animateTransform attributeName="transform" type="translate" values="0 -40;-12 0" dur="0.450s" repeatCount="indefinite"/>');
     for(let i=0;i<34;i++){const x=(i*47)%400,y=(i*83)%330;s+='<path d="M'+x+' '+y+' l-4 14"/>';}s+='</g>';}
   if(th.horde===2)s+='<rect width="'+W+'" height="'+H+'" fill="#c22b3a" opacity=".07">'+bsAnim(A,'<animate attributeName="opacity" values=".04;.12;.04" dur="2.400s" repeatCount="indefinite"/>')+'</rect>';
+  if(mine&&S.base){plots().forEach((pl,i)=>{const x=30+i*36,y=236;s+='<path d="M'+(x-15)+' '+(y+5)+' q15 -8 30 0 v5 h-30z" fill="#3a2a1c" '+bsO(1.4)+'/>'+(pl.seed?'<text x="'+x+'" y="'+(y+1)+'" font-size="'+(plotRipe(pl)?24:14+plotStage(pl)*3)+'" text-anchor="middle">'+plotEmoji(pl)+'</text>'+(plotRipe(pl)&&A?'<text x="'+(x+10)+'" y="'+(y-12)+'" font-size="9">✨<animate attributeName="opacity" values="1;.2;1" dur="1.4s" repeatCount="indefinite"/></text>':''):'');});}
   const label=th.horde===2?'Horde night. They are at the fence.':th.horde===1?'They are gathering outside.':th.raiders?'Raiders on the street.':'Your base';
   return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;border-radius:8px;margin-top:10px" role="img" aria-label="'+label+'">'+s+'</svg>';
 }
@@ -5853,6 +5899,9 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.67',d:'Sep 28',t:'Plant something, then walk',
+  i:['YOUR PLOT (Base tab). Plant a seed - beans, tomatoes, sunflowers, and with a garden herbs, a pumpkin, poppies - and it grows as you walk: a stage every few hundred steps, drawn in your base picture, sparkling when it is ripe. Harvest it for food, water, meds, points, a key, something to wear. A small walk still moves a seedling. Two plots to start, one more per garden level.',
+     'YOUR DAY. When your steps come in, one screen shows what the walk did: how many steps, what grew, who came back, what the crew found on the road - with a Harvest button and a Plant button for tomorrow. The demo steps button shows it too.']},
  {v:'7.66',d:'Sep 27',t:'The workshop, titles, and fog on your town',
   i:['THE WORKSHOP (Base tab, under the Kitchen). Scrap into tools you pick when to spend: a MOLOTOV (6 scrap + a water bottle) hits every enemy in a fight at once, two a fight, loud. LOCKPICKS (4 scrap + a part) open a locked room silently. A NOISEMAKER (5 scrap) knocks 30 off the noise where you are looting. Or whittle 8 bolts for 3 scrap. Tools sit on a TOOLBELT, five of each - not in your pack, so stashing never melts them into points.',
      'TITLES. Every milestone on The wall (You tab) is now a title. Tap Wear and it shows under your name on the County board for your friends. 13 new milestones to earn, including a million steps, 20,000 in a day, workshop ones and town ones.',
@@ -7425,7 +7474,7 @@ function wire(){
   $('#syncSet').onclick=()=>{const v=parseInt($('#syncInput').value,10);if(!(v>=0)){toast('Type a number first');return;}if(setManual(v)){$('#syncInput').value='';syncMath();}};
   $('#pedoBtn').onclick=pedoToggle;$('#clipBtn').onclick=readClipboard;$('#bankBtn').onclick=bank;$('#healBtn').onclick=heal;$('#eatBtn').onclick=eat;$('#dropBtn').onclick=supplyDrop;$('#drinkBtn').onclick=()=>drink();
   $('#lookBtn').onclick=()=>lookSheet();$('#respecBtn').onclick=respec;$('#bgBtn').onclick=()=>bgSheet(false);$('#sfxBtn').onclick=()=>{S.sfx=!S.sfx;save();render();if(S.sfx)SFX.play('ui');};
-  $('#demoBtn').onclick=()=>{toast('+300 demo steps','z');addSteps(300,'demo');};$('#shareBtn').onclick=shareCard;
+  $('#demoBtn').onclick=()=>{const before=plotSnap();const nb=(S.expedNews||[]).length;addSteps(300,'demo');setTimeout(()=>{try{if(!C&&!$('#modal').classList.contains('on'))dayReveal(300,before,nb);}catch(e){}},400);};$('#shareBtn').onclick=shareCard;
   $('#streetBtn').onclick=streetStart;$('#mapBack').onclick=streetStop;$('#homeBtn').onclick=setHomeHere;$('#refreshPois').onclick=()=>{if(STREET.pos){STREET.lastFetch=null;try{Object.keys(localStorage).filter(k=>k.startsWith('dm.pois.')).forEach(k=>localStorage.removeItem(k));}catch(e){}fetchPois(STREET.pos,true);}else toast('Waiting for GPS first','a');};
   $('#updateBtn').onclick=()=>{toast('Fetching the latest version');applyUpdate();};$('#updateBar').onclick=applyUpdate;
   $('#undoBtn').onclick=undoRestore;$('#resetBtn').onclick=()=>{openSheet('<h2>Reset everything?</h2><p>Base, crew, gear, skills and league history on this device will be gone.</p><div class="grid2"><button class="btn" onclick="closeSheet()">Keep playing</button><button class="btn d" onclick="hardReset()">Reset</button></div>');};
