@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.70';
+const VERSION='7.71';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -3630,7 +3630,7 @@ function takeItem(it,loc){
 }
 function searchRoom(i){pushSoon();
   const loc=S.loc;if(!loc||!loc.cleared)return;const r=loc.rooms[i];if(r.done)return;
-  if(r.sealed){breakSeal(i);return;}if(loc.stronghold&&r.stage>loc.stage){toast('Push deeper first');return;}
+  if(r.sealed){breakSeal(i);return;}if(loc.stronghold&&r.stage>loc.stage){toast('Locked until stage '+r.stage+'. Push to '+['','the gate','the yard','the boss trailer'][loc.stage+1]+' first.','d');return;}
   if(roomTagBefore(i))return;
   const tl=roomTagLoot(r);r.done=true;S.roomsSearched=(S.roomsSearched||0)+1;
   for(const it of tl.items)takeItem(it,loc);
@@ -5697,7 +5697,7 @@ function renderLoc(){
   if(loc.stronghold){
     const stageNames=['the gate','the yard','the boss trailer'];const next=loc.stage<3?stageNames[loc.stage]:null;
     el.innerHTML=`<h2>🏴 ${esc(loc.n)} <span class="sub">stage ${loc.stage}/3</span></h2><p><b style="color:var(--bone)">WANTED: ${esc(bossName())}</b>. Fires, tents, a trailer with a padlock. Fight through ${next?next:'nothing, it is yours'}${loc.stage<3?', or take what you have and go':''}. Every stage you clear opens its loot.</p>
-    ${loc.stage>0?`<div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div><div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done||r.stage>loc.stage?'disabled':''}><span class="n">${esc(r.n)}</span><span class="m">${r.done?'searched':r.stage>loc.stage?'locked: stage '+r.stage:'noise +'+r.noise}</span></button>`).join('')}</div>`:''}
+    ${loc.stage>0?`<div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div><div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}${r.stage>loc.stage?' locked':''}" onclick="searchRoom(${i})" ${r.done?'disabled':''}><span class="n">${r.stage>loc.stage?'🔒 ':''}${esc(r.n)}</span><span class="m">${r.done?'searched':r.stage>loc.stage?'opens after '+['','the gate','the yard','the boss trailer'][r.stage-1]+' (stage '+r.stage+')':'noise +'+r.noise}</span></button>`).join('')}</div>`:''}
     ${loc.found.length?`<div class="section-label" style="margin-top:12px">Found here</div><div class="loot" style="margin-top:6px">${loc.found.map(it=>`<div class="item r-${it.r||'common'}"><span class="e">${it.e}</span>${esc(it.n)}<span class="pt">+${it.pts}</span></div>`).join('')}</div>`:''}
     ${bankedLine()}<div class="grid2" style="margin-top:12px">${next?`<button class="btn d" onclick="pushStage()">Push to ${next}</button>`:`<button class="btn" onclick="claimBase()">${S.base?'Move base here · compare first':'Claim as base'}</button>`}<button class="btn ${next?'':'r'}" onclick="leaveLoc()">${loc.stage?'Take the loot and go':'Keep walking'}</button></div>`;return;}
   if(loc.rival){const body=rivalCardBody(loc);
@@ -5925,6 +5925,8 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.71',d:'Sep 29',t:'Stronghold rooms say why they are locked',
+  i:['In a raider stronghold the Loot pile and the Boss trailer are locked until you have pushed through the stage before them - but they just sat there grey and did nothing when tapped, which looked broken. Now they show a lock, say which stage opens them, and tapping one tells you what to push to first.']},
  {v:'7.70',d:'Sep 28',t:'No more difficulty setting',
   i:['Hardened and Hollow are gone. Everyone plays the same county with the same rules - the fair ones. If you were on a harder setting you have been moved over, and nothing you own changed.']},
  {v:'7.69',d:'Sep 28',t:'Fewer infections, more scrap',

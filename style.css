@@ -79,6 +79,7 @@ a{color:var(--amber)}
 .room .n{font-family:'Bebas Neue';font-size:20px;letter-spacing:1px}
 .room .m{font-size:12px;color:var(--muted)}
 .room.done{opacity:.5;border-style:dashed}
+.room.locked{opacity:.75;border-style:dashed}
 .room .peek{font-size:12px;color:var(--amber)}
 .loot{display:flex;flex-wrap:wrap;gap:8px}
 .item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;background:var(--ash2);border:1px solid var(--line);font-size:13px;font-weight:600;animation:pop .3s cubic-bezier(.2,1.4,.4,1);border-left-width:4px}
