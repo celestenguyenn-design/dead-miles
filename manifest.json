@@ -1,7 +1,7 @@
 {
   "name": "Dead Miles",
   "short_name": "Dead Miles",
-  "description": "Walk in real life. Loot Hollow County, fight what is in the houses, hold your base.",
+  "description": "Move in real life. Grow a farm at the end of the world, take a short run into the dead county every night, hold off the Sunday horde.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

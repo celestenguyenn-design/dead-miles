@@ -85,7 +85,9 @@ function decide(row, everyone) {
       out.push({
         tag: 'horde', day,
         title: 'Horde night',
-        body: `They come in about an hour. Your walls hold ${pub.defense || 0}. Get behind them.`,
+        body: pub.v === 8
+          ? `The Sunday horde hits your camp in about an hour: ${pub.horde_str || '?'} of them vs your defense ${pub.defense || 0}.`
+          : `They come in about an hour. Your walls hold ${pub.defense || 0}. Get behind them.`,
       });
     }
   }
@@ -104,11 +106,16 @@ function decide(row, everyone) {
   const goal = Number(pub.goal || 6000);
   const steps = Number(row.steps_today || pub.steps_today || 0);
   const streak = Number(pub.streak || 0);
-  if (hour >= 19 && hour < 22 && streak >= 3 && steps < goal && fresh('streak')) {
+  // v8 (Homestead): workouts count too, so steps alone can't say the day is short.
+  // The game sends streak 0 once today already counts.
+  const short = pub.v === 8 ? Number(pub.grit_today || 0) < 15 : steps < goal;
+  if (hour >= 19 && hour < 22 && streak >= 3 && short && fresh('streak')) {
     out.push({
       tag: 'streak', day,
       title: `Streak of ${streak} at risk`,
-      body: `${fmt(goal - steps)} steps to go before midnight. A walker gets into the scrap if you miss.`,
+      body: pub.v === 8
+        ? `A 15-minute walk or an 8-minute workout keeps it alive.`
+        : `${fmt(goal - steps)} steps to go before midnight. A walker gets into the scrap if you miss.`,
     });
   }
 
