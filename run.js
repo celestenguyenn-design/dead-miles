@@ -74,6 +74,7 @@ function startRun() {
   let maxhp = baseMaxHp() + Math.round((mf.maxhp || 0) * mm);
   const med = S.surv.filter(s => s.job === 'medic'); if (med.length) maxhp += 5 + Math.max(...med.map(s => s.hearts));
   if (charms.includes('locket')) maxhp += 10;
+  maxhp += 2 * Math.floor(roadSkill('train').lvl / 5);
   const deck = STARTER_DECK.map(id => ({ id, u: uid() }));
   const pet = activePet(); if (pet) deck.push({ id: pet.kind === 'dog' ? 'sicem' : 'pounce', u: uid() });
   const seed = hash(todayStr() + R.id + S.stats.runs + S.created);

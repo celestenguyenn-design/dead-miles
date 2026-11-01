@@ -307,3 +307,25 @@ const BOUNTIES = [
 
 /* ---------- character titles by level ---------- */
 const TITLES = ['Drifter', 'Homesteader', 'Scavenger', 'Ranger', 'Warden', 'Road Captain', 'Legend of Hollow County'];
+
+/* ---------- on the road (v8.1) ----------
+   WalkScape-style: pick something to do while you walk. Every `every` steps
+   your phone counts finishes one round of it. Nothing here is locked behind
+   steps - you can switch any time, for free - steps just make it go. */
+const ROAD = {
+  scav:   { n: 'Scavenge',     e: '🎒', every: 300, d: 'Pick through cars and porches for scrap.', skill: 'Scavenging' },
+  wood:   { n: 'Chop wood',    e: '🪓', every: 300, d: 'Fallen trees and broken fences become wood.', skill: 'Woodcutting' },
+  forage: { n: 'Forage',       e: '🌿', every: 700, d: 'Wild gardens and seed racks. Seeds, sometimes crops.', skill: 'Foraging' },
+  patrol: { n: 'Patrol',       e: '🔦', every: 400, d: 'Walk the fence line. Every round adds defense for this Sunday\'s horde.', skill: 'Patrolling' },
+  train:  { n: 'Train',        e: '💪', every: 400, d: 'Hard miles. Pure XP for you.', skill: 'Endurance' },
+};
+const ROAD_ORDER = ['scav', 'wood', 'forage', 'patrol', 'train'];
+const ROAD_PATROL_CAP = 40;   // patrol defense per week
+// What each skill level unlocks, shown on the skill card.
+const ROAD_PERKS = {
+  scav:   { 3: 'Finds a meal-sized can of food sometimes', 5: 'Sometimes finds a torch', 8: 'Sometimes finds a charm' },
+  wood:   { 3: 'Double wood more often', 6: 'Sometimes finds scrap in the rubble' },
+  forage: { 3: 'Uncommon seeds', 5: 'Rare seeds', 8: 'Moonflower seeds' },
+  patrol: { 4: 'Patrol rounds count double', 7: 'Sometimes finds a stray or a survivor' },
+  train:  { 5: '+2 max HP on runs per 5 levels' },
+};

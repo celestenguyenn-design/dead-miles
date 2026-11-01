@@ -238,3 +238,5 @@ input{background:#120f0b;border:1px solid var(--line);color:var(--bone);border-r
 .ob>p{text-align:center;color:var(--bone);font-size:17px}
 .ob input{width:100%}
 @media (max-width:380px){.res{font-size:12.5px;gap:5px}.who b{max-width:60px}.cc{width:94px}}
+.card.road{border-color:var(--leaf2);background:linear-gradient(160deg,#22301a,#1e1a14 70%)}
+.walkrep{background:#120f0b88;border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px}

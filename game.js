@@ -2,7 +2,7 @@
    The run + combat engine is run.js. Content is content.js.
    The old walking game (v7.71) lives on, untouched, in classic/. */
 'use strict';
-const VERSION = '8.0';
+const VERSION = '8.1';
 const SAVE_KEY = 'deadmiles.v8';
 const OLD_KEY = 'deadmiles.v3';
 
@@ -62,6 +62,7 @@ function fresh() {
     idle: { last: Date.now(), scrap: 0, wood: 0 },
     morning: { date: '', evt: null, done: false, recap: null },
     daily: { date: '', list: [], prog: {} },
+    road: { act: 'scav', prog: 0, skills: {}, patrolWeek: '', patrol: 0, rep: null },
     horde: { week: '', res: null, first: weekId() },
     run: null,
     stats: { runs: 0, wins: 0, kills: 0, bosses: 0, harvests: 0, meals: 0, cards: 0, grit: 0, best: 0 },
@@ -134,10 +135,11 @@ function activityChanged(quiet) {
 function setCounted(n, src) {
   rollDay(); n = Math.floor(n); if (!(n >= 0)) return false;
   if (n <= (S.act.counted || 0)) return false;
+  walkSteps(n - (S.act.counted || 0));
   S.act.counted = n; S.act.src = src || 'phone';
   activityChanged(); save(); render(); return true;
 }
-function addManualSteps(n) { rollDay(); n = Math.floor(n); if (!(n > 0) || n > 60000) { toast('That does not look like a step count'); return; } S.act.manual += n; log('Added ' + fmt(n) + ' steps by hand.'); activityChanged(); save(); render(); }
+function addManualSteps(n) { rollDay(); n = Math.floor(n); if (!(n > 0) || n > 60000) { toast('That does not look like a step count'); return; } S.act.manual += n; walkSteps(n); log('Added ' + fmt(n) + ' steps by hand.'); activityChanged(); save(); render(); }
 function addWorkout(type, min) {
   rollDay(); min = Math.floor(min); const W = WORKOUTS.find(w => w.id === type); if (!W) return;
   if (!(min > 0) || min > 300) { toast('Minutes between 1 and 300'); return; }
@@ -149,6 +151,7 @@ function removeWorkout(i) { const w = S.act.work[i]; if (!w) return; S.act.work.
 function backfillDay(date, steps) {
   const h = S.hist[date] || { steps: 0, grit: 0, work: 0 };
   if (steps <= (h.steps || 0)) return;
+  walkSteps(steps - (h.steps || 0));
   const before = h.grit || 0; h.steps = steps;
   h.grit = Math.floor(steps / GRIT_PER_STEPS) + Math.round((h.workGrit || 0));
   S.hist[date] = h; if (h.grit > before) { addXp((h.grit - before) * 3); S.stats.grit += h.grit - before; }
@@ -156,6 +159,67 @@ function backfillDay(date, steps) {
   if (date === dayOffset(-1) && h.grit >= VIGOR[1].at && (!S.streak.last || S.streak.last < date)) {
     S.streak.days = (S.streak.last === dayOffset(-2)) ? S.streak.days + 1 : 1; S.streak.last = date;
   }
+}
+
+/* ================= on the road (WalkScape-style) ================= */
+function roadSkill(k) { const R = S.road; if (!R.skills[k]) R.skills[k] = { lvl: 1, xp: 0 }; return R.skills[k]; }
+function roadNeed(l) { return 40 + l * 30; }
+function patrolDef() { return S.road.patrolWeek === weekId() ? S.road.patrol : 0; }
+function setRoad(k) { if (!ROAD[k]) return; S.road.act = k; S.road.prog = 0; SFX.play('ui'); save(); closeSheet(); render(); toast(ROAD[k].e + ' ' + ROAD[k].n + ' while you walk', 'z'); }
+function walkSteps(n) {
+  n = Math.floor(n); if (!(n > 0) || !S.onboarded) return;
+  const R = S.road; const A = ROAD[R.act] || ROAD.scav;
+  if (!R.rep) R.rep = { steps: 0, rounds: 0, got: {}, act: R.act, lv: [] };
+  R.rep.steps += n; R.prog += n;
+  let rounds = 0;
+  while (R.prog >= A.every && rounds < 500) { R.prog -= A.every; rounds++; roadRound(R.act); }
+  if (rounds >= 500) R.prog = 0;
+  R.rep.rounds += rounds;
+}
+function repGot(k, v) { const g = S.road.rep.got; g[k] = (g[k] || 0) + v; }
+function roadRound(k) {
+  const sk = roadSkill(k), L = sk.lvl, m = 1 + 0.06 * (L - 1), r = Math.random;
+  if (k === 'scav') {
+    const v = Math.round(rint(1, 3) * m); S.scrap += v; repGot('⚙️ scrap', v);
+    if (L >= 3 && r() < 0.03) { const ml = pick(['salad', 'hash', 'soup', 'chili']); S.meals[ml] = (S.meals[ml] || 0) + 1; repGot(MEALS[ml].e + ' ' + MEALS[ml].n, 1); }
+    if (L >= 5 && r() < 0.012) { S.torches++; repGot('🔥 torch', 1); }
+    if (L >= 8 && r() < 0.005) { const c = Object.keys(CHARMS).find(c => CHARMS[c].r !== 'gift' && !S.keepsakes.includes(c)); if (c) { S.keepsakes.push(c); repGot(CHARMS[c].e + ' ' + CHARMS[c].n, 1); } }
+  }
+  if (k === 'wood') {
+    const v = 1 + (r() < 0.25 + (L >= 3 ? 0.15 : 0) ? 1 : 0) + (r() < (m - 1) ? 1 : 0); S.wood += v; repGot('🪵 wood', v);
+    if (L >= 6 && r() < 0.1) { S.scrap += 2; repGot('⚙️ scrap', 2); }
+  }
+  if (k === 'forage') {
+    const pool = CROP_ORDER.filter(c => { const R = CROPS[c].r; return R === 'common' || (R === 'uncommon' && L >= 3) || (R === 'rare' && L >= 5) || (R === 'epic' && L >= 8 && r() < 0.3); });
+    const sd = pick(pool); S.seeds[sd] = (S.seeds[sd] || 0) + 1; repGot(CROPS[sd].e + ' ' + CROPS[sd].n + ' seed', 1);
+    if (r() < 0.25 * m) { const c = pick(pool.filter(c => CROPS[c].r === 'common')); S.crops[c] = (S.crops[c] || 0) + 1; repGot(CROPS[c].e + ' ' + CROPS[c].n, 1); }
+  }
+  if (k === 'patrol') {
+    const R = S.road; if (R.patrolWeek !== weekId()) { R.patrolWeek = weekId(); R.patrol = 0; }
+    const v = Math.min(ROAD_PATROL_CAP - R.patrol, L >= 4 ? 2 : 1); if (v > 0) { R.patrol += v; repGot('🛡️ horde defense', v); } else { S.scrap += 1; repGot('⚙️ scrap', 1); }
+    if (L >= 7 && r() < 0.006 && S.pets.length < 8) { const p = petJoin(r() < 0.5 ? 'dog' : 'cat'); repGot(PETS[p.kind].e + ' ' + p.name + ' followed you home', 1); }
+  }
+  if (k === 'train') { addXp(Math.round(10 * m)); repGot('✨ XP', Math.round(10 * m)); }
+  sk.xp += 10;
+  while (sk.xp >= roadNeed(sk.lvl)) { sk.xp -= roadNeed(sk.lvl); sk.lvl++; S.road.rep.lv.push(ROAD[k].skill + ' ' + sk.lvl); toast('⬆ ' + ROAD[k].skill + ' level ' + sk.lvl, 'l'); log(ROAD[k].skill + ' level ' + sk.lvl + '.'); }
+}
+function openRoad() {
+  openSheet(`<h2>What do you do on the road?</h2><p class="help">Every few hundred steps finishes one round. Switch any time; it's free. Each one levels up its own skill.</p><div class="stack">` + ROAD_ORDER.map(k => {
+    const A = ROAD[k], sk = roadSkill(k), perks = ROAD_PERKS[k] || {};
+    const next = Object.keys(perks).map(Number).find(l => l > sk.lvl);
+    return `<button class="pickrow ${S.road.act === k ? 'on' : ''}" onclick="setRoad('${k}')"><span class="pe">${A.e}</span><span style="flex:1"><b>${A.n}</b> <span class="chip">${A.skill} ${sk.lvl}</span><small>${A.d} One round every ${A.every} steps.</small>${next ? `<small class="sub">Level ${next}: ${perks[next]}</small>` : ''}</span></button>`;
+  }).join('') + `</div>`);
+}
+function renderRoadCard() {
+  const R = S.road, A = ROAD[R.act] || ROAD.scav, sk = roadSkill(R.act), rp = R.rep;
+  let h = `<div class="card road"><h2>🚶 On the road <span class="sub">${fmt(stepsToday())} steps today</span></h2>
+    <button class="pickrow on" onclick="openRoad()"><span class="pe">${A.e}</span><span style="flex:1"><b>${A.n}</b> <span class="chip">${A.skill} ${sk.lvl}</span>${bar(R.prog, A.every, 'grit')}<small>${fmt(A.every - R.prog)} steps to the next round · ${A.skill} ${sk.xp}/${roadNeed(sk.lvl)} XP</small></span><span class="sub">change</span></button>`;
+  if (rp && rp.steps) {
+    const got = Object.entries(rp.got);
+    h += `<div class="walkrep"><p><b>While you walked:</b> ${fmt(rp.steps)} steps, ${plural(rp.rounds, 'round')}.</p>${got.length ? `<div class="chips">${got.map(([k, v]) => `<span class="chip">${esc(k)} ${k.startsWith('✨') || v > 1 ? '+' + fmt(v) : ''}</span>`).join('')}</div>` : '<p class="help">Almost there. Keep going.</p>'}${rp.lv.length ? `<p class="unlock">⬆ ${rp.lv.map(esc).join(', ')}</p>` : ''}<button class="btn sm ghost" onclick="S.road.rep=null;save();render()">Nice</button></div>`;
+  }
+  h += `<div class="row"><button class="btn ghost" onclick="openSteps()">Steps: ${fmt(stepsToday())}</button>${O().ok ? `<button class="btn ghost sm" onclick="pullSteps();toast('Checking for steps')">↻ Sync</button>` : `<button class="btn ghost sm" onclick="go('me')">Set up phone sync</button>`}</div></div>`;
+  return h;
 }
 
 /* ================= levels ================= */
@@ -400,7 +464,7 @@ function newBounties() {
   S.daily = { date: todayStr(), list, prog: {} };
 }
 function bountyProg(id, n) { if (!S.daily || S.daily.date !== todayStr()) return; if (id === 'grit') { S.daily.prog.grit = gritToday(); return; } if (id === 'floor') { S.daily.prog.floor = Math.max(S.daily.prog.floor || 0, n); return; } S.daily.prog[id] = (S.daily.prog[id] || 0) + n; }
-function bountyText(b) { return BOUNTIES.find(x => x.id === b.id).d.replace('{n}', b.n); }
+function bountyText(b) { if (b.id === 'grit') return 'Walk ' + fmt(b.n * GRIT_PER_STEPS) + ' steps today'; return BOUNTIES.find(x => x.id === b.id).d.replace('{n}', b.n); }
 function bountyHave(b) { return Math.min(b.n, S.daily.prog[b.id] || 0); }
 function rewardText(r) { return Object.entries(r).map(([k, v]) => k === 'scrap' ? v + ' ⚙️' : k === 'wood' ? v + ' 🪵' : k === 'torch' ? v + ' 🔥 torch' : k === 'seedRare' ? 'rare seeds' : k).join(' '); }
 function claimBounty(i) {
@@ -417,7 +481,7 @@ function hordeAt(d = new Date()) { const w = weekStart(d); w.setDate(w.getDate()
 function weeksPlayed() { return Math.max(0, Math.round((weekStart() - new Date(S.horde.first)) / (7 * 864e5))); }
 function hordeStrength() { const prog = Object.keys(S.beaten).length; return Math.round(18 + weeksPlayed() * 8 + prog * 10); }
 function defense() {
-  let d = (S.build.walls || 0) * 12 + (S.build.tower || 0) * 6 + S.lvl * 2;
+  let d = patrolDef() + (S.build.walls || 0) * 12 + (S.build.tower || 0) * 6 + S.lvl * 2;
   for (const s of S.surv) if (s.job === 'guard') d += 8 + 2 * s.hearts;
   if (hasCampCharm('badge')) d += 15;
   const p = activePet(); if (p && p.kind === 'dog') d += 4;
@@ -451,6 +515,7 @@ async function rpc(fn, args) {
   const t = await r.text(); if (!r.ok) throw new Error(fn + ' failed (' + r.status + '): ' + t.slice(0, 160)); return t ? JSON.parse(t) : null;
 }
 const O = () => S.online;
+function netErr(e) { const m = String(e && e.message || e); if (/load failed|failed to fetch|networkerror|network request/i.test(m)) return location.hostname.endsWith('github.io') ? 'Could not reach the server. Check your connection and try again.' : 'Could not reach the server. This preview cannot go online; the real game at celestenguyenn-design.github.io/dead-miles can.'; return m; }
 function slug(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 20); }
 async function goOnline(handle, token) {
   const o = O(); handle = slug(handle || S.name); if (!handle) { toast('Pick a handle first'); return; }
@@ -461,7 +526,7 @@ async function goOnline(handle, token) {
     o.handle = handle; o.ok = true; o.err = ''; toast('Online as @' + handle, 'z');
     if (token && token.trim()) await offerCloudRestore();
     save(); render(); await pushPlayer(); await pullSteps(); await fetchStepKey();
-  } catch (e) { o.ok = false; o.err = e.message; save(); render(); }
+  } catch (e) { o.ok = false; o.err = netErr(e); toast(o.err, 'd'); save(); render(); }
 }
 async function offerCloudRestore() {
   const o = O(); let b = null;
@@ -514,7 +579,7 @@ async function pullSteps() {
     if (yest.length) backfillDay(yd, Math.max(...yest.map(r => r.steps)));
     if (today.length) { o.lastPost = new Date(today[0].posted_at).getTime(); setCounted(Math.max(...today.map(r => r.steps)), 'phone'); }
     o.err = '';
-  } catch (e) { o.err = e.message; }
+  } catch (e) { o.err = netErr(e); }
   save(); render();
 }
 async function fetchStepKey() { const o = O(); if (!o.ok) return; try { const k = await rpc('get_step_key', { p_handle: o.handle, p_token: o.token }); if (k) { o.stepKey = k; save(); } } catch (e) { } }
@@ -566,7 +631,7 @@ function renderTop() {
   const g = gritToday(), vi = vigorIdx(g), nx = VIGOR[vi + 1];
   $('#top').innerHTML = `<div class="who" onclick="go('me')">${ART.avatarSVG(S.av, 38)}<div><b>${esc(S.name)}</b><small>Lv ${S.lvl} · ${esc(title())}</small></div></div>
     <div class="res"><span title="scrap">⚙️ ${fmt(S.scrap)}</span><span title="wood">🪵 ${fmt(S.wood)}</span><span title="torches - one run each">🔥 ${S.torches}</span></div>
-    <button class="vig v${vi}" onclick="openActivity()" title="Today's grit"><span>${VIGOR[vi].e} ${g}</span><small>${nx ? (nx.at - g) + ' to ' + nx.n : 'max'}</small></button>`;
+    <button class="vig v${vi}" onclick="openSteps()" title="Steps today"><span>${VIGOR[vi].e} ${fmt(stepsToday())}</span><small>steps today</small></button>`;
   const n = $('#tabRunDot'); if (n) n.hidden = !S.run;
 }
 
@@ -598,7 +663,7 @@ function obNext() {
   if (!S.surv.length) { const s = newSurvivor(); s.name = 'Hattie'; s.past = 'grew prize tomatoes for the county fair'; s.likes = 'tomato'; s.job = 'farm'; S.surv.push(s); }
   document.querySelector('.tabs').hidden = false; log('You found the farmhouse. Hattie was already here.');
   save(); TAB = 'today'; render(); if (O().ok) { pullSteps(); pushPlayer(); }
-  setTimeout(() => openSheet(`<h2>The farmhouse</h2><p>An old woman with a hoe opens the door before you knock.</p><p><i>"I'm Hattie. Radishes are nearly up. If you're staying, you're working."</i></p><p class="help">Harvest on the <b>Farm</b> tab, then take a <b>Run</b> tonight. Log a walk or a workout any time by tapping the grit badge at the top.</p><button class="btn r wide" onclick="closeSheet()">Got it</button>`), 300);
+  setTimeout(() => openSheet(`<h2>The farmhouse</h2><p>An old woman with a hoe opens the door before you knock.</p><p><i>"I'm Hattie. Radishes are nearly up. If you're staying, you're working."</i></p><p class="help">Harvest on the <b>Farm</b> tab, then take a <b>Run</b> tonight. Pick what you do <b>on the road</b> on the Today tab: every few hundred steps your phone counts finishes a round of it.</p><button class="btn r wide" onclick="closeSheet()">Got it</button>`), 300);
 }
 
 /* ---------- Today ---------- */
@@ -611,16 +676,16 @@ function renderToday() {
   const mo = S.morning;
   if (mo && (mo.evt || (mo.recap && mo.recap.pet)) && !(mo.done && mo.seen)) h += renderMorning();
   const hr = S.horde.res; if (hr && !hr.seen) h += `<div class="card ${hr.k === 'win' ? 'green' : hr.k === 'hold' ? 'amber' : 'blood'}"><h2>🧟 Horde night <span class="sub">${hr.k === 'win' ? 'held' : hr.k === 'hold' ? 'barely' : 'overrun'}</span></h2><p>${hr.t}</p><p class="help">Horde ${hr.str} vs your defense ${hr.def}. ${hr.got}</p><button class="btn sm" onclick="S.horde.res.seen=true;save();render()">OK</button></div>`;
+  h += renderRoadCard();
   // vigor
-  h += `<div class="card vigcard v${vi}"><div class="vtop"><div class="vbig">${V.e}</div><div style="flex:1"><h2>${V.n} <span class="sub">${g} grit today</span></h2>
-    ${nx ? bar(g - V.at, nx.at - V.at, 'grit') + `<p class="help">${nx.at - g} more grit for <b>${nx.n}</b>: ${nx.d}. That's about ${fmt((nx.at - g) * GRIT_PER_STEPS)} steps or ${Math.ceil((nx.at - g) / 2)} min of exercise.</p>` : '<p class="help">Maxed out. Legendary.</p>'}
+  h += `<div class="card vigcard v${vi}"><div class="vtop"><div class="vbig">${V.e}</div><div style="flex:1"><h2>${V.n} <span class="sub">${fmt(stepsToday())} steps today</span></h2>
+    ${nx ? bar(g - V.at, nx.at - V.at, 'grit') + `<p class="help">About ${fmt((nx.at - g) * GRIT_PER_STEPS)} more steps for <b>${nx.n}</b>: ${nx.d}.</p>` : '<p class="help">Maxed out. Legendary.</p>'}
     <p class="help">${V.d}</p></div></div>
-    <div class="row"><button class="btn r" onclick="openActivity()">+ Log a workout</button><button class="btn ghost" onclick="openSteps()">Steps: ${fmt(stepsToday())}</button>${O().ok ? `<button class="btn ghost sm" onclick="pullSteps();toast('Checking')">↻</button>` : ''}</div>
-    <p class="help">🌱 Streak ${S.streak.days}${S.streak.rests ? ' · ' + plural(S.streak.rests, 'rest day') + ' banked' : ''}. A day counts at ${VIGOR[1].at} grit.</p></div>`;
+    <p class="help">🌱 Streak ${S.streak.days}${S.streak.rests ? ' · ' + plural(S.streak.rests, 'rest day') + ' banked' : ''}. A day counts at ${fmt(VIGOR[1].at * GRIT_PER_STEPS)} steps. <button class="linkish" onclick="openActivity()">Did a workout? Log it</button></p></div>`;
   // tonight
   const tor = S.torches;
   h += `<div class="card night"><h2>${night.e} Tonight: ${night.n}</h2><p>${night.d}</p>
-    ${S.run ? `<button class="btn r wide" onclick="go('run')">Continue your run (floor ${S.run.floor + 1})</button>` : tor ? `<button class="btn r wide" onclick="go('run')">Head out 🔥 (${plural(tor, 'torch', 'torches')})</button>` : `<p class="help">No torches left. You get a free one every morning, and more for moving: ${TORCH_GRIT.filter(t => t > g).map(t => t + ' grit').join(', ') || 'all earned today'}.</p>`}</div>`;
+    ${S.run ? `<button class="btn r wide" onclick="go('run')">Continue your run (floor ${S.run.floor + 1})</button>` : tor ? `<button class="btn r wide" onclick="go('run')">Head out 🔥 (${plural(tor, 'torch', 'torches')})</button>` : `<p class="help">No torches left. You get a free one every morning, and more at ${TORCH_GRIT.filter(t => t > g).map(t => fmt(t * GRIT_PER_STEPS)).join(', ') || 'no more'} steps today.</p>`}</div>`;
   // farm + camp at a glance
   const idleS = Math.floor(id.scrap * vigor().mult), idleW = Math.floor(id.wood * vigor().mult);
   h += `<div class="grid2">
@@ -747,12 +812,13 @@ function openSurv(id) {
 /* ---------- Me ---------- */
 function renderMe() {
   const o = O(); let h = '';
-  h += `<div class="card"><div class="mehead">${ART.avatarSVG(S.av, 84)}<div style="flex:1"><h2>${esc(S.name)}</h2><p class="help">Level ${S.lvl} ${esc(title())} · ${baseMaxHp()} max HP</p>${bar(S.xp, xpNeed())}<p class="help">${S.xp}/${xpNeed()} XP. Grit gives the most XP; runs give some too.</p></div></div></div>`;
+  h += `<div class="card"><div class="mehead">${ART.avatarSVG(S.av, 84)}<div style="flex:1"><h2>${esc(S.name)}</h2><p class="help">Level ${S.lvl} ${esc(title())} · ${baseMaxHp()} max HP</p>${bar(S.xp, xpNeed())}<p class="help">${S.xp}/${xpNeed()} XP. Steps give the most XP; runs give some too.</p></div></div></div>`;
   // history
   const days = []; for (let i = 13; i >= 0; i--) { const d = dayOffset(-i); const hh = d === todayStr() ? { grit: gritToday() } : (S.hist[d] || { grit: 0 }); days.push({ d, g: hh.grit || 0 }); }
   const mx = Math.max(VIGOR[3].at, ...days.map(x => x.g));
   h += `<div class="card"><h2>Last two weeks <span class="sub">${fmt(gritWeek())} grit this week</span></h2><div class="hist">` + days.map(x => `<div class="hb" title="${x.d}: ${x.g}"><i class="v${vigorIdx(x.g)}" style="height:${Math.max(3, x.g / mx * 100)}%"></i><small>${'MTWTFSS'[(new Date(x.d + 'T12:00').getDay() + 6) % 7]}</small></div>`).join('') + `</div>
     <p class="help">Lines: ${VIGOR.slice(1).map(v => v.e + ' ' + v.at).join(' · ')}</p></div>`;
+  h += `<div class="card"><h2>Road skills</h2><div class="stack">` + ROAD_ORDER.map(k => { const sk = roadSkill(k); return `<div class="offer"><span>${ROAD[k].e} <b>${ROAD[k].skill}</b> ${sk.lvl}</span><span style="width:45%">${bar(sk.xp, roadNeed(sk.lvl))}</span></div>`; }).join('') + `</div><p class="help">This week's patrols: +${patrolDef()}/${ROAD_PATROL_CAP} horde defense.</p></div>`;
   // stats
   const st = S.stats;
   h += `<div class="card"><h2>Record</h2><div class="stats">${[['Runs', st.runs], ['Survived', st.wins], ['Bosses', st.bosses], ['Kills', st.kills], ['Harvested', st.harvests], ['Meals', st.meals], ['Lifetime grit', st.grit], ['Best floor', st.best]].map(([k, v]) => `<div><b>${fmt(v)}</b><small>${k}</small></div>`).join('')}</div></div>`;
@@ -783,6 +849,7 @@ function renderMe() {
 function editName() { askText('Your name', S.name, 16, n => { S.name = n; save(); render(); }); }
 function openNews() { openSheet(`<h2>What's new</h2>` + NEWS.map(n => `<h3>v${n.v}</h3><ul>${n.items.map(i => `<li>${i}</li>`).join('')}</ul>`).join('')); S.seenNews = VERSION; save(); }
 const NEWS = [
+  { v: '8.1', items: ['<b>On the road</b>: pick what you do while you walk (scavenge, chop wood, forage, patrol, train). Every few hundred steps your phone counts finishes a round, with loot and its own skill to level. Switch any time.', 'Everything now talks in steps. Workouts still count if you log one.', 'Going online says clearly when it cannot reach the server.'] },
   { v: '8.0', items: ['Dead Miles is now <b>Homestead</b>: a farm and camp by day, a short roguelite run by night.', 'Steps and workouts give <b>grit</b>. Grit boosts harvests and camp work, earns extra runs, and levels you up. It never locks the farm, the camp or travel.', 'Log any workout - yoga, lifting, a bike ride - not only steps.', 'Survivors with jobs, hearts and stories. Pets came over from the old game.', 'A Sunday horde to prepare for all week, five regions, ten night conditions, daily jobs.', 'The old walking game is kept at <a href="classic/">classic/</a>.'] },
 ];
 
