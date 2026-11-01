@@ -117,7 +117,7 @@ function endRun(kind) {
   save(); render();
 }
 function closeRun() { S.run = null; save(); TAB = 'today'; render(); }
-function headHome() { if (!S.run) return; if (!confirm('Head home now and keep everything you found?')) return; endRun('home'); }
+function headHome(sure) { if (!S.run) return; if (!sure) { openSheet(`<h2>Head home?</h2><p>You keep everything you found tonight. The boss will still be here tomorrow.</p><div class="row"><button class="btn r" onclick="closeSheet();headHome(true)">Head home</button><button class="btn ghost" onclick="closeSheet()">Keep going</button></div>`); return; } endRun('home'); }
 
 /* ================= entering nodes ================= */
 function enterNode(f, l) {

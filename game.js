@@ -326,7 +326,8 @@ function petJoin(kind) {
   S.pets.push(p); if (!S.petActive) S.petActive = p.id; log('A ' + PETS[kind].n.toLowerCase() + ' joined you. You named it ' + p.name + '.');
   return p;
 }
-function renamePet(id) { const p = S.pets.find(x => x.id === id); if (!p) return; const n = prompt('Name your ' + PETS[p.kind].n.toLowerCase(), p.name); if (n && n.trim()) { p.name = n.trim().slice(0, 14); save(); render(); } }
+function askText(title, val, max, done) { window._askDone = done; openSheet(`<h2>${esc(title)}</h2><input id="askIn" maxlength="${max}" value="${esc(val)}" style="width:100%"><button class="btn r wide" onclick="const v=($('#askIn').value||'').trim();if(v){window._askDone(v.slice(0,${max}));}closeSheet()">Save</button>`); setTimeout(() => { const i = $('#askIn'); if (i) { i.focus(); i.select(); } }, 50); }
+function renamePet(id) { const p = S.pets.find(x => x.id === id); if (!p) return; askText('Name your ' + PETS[p.kind].n.toLowerCase(), p.name, 14, n => { p.name = n; save(); render(); }); }
 function petSVG(p, size) { try { return ART.petSVG(p.kind, size, p.coat); } catch (e) { return '<span style="font-size:' + (size / 2) + 'px">' + PETS[p.kind].e + '</span>'; } }
 
 /* ================= mornings ================= */
@@ -779,7 +780,7 @@ function renderMe() {
     <details><summary class="help">Journal</summary><div class="journal">${S.log.slice(0, 30).map(l => `<p><small>${ago(l.t)}</small> ${esc(l.m)}</p>`).join('')}</div></details></div>`;
   return h;
 }
-function editName() { const n = prompt('Your name', S.name); if (n && n.trim()) { S.name = n.trim().slice(0, 16); save(); render(); } }
+function editName() { askText('Your name', S.name, 16, n => { S.name = n; save(); render(); }); }
 function openNews() { openSheet(`<h2>What's new</h2>` + NEWS.map(n => `<h3>v${n.v}</h3><ul>${n.items.map(i => `<li>${i}</li>`).join('')}</ul>`).join('')); S.seenNews = VERSION; save(); }
 const NEWS = [
   { v: '8.0', items: ['Dead Miles is now <b>Homestead</b>: a farm and camp by day, a short roguelite run by night.', 'Steps and workouts give <b>grit</b>. Grit boosts harvests and camp work, earns extra runs, and levels you up. It never locks the farm, the camp or travel.', 'Log any workout - yoga, lifting, a bike ride - not only steps.', 'Survivors with jobs, hearts and stories. Pets came over from the old game.', 'A Sunday horde to prepare for all week, five regions, ten night conditions, daily jobs.', 'The old walking game is kept at <a href="classic/">classic/</a>.'] },
