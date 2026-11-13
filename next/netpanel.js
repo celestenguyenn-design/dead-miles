@@ -117,12 +117,14 @@
       + '<button class="btn s" data-a="sync" ' + (UI.busy ? 'disabled' : '') + '>' + (UI.busy ? 'Syncing...' : 'Sync now') + '</button></div>'
       + '<div class="bar"><i style="width:' + (d.ap + d.at ? php : 0) + '%;background:' + C.ora + '"></i><i style="width:' + (d.ap + d.at ? typ : 0) + '%;background:' + C.lil + '"></i></div>'
       + '<div class="leg"><span><b style="background:' + C.ora + '"></b>Phone ' + fmt(d.ap) + '</span><span><b style="background:' + C.lil + '"></b>Typed ' + fmt(d.at) + '</span></div>'
-      + '<p class="mut" style="margin-top:10px">Checked ' + ago(NET.lastPull) + '. ' + (NET.lastPost ? 'Your phone last sent steps at ' + clock(NET.lastPost) + '.' : '<span style="color:#f0c23c">Nothing from your phone yet today.</span>') + (posts ? '<br>Received: ' + posts : '') + '</p>'
+      + '<p class="mut" style="margin-top:10px">Checked ' + ago(NET.lastPull) + '. ' + (NET.lastPost ? 'Your phone last sent steps at ' + clock(NET.lastPost) + '.' : '<span style="color:#f0c23c">Nothing from your phone yet today.</span>' + (window.SYNC ? ' <button class="lnk" style="padding:0" data-a="guide">Help me sync</button>' : '')) + (posts ? '<br>Received: ' + posts : '') + '</p>'
       + '<details><summary>Phone missed a walk? Type today\'s total</summary><p class="mut">Typed steps count half and at most ' + fmt(NET.cfg.typedCap) + ' above what your phone counted. When your phone catches up, nothing is counted twice.</p><input id="np-typed" inputmode="numeric" pattern="[0-9]*" placeholder="my total today">' + msg('typed') + '<button class="btn g" style="width:100%;margin-bottom:12px" data-a="typed">That\'s my total</button></details>'
       + '</div>';
   }
 
   function howCard() {
+    // syncguide.js (window.SYNC) is the full step-by-step guide; the short notes below stay as a fallback.
+    if (window.SYNC) return '<div class="card"><h3>How to sync steps</h3><p>Step-by-step for iPhone and Android, a Test button, and a fix-it checklist.</p><button class="btn" style="width:100%" data-a="guide">How to sync steps</button></div>';
     if (!NET.ok) return '';
     const key = NET.token;
     return '<div class="card"><h3>How to sync steps</h3>'
@@ -166,7 +168,7 @@
     // keep typed input values across re-renders
     const keep = {}; root.querySelectorAll('input[id]').forEach(i => { keep[i.id] = i.value; });
     root.innerHTML = '<div class="sh"><div class="grab"></div><div class="top"><h2>Online</h2><button class="x" data-a="close" aria-label="Close">&times;</button></div>'
-      + accountCard() + stepsCard() + pinCard() + partyCard() + boardCard() + howCard()
+      + accountCard() + stepsCard() + howCard() + pinCard() + partyCard() + boardCard()
       + (NET.ok ? '<div style="text-align:center"><button class="lnk" data-a="signout">Sign out of this device</button></div>' : '')
       + '</div>';
     for (const k in keep) { const i = document.getElementById(k); if (i && keep[k]) i.value = keep[k]; }
@@ -181,6 +183,7 @@
   async function act(a) {
     UI.msg = {};
     if (a === 'close') return NET.closePanel();
+    if (a === 'guide') { NET.closePanel(); if (window.SYNC) window.SYNC.open(); return; }
     if (a === 'register') { UI.h = val('np-h'); UI.n = val('np-n'); const r = await NET.register(UI.h, UI.n || UI.h); if (!r.ok) say('acct', r.message || r.error); else { await NET.board(); render(); } return; }
     if (a === 'signin') { UI.h = val('np-h'); const r = await NET.signIn(UI.h, val('np-s')); if (!r.ok) say('acct', r.error); else { await Promise.all([NET.board(), NET.partyGet()]); render(); } return; }
     if (a === 'signout') { if (confirm('Sign out of @' + NET.handle + ' on this device? Your game stays saved on the server.')) NET.signOut(); return render(); }

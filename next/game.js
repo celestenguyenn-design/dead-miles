@@ -1,13 +1,16 @@
 /* The test panel hands out free steps, caps and materials, so it never opens on the
    real site where friends play - only on local test copies and the claude.ai preview. */
 var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
+/* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
+   newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
+const NEXT_VERSION = '0.4';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
 'use strict';
 (() => {
   const D = DM.D, E = DM.E, $ = E.$, SFX = E.SFX, toast = E.toast;
-  const KEY = 'dm-next-save', VER = 1, VERSION = 'next 0.3';
+  const KEY = 'dm-next-save', VER = 1, VERSION = 'next ' + NEXT_VERSION;
   const STASH_SLOTS = 40;
   DM.onlineState = { signedIn: false, name: null, lastSync: null, status: 'offline' };
   const Game = DM.Game = {};
@@ -35,6 +38,8 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
   function migrate(v) {
     v.trader = v.trader || { caps: 0, completed: 0, day: '', offers: [], active: [], stock: [], seq: 0 };
     v.walked = v.walked || 0;
+    v.base = DM.Base.norm(v.base, v);       // phase 4: the base (pool, pieces, garden, decor)
+    v.horde = DM.Base.normHorde(v.horde);   // phase 4: horde night (shifts, reports waiting to send, results)
     if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); s.packBonus = s.packBonus || 0; }
     return v;
   }
@@ -46,6 +51,7 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
     updateSync();
   };
   Game.data = () => SV;
+  Object.defineProperty(Game, 'survivor', { get: () => SV && SV.survivor });
 
   // ---------------------------------------------------------------- survivor
   const maxHp = s => s.job === 'brawler' ? 130 : 100;
@@ -87,6 +93,7 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
     if (src === 'typed') n = Math.min(n, Math.max(0, 4000 - SV.day.typed));
     SV.day[src] += n;
     SV.walked = (SV.walked || 0) + (src === 'typed' ? n * .5 : n);
+    DM.Base.addPool(SV, src === 'typed' ? n * .5 : n);   // build steps: the same steps, they do not take away houses
     revealQuestHouses();
     const before = SV.day.scouted;
     scout();
@@ -103,7 +110,7 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
     if (!p || p.key !== day) return DM.addSteps(n, src);
     n = Math.max(0, Math.round(+n || 0));
     if (src === 'typed') n = Math.min(n, Math.max(0, 4000 - p.typed));
-    p[src] += n; SV.walked = (SV.walked || 0) + (src === 'typed' ? n * .5 : n);
+    p[src] += n; SV.walked = (SV.walked || 0) + (src === 'typed' ? n * .5 : n); DM.Base.addPool(SV, src === 'typed' ? n * .5 : n);
     const target = housesFor(worth(effective(p))); let added = 0;
     while (p.scouted < target) { p.scouted++; added++; addHouse(worth(effective(p)) * p.scouted / Math.max(1, target), p.key); }
     revealQuestHouses(); Game.save();
@@ -188,6 +195,14 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
       const cs = L.furn.filter(f => f.loot && !f.secretLoot && !f.lock && f.room !== 'o');
       const f = cs[D.hashStr(q.id) % cs.length]; f.extra = (f.extra || []).concat('parcel'); f.noEmpty = 1;
     }
+    if ((h.type === 'mansion' || h.type === 'apt') && !q) { // decor turns up more often in mansions and apartments
+      const rnd = D.mulberry32(h.seed ^ 0x2c1b3c6d), cs = L.furn.filter(f => f.loot && !f.secretLoot && f.room !== 'o');
+      if (cs.length && rnd() < (h.type === 'mansion' ? .75 : .45)) {
+        L.furn = L.furn.map(f => Object.assign({}, f));
+        const ks = Object.keys(D.DECOR), f = L.furn.filter(f => f.loot && !f.secretLoot && f.room !== 'o')[Math.floor(rnd() * cs.length)];
+        f.extra = (f.extra || []).concat(ks[Math.floor(rnd() * ks.length)]); f.noEmpty = 1;
+      }
+    }
     SV.stats.runs++; Game.save();
     hideMenu();
     DM.House.start(L, {
@@ -223,6 +238,7 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
     return true;
   }
   Game.canGive = canGive;
+  Object.assign(Game, { countItem: k => countItem(k), takeItems: (k, n) => takeItems(k, n), give: (k, n, d) => give(k, n, d) });
   function refreshTrader(force) {
     const T = SV.trader, day = SV.day.key;
     if (T.day === day && !force) return;
@@ -341,10 +357,15 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
     const lost = give(k, n, d);
     SV.survivor.xp += 2; Game.save(); SFX.play('open');
     toast(lost ? `Crafted ${D.ITEMS[k].n} - no room for ${lost}` : `Crafted ${D.ITEMS[k].n}${n > 1 ? ' x' + n : ''}`, 1.8);
-    renderHome();
+    reHost();
   }
+  let benchHost = null, stashHost = null;   // set while the base shows the workbench / stash chest
+  Game.benchPanel = el => { benchHost = el; stashHost = null; renderBench(); };
+  Game.stashPanel = el => { stashHost = el; benchHost = null; sel = null; renderStash(); };
+  const reHost = () => { if (benchHost && document.body.contains(benchHost)) renderBench(); else if (stashHost && document.body.contains(stashHost)) renderStash(); else { benchHost = stashHost = null; renderHome(); } };
   function renderBench() {
-    const s = SV.survivor, el = $('#mpane');
+    if (benchHost && !document.body.contains(benchHost)) benchHost = null;
+    const s = SV.survivor, el = benchHost || $('#mpane');
     const unknown = Object.keys(D.RECIPES).filter(k => !s.known.includes(k)).length;
     el.innerHTML = `<div class="kick sect">Workbench · ${s.known.length} recipe${s.known.length === 1 ? '' : 's'} known</div>` + s.known.map(k => {
       const r = D.RECIPES[k], ok = canCraft(r), out = r.out[0];
@@ -571,6 +592,7 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
         <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="My total today" maxlength="8"><button id="mLog" class="mbtn sm">Log</button></div>
         <div id="msync" class="msync"></div>
       </div>
+      ${SV.tutorialDone || SV.stats.runs ? baseCards() : ''}
       <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Pack &amp; stash</button><button data-t="bench">Workbench</button></div>
       <div id="mpane"></div>`;
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { SFX.play('ui'); tab(b.dataset.t); }; });
@@ -581,6 +603,7 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
       const used = DM.addSteps(v, 'typed'); if (used < v) toast(`Typed steps are capped at 4,000 a day (${used.toLocaleString('en-US')} counted)`, 2.6);
     };
     $('#mnet').onclick = openAccount;
+    bindBaseCards();
     $('#mLook').onclick = () => { SFX.play('ui'); editLook(); };
     let vt = 0, vtT = 0; $('#mver').onclick = () => { const n = performance.now(); if (n - vtT > 1200) vt = 0; vtT = n; if (++vt >= 5) { vt = 0; if (DM_DEV_OK) openDev(); } };
     $('#mset').onclick = openSettings;
@@ -619,10 +642,95 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
     el.querySelectorAll('[data-auto]').forEach(b => b.onclick = () => { SFX.play('ui'); autoSearch(find(b.dataset.auto)); });
   }
 
+  // ---- base + horde night cards (phase 4)
+  const HD = DM.Horde, BS = DM.Base;
+  function baseCards() {
+    const b = SV.base, gn = BS.gardenNote(), n = HD.next(), open = HD.windowOpen(), party = window.NET && NET.party, code = party && party.code;
+    const wk = n && SV.horde.weeks[n.week], mine = wk ? wk.n : 0;
+    const pk = code && party.data && party.data.horde && n && party.data.horde[n.week], pkills = pk ? Object.values(pk.shifts || {}).reduce((a, x) => a + (x.k || 0), 0) : 0;
+    const res = Object.keys(SV.horde.resolved).sort().map(k => [k, SV.horde.resolved[k]]).filter(([, r]) => r && !r.skip && !r.seen).pop();
+    return `<div class="basecard"><div class="bci"><b>Your base</b><span>Defence <em>${BS.defense()}</em> · <em>${Math.round(b.pool).toLocaleString('en-US')}</em> build steps</span>${gn ? `<span class="gnote">Garden: ${gn}</span>` : ''}</div><button class="mbtn" id="hBase">Go to base</button></div>
+      <div class="hordecard${open ? ' open' : ''}"><div class="hhead"><span class="kick">Horde night</span><span class="hwhen">Sundays 9 PM New York${n && new Date(n.at).getHours() !== 21 ? ` · ${esc(BS.when(n.at))} here` : ''}</span></div>
+        <div class="hcount" id="hCount">${n ? (open ? 'Watch shift open · hits in ' : 'in ') + BS.until(n.at) : ''}</div>
+        <div class="hparty">${code ? `Party <b>${esc(code)}</b> · ${(party.members || []).length}/6${pk ? ` · ${pkills} kills so far` : ''}` : 'Solo horde · join a party to share one'}${mine ? ` · you: ${mine}/${HD.MAX_SHIFTS} shift${mine > 1 ? 's' : ''}` : ''}</div>
+        <div class="hbtnrow">${open && mine < HD.MAX_SHIFTS ? '<button class="mbtn sm" id="hShift">Start watch shift</button>' : open ? '<span class="hdone">Shifts done this week</span>' : '<span class="hdone">Shifts open 24 h before</span>'}<button class="mbtn sm ghost" id="hParty">${code ? 'Party' : 'Join party'}</button></div>
+        ${res ? resultHTML(res[0], res[1]) : ''}</div>`;
+  }
+  function resultHTML(week, r) {
+    const title = r.hold ? (r.shifted ? 'Your base held!' : 'Your base held') : 'The horde got in';
+    return `<div class="hres ${r.hold ? 'held' : 'fail'}"><b>${title}</b><span>Horde of ${r.S}${r.solo ? ' (solo)' : ''} · ${r.K} killed on shifts · ${r.A} reached your walls · your defence ${r.defense}</span>
+      ${r.crate && r.crate.length ? `<div class="picons">Crate: ${r.crate.map(e => `${icon(e.k)}${D.ITEMS[e.k].n}${e.n > 1 ? ' x' + e.n : ''}`).join(' ')}</div>` : r.hold && !r.shifted ? '<span>No crate: you skipped the watch shift.</span>' : ''}
+      ${r.dmg ? `<span class="bad">${esc(r.dmg)} was wrecked. Repair it at the base.</span>` : ''}${r.lost && r.lost.length ? `<span class="bad">No room for: ${r.lost.map(e => D.ITEMS[e.k].n).join(', ')}</span>` : ''}<button class="mbtn sm" data-seen="${week}">OK</button></div>`;
+  }
+  function bindBaseCards() {
+    const b = $('#hBase'); if (!b) return;
+    b.onclick = () => { SFX.play('ui'); goBase(); };
+    if ($('#hShift')) $('#hShift').onclick = () => { SFX.play('ui'); startShift(); };
+    $('#hParty').onclick = () => { SFX.play('ui'); partySheet(); };
+    document.querySelectorAll('[data-seen]').forEach(x => x.onclick = () => { SV.horde.resolved[x.dataset.seen].seen = true; Game.save(); renderHome(); });
+  }
+  function goBase(o = {}) {
+    if (SV.survivor.hp < 15 && o.shift) { toast('Too hurt for a shift. Eat or patch up first.', 2.2); return; }
+    hideMenu();
+    BS.start(Object.assign({}, o, { onExit: (res, was) => {
+      SV.stats.kills += res.kills; if (res.kind === 'down') SV.stats.downs++;
+      Game.save(); publish(); showMenu(); renderHome();
+      if (!(was && was.shift)) toast(res.kind === 'down' ? 'You came to on the shack floor.' : 'Back to the road', 1.4);
+    } }));
+  }
+  function startShift() {
+    const n = HD.windowOpen(); if (!n) { toast('The watch shift opens 24 h before horde night', 2); return; }
+    if ((SV.horde.weeks[n.week] || {}).n >= HD.MAX_SHIFTS) { toast('You did all your shifts this week', 1.8); return; }
+    goBase({ shift: true, week: n.week });
+  }
+  function partySheet() {
+    const N = window.NET, p = N && N.party;
+    if (!N || !N.ok) { sheetOpen(`<div class="kick">Horde night</div><h3>Party</h3><p class="mp">Up to 6 friends share one horde. Sign in first (Account & friends), then everyone types the same party code.</p><button class="mbtn" id="pAcc">Account &amp; friends</button><button class="mbtn ghost" id="pClose">Close</button>`); $('#pAcc').onclick = () => { sheetClose(); openAccount(); }; $('#pClose').onclick = sheetClose; return; }
+    sheetOpen(`<div class="kick">Horde night</div><h3>Party</h3>${p && p.code ? `<p class="mp">You are in <b>${esc(p.code)}</b> (${(p.members || []).length}/6): ${(p.members || []).map(m => '@' + esc(m)).join(', ')}.</p><p class="mp">Everyone's watch-shift kills thin the same horde. Each base is checked against what is left.</p><button class="mbtn ghost" id="pLeave">Leave party</button>`
+      : `<p class="mp">Up to 6 friends share one horde, with one deadline: Sunday 9 PM New York time. Everyone types the same code.</p><div class="steprow"><input id="pCode" placeholder="party code" maxlength="20" autocapitalize="off"><button class="mbtn sm" id="pJoin">Join</button></div><div class="mp" id="pMsg"></div>`}
+      <button class="mbtn ghost" id="pClose">Close</button>`);
+    $('#pClose').onclick = sheetClose;
+    if ($('#pJoin')) $('#pJoin').onclick = async () => { const r = await N.partyJoin($('#pCode').value); if (r.ok) { sheetClose(); renderHome(); toast('Joined the party', 1.6); } else $('#pMsg').textContent = r.error || 'Could not join'; };
+    if ($('#pLeave')) $('#pLeave').onclick = async b => { const el = $('#pLeave'); if (!el.dataset.sure) { el.dataset.sure = 1; el.textContent = 'Tap again to leave'; return; } await N.partyLeave(); sheetClose(); renderHome(); };
+  }
+  // After the deadline: resolve last week's horde once, on this phone, from the party record (or solo).
+  let resolving = false;
+  async function resolveHorde() {
+    if (resolving || !SV || !SV.survivor || DM.scene) return;
+    const st = SV.horde, pv = HD.prev(); if (!pv || st.resolved[pv.week]) return;
+    if (!st.since || pv.week < st.since) { st.resolved[pv.week] = { skip: 1 }; Game.save(); return; }
+    resolving = true;
+    try {
+      await HD.flush(st);
+      const N = window.NET, signed = N && N.handle && N.token;
+      let party = null;
+      if (signed) {
+        party = N.ok ? await HD.partyNow() : null;
+        if (!N.ok && HD.now() - pv.at < 72 * 36e5) return;   // signed in but offline: wait (up to 3 days) for the party record
+        if (!N.ok) party = N.party || null;
+      }
+      const me = signed ? String(N.handle).toLowerCase() : 'me', local = st.weeks[pv.week];
+      const shifts = Object.assign({}, (party && party.data && party.data.horde && party.data.horde[pv.week] && party.data.horde[pv.week].shifts) || {});
+      if (local && (!shifts[me] || (shifts[me].k || 0) < local.k)) shifts[me] = { k: local.k, d: local.d, n: local.n };
+      const code = party && party.code || '', members = party ? (party.members || []).slice() : [me];
+      if (party && !members.includes(me)) members.push(me);
+      const r = HD.compute({ code, week: pv.week, members, shifts, me, defense: BS.defense() });
+      const rnd = D.mulberry32(D.hashStr((code || 'solo') + ':' + pv.week + ':' + me + ':' + SV.seedBase));
+      r.crate = []; r.lost = [];
+      if (r.hold && r.shifted) { const stacks = D.toStacks(D.rollLoot('hordecrate', rnd), rnd); for (const e of stacks) { const left = give(e.k, e.n, e.d); if (left < e.n) r.crate.push({ k: e.k, n: e.n - left }); if (left) r.lost.push({ k: e.k, n: left }); } SV.trader.caps += 10; }
+      if (!r.hold) r.dmg = BS.hordeDamage(rnd);
+      r.at = Date.now(); r.code = code; delete r.members;
+      st.resolved[pv.week] = r; Game.save(); renderHome();
+      toast(r.hold ? 'Horde night is over - your base held' : 'Horde night is over - the horde got in', 2.6);
+    } catch (e) { console.warn('horde', e); } finally { resolving = false; }
+  }
+  Game.resolveHorde = resolveHorde;
+
   // ---- pack & stash
   let sel = null; // {from:'pack'|'stash'|'hands', i}
   function renderStash() {
-    const s = SV.survivor, el = $('#mpane');
+    if (stashHost && !document.body.contains(stashHost)) stashHost = null;
+    const s = SV.survivor, el = stashHost || $('#mpane');
     const slot = (e, from, i) => {
       const it = D.ITEMS[e.k], on = sel && sel.from === from && sel.i === i;
       return `<button class="slot${it.rare ? ' rare' : ''}${on ? ' sel' : ''}" data-from="${from}" data-i="${i}">${icon(e.k)}<span>${it.n}</span>${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${e.d != null && it.w ? `<i class="dur"><i style="width:${Math.max(4, e.d / D.WEAPONS[it.w].dur * 100)}%"></i></i>` : ''}</button>`;
@@ -635,21 +743,21 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
       <div class="grid g4">${s.pack.map((e, i) => slot(e, 'pack', i)).join('')}${empty(packSlots() - s.pack.length)}</div>
       ${s.pack.length && !sel ? '<button class="mbtn sm" id="sAll" style="margin-top:8px;width:100%">Stash all</button>' : ''}
       <div id="sacts"></div>
-      <div class="kick sect">Home stash · ${s.stash.length}/${STASH_SLOTS}</div>
+      <div class="kick sect">${stashHost ? 'Stash chest' : 'Stash chest (at your base)'} · ${s.stash.length}/${STASH_SLOTS}</div>
       <div class="grid g5">${s.stash.map((e, i) => slot(e, 'stash', i)).join('')}${empty(Math.min(10, STASH_SLOTS - s.stash.length))}</div>`;
     el.querySelectorAll('.slot[data-from]').forEach(b => b.onclick = () => { const f = b.dataset.from, i = +b.dataset.i; sel = sel && sel.from === f && sel.i === i ? null : { from: f, i }; SFX.play('ui'); renderStash(); });
-    if ($('#sAll')) $('#sAll').onclick = () => {
+    if (el.querySelector('#sAll')) el.querySelector('#sAll').onclick = () => {
       for (let i = s.pack.length - 1; i >= 0; i--) { const e = s.pack[i]; const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d); e.n -= n; if (!e.n) s.pack.splice(i, 1); }
       SFX.play('ui'); Game.save(); renderStash(); toast(s.pack.length ? 'Stash is full - some things stayed in your pack' : 'Everything is in the stash', 1.8);
     };
     if (sel) stashActions();
   }
   function stashActions() {
-    const s = SV.survivor, acts = $('#sacts');
+    const s = SV.survivor, acts = (stashHost || $('#mpane')).querySelector('#sacts');
     const e = sel.from === 'hands' ? { k: s.hands.k, n: 1, d: s.hands.d } : s[sel.from][sel.i];
     if (!e) { sel = null; return; }
     const it = D.ITEMS[e.k], btns = [];
-    const done = msg => { sel = null; Game.save(); renderHome(); if (msg) toast(msg, 1.4); };
+    const done = msg => { sel = null; Game.save(); reHost(); if (msg) toast(msg, 1.4); };
     if (sel.from === 'pack') btns.push(['To stash', () => { const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d); if (!n) return toast('Stash is full', 1.4); e.n -= n; if (!e.n) s.pack.splice(sel.i, 1); done(); }]);
     if (sel.from === 'stash') btns.push(['To pack', () => { const n = addTo(s.pack, packSlots(), e.k, e.n, e.d); if (!n) return toast('Pack is full', 1.4); e.n -= n; if (!e.n) s.stash.splice(sel.i, 1); done(); }]);
     if (sel.from === 'hands') btns.push(['Unequip', () => { if (!addTo(s.pack, packSlots(), e.k, 1, e.d) && !addTo(s.stash, STASH_SLOTS, e.k, 1, e.d)) return toast('No room', 1.4); s.hands = null; done(); }]);
@@ -688,7 +796,7 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
     $('#mAcc').onclick = () => { sheetClose(); openAccount(); };
     $('#mCopy').onclick = () => { const t = $('#mExp'); t.select(); try { navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand('copy'); } toast('Copied', 1); };
     $('#mLoad').onclick = () => {
-      try { const v = JSON.parse($('#mImp').value); if (!v || v.v !== VER || !('houses' in v)) throw new Error('not a Dead Miles save'); SV = v; DM.S = SV.survivor; Game.save(); sheetClose(); boot2(); toast('Backup loaded', 1.6); }
+      try { const v = JSON.parse($('#mImp').value); if (!v || v.v !== VER || !('houses' in v)) throw new Error('not a Dead Miles save'); SV = migrate(v); DM.S = SV.survivor; Game.save(); sheetClose(); boot2(); toast('Backup loaded', 1.6); }
       catch (e) { toast('That does not look like a save: ' + e.message, 2.4); }
     };
     $('#mClose').onclick = sheetClose;
@@ -701,7 +809,10 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
       <div class="devgrid"><button class="mbtn sm" data-d="s1">+1,000 steps</button><button class="mbtn sm" data-d="s5">+5,000 steps</button>
       <button class="mbtn sm" data-d="day">New day</button><button class="mbtn sm" data-d="heal">Full heal</button>
       <button class="mbtn sm" data-d="ev">Thanksgiving: ${D.EVENT ? 'on' : 'off'}</button><button class="mbtn sm" data-d="q20">+20 quests done</button>
-      <button class="mbtn sm" data-d="caps">+100 caps</button><button class="mbtn sm" data-d="mats">+materials</button><button class="mbtn sm ghost" data-d="reset">Reset save</button></div>
+      <button class="mbtn sm" data-d="caps">+100 caps</button><button class="mbtn sm" data-d="mats">+materials</button>
+      <button class="mbtn sm" data-d="pool">+10,000 build steps</button><button class="mbtn sm" data-d="seeds">+seeds &amp; decor</button>
+      <button class="mbtn sm" data-d="gday">Garden: +1 day</button><button class="mbtn sm" data-d="hwin">Horde: ${DM.Horde.devOffset ? 'real clock' : 'shift window'}</button>
+      <button class="mbtn sm" data-d="hres">Horde: resolve now</button><button class="mbtn sm ghost" data-d="reset">Reset save</button></div>
       <div class="btnrow"><button class="mbtn sm ghost" id="mClose">Close</button></div>`);
     $('#msheet').querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
       const k = b.dataset.d;
@@ -711,8 +822,13 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
       if (k === 'q20') { SV.trader.completed += 20; refreshTrader(true); Game.save(); renderHome(); toast('Trader level ' + traderLevel(), 1.6); }
       if (k === 'caps') { SV.trader.caps += 100; Game.save(); renderHome(); }
       if (k === 'mats') { for (const [m, n] of [['scrap', 10], ['cloth', 6], ['tape', 3], ['wood', 4], ['nails', 12]]) addTo(SV.survivor.stash, STASH_SLOTS, m, n); Game.save(); renderHome(); }
+      if (k === 'pool') { SV.base.pool += 10000; Game.save(); renderHome(); }
+      if (k === 'seeds') { for (const m of ['seed_tomato', 'seed_carrot', 'seed_corn', 'd_sofa', 'd_lamp', 'd_poster', 'd_rug', 'd_gnome', 'd_lights', 'd_plant']) addTo(SV.survivor.stash, STASH_SLOTS, m, D.ITEMS[m].seed ? 3 : 1); Game.save(); renderHome(); }
+      if (k === 'gday') { DM.Base.devDay(); Game.save(); renderHome(); toast('Garden: a day passed', 1.2); }
+      if (k === 'hwin') { const H = DM.Horde; if (H.devOffset) H.devOffset = 0; else { const n = H.next(Date.now()); H.devOffset = n.at - Date.now() - 3 * 36e5; } renderHome(); }
+      if (k === 'hres') { const H = DM.Horde, n = H.next(); H.devOffset = (H.devOffset || 0) + (n.at - H.now()) + 60e3; renderHome(); resolveHorde(); }
       if (k === 'ev') { location.search = D.EVENT ? '' : '?event=thanksgiving'; }
-      if (k === 'reset') { if (b.dataset.sure) { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } SV = fresh(); DM.S = null; sheetClose(); boot2(); return; } b.dataset.sure = 1; b.textContent = 'Tap again to wipe'; return; }
+      if (k === 'reset') { if (b.dataset.sure) { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } SV = migrate(fresh()); DM.S = null; sheetClose(); boot2(); return; } b.dataset.sure = 1; b.textContent = 'Tap again to wipe'; return; }
       openDev();
     });
     $('#mClose').onclick = sheetClose;
@@ -782,6 +898,8 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
       }
     } catch (e) { /* offline */ }
     N.onSteps = onNetSteps;   // set only after the save is settled: steps wait in the ledger until then
+    try { if (N.ok) await withTimeout(N.partyGet(), 6000); } catch (e) { /* offline */ }
+    resolveHorde().then(() => DM.Horde.flush(SV.horde)).then(() => { Game.save(); renderHome(); }).catch(() => { });
     publish();
     updateSync();
   }
@@ -791,6 +909,19 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
     try { NET.publish({ name: s.name, level: D.scavLvl(s.xp), job: s.job, scav: Math.round(s.xp), looted: SV.stats.runs, kills: SV.stats.kills, extra: { look: s.look, trader: traderLevel(), quests: SV.trader.completed, secrets: SV.stats.secrets } }); } catch (e) { /* offline */ }
   }
   Game.onLevel = () => publish();
+  // a newer release on the site: save, then reload once (no loop: one try per version per tab session)
+  async function checkVersion() {
+    try {
+      const r = await fetch('version.txt?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return;
+      const v = (await r.text()).trim();
+      if (!/^[0-9][0-9.]*$/.test(v) || v === NEXT_VERSION || DM.scene) return;
+      if (sessionStorage.getItem('dm-next-reloaded') === v) return;
+      sessionStorage.setItem('dm-next-reloaded', v);
+      Game.save(); try { window.NET && await NET.flush(); } catch (e) { /* offline */ }
+      location.reload();
+    } catch (e) { /* offline or blocked */ }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && SV) { checkVersion(); resolveHorde(); } });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && SV) { Game.save(); try { window.NET && NET.flush(); } catch (e) { /* ignore */ } } });
   Game.boot = async function () {
     SV = load(); DM.S = SV.survivor;
@@ -799,7 +930,8 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
     boot2();
     $('#loading').remove();
     netStart();
-    setInterval(() => { if (SV.day.key !== today()) { rollDay(); Game.save(); renderHome(); } }, 60000);
+    setInterval(() => { if (SV.day.key !== today()) { rollDay(); Game.save(); renderHome(); } resolveHorde(); const c = document.getElementById('hCount'), n = DM.Horde.next(); if (c && n) c.textContent = (DM.Horde.windowOpen() ? 'Watch shift open · hits in ' : 'in ') + DM.Base.until(n.at); }, 60000);
+    checkVersion();
     DM.ready = true;
   };
   Game.boot().catch(e => { console.error(e); const l = $('#loading'); if (l) l.textContent = 'Failed to load: ' + e.message; });
