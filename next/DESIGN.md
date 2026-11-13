@@ -98,10 +98,35 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   danger shown, e.g. a police station); the rest can go to crew auto-search.
 - Consistency (horde shifts, watering, streak) matters as much as volume.
 
+## Jobs (decided)
+- Pick a job ("what you did before") at character creation, like old Dead
+  Miles backgrounds: perk + small starter kit. Old: Farmer (garden), Engineer
+  (cheaper base builds), Chef (food heals more), Firefighter (HP, fire axe),
+  Carpenter (walls/traps), Mechanic (repairs), Gamer (XP, weaker). New, loot
+  themed (proposed): Locksmith (quiet locks/safes, spots secrets sooner), Nurse
+  (more meds, better healing), Cop (guns, police-station loot).
+
+## Trader + quests (decided, 7 Days to Die style)
+- A trader is a permanent entry on the house list (never uses a scouted slot),
+  a safe zone you can go back to any time. Name/personality TBD (owner may pick).
+- Quest board refreshes daily. Types: Clear (kill all zombies in a given
+  house), Fetch (find an item in a house), Secrets (find N hidden
+  compartments), Hunt (kill N zombies anywhere), Supply run (bring items).
+  Quest houses are "N steps away" and appear once you've walked that far.
+- Rewards: choose one - blueprint / food / medication / ammo - plus trader
+  currency for the shop.
+- Quest tiers 1-5. Trader level goes up every 20 completed quests ("if you do
+  20 quests, you get to trader level 2"); levels unlock the next quest tier
+  and better shop stock.
+- Blueprints unlock crafting at the base workbench (weapons, bigger packs,
+  traps, base upgrades).
+
 ## Build order
 1. Prototype one house: joystick, rooms with lootable furniture, timed search,
    loot window, a hidden room, zombies that hear noise, real-time combat. (next/)
-2. House generator (many layouts by building type), scouting from steps.
+2. House generator (many layouts by building type), scouting from steps,
+   the daily house list you choose from.
+2b. Trader, quests, jobs.
 3. Character, gear, inventory, cosmetics/dress-up on the top-down sprite.
 4. Accounts + step sync + friends using the existing backend.
 5. Weekly boss, gifts, Oura check-in, party horde night.

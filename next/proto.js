@@ -7,6 +7,8 @@
 
   // ---------------------------------------------------------------- map
   const r = (s, n) => s.repeat(n);
+  // attic crawlspace: a separate pocket off to the side of the house, reached only by ladder
+  const ATTIC = { 11: '######', 12: '#aaaa#', 13: '#aaaa#', 14: '#aaaa#', 15: '#aaaa#', 16: '######' };
   const ROWS = [
     r(' ', 24),
     ' ' + r('#', 22) + ' ',
@@ -32,11 +34,11 @@
     ' ' + r('#', 19) + 'F## ',
     r('o', 24),
     r('o', 24),
-  ];
-  const MW = 24, MH = ROWS.length;
+  ].map((row, y) => row + (y >= 28 ? r('o', 6) : ATTIC[y] || r(' ', 6)));
+  const MW = 30, MH = ROWS.length;
   ROWS.forEach((row, i) => { if (row.length !== MW) console.error('map row', i, 'has length', row.length); });
-  const ROOMCH = { k: 'k', b: 'b', c: 'c', s: 's', r: 'r', l: 'l', h: 'h', o: 'o', K: 'k', C: 'c', R: 'r', L: 'l', B: 'b', F: 'h', X: 's' };
-  const ROOMNAME = { k: 'Kitchen', b: 'Bathroom', c: 'Utility closet', s: 'Hidden room', r: 'Bedroom', l: 'Living room', h: 'Hallway', o: 'Stoop' };
+  const ROOMCH = { k: 'k', b: 'b', c: 'c', s: 's', r: 'r', l: 'l', h: 'h', o: 'o', a: 'a', K: 'k', C: 'c', R: 'r', L: 'l', B: 'b', F: 'h', X: 's' };
+  const ROOMNAME = { k: 'Kitchen', b: 'Bathroom', c: 'Utility closet', s: 'Hidden room', r: 'Bedroom', l: 'Living room', h: 'Hallway', o: 'Stoop', a: 'Attic' };
   const ch = (x, y) => (x < 0 || y < 0 || x >= MW || y >= MH) ? ' ' : ROWS[y][x];
   const isVoid = (x, y) => ch(x, y) === ' ';
   const isWall = (x, y) => { const c = ch(x, y); return c === '#' || (c === 'X' && !G.secretOpen); };
@@ -60,6 +62,10 @@
     battery: { n: 'Batteries', i: 'battery' },
     tape: { n: 'Duct tape', i: 'tape' },
     book: { n: 'Paperback', i: 'book' },
+    note: { n: 'Torn note', i: 'note', use: 'Read' },
+    pole: { n: 'Hook pole', i: 'hook' },
+    watch: { n: 'Pocket watch', i: 'watch', rare: 1 },
+    jewelry: { n: 'Gold ring', i: 'ring', rare: 1 },
   };
   // how many fit in one pack slot (anything not listed does not stack)
   const STACK = { water: 3, beans: 3, snack: 3, drink: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
@@ -95,6 +101,8 @@
     coat: [[1, 2], { cloth: 3, snack: 1, key: 1 }],
     hall: [[1, 1], { key: 2, battery: 1 }],
     corpse: [[0, 1], { scrap: 1, ammo: 1, snack: 1, bandage: 1 }],
+    cache: [[3, 4], { watch: 2, jewelry: 3, ammo: 3, meds: 2 }, ['jewelry', 'watch']],
+    attic: [[3, 4], { watch: 2, jewelry: 2, ammo: 3, meds: 2, battery: 1 }, ['watch']],
   };
   function rollLoot(key) {
     const [[a, b], tab, guaranteed] = LOOT[key];
@@ -114,6 +122,7 @@
   try { const v = JSON.parse(localStorage.getItem(SKEY) || '{}'); if (v.scav && v.scav.xp >= 0) SK.xp = +v.scav.xp; } catch (e) { /* storage blocked */ }
   function saveSkills() { try { localStorage.setItem(SKEY, JSON.stringify({ scav: { xp: SK.xp } })); } catch (e) { /* ignore */ } }
   function scavLvl() { let L = 1; while (L < 10 && SK.xp >= XPCUM(L + 1)) L++; return L; }
+  const NOTE_TEXT = '"Grandpa never trusted banks. Said the floor under supper was the safest place in Brooklyn."';
   const searchMul = () => 1.5 * (1 - .06 * (scavLvl() - 1));   // slow at first, faster with skill
   const extraChance = () => .04 * (scavLvl() - 1);
   const packSlots = () => scavLvl() >= 9 ? 14 : 12;
@@ -152,10 +161,12 @@
     { art: 'heater', at: [14, 13, 1, 1], H: 54, solid: 1 },
     // hidden room
     { art: 'supply', at: [2, 10, 2, 1], H: 56 },
-    { art: 'crate', name: 'Hidden crate', at: [4, 10, 2, 1], H: 30, time: 3, noise: 4, loot: 'crate', rare: 1 },
+    { art: 'crate', name: 'Hidden crate', at: [4, 10, 2, 1], H: 30, time: 3, noise: 4, loot: 'crate', rare: 1, secretLoot: 1 },
+    // attic crawlspace
+    { art: 'crate', name: 'Old trunk', at: [25, 12, 2, 1], H: 30, time: 2.6, noise: 3, loot: 'attic', rare: 1, secretLoot: 1 },
     { art: 'cot', at: [5, 11, 1, 2], H: 12, solid: 1 },
     // bedroom
-    { id: 'secretShelf', art: 'bookshelf', name: 'Bookshelf', at: [3, 15, 2, 1], H: 62, time: 2, noise: 2.5, loot: 'books', secret: 1, seed: 2 },
+    { id: 'secretShelf', art: 'bookshelf', name: 'Bookshelf', at: [3, 15, 2, 1], H: 62, secret: 1, seed: 2 },
     { art: 'bed', at: [6, 15, 2, 3], H: 18 },
     { art: 'nightstand', name: 'Nightstand', at: [8, 15, 1, 1], H: 24, time: 1.5, noise: 2, loot: 'night' },
     { art: 'wardrobe', name: 'Wardrobe', at: [12, 15, 2, 1], H: 64, time: 2.8, noise: 5, loot: 'wardrobe' },
@@ -204,12 +215,12 @@
         hp: 100, sta: 100, staDelay: 0, st: 'free', stT: 0, inv: 0, ph: 0, stepAcc: 0, kbx: 0, kby: 0,
         swingQ: false, search: null, flash: 0, swingHit: false, downRot: 0,
       },
-      zs: [], furn: [], pack: [], poofs: [], dropOk: false, parts: [], rings: [], nums: [], decals: [], banners: [],
+      zs: [], furn: [], pack: [], drops: [], rug: { st: 0 }, cache: { name: 'Floor cache', room: 'k', loot0: null }, attic: { st: 0 }, secrets: { shelf: false, cache: false, attic: false }, parts: [], rings: [], nums: [], decals: [], banners: [],
       fog: {}, visited: {}, room: 'o', noiseLvl: 0, cam: { x: 20.5 * T, y: 26 * T }, z3: false,
       stats: { searched: 0, kills: 0, start: performance.now() }, entered: false, lastNoise: null, field: null, fieldT: 0, fieldCell: -1,
       secretHint: 0, sheet: null,
     };
-    for (const k in ROOMNAME) { G.fog[k] = k === 's' ? .99 : .97; G.visited[k] = false; }
+    for (const k in ROOMNAME) { G.fog[k] = k === 's' || k === 'a' ? .99 : .97; G.visited[k] = false; }
     G.fog.o = 0.12; G.visited.o = true;
     let fid = 0;
     for (const d of FDEF) {
@@ -224,10 +235,12 @@
       G.furn.push(f);
     }
     // ~20% of containers turn out empty - never the fridge, the hidden stash, or the bin by the stoop
-    const elig = G.furn.filter(f => f.lootable && f.art !== 'fridge' && f.art !== 'crate' && f.name !== 'Garbage bin');
+    const elig = G.furn.filter(f => f.lootable && f.art !== 'fridge' && f.art !== 'crate' && f.name !== 'Garbage bin' && f.name !== 'Dresser' && f.name !== 'Toolbox');
     for (let i = elig.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [elig[i], elig[j]] = [elig[j], elig[i]]; }
     elig.slice(0, Math.round(elig.length * .2)).forEach(f => f.empty = true);
     for (const f of G.furn) if (f.lootable) f.pre = f.empty ? [] : rollLoot(f.loot); // rolled up front so Keen eye can sense rares
+    G.furn.find(f => f.name === 'Dresser').pre.push('note');   // the clue for the floor cache
+    G.furn.find(f => f.name === 'Toolbox').pre.push('pole');   // opens the attic hatch
     G.zs.push(mkZombie(6.4 * T, 21.62 * T, 'sleep', 'l'));
     G.zs.push(mkZombie(8.6 * T, 12.7 * T, 'idle', 'b'));
     buildWalls(); buildSolid();
@@ -552,6 +565,40 @@
   function dmgNum(x, y, v, col) { G.nums.push({ x, y, v, t: 0, col }); }
 
   // ---------------------------------------------------------------- interaction
+  // secrets stay invisible until most of the house has been searched; no announcement when that happens
+  function gateOpen() { const L = G.furn.filter(f => f.lootable && !f.secretLoot); return L.filter(f => f.searched).length >= Math.ceil(L.length * .75); }
+  const hasItem = k => G.pack.some(e => e.k === k);
+  const RUG = { x: 14.2 * T, y: 3.2 * T, w: 4.6 * T, h: 3.4 * T }, BOARD = { x: 18.05 * T, y: 5.8 * T, w: 26, h: 10 };
+  const HATCH = { x: 20.5 * T, y: 15.4 * T }, HOLE = { x: 26.5 * T, y: 15.2 * T };
+  function secretActs(out) {
+    const p = G.p, gate = gateOpen();
+    const sh = G.furn.find(f => f.id === 'secretShelf');
+    if (gate && !G.secretOpen && !sh.slideState && p.fy < -.35 && p.x > sh.x + 4 && p.x < sh.x + sh.w - 4 && p.y - (sh.y + sh.h) < 24)
+      out.push({ obj: sh, act: 'Push', name: 'Bookshelf', rect: furnRect(sh), noise: 2, secret: true });
+    const r = G.rug, onRug = p.x > RUG.x - 12 && p.x < RUG.x + RUG.w + 12 && p.y > RUG.y - 12 && p.y < RUG.y + RUG.h + 12;
+    if (gate && r.st === 0 && onRug) out.push({ obj: r, act: 'Move', name: 'rug', rect: { x: p.x - 4, y: p.y - 4, w: 8, h: 8 }, noise: 1.5, dur: 1.3, secret: true, done: moveRug });
+    if (r.st === 1) out.push({ obj: r, act: 'Pry', name: 'floorboard', rect: BOARD, noise: 3.5, dur: 2.5, secret: true, done: pryBoard });
+    if (r.st === 2 && G.cache.loot0 && G.cache.loot0.length) out.push({ obj: G.cache, act: 'Open', name: 'Floor cache', rect: BOARD, secret: true });
+    const a = G.attic, nearHatch = Math.hypot(p.x - HATCH.x, p.y - HATCH.y) < .75 * T;
+    if (a.st === 0 && gate && nearHatch && hasItem('pole')) out.push({ obj: a, act: 'Pull down', name: 'attic hatch', rect: { x: HATCH.x - 10, y: HATCH.y - 6, w: 20, h: 12 }, noise: 3, dur: 1.2, secret: true, done: () => { a.st = 1; SFX.play('scrape'); } });
+    if (a.st === 1 && nearHatch) out.push({ obj: a, act: 'Climb', name: 'into the attic', rect: { x: HATCH.x - 10, y: HATCH.y - 6, w: 20, h: 12 }, noise: 1, dur: .6, secret: true, done: () => climb(true) });
+    if (G.room === 'a' && Math.hypot(p.x - HOLE.x, p.y - HOLE.y) < .8 * T) out.push({ obj: a, act: 'Climb', name: 'down the ladder', rect: { x: HOLE.x - 14, y: HOLE.y - 8, w: 28, h: 16 }, noise: 1, dur: .5, secret: true, done: () => climb(false) });
+  }
+  function moveRug() { G.rug.st = 1; SFX.play('whoosh'); puff(RUG.x + RUG.w * .8, RUG.y + RUG.h * .7, 2, 8, 'rgba(234,210,164,.5)', 50, .7, 3); }
+  function pryBoard() {
+    G.rug.st = 2; G.secrets.cache = true; SFX.play('hit');
+    G.cache.loot0 = toStacks(rollLoot('cache'));
+    gainXP(8, G.p.x, G.p.y);
+    openLoot(G.cache, { act: 'Open', name: 'Floor cache' });
+  }
+  function climb(up) {
+    $('#fade').classList.add('on');
+    setTimeout(() => {
+      if (up) { DM.tp(HOLE.x / T, HOLE.y / T - .45); if (!G.secrets.attic) { G.secrets.attic = true; gainXP(8, G.p.x, G.p.y); } }
+      else DM.tp(HATCH.x / T, HATCH.y / T + .6);
+      $('#fade').classList.remove('on');
+    }, 260);
+  }
   function interactables() {
     const out = [];
     for (const f of G.furn) {
@@ -559,10 +606,11 @@
       if (f.id === 'sofa' && G.zs.some(z => z.st === 'sleep' || z.st === 'rise')) continue; // someone is sleeping on it
       let act = null;
       if (!f.searched) act = 'Search';
-      else if (f.secret && !G.secretOpen && f.slideState !== 'sliding') act = 'Push';
       else if (f.loot0 && f.loot0.length) act = 'Open';
       if (act) out.push({ obj: f, act, rect: f.wall ? { x: f.x + 4, y: f.y + 20, w: f.w - 8, h: f.h - 20 } : furnRect(f), name: f.name, noise: f.noise });
     }
+    for (const d of G.drops) out.push({ obj: d, act: 'Pick up', rect: { x: d.x - 12, y: d.y - 8, w: 24, h: 14 }, name: ITEMS[d.k].n + (d.n > 1 ? ' x' + d.n : ''), drop: true });
+    secretActs(out);
     for (const z of G.zs) {
       if (!z.dead || z.rot === 0) continue;
       let act = !z.searched ? 'Search' : (z.loot0 && z.loot0.length ? 'Open' : null);
@@ -587,13 +635,15 @@
     const dx = cx - p.x, dy = cy - p.y, d = Math.hypot(dx, dy) || 1;
     p.fx = dx / d; p.fy = dy / d; if (Math.abs(dx) > 3) p.flip = dx < 0;
     if (it.act === 'Open') { openLoot(o, it); return; }
-    const dur = it.act === 'Push' ? 1.7 : (it.corpse ? 1.4 : o.time) * searchMul();
+    if (it.drop) { pickUp(o); return; }
+    const dur = it.dur || (it.act === 'Push' ? 1.7 : (it.corpse ? 1.4 : o.time) * searchMul());
     p.st = 'search'; p.stT = 0; p.search = { it, t: 0, dur, nextNoise: .25, nextFx: 0 };
     if (it.act === 'Search' && (o.art === 'fridge' || o.art === 'wardrobe' || o.art === 'coat' || o.art === 'pantry')) SFX.play('open');
   }
   function finishSearch() {
     const p = G.p, s = p.search, it = s.it, o = it.obj;
     p.st = 'free'; p.search = null;
+    if (it.done) { it.done(); return; }
     if (it.act === 'Push') {
       o.slideState = 'sliding'; o.slideT = 0; SFX.play('scrape'); emitNoise(o.x + o.w / 2, o.y + o.h, 5.5);
       return;
@@ -605,7 +655,6 @@
     // xp: bigger containers teach more, the hidden stash a lot
     gainXP(it.corpse ? 2 : 2 + (o.time >= 2.2 ? 1 : 0) + (o.rare ? 6 : 0), G.p.x, G.p.y);
     o._key = null;
-    if (o.secret && !G.secretOpen) { toast('A cold draught leaks from behind the shelf...', 3); }
     openLoot(o, it);
   }
   function cancelSearch() { const p = G.p; if (p.st === 'search') { p.st = 'free'; p.search = null; } }
@@ -617,8 +666,10 @@
     const wx = G.cam.x + (cx - rc.left - DEV.W / 2) / DEV.zoom, wy = G.cam.y + (cy - rc.top - DEV.H / 2) / DEV.zoom;
     let best = null, bk = -1e9;
     for (const it of interactables()) {
+      if (it.secret) continue;
       const o = it.obj; let bx;
       if (it.corpse) bx = { x: it.rect.x, y: it.rect.y - 34, w: it.rect.w, h: it.rect.h + 40 };
+      else if (it.drop) bx = { x: o.x - 16, y: o.y - 30, w: 32, h: 38 };
       else if (o.wall) bx = { x: o.x + 4, y: o.y + o.h - 60, w: o.w - 8, h: 60 };
       else { const g = ART.geo(o); bx = { x: o.x + (o.slide || 0) * T, y: g.ty0 - 8, w: o.w, h: g.fy1 - g.ty0 + 8 }; }
       if (rm(it) && G.fog[rm(it)] > .6) continue;
@@ -641,10 +692,11 @@
       G.tapMark = { x: wx, y: wy, t: 0 };
     }
   }
-  function rm(it) { return it.corpse ? null : it.obj.room; }
+  function rm(it) { return it.corpse || it.drop ? null : it.obj.room; }
   function goalCellFor(it) {
     const o = it.obj;
     if (it.corpse) return cellOf({ x: it.rect.x + it.rect.w / 2, y: o.y });
+    if (it.drop) return cellOf(o);
     const tx = o.tx + Math.round(o.slide || 0), cx = tx + Math.floor((o.tw - 1) / 2), cy = o.ty + Math.floor((o.th - 1) / 2);
     const cand = [[cx, o.ty + o.th], [cx + (o.tw > 1 ? 1 : 0), o.ty + o.th], [cx, o.ty - 1], [tx - 1, cy], [tx + o.tw, cy]];
     for (const [x, y] of cand) if (x >= 0 && y >= 0 && x < MW && y < MH && !solidCell[y * MW + x]) return [x, y];
@@ -970,7 +1022,7 @@
   function updateWorld(dt) {
     // fog
     for (const k in G.fog) {
-      const target = k === G.room ? 0 : k === 'o' ? .12 : G.visited[k] ? .45 : k === 's' ? .99 : .97;
+      const target = k === G.room ? 0 : k === 'a' ? .99 : G.room === 'a' ? .97 : k === 'o' ? .12 : G.visited[k] ? .45 : k === 's' ? .99 : .97;
       G.fog[k] = lerp(G.fog[k], target, 1 - Math.exp(-(target < G.fog[k] ? 5 : 2) * dt));
     }
     G.noiseLvl = Math.max(0, G.noiseLvl - dt * .28);
@@ -983,7 +1035,7 @@
     G.parts = G.parts.filter(q => q.life > 0);
     if (G.decals.length > 120) G.decals.splice(0, G.decals.length - 120);
     for (const r of G.rings) r.t += dt; G.rings = G.rings.filter(r => r.t < .9);
-    for (const q of G.poofs) q.t += dt; G.poofs = G.poofs.filter(q => q.t < .6);
+    for (const d of G.drops) d.t += dt;
     for (const n of G.nums) n.t += dt; G.nums = G.nums.filter(n => n.t < .9);
     for (const b of G.banners) b.t += dt; G.banners = G.banners.filter(b => b.t < 2.4);
     // secret shelf
@@ -992,14 +1044,13 @@
       sh.slideT += dt; sh.slide = Math.min(1, sh.slideT / .9); sh._key = null;
       if (Math.random() < .6) puff(sh.x + sh.slide * T + 4, sh.y + sh.h - 2, 4, 1, 'rgba(234,210,164,.6)', 40, .6, 3);
       G.shake = Math.max(G.shake, 1.5);
-      if (sh.slide >= 1) { sh.slideState = 'open'; G.secretOpen = true; buildWalls(); buildSolid(); toast('There is a room behind the shelf!', 2.6); }
+      if (sh.slide >= 1) { sh.slideState = 'open'; G.secretOpen = true; G.secrets.shelf = true; buildWalls(); buildSolid(); gainXP(8, G.p.x, G.p.y); }
     }
-    if (!G.secretOpen && G.visited.r && Math.hypot(G.p.x - 3.5 * T, G.p.y - 15 * T) < 6 * T) {
+    if (scavLvl() >= 6 && !G.secretOpen && G.room === 'r' && Math.hypot(G.p.x - 3.5 * T, G.p.y - 15 * T) < 5 * T) { // Keen eye only, and subtle
       G.secretHint -= dt;
       if (G.secretHint <= 0) {
-        const keen = scavLvl() >= 6;
-        G.secretHint = keen ? .12 : .28;
-        G.parts.push({ x: 3 * T + 4 + Math.random() * 6, y: 15.9 * T, z: 4 + Math.random() * 40, vx: 8 + Math.random() * 14, vy: 4 + Math.random() * 8, vz: (Math.random() - .3) * 8, g: 0, life: 2.2, max: 2.2, col: keen ? 'rgba(255,214,140,.95)' : 'rgba(220,226,255,.55)', size: (keen ? 2.4 : 1.6) + Math.random() * 1.2, mote: 1 });
+        G.secretHint = .45;
+        G.parts.push({ x: 3 * T + 4 + Math.random() * 6, y: 15.9 * T, z: 4 + Math.random() * 30, vx: 6 + Math.random() * 10, vy: 3 + Math.random() * 6, vz: (Math.random() - .3) * 6, g: 0, life: 1.8, max: 1.8, col: 'rgba(220,226,255,.35)', size: 1.4 + Math.random(), mote: 1 });
       }
     }
     // the third zombie wanders in from the street
@@ -1050,9 +1101,6 @@
     rug(c, 3.4 * T, 22.2 * T, 4.2 * T, 3.4 * T, '#3f4c7a', '#5a6aa0', P.CRMD);
     rug(c, 19.5 * T, 11 * T, 2 * T, 14 * T, '#5c2f3c', '#7a3f4e', P.CRMD);
     rug(c, 7.5 * T, 12.2 * T, 1.8 * T, 1.2 * T, '#93a86c', '#7a8f58', P.CRM);
-    // scuff arcs where the secret shelf has been dragged before
-    c.strokeStyle = 'rgba(234,210,164,.13)'; c.lineWidth = 1.6;
-    for (let i = 0; i < 3; i++) { c.beginPath(); c.arc(3 * T + 6, 15.9 * T, T * (1.05 + i * .12), -.02, .7); c.stroke(); }
     // ambient occlusion under wall faces
     for (const w of wallCells.concat(...wallCells.map(c => c.sub || []))) if (w.face) {
       const g = c.createLinearGradient(0, w.key, 0, w.key + 16); g.addColorStop(0, 'rgba(10,8,24,.45)'); g.addColorStop(1, 'rgba(10,8,24,0)');
@@ -1161,6 +1209,9 @@
     ctx.fillStyle = '#23223c'; ctx.fillRect(-T * 4, MH * T - 2, MW * T + T * 8, T * 8);
     ctx.fillStyle = 'rgba(201,168,90,.35)'; for (let x = -3; x < MW + 4; x += 3) ctx.fillRect(x * T, (MH + 1.6) * T, T * 1.3, 3);
     ctx.drawImage(floorCv, 0, 0, MW * T, MH * T);
+    drawRug();
+    if (G.visited.a) { ART.blk(ctx, HOLE.x - 18, HOLE.y - 10, 36, 20, '#0c0816', 2, 2.4); drawLadder(true, HOLE.x, HOLE.y + 2); }
+    if (scavLvl() >= 6 && !G.secretOpen) { ctx.strokeStyle = 'rgba(234,210,164,.09)'; ctx.lineWidth = 1.4; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(3 * T + 6, 15.9 * T, T * (1.05 + i * .12), -.02, .7); ctx.stroke(); } }
     // decals
     for (const d of G.decals) {
       ctx.globalAlpha = d.a; ctx.fillStyle = d.col; ctx.beginPath(); ctx.ellipse(d.x, d.y, d.r, d.r * .55, d.rot, 0, 6.28); ctx.fill();
@@ -1176,6 +1227,8 @@
     const list = [];
     for (const w of wallCells) { if (w.key < vy0 || w.key - WH - T > vy1 || (w.x + 1) * T < vx0 || w.x * T > vx1) continue; list.push({ k: w.key, w }); }
     for (const d of doorLeaves) list.push({ k: d.key, d });
+    for (const d of G.drops) list.push({ k: d.y - 2, dr: d });
+    if (G.attic.st === 1) list.push({ k: HATCH.y + 6, lad: 1 });
     for (const f of G.furn) { const k = f.wall ? f.y + f.h + .5 : f.y + f.h; if (k + 10 < vy0 || f.y - 120 > vy1) continue; list.push({ k, f }); }
     for (const z of G.zs) list.push({ k: z.st === 'sleep' || z.st === 'rise' && z.stT < .5 ? 22 * T + 1 : z.dead ? z.y - 14 : z.y, z });
     list.push({ k: p.y, pl: 1 });
@@ -1183,11 +1236,12 @@
     for (const it of list) {
       if (it.w) drawWall(it.w);
       else if (it.d) drawDoor(it.d);
+      else if (it.dr) drawDrop(it.dr);
+      else if (it.lad) drawLadder(false, HATCH.x, HATCH.y + 6);
       else if (it.f) { const f = it.f, cvs = furnCanvas(f); if (f.lootable && f.searched && !(f.loot0 && f.loot0.length) && !(f.secret && !G.secretOpen)) ctx.globalAlpha = .82; ctx.drawImage(cvs, f._b.x + (f.slide || 0) * T, f._b.y, f._b.w, f._b.h); ctx.globalAlpha = 1; if (f.art === 'crate' && !f.searched) ART.candle(ctx, f.x + f.w - 12, ART.geo(f).ty0 + 12, G.t); }
       else if (it.z) drawZombie(it.z);
       else drawPlayer();
     }
-    drawPoofs();
     // particles
     for (const q of G.parts) {
       const a = Math.min(1, q.life / q.max * 2);
@@ -1242,15 +1296,37 @@
   }
 
   const iconImg = {};
-  // dropped items are gone for good: the icon puffs away at her feet
-  function drawPoofs() {
-    for (const q of G.poofs) {
-      const im = iconImg[ITEMS[q.k].i] || (iconImg[ITEMS[q.k].i] = Object.assign(new Image(), { src: ART.iconURL[ITEMS[q.k].i] }));
-      const k = q.t / .6, sc = 1 + k * .35;
-      ctx.globalAlpha = Math.max(0, 1 - k * k);
-      if (im.complete) ctx.drawImage(im, q.x - 15 * sc, q.y - 26 - k * 14 - 15 * (sc - 1), 30 * sc, 30 * sc);
+  function drawDrop(d) {
+    const im = iconImg[ITEMS[d.k].i] || (iconImg[ITEMS[d.k].i] = Object.assign(new Image(), { src: ART.iconURL[ITEMS[d.k].i] }));
+    const bounce = d.t < .7 ? Math.abs(Math.sin(d.t * 9)) * 16 * (1 - d.t / .7) : 0;
+    drawShadow(d.x, d.y + 1, 11 - bounce * .25, .45);
+    if (im.complete) ctx.drawImage(im, d.x - 15, d.y - 26 - bounce, 30, 30);
+    if (d.n > 1) { ctx.font = '900 10px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = P.INK; ctx.strokeText('x' + d.n, d.x + 12, d.y + 2); ctx.fillStyle = P.CRM; ctx.fillText('x' + d.n, d.x + 12, d.y + 2); }
+  }
+  // rug under the dining table, the loose board, and the hole once pried
+  function drawRug() {
+    const r = G.rug, R = RUG;
+    const w = r.st ? R.w * .58 : R.w;
+    ART.rr(ctx, R.x, R.y, w, R.h, 5); ctx.fillStyle = '#5e2a36'; ctx.fill(); ctx.lineWidth = 2.4; ctx.strokeStyle = P.INK; ctx.stroke();
+    ART.rr(ctx, R.x + 7, R.y + 7, w - 14, R.h - 14, 3); ctx.strokeStyle = '#8a4050'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = '#c95f2c'; for (let i = 0; i < 5; i++) { const xx = R.x + 20 + i * 36; if (xx > R.x + w - 14) break; ctx.save(); ctx.translate(xx, R.y + R.h / 2); ctx.rotate(.785); ctx.fillRect(-4, -4, 8, 8); ctx.restore(); }
+    if (r.st) { // rolled edge
+      ART.blk(ctx, R.x + w - 10, R.y - 2, 16, R.h + 4, '#6e3240', 8, 2.4);
+      const B = BOARD;
+      if (r.st === 1) { ART.blk(ctx, B.x, B.y, B.w, B.h, '#5a4560', 1, 1.6); ART.dot(ctx, B.x + 4, B.y + 5, 1.4, P.MUTE); ART.dot(ctx, B.x + B.w - 4, B.y + 5, 1.4, P.MUTE); }
+      else {
+        ART.blk(ctx, B.x, B.y, B.w, B.h + 2, '#0c0816', 1, 1.6);
+        if (G.cache.loot0 && G.cache.loot0.length) ART.blk(ctx, B.x + 6, B.y + 2, 14, 7, '#b9bdcc', 2, 1.2);
+        ctx.save(); ctx.translate(B.x + B.w + 8, B.y + 2); ctx.rotate(.5); ART.blk(ctx, -4, -2, B.w, 8, '#5a4560', 1, 1.6); ctx.restore();
+      }
     }
-    ctx.globalAlpha = 1;
+  }
+  function drawLadder(top, x, y) { // ladder from the ceiling hatch (hall) or poking out of the attic hole
+    if (top) { ART.blk(ctx, x - 16, y - 8, 32, 16, '#0c0816', 2, 2); }
+    const y0 = top ? y - 46 : y - 86, y1 = top ? y + 6 : y;
+    ctx.fillStyle = P.WOOD; ctx.strokeStyle = P.INK; ctx.lineWidth = 2;
+    for (const xx of [x - 11, x + 7]) { ctx.fillRect(xx, y0, 4, y1 - y0); ctx.strokeRect(xx, y0, 4, y1 - y0); }
+    for (let yy = y0 + 8; yy < y1 - 2; yy += 11) { ctx.fillRect(x - 9, yy, 18, 3); ctx.strokeRect(x - 9, yy, 18, 3); }
   }
   const DOORH = 50;
   function drawDoor(d) {
@@ -1462,9 +1538,11 @@
     for (const it of interactables()) {
       const o = it.obj, d = rectDist(p.x, p.y, it.rect);
       if (d > 3 * T) continue;
-      const rm = it.corpse ? null : o.room; if (rm && G.fog[rm] > .6) continue;
+      if (it.secret) continue;
+      const rm = it.corpse || it.drop ? null : o.room; if (rm && G.fog[rm] > .6) continue;
       let mx, my;
-      if (it.corpse) { mx = o.x + (o.fallDir || 1) * 34; my = o.y - 34; }
+      if (it.drop) { mx = o.x; my = o.y - 40; }
+      else if (it.corpse) { mx = o.x + (o.fallDir || 1) * 34; my = o.y - 34; }
       else { const g = ART.geo(o); mx = o.x + o.w / 2 + (o.slide || 0) * T; my = (o.wall ? o.y + o.h - 62 : g.ty0) - 14; }
       const isT = tgt && tgt.obj === o;
       const bob = isT ? Math.sin(G.t * 6) * 2 : 0;
@@ -1650,32 +1728,31 @@
       acts.innerHTML = `<span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}</span>`;
       if (it.use) { const b = document.createElement('button'); b.textContent = it.use; b.onclick = ev => { ev.stopPropagation(); useItem(sel); }; acts.appendChild(b); }
       const d = document.createElement('button'); d.className = 'ghost'; d.textContent = 'Drop';
-      d.onclick = ev => { ev.stopPropagation(); if (G.dropOk) dropItem(sel); else confirmDrop(sel); }; acts.appendChild(d);
+      d.onclick = ev => { ev.stopPropagation(); dropItem(sel); }; acts.appendChild(d);
     }
     sheet.classList.add('on');
   }
   function useItem(i) {
     const e = G.pack[i], it = ITEMS[e.k], p = G.p;
+    if (e.k === 'note') { $('#shActs').innerHTML = `<div class="note">${NOTE_TEXT}</div>`; SFX.play('pick'); return; }
     if (it.hp) p.hp = Math.min(100, p.hp + it.hp);
     if (it.sta) p.sta = Math.min(100, p.sta + it.sta);
     e.n--; if (!e.n) G.pack.splice(i, 1);
     SFX.play('pick'); toast(`${it.use === 'Use' ? 'Used' : it.use === 'Take' ? 'Took' : it.use === 'Eat' ? 'Ate' : 'Drank'} ${it.n.toLowerCase()}`, 1.3);
     openPack(e.n ? i : -1);
   }
-  // first drop of a run asks once, inside the sheet (window.confirm is blocked in the sandbox)
-  function confirmDrop(i) {
-    const e = G.pack[i], acts = $('#shActs');
-    acts.innerHTML = `<span>Drop <b>${ITEMS[e.k].n}${e.n > 1 ? ' x' + e.n : ''}</b>? It's gone for good.</span>`;
-    const ok = document.createElement('button'); ok.textContent = 'Drop'; ok.onclick = ev => { ev.stopPropagation(); G.dropOk = true; dropItem(i); };
-    const no = document.createElement('button'); no.className = 'ghost'; no.textContent = 'Cancel'; no.onclick = ev => { ev.stopPropagation(); openPack(i); };
-    acts.append(ok, no);
-  }
   function dropItem(i) {
     const e = G.pack.splice(i, 1)[0], p = G.p;
-    G.poofs.push({ k: e.k, x: p.x + (p.flip ? -16 : 16), y: p.y + 4, t: 0 });
-    puff(p.x + (p.flip ? -16 : 16), p.y + 2, 6, 8, 'rgba(157,144,191,.8)', 50, .6, 3.5);
-    SFX.play('whoosh'); toast(`Dropped ${ITEMS[e.k].n.toLowerCase()}${e.n > 1 ? ' x' + e.n : ''} - gone for good`, 1.4);
-    closeSheet(); // let her see it go
+    const a = G.drops.length * 2.1; // nudge so several drops do not sit exactly on top of each other
+    G.drops.push({ k: e.k, n: e.n, x: p.x + (p.flip ? -18 : 18) + Math.cos(a) * 6, y: p.y + 6 + Math.sin(a) * 5, t: 0 });
+    SFX.play('open'); toast('Dropped - it stays here until you leave', 1.6);
+    closeSheet(); // let her see it land
+  }
+  function pickUp(d) {
+    const got = addToPack(d.k, d.n);
+    if (!got) { toast('Your pack is full', 1.3); return; }
+    d.n -= got; if (!d.n) G.drops.splice(G.drops.indexOf(d), 1);
+    SFX.play('pick'); toast(`Picked up ${ITEMS[d.k].n.toLowerCase()}${got > 1 ? ' x' + got : ''}`, 1.1);
   }
   $('#shTake').addEventListener('click', e => { e.stopPropagation(); takeAll(); });
   $('#shClose').addEventListener('click', e => { e.stopPropagation(); closeSheet(); });
@@ -1704,16 +1781,18 @@
   function showSummary() {
     G.over = true; G.paused = true; closeSheet(true);
     const rooms = Object.keys(ROOMNAME).filter(k => k !== 'o'), seen = rooms.filter(k => G.visited[k]).length;
-    const total = G.furn.filter(f => f.lootable).length;
+    const total = G.furn.filter(f => f.lootable && !f.secretLoot).length;
     const secs = Math.round((performance.now() - G.stats.start) / 1000);
     $('#cardBody').innerHTML = `
       <div class="kick">14 Halsey St · you got out</div>
       <h2>Back on the street</h2>
-      <div class="stats"><div><b>${seen}/${rooms.length}</b>rooms</div><div><b>${G.stats.searched}/${total}</b>searched</div><div><b>${G.stats.kills}</b>zombies</div><div><b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b>time</div></div>
-      ${G.visited.s ? '<div class="found">You found the hidden room</div>' : '<div class="found dim">Something in this house stayed hidden...</div>'}
+      <div class="stats"><div><b>${seen}/${rooms.length}</b>rooms</div><div><b>${G.furn.filter(f => f.lootable && !f.secretLoot && f.searched).length}/${total}</b>searched</div><div><b>${G.stats.kills}</b>zombies</div><div><b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b>time</div></div>
+      ${(() => { const n = Object.values(G.secrets).filter(Boolean).length, m = Object.keys(G.secrets).length; return `<div class="found${n ? '' : ' dim'}">Secrets found: ${n} of ${m}</div>`; })()}
       <div class="sum">${packSummaryHTML(G.pack)}</div>
+      ${G.drops.length ? `<div class="lost">Left behind: ${G.drops.map(d => ITEMS[d.k].n + (d.n > 1 ? ' x' + d.n : '')).join(', ')}</div>` : ''}
       ${skillLine()}
       <div class="btnrow"><button id="cBack" class="ghost">Go back in</button><button id="cNew">New run</button></div>`;
+    G.drops = []; // whatever she left on the floor is gone once she leaves
     $('#card').classList.add('on'); bindReset();
     $('#cBack').onclick = () => { hideCards(); G.over = false; G.paused = false; G.p.y = 28.4 * T; G.p.vy = 0; };
     $('#cNew').onclick = () => newGame();
@@ -1756,7 +1835,7 @@
 
   // debug / test hooks
   const DM = window.DM = {
-    get G() { return G; }, fps: 0, ms: 0, SK, scavLvl, XPCUM, openPack, dropItem,
+    get G() { return G; }, gateOpen, fps: 0, ms: 0, SK, scavLvl, XPCUM, openPack, dropItem,
     tp(tx, ty) { G.p.x = tx * T; G.p.y = ty * T; G.p.vx = G.p.vy = 0; G.cam.x = G.p.x; G.cam.y = G.p.y - 34; },
     face(x, y) { G.p.fx = x; G.p.fy = y; if (x) G.p.flip = x < 0; },
     target() { const t = findTarget(); return t ? { act: t.act, name: t.name } : null; },

@@ -131,6 +131,17 @@ const ART = (() => {
       <rect x="-17" y="-22" width="7" height="44" fill="#9a4522" stroke="#11142f" stroke-width="2"/><rect x="-4" y="-12" width="16" height="9" fill="#f6e3bb" stroke="#11142f" stroke-width="1.6"/>
       <path d="M17,-18 L20,-16 L20,24 L-12,24 L-14,22" fill="#f6e3bb" stroke="#11142f" stroke-width="2" stroke-linejoin="round"/></g>`,
   };
+  Object.assign(EXTRA_ICONS, {
+    note: `<g transform="rotate(-8)"><path d="M-18,-24 L14,-24 L18,-14 L12,-6 L18,4 L14,24 L-18,24 Z" fill="#f6e3bb" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/>
+      <path d="M-12,-14 L8,-14 M-12,-6 L4,-6 M-12,2 L8,2 M-12,10 L2,10" stroke="#5a4a86" stroke-width="2" stroke-linecap="round"/></g>`,
+    hook: `<g transform="rotate(35)"><rect x="-3" y="-30" width="6" height="56" rx="2" fill="#b07a45" stroke="#11142f" stroke-width="2.6"/>
+      <path d="M0,-28 L0,-34 Q0,-40 6,-40 Q12,-40 12,-34" fill="none" stroke="#11142f" stroke-width="6" stroke-linecap="round"/><path d="M0,-28 L0,-34 Q0,-40 6,-40 Q12,-40 12,-34" fill="none" stroke="#b9bdcc" stroke-width="3" stroke-linecap="round"/></g>`,
+    watch: `<path d="M0,-28 L0,-18" stroke="#c9a85a" stroke-width="3"/><circle cx="0" cy="-30" r="4" fill="none" stroke="#11142f" stroke-width="2.4"/>
+      <circle r="18" fill="#e0b94a" stroke="#11142f" stroke-width="2.6"/><circle r="13" fill="#f6e3bb" stroke="#11142f" stroke-width="1.8"/>
+      <path d="M0,0 L0,-9 M0,0 L6,3" stroke="#11142f" stroke-width="2.2" stroke-linecap="round"/>`,
+    ring: `<ellipse cx="0" cy="6" rx="18" ry="14" fill="none" stroke="#11142f" stroke-width="9"/><ellipse cx="0" cy="6" rx="18" ry="14" fill="none" stroke="#e0b94a" stroke-width="5"/>
+      <path d="M-8,-10 L0,-20 L8,-10 L0,-4 Z" fill="#9fe0e6" stroke="#11142f" stroke-width="2.4" stroke-linejoin="round"/>`,
+  });
   const iconURL = {};
   function buildIcons() {
     const all = Object.assign({}, S.icons, EXTRA_ICONS);
@@ -167,6 +178,7 @@ const ART = (() => {
     l: { a: '#4d3a5e', b: '#43335a', kind: 'planks' },
     h: { a: '#453453', b: '#3c2e4b', kind: 'planks' },
     o: { a: '#353452', b: '#2c2b46', kind: 'sidewalk' },
+    a: { a: '#3a2c3c', b: '#2c2030', kind: 'boards' },
   };
   function drawFloorTile(ctx, room, tx, ty, T) {
     const f = FLOOR[room]; if (!f) return;
@@ -213,6 +225,7 @@ const ART = (() => {
     l: { a: '#5a4a86', b: '#4d3f78', trim: '#3d2d61', kind: 'wainscot' },
     h: { a: '#523f6e', b: '#463562', trim: '#2a1f4a', kind: 'wainscot' },
     o: { a: '#3d2d61', b: '#33264f', trim: '#1a1336', kind: 'brickout' },
+    a: { a: '#4a3640', b: '#3a2a34', trim: '#22161e', kind: 'brick' },
   };
   function drawWallFace(ctx, room, x, y, w, h, tx) {
     const f = WALLFACE[room] || WALLFACE.h;
