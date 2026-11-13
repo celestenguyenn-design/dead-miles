@@ -141,8 +141,12 @@ window.DM = window.DM || {};
     denim: { n: 'Denim jacket', slot: 'outfit', r: 'c', src: 'loot' }, raincoat: { n: 'Raincoat', slot: 'outfit', r: 'c', src: 'loot' },
     varsity: { n: 'Varsity jacket', slot: 'outfit', r: 'r', src: 'loot' }, puffer: { n: 'Puffer jacket', slot: 'outfit', r: 'e', src: 'trader', lv: 4 },
     leather: { n: 'Biker jacket', slot: 'outfit', r: 'l', src: 'police' },
+    // weekly group boss (boss.js): a chance when the boss your party fought goes down
+    wardencap: { n: "Warden's cap", slot: 'hat', r: 'e', src: 'boss' }, ashcrown: { n: 'Ash crown', slot: 'hat', r: 'l', src: 'boss' },
+    stetho: { n: 'Stethoscope', slot: 'neck', r: 'e', src: 'boss' }, apron: { n: "Butcher's apron", slot: 'outfit', r: 'e', src: 'boss' },
   };
-  D.cosHint = k => { const c = D.COS[k]; return { loot: 'Found in houses', corpse: 'Found on zombies', police: 'Police stations', mansion: 'Mansions', horde: 'Horde-night crates', quest: "Dot's quest rewards", trader: 'Trader level ' + c.lv, event: D.EVHINT[k] || 'Seasonal event' }[c.src]; };
+  D.cosHint = k => { const c = D.COS[k]; return { loot: 'Found in houses', corpse: 'Found on zombies', police: 'Police stations', mansion: 'Mansions', horde: 'Horde-night crates', quest: "Dot's quest rewards", trader: 'Trader level ' + c.lv, event: D.EVHINT[k] || 'Seasonal event', boss: D.BOSSHINT[k] || 'Weekly boss' }[c.src]; };
+  D.BOSSHINT = { apron: 'Weekly boss: the Butcher of Bed-Stuy', ashcrown: 'Weekly boss: Mother Ash', wardencap: 'Weekly boss: the Bridge Warden', stetho: 'Weekly boss: the Night Nurse' };
   // where each event cosmetic comes from (the wardrobe also tags them "Thanksgiving 2026" etc.)
   D.EVHINT = { pilgrim: 'Thanksgiving: the zombie turkey', feathers: 'Thanksgiving: zombie turkeys', pietin: "Thanksgiving: Dot's dinner job", harvest: "Thanksgiving: Dot's jobs",
     santa: 'Christmas: the Krampus walker', candycane: "Christmas: Dot's gift job" };
@@ -172,6 +176,7 @@ window.DM = window.DM || {};
   // how many fit in one slot (anything not listed does not stack)
   D.STACK = { gift: 3, candy: 5, seed_tomato: 10, seed_potato: 10, seed_carrot: 10, seed_corn: 10, seed_herbs: 10, tomato: 3, potato: 3, carrot: 3, corn: 3, herbs: 3, wood: 10, nails: 20, lockpick: 5, arrow: 20, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
   D.stackMax = k => D.STACK[k] || 1;
+  D.QUIVER = 60;   // 0.7: arrows live in a quiver (survivor.quiver.n), not in a pack slot
 
   // melee: dmg, wind/strike/rec seconds, reach in tiles, durability. bow is ranged.
   D.WEAPONS = {

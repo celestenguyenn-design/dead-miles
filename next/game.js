@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.6';
+const NEXT_VERSION = '0.7';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -56,6 +56,9 @@ const NEXT_VERSION = '0.6';
     v.trader.event = v.trader.event || null;   // phase 5a: Dot's seasonal job chain { key, step, kills, base }
     v.tips = v.tips || {};                  // phase 5: first-time tips already shown
     if (v.survivor) migrateCos(v.survivor);
+    if (v.survivor) migrateQuiver(v.survivor);
+    DM.Crew.norm(v);                        // phase 5b: crew + strays (SV.crew, SV.pets)
+    DM.Boss.norm(v);                        // phase 5b: the weekly boss (SV.boss)
     return v;
   }
   // phase 5: cosmetics live in the wardrobe, not the pack. The 0.4 'Pilgrim hat' pack item (and any stray cosmetic item) moves in.
@@ -68,6 +71,12 @@ const NEXT_VERSION = '0.6';
     }
     for (const sl in s.look.cos) if (!w.own[s.look.cos[sl]]) delete s.look.cos[sl];   // only what you own can be worn
   }
+  // 0.7: the quiver. Arrows in the pack move into it (up to D.QUIVER); they no longer take a pack slot or spill on death.
+  function migrateQuiver(s) {
+    const q = s.quiver = s.quiver && typeof s.quiver === 'object' ? s.quiver : { n: 0 }; q.n = Math.max(0, Math.min(D.QUIVER, +q.n || 0));
+    for (let i = s.pack.length - 1; i >= 0 && q.n < D.QUIVER; i--) if (s.pack[i].k === 'arrow') { const t = Math.min(s.pack[i].n, D.QUIVER - q.n); q.n += t; s.pack[i].n -= t; if (!s.pack[i].n) s.pack.splice(i, 1); }
+  }
+  function toQuiver(n) { const q = SV.survivor.quiver = SV.survivor.quiver || { n: 0 }, t = Math.max(0, Math.min(n, D.QUIVER - q.n)); q.n += t; return t; }
   const cosQueue = [];   // unlock popups waiting to be shown
   D.cosOwned = () => (SV && SV.survivor && SV.survivor.wardrobe ? SV.survivor.wardrobe.own : {});
   Game.save = function () {
@@ -85,10 +94,11 @@ const NEXT_VERSION = '0.6';
   function createSurvivor(name, look, job) {
     const J = D.JOBS[job];
     let xp = 0; try { const v = JSON.parse(localStorage.getItem('dm-next-skills') || '{}'); if (v.scav) xp = +v.scav.xp || 0; } catch (e) { /* none */ }
-    const s = { name: name || 'Survivor', look, job, hp: 0, xp, pack: [], stash: [], hands: null, packBonus: 0, known: D.BASIC.concat(job === 'hunter' ? ['arrow'] : []), wardrobe: { own: {}, seen: {} } };
+    const s = { name: name || 'Survivor', look, job, hp: 0, xp, pack: [], stash: [], hands: null, quiver: { n: 0 }, packBonus: 0, known: D.BASIC.concat(job === 'hunter' ? ['arrow'] : []), wardrobe: { own: {}, seen: {} } };
     s.hp = maxHp(s);
     for (const [k, n] of J.kit) {
       if (k === J.hands) { s.hands = { k, d: D.WEAPONS[D.ITEMS[k].w].dur }; continue; }
+      if (k === 'arrow') { s.quiver = { n: Math.min(D.QUIVER, n) }; continue; }
       addTo(s.pack, 12, k, n, D.isWeapon(k) ? D.WEAPONS[D.ITEMS[k].w].dur : undefined);
     }
     return s;
@@ -121,6 +131,7 @@ const NEXT_VERSION = '0.6';
     SV.day[src] += n;
     SV.walked = (SV.walked || 0) + (src === 'typed' ? n * .5 : n);
     DM.Base.addPool(SV, src === 'typed' ? n * .5 : n);   // build steps: the same steps, they do not take away houses
+    DM.Crew.onSteps(src === 'typed' ? n * .5 : n);       // the active pet levels up slowly from your steps
     revealQuestHouses();
     const before = SV.day.scouted;
     scout();
@@ -137,7 +148,7 @@ const NEXT_VERSION = '0.6';
     if (!p || p.key !== day) return DM.addSteps(n, src);
     n = Math.max(0, Math.round(+n || 0));
     if (src === 'typed') n = Math.min(n, Math.max(0, 4000 - p.typed));
-    p[src] += n; SV.walked = (SV.walked || 0) + (src === 'typed' ? n * .5 : n); DM.Base.addPool(SV, src === 'typed' ? n * .5 : n);
+    p[src] += n; SV.walked = (SV.walked || 0) + (src === 'typed' ? n * .5 : n); DM.Base.addPool(SV, src === 'typed' ? n * .5 : n); DM.Crew.onSteps(src === 'typed' ? n * .5 : n);
     const target = housesFor(worth(effective(p))); let added = 0;
     while (p.scouted < target) { p.scouted++; added++; addHouse(worth(effective(p)) * p.scouted / Math.max(1, target), p.key); }
     revealQuestHouses(); Game.save();
@@ -187,6 +198,8 @@ const NEXT_VERSION = '0.6';
     SV.day = { key: t, phone: 0, typed: 0, walk: 0, scouted: 0 };
     // unlooted houses last 3 days; finished ones are cleared from the list; quest houses stay while the quest is open
     SV.houses = SV.houses.filter(h => h.quest ? questById(h.quest) && h.status !== 'looted' : h.status === 'new' && dayNum(t) - dayNum(h.day) < 3);
+    if (s) DM.Crew.morning(days);   // phase 5b: the crew eats, the medic heals, the gardener waters, pets come home
+    DM.Boss.roll();
   }
   function devNewDay() { // pretend a day passed: shift every date back one day, then roll over
     SV.day.key = keyOf(dayNum(SV.day.key) - 1);
@@ -194,21 +207,22 @@ const NEXT_VERSION = '0.6';
     rollDay(true); Game.save(); renderHome(); toast('A new day', 1.4);
   }
 
-  // ---------------------------------------------------------------- crew auto-search: instant, ~40% of the loot, never secrets
+  // ---------------------------------------------------------------- crew auto-search: instant, ~35-60% of the loot (more with a bigger crew), never secrets
   function autoSearch(h) {
     const L = layoutOf(h), rnd = D.mulberry32(h.seed ^ 0x5bd1e995);
-    const got = [];
+    const got = [], share = DM.Crew.autoShare(), skip = DM.Crew.lockSkip(), n = SV.crew.list.length;
     for (const f of L.furn) {
       if (!f.loot || f.secretLoot) continue;
-      if (f.lock && rnd() < .5) continue; // the crew skips half the locked stuff
-      for (const k of D.rollLoot(f.loot, rnd)) if (rnd() < .4) got.push(k);
+      if (f.lock && rnd() < skip) continue; // the crew skips some of the locked stuff (scavengers fewer)
+      for (const k of D.rollLoot(f.loot, rnd)) if (rnd() < share) got.push(k);
     }
+    DM.Crew.onTask('scavenger', 2);
     const stacks = D.toStacks(got, rnd), lost = [];
-    for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } const n = addTo(SV.survivor.stash, STASH_SLOTS, e.k, e.n, e.d); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k); }
+    for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, STASH_SLOTS, e.k, e.n, e.d); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k); }
     h.status = 'auto'; SV.stats.auto++;
     SV.survivor.xp += 3;
     Game.save();
-    showResult(L.name + ' · ' + L.address, stacks, lost, 'Everything went to your stash. The crew grabs less than you would and never finds hidden compartments.');
+    showResult(L.name + ' · ' + L.address, stacks, lost, `Everything went to your stash. ${n ? `Your crew of ${n} brought back about ${Math.round(share * 100)}% of what was there` : `With no crew yet, a couple of neighbours helped: about ${Math.round(share * 100)}% of what was there`} - and never the hidden compartments.`);
     renderHome();
   }
 
@@ -239,7 +253,8 @@ const NEXT_VERSION = '0.6';
     }
     SV.stats.runs++; Game.save();
     hideMenu();
-    DM.House.start(L, {
+    const hide = DM.Crew.forHouse(h, L);   // phase 5b: a survivor hiding in a closet, a stray under the furniture (rare)
+    DM.House.start(L, DM.Crew.wrap({
       hint: h.type === 'tutorial' ? 'Joystick to move  ·  SEARCH near furniture' : `${L.name} · ${L.address}`,
       onExit: res => {
         h.status = q && !q.done ? 'new' : 'looted'; if (h.type === 'tutorial') SV.tutorialDone = true;
@@ -249,27 +264,36 @@ const NEXT_VERSION = '0.6';
         Game.save(); publish(); showMenu(); tab('houses'); renderHome();
         toast(res.kind === 'down' ? 'You made it home. Barely.' : `Home safe from ${res.address}`, 2.4);
       },
-    });
+    }, 'house', { hide }));
   }
+  // after a boss fight (boss.js)
+  Game.hideMenu = () => hideMenu();
+  Game.afterRun = function (res) {
+    SV.stats.kills += Math.max(0, res.kills - (res.boss ? 1 : 0)); if (res.kind === 'down') SV.stats.downs++;
+    Game.save(); publish(); showMenu(); renderHome();
+  };
 
   // ---------------------------------------------------------------- trader: Auntie Dot, quests, shop, crafting
   const traderLevel = () => Math.min(5, 1 + Math.floor((SV.trader.completed || 0) / 20));
   const questById = id => SV.trader.active.find(q => q.id === id) || null;
-  const countItem = k => SV.survivor.pack.concat(SV.survivor.stash).filter(e => e.k === k).reduce((a, e) => a + e.n, 0);
+  const countItem = k => SV.survivor.pack.concat(SV.survivor.stash).filter(e => e.k === k).reduce((a, e) => a + e.n, 0) + (k === 'arrow' && SV.survivor.quiver ? SV.survivor.quiver.n : 0);
   function takeItems(k, n) { // stash first, then pack; returns removed entries (weapons keep durability)
     const out = [];
     for (const list of [SV.survivor.stash, SV.survivor.pack]) for (let i = list.length - 1; i >= 0 && n > 0; i--) if (list[i].k === k) { const t = Math.min(n, list[i].n); list[i].n -= t; n -= t; out.push({ k, n: t, d: list[i].d }); if (!list[i].n) list.splice(i, 1); }
+    if (k === 'arrow' && n > 0 && SV.survivor.quiver) { const t = Math.min(n, SV.survivor.quiver.n); SV.survivor.quiver.n -= t; if (t) out.push({ k, n: t }); }
     return out;
   }
   function give(k, n, d) { // into the pack if it fits, the rest to the stash; returns what did not fit anywhere
     if (D.ITEMS[k] && D.ITEMS[k].cos) { Game.unlockCos(k); return 0; }
+    if (k === 'arrow') { n -= toQuiver(n); if (!n) return 0; }   // arrows: the quiver first
     let got = addTo(SV.survivor.pack, packSlots(), k, n, d); if (got < n) got += addTo(SV.survivor.stash, STASH_SLOTS, k, n - got, d);
     return n - got;
   }
   function canGive(items, remove = []) { // dry run of give() on copies: does everything fit in pack + stash?
     const pk = SV.survivor.pack.map(e => Object.assign({}, e)), st = SV.survivor.stash.map(e => Object.assign({}, e));
     for (let [k, n] of remove) for (const list of [st, pk]) for (let i = list.length - 1; i >= 0 && n > 0; i--) if (list[i].k === k) { const t = Math.min(n, list[i].n); list[i].n -= t; n -= t; if (!list[i].n) list.splice(i, 1); }
-    for (const [k, n] of items) { let got = addTo(pk, packSlots(), k, n, D.isWeapon(k) ? 1 : undefined); if (got < n) got += addTo(st, STASH_SLOTS, k, n - got, D.isWeapon(k) ? 1 : undefined); if (got < n) return false; }
+    let qroom = Math.max(0, D.QUIVER - ((SV.survivor.quiver || {}).n || 0));
+    for (let [k, n] of items) { if (k === 'arrow') { const t = Math.min(n, qroom); qroom -= t; n -= t; if (!n) continue; } let got = addTo(pk, packSlots(), k, n, D.isWeapon(k) ? 1 : undefined); if (got < n) got += addTo(st, STASH_SLOTS, k, n - got, D.isWeapon(k) ? 1 : undefined); if (got < n) return false; }
     return true;
   }
   Game.canGive = canGive;
@@ -336,7 +360,7 @@ const NEXT_VERSION = '0.6';
   function bump(type, n = 1) {
     for (const q of SV.trader.active) if (q.type === type && !q.done) { q.have = Math.min(q.need, q.have + n); if (q.have >= q.need) questDone(q); }
   }
-  Game.onKill = z => { if (!SV || !SV.trader) return; if (EVS.isBoss(z)) { evKill(z.kind); return; } bump('hunt'); };
+  Game.onKill = z => { if (!SV || !SV.trader || z.kind === 'wboss') return; if (EVS.isBoss(z)) { evKill(z.kind); return; } bump('hunt'); };
   Game.onSecret = () => { if (SV && SV.trader) bump('secrets'); };
   function checkFetch() { for (const q of SV.trader.active) if (q.type === 'fetch' && !q.done && countItem('parcel')) questDone(q); }
   const supplyReady = q => q.type === 'supply' && countItem(q.item) >= q.need;
@@ -530,23 +554,76 @@ const NEXT_VERSION = '0.6';
     const lost = give(k, n, d);
     SV.survivor.xp += 2; Game.save(); SFX.play('open');
     toast(lost ? `Crafted ${D.ITEMS[k].n} - no room for ${lost}` : `Crafted ${D.ITEMS[k].n}${n > 1 ? ' x' + n : ''}`, 1.8);
+    if (!benchHost) benchSel = null;
     reHost();
   }
   let benchHost = null, stashHost = null;   // set while the base shows the workbench / stash chest
-  Game.benchPanel = el => { benchHost = el; stashHost = null; renderBench(); };
+  Game.benchPanel = el => { benchHost = el; stashHost = null; benchSel = null; renderBench(); };
   Game.stashPanel = el => { stashHost = el; benchHost = null; sel = null; renderStash(); };
   const reHost = () => { if (benchHost && document.body.contains(benchHost)) renderBench(); else if (stashHost && document.body.contains(stashHost)) renderStash(); else { benchHost = stashHost = null; renderHome(); } };
+  // where a material turns up: the loot tables that carry it most, Dot's shelf, or the bench itself
+  const PLACE = { fridge: 'fridges', cooler: 'coolers', cabinet: 'kitchen cabinets', kdrawers: 'kitchen drawers', pantry: 'pantries', trash: 'garbage bins', island: 'kitchen islands', vanity: 'bathroom vanities',
+    medcab: 'medicine cabinets', shelves: 'utility shelves', toolbox: 'toolboxes', crate: 'hidden stashes', books: 'bookshelves', night: 'nightstands', wardrobe: 'closets', dresser: 'dressers', desk: 'desks',
+    tv: 'TV stands', coat: 'coat closets', hall: 'hall tables', hutch: 'hutches', side: 'side tables', corpse: 'zombies', safe: 'gun safes', cache: 'hidden caches', attic: 'attics', wallcache: 'wall caches',
+    store: 'store shelves', register: 'registers', storage: 'storage rooms', pharm: 'pharmacy shelves', pharmstore: 'pharmacies', cage: 'pharmacy cages', locker: 'police lockers', evidence: 'evidence rooms',
+    armory: 'armories', filing: 'filing cabinets', gym: 'gym lockers', nurse: "nurse's offices", workbench: 'garage workbenches', garage: 'garages', washer: 'washers', wine: 'wine racks', cellar: 'cellars' };
+  function whereFrom(k) {
+    const sc = [];
+    for (const t in D.LOOT) { if (!PLACE[t]) continue; const tab = D.LOOT[t][1], w = tab[k] || 0; if (!w) continue; const tot = Object.values(tab).reduce((a, b) => a + b, 0); sc.push([PLACE[t], w / tot + (D.LOOT[t][2] && D.LOOT[t][2].includes(k) ? .5 : 0)]); }
+    const out = sc.sort((a, b) => b[1] - a[1]).map(x => x[0]).filter((x, i, a) => a.indexOf(x) === i).slice(0, 3);
+    if (D.SHOP.some(r => r[0] === k)) out.push("Dot's shop");
+    if (Object.values(D.RECIPES).some(r => r.out[0] === k)) out.push('craft it here');
+    if (D.ITEMS[k] && D.ITEMS[k].seed !== undefined) out.push('garden harvests');
+    return out.length ? out.join(', ') : 'rare: keep looking';
+  }
+  function whatItDoes(k) {
+    const it = D.ITEMS[k]; if (!it) return '';
+    if (it.w) { const W = D.WEAPONS[it.w]; return W.ranged ? `Ranged weapon · ${W.dmg} damage · lasts ${W.dur} shots · needs arrows` : `Melee weapon · ${W.dmg} damage · reach ${W.reach} · lasts ${W.dur} hits · ${W.noise >= 4 ? 'loud' : W.noise >= 3 ? 'a bit loud' : 'quiet'}`; }
+    if (it.slots) return `Fit it to your pack: +${it.slots} pack slots for good`;
+    if (it.hp || it.sta) return [it.hp ? `heals ${it.hp} HP` : '', it.sta ? `+${it.sta} stamina` : ''].filter(Boolean).join(' · ').replace(/^./, c => c.toUpperCase());
+    return { lockpick: 'Opens locks silently with the lockpick mini-game. Snaps if you force it.', arrow: 'Ammo for the hunting bow. You can pick most of them back up.', shoes: 'Wear them: your footsteps make 30% less noise.',
+      lockset: 'Keep it in your kit: locks feel easier (wider sweet spot, picks last longer).', prybar: 'A quiet way to pry things open; also a weapon.' }[k] || '';
+  }
+  let benchSel = null;
+  function benchRows(keys, known) {
+    return keys.map(k => {
+      const r = D.RECIPES[k], ok = known && canCraft(r), out = r.out[0];
+      return `<div class="recipe tap${ok ? '' : ' no'}${known ? '' : ' locked'}" data-rec="${k}"><div class="rout">${icon(out)}${r.out[1] > 1 ? `<em>x${r.out[1]}</em>` : ''}</div>
+        <div class="rinfo"><b>${r.n}</b>${known ? '' : '<div class="bpneed">Blueprint needed - Dot trades them</div>'}<div class="rin">${Object.keys(r.in).map(m => { const have = countItem(m); return `<span class="${have >= r.in[m] ? 'ok' : 'miss'}">${icon(m)}<i>${D.ITEMS[m].n}</i> ${have}/${r.in[m]}</span>`; }).join('')}</div></div>
+        ${known ? `<button class="mbtn sm${ok ? '' : ' ghost'}" data-craft="${k}"${ok ? '' : ' disabled'}>Craft</button>` : '<span class="rlock">?</span>'}</div>`;
+    }).join('');
+  }
   function renderBench() {
     if (benchHost && !document.body.contains(benchHost)) benchHost = null;
     const s = SV.survivor, el = benchHost || $('#mpane');
-    const unknown = Object.keys(D.RECIPES).filter(k => !s.known.includes(k)).length;
-    el.innerHTML = `<div class="kick sect">Workbench · ${s.known.length} recipe${s.known.length === 1 ? '' : 's'} known</div>` + s.known.map(k => {
-      const r = D.RECIPES[k], ok = canCraft(r), out = r.out[0];
-      return `<div class="recipe${ok ? '' : ' no'}"><div class="rout">${icon(out)}${r.out[1] > 1 ? `<em>x${r.out[1]}</em>` : ''}</div>
-        <div class="rinfo"><b>${r.n}</b><div class="rin">${Object.keys(r.in).map(m => { const have = countItem(m); return `<span class="${have >= r.in[m] ? 'ok' : 'miss'}">${icon(m)}${D.ITEMS[m] ? D.ITEMS[m].n : m} ${have}/${r.in[m]}</span>`; }).join('')}</div></div>
-        <button class="mbtn sm${ok ? '' : ' ghost'}" data-craft="${k}"${ok ? '' : ' disabled'}>Craft</button></div>`;
-    }).join('') + `<div class="empty">${unknown ? `${unknown} more blueprint${unknown > 1 ? 's' : ''} out there - Dot trades them, and some turn up in hidden stashes.` : 'You know every blueprint so far.'}<br>Materials come from the stash and the pack.</div>`;
-    el.querySelectorAll('[data-craft]').forEach(b => b.onclick = () => craft(b.dataset.craft));
+    if (benchHost && benchSel) { el.innerHTML = benchDetailHTML(benchSel); bindDetail(el); return; }
+    const unknown = Object.keys(D.RECIPES).filter(k => !s.known.includes(k));
+    el.innerHTML = `<div class="kick sect">Workbench · ${s.known.length} recipe${s.known.length === 1 ? '' : 's'} known</div><div class="benchhint">Tap a recipe to see what it does and where to find each material.</div>` + benchRows(s.known, true)
+      + (unknown.length ? `<div class="kick sect">Not learned yet · ${unknown.length}</div>` + benchRows(unknown, false) : '')
+      + `<div class="empty">${unknown.length ? 'Blueprints: Dot trades them, and some turn up in hidden stashes and safes.' : 'You know every blueprint so far.'}<br>Materials come from the stash and the pack.</div>`;
+    el.querySelectorAll('[data-craft]').forEach(b => b.onclick = e => { e.stopPropagation(); craft(b.dataset.craft); });
+    el.querySelectorAll('[data-rec]').forEach(b => b.onclick = () => { SFX.play('ui'); openRecipe(b.dataset.rec); });
+  }
+  function benchDetailHTML(k) {
+    const r = D.RECIPES[k], known = SV.survivor.known.includes(k), out = r.out[0], it = D.ITEMS[out], miss = Object.keys(r.in).filter(m => countItem(m) < r.in[m]);
+    return `<div class="recdet"><div class="kick">Workbench${known ? '' : ' · not learned'}</div>
+      <div class="rdhead"><div class="rdicon">${icon(out)}${r.out[1] > 1 ? `<em>x${r.out[1]}</em>` : ''}</div><div><h3>${esc(r.n.replace(/ \(.*\)/, ''))}</h3><p class="mp">${esc(whatItDoes(out) || it.n)}</p></div></div>
+      <div class="kick sect">Materials</div>
+      ${Object.keys(r.in).map(m => { const have = countItem(m), ok = have >= r.in[m]; return `<div class="rdmat ${ok ? 'ok' : 'miss'}">${icon(m)}<div><b>${D.ITEMS[m].n}</b><span>${esc(whereFrom(m))}</span></div><em>${have}/${r.in[m]}</em></div>`; }).join('')}
+      ${known ? (miss.length ? `<button class="mbtn big" disabled>Missing: ${miss.map(m => D.ITEMS[m].n.toLowerCase()).join(', ')}</button>` : `<button class="mbtn big" id="rdCraft">Craft ${esc(it.n)}${r.out[1] > 1 ? ' x' + r.out[1] : ''}</button>`)
+        : '<button class="mbtn big" disabled>Blueprint needed - Dot trades them</button>'}
+      <button class="mbtn big ghost" id="rdBack">${benchHost ? 'Back to the bench' : 'Close'}</button></div>`;
+  }
+  function bindDetail(el) {
+    const k = benchSel;
+    if ($('#rdCraft')) $('#rdCraft').onclick = () => { craft(k); if (!benchHost) openRecipe(k); };
+    $('#rdBack').onclick = () => { SFX.play('ui'); benchSel = null; if (benchHost) renderBench(); else sheetClose(); };
+  }
+  function openRecipe(k) {
+    benchSel = k;
+    if (benchHost) { renderBench(); return; }
+    sheetOpen(benchDetailHTML(k)); bindDetail($('#msheet'));
+    const sh = $('#msheet'); sh.onclick = e => { if (e.target === sh) { benchSel = null; sheetClose(); } };
   }
 
   // ---- trader screen
@@ -849,7 +926,7 @@ const NEXT_VERSION = '0.6';
         ${IS_IOS && window.NET && NET.ok ? '<button class="mbtn sm" id="mSyncNow" style="width:100%;margin:8px 0 2px">Sync my steps now</button>' : ''}
         ${window.SYNC ? (window.NET && NET.ok && !d.phone && new Date().getHours() >= 14 ? '<button class="synclink nudge" id="mSyncG" data-m="fix">No phone steps yet today? Fix step sync</button>' : '<button class="synclink" id="mSyncG">How to sync steps</button>') : ''}
       </div>
-      ${SV.tutorialDone || SV.stats.runs ? baseCards() : ''}
+      ${SV.tutorialDone || SV.stats.runs ? baseCards() + DM.Boss.cardHTML() + DM.Crew.cardHTML() : ''}
       <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Pack &amp; stash${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button></div>
       <div id="mpane"></div>`;
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { SFX.play('ui'); tab(b.dataset.t); }; });
@@ -861,6 +938,7 @@ const NEXT_VERSION = '0.6';
     };
     $('#mnet').onclick = openAccount;
     bindBaseCards();
+    DM.Boss.bind($('#mbody')); DM.Crew.bindCard(() => renderHome());
     if ($('#evBan')) $('#evBan').onclick = () => { SFX.play('ui'); openEvent(); };
     // iPhone: run the player's own "Dead Miles Steps" Shortcut and come straight back here
     // (x-callback-url), so a manual sync is one tap instead of a trip to the Shortcuts app.
@@ -891,7 +969,8 @@ const NEXT_VERSION = '0.6';
       <div class="hmeta"><span>Level ${traderLevel()} · ${T.active.length}/2 jobs${ready ? ` · <b class="hot">${ready} ready to turn in</b>` : ''}</span></div>
       <div class="hdays">Safe zone · ${icon('caps')} ${T.caps} caps</div></div><div class="hbtns"><button class="mbtn" id="hTrader">Visit</button></div></div>` : '';
     if (!list.length) { el.innerHTML = traderCard + `<div class="empty big">No houses scouted yet.<br>Walk - every ~1,000 steps turns up another door.</div>`; if ($('#hTrader')) $('#hTrader').onclick = openTrader; return; }
-    el.innerHTML = traderCard + list.map(h => {
+    const bossCard = SV.tutorialDone ? DM.Boss.cardHTML(true) : '';
+    el.innerHTML = traderCard + bossCard + list.map(h => {
       const T = D.BTYPES[h.type], left = 3 - (dayNum(SV.day.key) - dayNum(h.day)), done = h.status !== 'new' && h.status !== 'far';
       const q = h.quest && questById(h.quest), far = h.status === 'far';
       const tags = [h.nLocks ? `${h.nLocks} lock${h.nLocks > 1 ? 's' : ''}` : 'no locks', `${h.nZombies} zombie${h.nZombies === 1 ? '' : 's'}`];
@@ -908,6 +987,7 @@ const NEXT_VERSION = '0.6';
     }).join('');
     const find = id => id === 'tutorial' ? { id: 'tutorial', type: 'tutorial', seed: 0, status: 'new' } : SV.houses.find(h => h.id === id);
     if ($('#hTrader')) $('#hTrader').onclick = () => { SFX.play('ui'); openTrader(); };
+    DM.Boss.bind(el);
     el.querySelectorAll('[data-loot]').forEach(b => b.onclick = () => { SFX.play('ui'); loot(find(b.dataset.loot)); });
     el.querySelectorAll('[data-auto]').forEach(b => b.onclick = () => { SFX.play('ui'); autoSearch(find(b.dataset.auto)); });
   }
@@ -994,7 +1074,7 @@ const NEXT_VERSION = '0.6';
       if (r.hold && r.shifted) { const stacks = D.toStacks(D.rollLoot(sp.crate && D.LOOT[sp.crate] ? sp.crate : 'hordecrate', rnd), rnd); for (const e of stacks) { const left = give(e.k, e.n, e.d); if (left < e.n) r.crate.push({ k: e.k, n: e.n - left }); if (left) r.lost.push({ k: e.k, n: left }); } SV.trader.caps += 10 + (sp.caps || 0); }
       if (!r.hold) r.dmg = BS.hordeDamage(rnd);
       r.at = Date.now(); r.code = code; delete r.members;
-      st.resolved[pv.week] = r; Game.save(); renderHome();
+      st.resolved[pv.week] = r; DM.Crew.onTask('guard', 3); Game.save(); renderHome();
       toast(r.hold ? 'Horde night is over - your base held' : 'Horde night is over - the horde got in', 2.6);
     } catch (e) { console.warn('horde', e); } finally { resolving = false; }
   }
@@ -1018,10 +1098,11 @@ const NEXT_VERSION = '0.6';
       <div class="kick sect">Equipped</div>
       <div class="eqrow">
         <button class="eqslot${sel && sel.from === 'hands' ? ' sel' : ''}" ${h ? 'data-from="hands" data-i="0"' : 'id="eqFists"'}><i class="eqk">Weapon · hand</i>${h ? icon(h.k) : '<span class="eqnone">✊</span>'}<b>${h ? esc(hw.n) : 'Fists'}</b><span>${hd} dmg${h && h.d != null ? ` · ${Math.round(h.d / D.WEAPONS[hw.w].dur * 100)}%` : ''}</span>${h && h.d != null ? `<i class="dur"><i style="width:${Math.max(4, h.d / D.WEAPONS[hw.w].dur * 100)}%"></i></i>` : ''}</button>
+        <button class="eqslot quiv${sel && sel.from === 'quiver' ? ' sel' : ''}" data-from="quiver" data-i="0"><i class="eqk">Quiver</i>${(s.quiver || {}).n ? icon('arrow') : `<img class="dim" alt="" src="${ART.iconURL.arrow}">`}<b>${(s.quiver || {}).n || 0} arrow${(s.quiver || {}).n === 1 ? '' : 's'}</b><span>max ${D.QUIVER} · no pack slot</span></button>
         <div class="eqslot"><i class="eqk">Backpack</i>${s.packBonus ? icon(s.packBonus >= 4 ? 'backpack' : 'packplus') : `<img class="dim" alt="" src="${ART.iconURL.backpack}">`}<b>${packSlots()} slots</b><span>${s.packBonus ? `+${s.packBonus} from upgrades` : 'No upgrade yet'}</span></div>
         <button class="eqslot cos" id="eqWard"><i class="eqk">Cosmetics</i><span class="eqcos">${worn.length ? worn.slice(0, 4).map(c => `<img alt="" src="${ART.iconURL['cos_' + c]}">`).join('') : '<img alt="" src="' + ART.iconURL.cosS_beanie + '">'}</span><b>Wardrobe →</b><span>${worn.length ? worn.length + ' worn' : 'Nothing worn'}${newCos() ? ` · <em class="newtxt">${newCos()} new</em>` : ''}</span></button>
       </div>
-      ${gear.length ? `<div class="eqgear">Also wearing: ${gear.join(' · ')}</div>` : ''}${A('hands')}
+      ${gear.length ? `<div class="eqgear">Also wearing: ${gear.join(' · ')}</div>` : ''}${A('hands')}${A('quiver')}
       <div class="kick sect">Backpack · ${s.pack.length}/${packSlots()}</div>
       <div class="grid g4">${s.pack.map((e, i) => slot(e, 'pack', i)).join('')}${empty(packSlots() - s.pack.length)}</div>
       ${s.pack.length && !sel ? '<button class="mbtn sm" id="sAll" style="margin-top:8px;width:100%">Stash all</button>' : ''}${A('pack')}
@@ -1031,16 +1112,24 @@ const NEXT_VERSION = '0.6';
     if (el.querySelector('#eqFists')) el.querySelector('#eqFists').onclick = () => toast(s.pack.concat(s.stash).some(e => D.isWeapon(e.k)) ? 'Tap a weapon below, then Equip' : 'No weapon yet - they turn up in kitchens, garages and lockers', 2);
     el.querySelectorAll('[data-from]').forEach(b => b.onclick = () => { const f = b.dataset.from, i = +b.dataset.i; sel = sel && sel.from === f && sel.i === i ? null : { from: f, i }; SFX.play('ui'); renderStash(); });
     if (el.querySelector('#sAll')) el.querySelector('#sAll').onclick = () => {
-      // Arrows stay with you: hunters were stashing them with everything else and having to fetch them back.
-      const keep = k => k === 'arrow';
-      for (let i = s.pack.length - 1; i >= 0; i--) { const e = s.pack[i]; if (keep(e.k)) continue; const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d); e.n -= n; if (!e.n) s.pack.splice(i, 1); }
-      const left = s.pack.filter(e => !keep(e.k)).length;
-      SFX.play('ui'); Game.save(); renderStash(); toast(left ? 'Stash is full - some things stayed in your pack' : s.pack.length ? 'Stashed everything - kept your arrows' : 'Everything is in the stash', 1.8);
+      for (let i = s.pack.length - 1; i >= 0; i--) { const e = s.pack[i]; const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d); e.n -= n; if (!e.n) s.pack.splice(i, 1); }
+      SFX.play('ui'); Game.save(); renderStash(); toast(s.pack.length ? 'Stash is full - some things stayed in your pack' : 'Everything is in the stash', 1.8);
     };
     if (sel) stashActions();
   }
+  // the quiver: fill it from the stash/pack, or put its arrows away in the stash
+  function quiverActions(s, acts) {
+    const q = s.quiver = s.quiver || { n: 0 }, spare = s.pack.concat(s.stash).filter(e => e.k === 'arrow').reduce((a, e) => a + e.n, 0);
+    const done = msg => { sel = null; Game.save(); reHost(); if (msg) toast(msg, 1.6); };
+    acts.innerHTML = `<div class="sact"><span><b>Quiver</b> ${q.n}/${D.QUIVER} <em>arrows here never use a pack slot and never spill when you go down</em></span></div>`;
+    const row = acts.firstChild, add = (t, fn, ghost) => { const b = document.createElement('button'); b.className = 'mbtn sm' + (ghost ? ' ghost' : ''); b.textContent = t; b.onclick = () => { SFX.play('pick'); fn(); }; row.appendChild(b); };
+    if (spare && q.n < D.QUIVER) add(`Fill from stash/pack (${Math.min(spare, D.QUIVER - q.n)})`, () => { const want = Math.min(spare, D.QUIVER - q.n); let need = want; for (const list of [s.pack, s.stash]) for (let i = list.length - 1; i >= 0 && need; i--) if (list[i].k === 'arrow') { const t = Math.min(need, list[i].n); list[i].n -= t; need -= t; if (!list[i].n) list.splice(i, 1); } q.n += want; done(`Quiver: ${q.n} arrows`); });
+    if (q.n) add('Put in stash', () => { const n = addTo(s.stash, STASH_SLOTS, 'arrow', q.n); if (!n) return toast('Stash is full', 1.4); q.n -= n; done(`${n} arrows to the stash`); }, !!spare);
+    if (!q.n && !spare) add('No arrows yet', () => toast('Arrows: Dot\'s shop, gym lockers, or craft them with the arrow blueprint', 2.2), true);
+  }
   function stashActions() {
     const s = SV.survivor, acts = (stashHost || $('#mpane')).querySelector('#sacts');
+    if (sel.from === 'quiver') { quiverActions(s, acts); return; }
     const e = sel.from === 'hands' ? { k: s.hands.k, n: 1, d: s.hands.d } : s[sel.from][sel.i];
     if (!e) { sel = null; return; }
     const it = D.ITEMS[e.k], btns = [];
@@ -1116,6 +1205,10 @@ const NEXT_VERSION = '0.6';
     ['Base & farming', 'Your base is built with steps (the same steps also scout houses). Build walls, a gate, traps and garden beds; decorate with furniture you find. Plant seeds, water them with steps each day, and harvest real food. The stash chest lives here.'],
     ['Horde night', 'Every Sunday 9 PM New York time a horde hits. In the 24 hours before, do a watch shift (a 2-3 minute defence) - every kill thins the horde for your whole party. Strong bases hold and pay out a crate; weak ones lose something you repair with steps. Skip the shift and you get nothing.'],
     ['Seasonal events', 'Holidays switch on by themselves: Thanksgiving (the week around it) and Christmas (Dec 18 - Jan 2). Events bring holiday loot, a mini-boss in about 1 in 3 houses, a chain of event jobs from Dot, and once-a-year cosmetics. Thanksgiving also has the Black Friday horde: a bigger Sunday horde with better crates.'],
+    ['Workbench & crafting', 'Workbench (home tab, or at the base) lists every recipe you know with each material, what you have and what you need. Tap a recipe to see what it does, every material in full with where to find it, and a big Craft button. Materials come from the stash and the pack. New recipes come from blueprints: Dot trades them, and some turn up in hidden stashes and safes.'],
+    ['Crew', 'About 1 house in 25 has a survivor hiding in a closet or a secret room (more in mansions and police stations). Talk to them: with a free bunk they move into your base (2 bunks, build up to 4). Each has a role - Scavenger (crew searches bring back more), Guard (horde-night defence), Medic (heals you each morning), Gardener (waters a plant a day), Tinkerer (cheaper repairs) - and levels up slowly. Each eats 1 food a day from your STASH; three hungry days and they leave a note (they never take anything). The more crew you have, the more a Crew search brings back.'],
+    ['Strays', 'Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Move slowly near them (a small push on the joystick) until they trust you, then tap to coax them out - or offer food from your pack. One pet comes along on runs and at the base; up to 4 live with you. Dogs bark when a zombie spots you and sometimes sniff out a container with something good; cats make you quieter and bring little presents some mornings. Pets level from your steps. They never die: a zombie scare sends them running home, back the next day.'],
+    ['Weekly boss', 'Every week (Monday to Sunday, New York time) a named boss holes up in a special house on everyone\'s list. Walk 5,000 steps that week to reach it, then fight it up to 2 times a day (90 seconds each). Red markers on the floor show where the next attack lands: a charge line, a slam ring, walkers being called. Its health is shared by your whole party for the whole week; when it falls, everyone who hit it gets a good item, caps and a chance at a boss cosmetic. Going down in a boss fight costs you nothing but the fight.'],
     ['Trader', 'Auntie Dot (top of the Houses list) is a safe zone. Take up to 2 jobs from her board, turn them in for caps and a reward you choose. Every 20 jobs raises her trader level: harder jobs, better stock, more cosmetics. Sell her spare loot.'],
   ];
   function openHowTo() {
@@ -1137,7 +1230,8 @@ const NEXT_VERSION = '0.6';
       <button class="mbtn sm" data-d="caps">+100 caps</button><button class="mbtn sm" data-d="mats">+materials</button>
       <button class="mbtn sm" data-d="pool">+10,000 build steps</button><button class="mbtn sm" data-d="seeds">+seeds &amp; decor</button>
       <button class="mbtn sm" data-d="gday">Garden: +1 day</button><button class="mbtn sm" data-d="hwin">Horde: ${DM.Horde.devOffset ? 'real clock' : 'shift window'}</button>
-      <button class="mbtn sm" data-d="hres">Horde: resolve now</button><button class="mbtn sm" data-d="cos">+cosmetic</button><button class="mbtn sm" data-d="wpn">+machete (stash)</button><button class="mbtn sm ghost" data-d="reset">Reset save</button></div>
+      <button class="mbtn sm" data-d="hres">Horde: resolve now</button><button class="mbtn sm" data-d="cos">+cosmetic</button><button class="mbtn sm" data-d="wpn">+machete (stash)</button><button class="mbtn sm" data-d="crew">+crew member</button><button class="mbtn sm" data-d="pet">+stray</button>
+      <button class="mbtn sm" data-d="hide">Next house: survivor + stray</button><button class="mbtn sm" data-d="boss">Boss: steps + fights</button><button class="mbtn sm" data-d="bhurt">Boss: -4,000 HP</button><button class="mbtn sm ghost" data-d="reset">Reset save</button></div>
       <div class="kick sect">Event (reloads) · now: ${EVA ? esc(EVA.ev.name) + (EVA.forced ? ' (forced)' : '') : 'none'}</div>
       <div class="chips devev">${['auto', ...EVS.ORDER, 'none'].map(v => `<button class="chip${EVS.dev.choice() === v ? ' on' : ''}" data-ev="${v}">${v === 'auto' ? 'Auto (calendar)' : v === 'none' ? 'None' : esc(EVS.get(v).name)}</button>`).join('')}</div>
       <div class="btnrow"><button class="mbtn sm ghost" id="mClose">Close</button></div>`);
@@ -1161,6 +1255,11 @@ const NEXT_VERSION = '0.6';
       if (k === 'hres') { const H = DM.Horde, n = H.next(); H.devOffset = (H.devOffset || 0) + (n.at - H.now()) + 60e3; renderHome(); resolveHorde(); }
       if (k === 'cos') { const left = Object.keys(D.COS).filter(c => !SV.survivor.wardrobe.own[c]); if (left.length) { sheetClose(); Game.unlockCos(left[Math.floor(Math.random() * left.length)]); return; } toast('You have them all', 1.2); }
       if (k === 'wpn') { addTo(SV.survivor.stash, STASH_SLOTS, 'machete', 1, 50); Game.onWeaponLoot('machete'); Game.save(); sheetClose(); renderHome(); return; }
+      if (k === 'crew') { const m = DM.Crew.dev.addCrew(); Game.save(); toast(`${m.name} joined (${DM.Crew.ROLES[m.role].n})`, 1.6); }
+      if (k === 'pet') { const pt = DM.Crew.dev.addPet(Math.random() < .5 ? 'dog' : 'cat', Math.floor(Math.random() * 4)); Game.save(); toast(`${pt.name} the ${pt.kind} joined`, 1.6); }
+      if (k === 'hide') { DM.Crew.forceNpc = DM.Crew.forceStray = !DM.Crew.forceNpc; toast(DM.Crew.forceNpc ? 'Every house: a survivor + a stray' : 'Back to normal odds', 1.6); }
+      if (k === 'boss') { DM.Boss.dev.steps(); DM.Boss.dev.fights(); renderHome(); }
+      if (k === 'bhurt') { DM.Boss.dev.hurt(4000); renderHome(); }
       if (k === 'gift') { for (const [m, n] of [['gift', 3], ['turkey', 1], ['pie', 3], ['cranberry', 3], ['stuffing', 3]]) addTo(SV.survivor.stash, STASH_SLOTS, m, n); Game.save(); renderHome(); }
       if (k === 'reset') { if (b.dataset.sure) { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } SV = migrate(fresh()); DM.S = null; sheetClose(); boot2(); return; } b.dataset.sure = 1; b.textContent = 'Tap again to wipe'; return; }
       openDev();
@@ -1234,6 +1333,7 @@ const NEXT_VERSION = '0.6';
     N.onSteps = onNetSteps;   // set only after the save is settled: steps wait in the ledger until then
     try { if (N.ok) await withTimeout(N.partyGet(), 6000); } catch (e) { /* offline */ }
     resolveHorde().then(() => DM.Horde.flush(SV.horde)).then(() => { Game.save(); renderHome(); }).catch(() => { });
+    DM.Boss.sync().then(() => { if (!DM.scene) renderHome(); }).catch(() => { });
     publish();
     updateSync();
   }
@@ -1257,6 +1357,7 @@ const NEXT_VERSION = '0.6';
   }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && SV) { checkVersion(); resolveHorde(); } });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && SV) { Game.save(); try { window.NET && NET.flush(); } catch (e) { /* ignore */ } } });
+  let bossTick = 0;
   Game.boot = async function () {
     SV = load(); DM.S = SV.survivor;
     await E.start();
@@ -1264,7 +1365,7 @@ const NEXT_VERSION = '0.6';
     boot2();
     $('#loading').remove();
     netStart();
-    setInterval(() => { if (SV.day.key !== today()) { rollDay(); Game.save(); renderHome(); } resolveHorde(); const c = document.getElementById('hCount'), n = DM.Horde.next(); if (c && n) c.textContent = (DM.Horde.windowOpen() ? 'Watch shift open · hits in ' : 'in ') + DM.Base.until(n.at); }, 60000);
+    setInterval(() => { if (SV.day.key !== today()) { rollDay(); Game.save(); renderHome(); } resolveHorde(); if (++bossTick % 3 === 0) DM.Boss.sync().then(() => { if (!DM.scene && !$('#msheet').classList.contains('on')) renderHome(); }).catch(() => { }); const c = document.getElementById('hCount'), n = DM.Horde.next(); if (c && n) c.textContent = (DM.Horde.windowOpen() ? 'Watch shift open · hits in ' : 'in ') + DM.Base.until(n.at); }, 60000);
     checkVersion();
     DM.ready = true;
   };
