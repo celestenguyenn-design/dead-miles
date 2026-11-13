@@ -64,6 +64,16 @@
       + 'Name the shortcut exactly: ' + SC_NAME;
   }
 
+  // The owner's ask: "the automated rundown so I can paste it into my iPhone's Shortcuts AI -
+  // do that option for all iPhone users." One prompt that builds the Shortcut AND its automations.
+  function fullSetupPrompt() {
+    return 'Do two things for me.\n\nPART 1 - Make a shortcut named exactly "' + SC_NAME + '". If a shortcut with that name already exists, '
+      + 'delete all of its actions first. ' + rebuildPrompt().replace(/^Rebuild this shortcut from scratch\. Keep its run times \(the "At" times at the top\) exactly as they are\. Delete every existing action, then add/, 'Then add')
+      + '\n\nPART 2 - Make it run by itself. Create four Personal Automations, each one:\n'
+      + '   Trigger: Time of Day, Daily\n   Times: 12:00 PM, 4:00 PM, 8:00 PM and 11:00 PM (one automation for each)\n'
+      + '   Action: Run Shortcut "' + SC_NAME + '"\n   Run Immediately: ON\n   Notify When Run: OFF';
+  }
+
   /* ---------------- CSS ---------------- */
   function css() {
     if (document.getElementById('sg-css')) return;
@@ -270,6 +280,9 @@
 
   function scrIphone() {
     let h = whoLine() + signInGate();
+    if (NET.ok && NET.stepKey) h += '<div class="note"><b>Fastest: let your iPhone build it.</b> Copy this, open the <b>Shortcuts</b> app, ask the <b>Shortcuts AI</b> (Apple Intelligence) to make a shortcut, and paste it in. Your personal code is already inside. Then run <b>' + SC_NAME + '</b> once, tap <b>Allow</b>, and check the <b>Automation</b> tab has four "' + SC_NAME + '" automations (if the AI could not make them, add them by hand: step 9 below).'
+      + '<textarea readonly id="sg-v-aisetup">' + esc((VALUES.aisetup = fullSetupPrompt())) + '</textarea>' + btn('copy:aisetup', 'Copy setup for Shortcuts AI', 'g') + msg('copy:aisetup')
+      + '<p class="help">No Shortcuts AI on your phone? Follow the steps below instead.</p></div>';
     h += '<div class="note"><b>Already had the Dead Miles Steps Shortcut from the old game?</b> Nothing to change. It keeps working here. Skip to <b>Test it</b> (step 8).</div>';
     h += step(1, 'Open the Shortcuts app', '<p>It is already on your iPhone (a blue and pink icon). Can\'t find it? Swipe down on the home screen and search <b>Shortcuts</b>. Deleted it? Get it free from the App Store.</p>');
     h += step(2, 'Make a new Shortcut', '<p>Tap <b>+</b> at the top right. Tap the name at the top and call it <b>' + SC_NAME + '</b>.</p>');
