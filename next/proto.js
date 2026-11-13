@@ -204,7 +204,7 @@
         hp: 100, sta: 100, staDelay: 0, st: 'free', stT: 0, inv: 0, ph: 0, stepAcc: 0, kbx: 0, kby: 0,
         swingQ: false, search: null, flash: 0, swingHit: false, downRot: 0,
       },
-      zs: [], furn: [], pack: [], drops: [], parts: [], rings: [], nums: [], decals: [], banners: [],
+      zs: [], furn: [], pack: [], poofs: [], dropOk: false, parts: [], rings: [], nums: [], decals: [], banners: [],
       fog: {}, visited: {}, room: 'o', noiseLvl: 0, cam: { x: 20.5 * T, y: 26 * T }, z3: false,
       stats: { searched: 0, kills: 0, start: performance.now() }, entered: false, lastNoise: null, field: null, fieldT: 0, fieldCell: -1,
       secretHint: 0, sheet: null,
@@ -563,7 +563,6 @@
       else if (f.loot0 && f.loot0.length) act = 'Open';
       if (act) out.push({ obj: f, act, rect: f.wall ? { x: f.x + 4, y: f.y + 20, w: f.w - 8, h: f.h - 20 } : furnRect(f), name: f.name, noise: f.noise });
     }
-    for (const d of G.drops) out.push({ obj: d, act: 'Pick up', rect: { x: d.x - 12, y: d.y - 8, w: 24, h: 14 }, name: ITEMS[d.k].n + (d.n > 1 ? ' x' + d.n : ''), drop: true });
     for (const z of G.zs) {
       if (!z.dead || z.rot === 0) continue;
       let act = !z.searched ? 'Search' : (z.loot0 && z.loot0.length ? 'Open' : null);
@@ -588,7 +587,6 @@
     const dx = cx - p.x, dy = cy - p.y, d = Math.hypot(dx, dy) || 1;
     p.fx = dx / d; p.fy = dy / d; if (Math.abs(dx) > 3) p.flip = dx < 0;
     if (it.act === 'Open') { openLoot(o, it); return; }
-    if (it.drop) { pickUp(o); return; }
     const dur = it.act === 'Push' ? 1.7 : (it.corpse ? 1.4 : o.time) * searchMul();
     p.st = 'search'; p.stT = 0; p.search = { it, t: 0, dur, nextNoise: .25, nextFx: 0 };
     if (it.act === 'Search' && (o.art === 'fridge' || o.art === 'wardrobe' || o.art === 'coat' || o.art === 'pantry')) SFX.play('open');
@@ -621,7 +619,6 @@
     for (const it of interactables()) {
       const o = it.obj; let bx;
       if (it.corpse) bx = { x: it.rect.x, y: it.rect.y - 34, w: it.rect.w, h: it.rect.h + 40 };
-      else if (it.drop) bx = { x: o.x - 16, y: o.y - 30, w: 32, h: 38 };
       else if (o.wall) bx = { x: o.x + 4, y: o.y + o.h - 60, w: o.w - 8, h: 60 };
       else { const g = ART.geo(o); bx = { x: o.x + (o.slide || 0) * T, y: g.ty0 - 8, w: o.w, h: g.fy1 - g.ty0 + 8 }; }
       if (rm(it) && G.fog[rm(it)] > .6) continue;
@@ -644,11 +641,10 @@
       G.tapMark = { x: wx, y: wy, t: 0 };
     }
   }
-  function rm(it) { return it.corpse || it.drop ? null : it.obj.room; }
+  function rm(it) { return it.corpse ? null : it.obj.room; }
   function goalCellFor(it) {
     const o = it.obj;
     if (it.corpse) return cellOf({ x: it.rect.x + it.rect.w / 2, y: o.y });
-    if (it.drop) return cellOf(o);
     const tx = o.tx + Math.round(o.slide || 0), cx = tx + Math.floor((o.tw - 1) / 2), cy = o.ty + Math.floor((o.th - 1) / 2);
     const cand = [[cx, o.ty + o.th], [cx + (o.tw > 1 ? 1 : 0), o.ty + o.th], [cx, o.ty - 1], [tx - 1, cy], [tx + o.tw, cy]];
     for (const [x, y] of cand) if (x >= 0 && y >= 0 && x < MW && y < MH && !solidCell[y * MW + x]) return [x, y];
@@ -987,6 +983,7 @@
     G.parts = G.parts.filter(q => q.life > 0);
     if (G.decals.length > 120) G.decals.splice(0, G.decals.length - 120);
     for (const r of G.rings) r.t += dt; G.rings = G.rings.filter(r => r.t < .9);
+    for (const q of G.poofs) q.t += dt; G.poofs = G.poofs.filter(q => q.t < .6);
     for (const n of G.nums) n.t += dt; G.nums = G.nums.filter(n => n.t < .9);
     for (const b of G.banners) b.t += dt; G.banners = G.banners.filter(b => b.t < 2.4);
     // secret shelf
@@ -1180,18 +1177,17 @@
     for (const w of wallCells) { if (w.key < vy0 || w.key - WH - T > vy1 || (w.x + 1) * T < vx0 || w.x * T > vx1) continue; list.push({ k: w.key, w }); }
     for (const d of doorLeaves) list.push({ k: d.key, d });
     for (const f of G.furn) { const k = f.wall ? f.y + f.h + .5 : f.y + f.h; if (k + 10 < vy0 || f.y - 120 > vy1) continue; list.push({ k, f }); }
-    for (const d of G.drops) list.push({ k: d.y - 2, dr: d });
     for (const z of G.zs) list.push({ k: z.st === 'sleep' || z.st === 'rise' && z.stT < .5 ? 22 * T + 1 : z.dead ? z.y - 14 : z.y, z });
     list.push({ k: p.y, pl: 1 });
     list.sort((a, b) => a.k - b.k);
     for (const it of list) {
       if (it.w) drawWall(it.w);
       else if (it.d) drawDoor(it.d);
-      else if (it.dr) drawDrop(it.dr);
       else if (it.f) { const f = it.f, cvs = furnCanvas(f); if (f.lootable && f.searched && !(f.loot0 && f.loot0.length) && !(f.secret && !G.secretOpen)) ctx.globalAlpha = .82; ctx.drawImage(cvs, f._b.x + (f.slide || 0) * T, f._b.y, f._b.w, f._b.h); ctx.globalAlpha = 1; if (f.art === 'crate' && !f.searched) ART.candle(ctx, f.x + f.w - 12, ART.geo(f).ty0 + 12, G.t); }
       else if (it.z) drawZombie(it.z);
       else drawPlayer();
     }
+    drawPoofs();
     // particles
     for (const q of G.parts) {
       const a = Math.min(1, q.life / q.max * 2);
@@ -1246,12 +1242,15 @@
   }
 
   const iconImg = {};
-  function drawDrop(d) {
-    const im = iconImg[ITEMS[d.k].i] || (iconImg[ITEMS[d.k].i] = Object.assign(new Image(), { src: ART.iconURL[ITEMS[d.k].i] }));
-    drawShadow(d.x, d.y + 1, 11, .45);
-    const bob = Math.sin(G.t * 3 + d.x) * 1.5;
-    if (im.complete) ctx.drawImage(im, d.x - 15, d.y - 26 + bob, 30, 30);
-    if (d.n > 1) { ctx.font = '900 10px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = P.INK; ctx.strokeText('x' + d.n, d.x + 12, d.y + 2); ctx.fillStyle = P.CRM; ctx.fillText('x' + d.n, d.x + 12, d.y + 2); }
+  // dropped items are gone for good: the icon puffs away at her feet
+  function drawPoofs() {
+    for (const q of G.poofs) {
+      const im = iconImg[ITEMS[q.k].i] || (iconImg[ITEMS[q.k].i] = Object.assign(new Image(), { src: ART.iconURL[ITEMS[q.k].i] }));
+      const k = q.t / .6, sc = 1 + k * .35;
+      ctx.globalAlpha = Math.max(0, 1 - k * k);
+      if (im.complete) ctx.drawImage(im, q.x - 15 * sc, q.y - 26 - k * 14 - 15 * (sc - 1), 30 * sc, 30 * sc);
+    }
+    ctx.globalAlpha = 1;
   }
   const DOORH = 50;
   function drawDoor(d) {
@@ -1463,10 +1462,9 @@
     for (const it of interactables()) {
       const o = it.obj, d = rectDist(p.x, p.y, it.rect);
       if (d > 3 * T) continue;
-      const rm = it.corpse || it.drop ? null : o.room; if (rm && G.fog[rm] > .6) continue;
+      const rm = it.corpse ? null : o.room; if (rm && G.fog[rm] > .6) continue;
       let mx, my;
-      if (it.drop) { mx = o.x; my = o.y - 40; }
-      else if (it.corpse) { mx = o.x + (o.fallDir || 1) * 34; my = o.y - 34; }
+      if (it.corpse) { mx = o.x + (o.fallDir || 1) * 34; my = o.y - 34; }
       else { const g = ART.geo(o); mx = o.x + o.w / 2 + (o.slide || 0) * T; my = (o.wall ? o.y + o.h - 62 : g.ty0) - 14; }
       const isT = tgt && tgt.obj === o;
       const bob = isT ? Math.sin(G.t * 6) * 2 : 0;
@@ -1637,12 +1635,6 @@
     if (o.loot0.length) { const left = o.loot0.reduce((a, e) => a + e.n, 0); toast(`Pack full - left ${left} item${left > 1 ? 's' : ''} here`, 1.8); renderLoot(); } else closeSheet();
   }
   function closeSheet(silent) { sheet.classList.remove('on'); if (G) G.sheet = null; }
-  function pickUp(d) {
-    const got = addToPack(d.k, d.n);
-    if (!got) { toast('Your pack is full', 1.3); return; }
-    d.n -= got; if (!d.n) G.drops.splice(G.drops.indexOf(d), 1);
-    SFX.play('pick'); toast(`Picked up ${ITEMS[d.k].n.toLowerCase()}${got > 1 ? ' x' + got : ''}`, 1.1);
-  }
   function openPack(sel = -1) {
     if (G.over) return;
     G.sheet = { kind: 'pack' };
@@ -1657,7 +1649,8 @@
       const e = G.pack[sel], it = ITEMS[e.k], acts = $('#shActs');
       acts.innerHTML = `<span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}</span>`;
       if (it.use) { const b = document.createElement('button'); b.textContent = it.use; b.onclick = ev => { ev.stopPropagation(); useItem(sel); }; acts.appendChild(b); }
-      const d = document.createElement('button'); d.className = 'ghost'; d.textContent = 'Drop'; d.onclick = ev => { ev.stopPropagation(); dropItem(sel); }; acts.appendChild(d);
+      const d = document.createElement('button'); d.className = 'ghost'; d.textContent = 'Drop';
+      d.onclick = ev => { ev.stopPropagation(); if (G.dropOk) dropItem(sel); else confirmDrop(sel); }; acts.appendChild(d);
     }
     sheet.classList.add('on');
   }
@@ -1669,13 +1662,20 @@
     SFX.play('pick'); toast(`${it.use === 'Use' ? 'Used' : it.use === 'Take' ? 'Took' : it.use === 'Eat' ? 'Ate' : 'Drank'} ${it.n.toLowerCase()}`, 1.3);
     openPack(e.n ? i : -1);
   }
+  // first drop of a run asks once, inside the sheet (window.confirm is blocked in the sandbox)
+  function confirmDrop(i) {
+    const e = G.pack[i], acts = $('#shActs');
+    acts.innerHTML = `<span>Drop <b>${ITEMS[e.k].n}${e.n > 1 ? ' x' + e.n : ''}</b>? It's gone for good.</span>`;
+    const ok = document.createElement('button'); ok.textContent = 'Drop'; ok.onclick = ev => { ev.stopPropagation(); G.dropOk = true; dropItem(i); };
+    const no = document.createElement('button'); no.className = 'ghost'; no.textContent = 'Cancel'; no.onclick = ev => { ev.stopPropagation(); openPack(i); };
+    acts.append(ok, no);
+  }
   function dropItem(i) {
     const e = G.pack.splice(i, 1)[0], p = G.p;
-    // land at her feet, nudged so several drops do not sit exactly on top of each other
-    const a = G.drops.length * 2.1;
-    G.drops.push({ k: e.k, n: e.n, x: p.x + Math.cos(a) * 14, y: p.y + 6 + Math.sin(a) * 6 });
-    SFX.play('open'); toast(`Dropped ${ITEMS[e.k].n.toLowerCase()}${e.n > 1 ? ' x' + e.n : ''}`, 1.2);
-    openPack();
+    G.poofs.push({ k: e.k, x: p.x + (p.flip ? -16 : 16), y: p.y + 4, t: 0 });
+    puff(p.x + (p.flip ? -16 : 16), p.y + 2, 6, 8, 'rgba(157,144,191,.8)', 50, .6, 3.5);
+    SFX.play('whoosh'); toast(`Dropped ${ITEMS[e.k].n.toLowerCase()}${e.n > 1 ? ' x' + e.n : ''} - gone for good`, 1.4);
+    closeSheet(); // let her see it go
   }
   $('#shTake').addEventListener('click', e => { e.stopPropagation(); takeAll(); });
   $('#shClose').addEventListener('click', e => { e.stopPropagation(); closeSheet(); });
