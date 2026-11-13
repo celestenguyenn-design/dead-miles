@@ -148,6 +148,7 @@
   #evchip { display: none; align-self: flex-start; margin-top: 2px; align-items: center; gap: 5px; padding: 4px 9px 4px 6px; border-radius: 99px; background: var(--ora); color: var(--ink); font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; border: 2px solid var(--ink); }
   body.event #evchip { display: inline-flex; }
   body.event #room::after { content: ""; display: inline-block; width: 9px; height: 9px; margin-left: 6px; background: #c95f2c; border-radius: 0 60% 0 60%; transform: rotate(20deg); }
+  body.ev-christmas #room::after { background: #e9eef8; border-radius: 50%; transform: none; }
   .bars { gap: 5px; }
   #useLbl em.opt { background: var(--lild); text-transform: none; letter-spacing: .02em; font-size: 10px; }
   .lockinfo { font-size: 13px !important; line-height: 1.4; padding: 18px 12px !important; }
@@ -444,6 +445,34 @@
   @keyframes pulse { to { filter: brightness(1.35); } }
   @keyframes pop { from { transform: scale(.6); opacity: 0; } }
   @keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+  /* phase 5a: seasonal events */
+  .evban { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0 0 12px; padding: 10px 12px; border-radius: 18px; text-align: left; background: linear-gradient(100deg, var(--evbg) 0%, #1c1538 85%); border: 3px solid var(--ink); box-shadow: 0 4px 0 var(--evc); position: relative; overflow: hidden; }
+  .evban::after { content: ""; position: absolute; right: -30px; top: -30px; width: 110px; height: 110px; border-radius: 50%; background: radial-gradient(color-mix(in srgb, var(--evc) 35%, transparent), transparent 70%); pointer-events: none; }
+  .evban .evg { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--evc); border: 2.5px solid var(--ink); box-shadow: 0 2px 0 var(--ink); }
+  .evban .evg svg { width: 24px; height: 24px; }
+  .evban .evt { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+  .evban .evt b { font-size: 16px; font-weight: 900; color: var(--crm); } .evban .evt em { font-style: normal; font-size: 12px; font-weight: 900; color: var(--evc); text-transform: uppercase; letter-spacing: .06em; }
+  .evban .evt small { flex-basis: 100%; font-size: 11px; font-weight: 700; color: var(--mute); line-height: 1.3; }
+  .evban .evgo { font-size: 26px; font-weight: 900; color: var(--evc); line-height: 1; }
+  .evban.soon { box-shadow: 0 4px 0 var(--plum); background: #1c1538; } .evban.soon .evg { filter: saturate(.6); }
+  .evsect { display: flex; align-items: center; gap: 6px; color: var(--evc) !important; } .evsect svg { flex: none; } .evsect span { margin-left: auto; color: var(--mute); letter-spacing: .06em; font-size: 10px; }
+  .qcard.evq { background: linear-gradient(160deg, color-mix(in srgb, var(--evc) 16%, #1c1538) 0%, #1c1538 60%); box-shadow: 0 3px 0 var(--evc); }
+  .qcard.evq .qhead em { background: var(--evc); color: var(--ink); } .qcard.evq.done .qtext { font-style: italic; }
+  .evneed { margin: 2px 0 6px; } .evrew { line-height: 1.6; } .evrew img { width: 18px !important; height: 18px !important; }
+  .evrew .rtag, .qrew .rtag { font-style: normal; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 5px; background: var(--rc); color: var(--ink); vertical-align: 1px; }
+  .qnote { font-size: 11px; font-weight: 800; color: var(--mute); }
+  .hmeta .evtag, .hmeta b.evtag { display: inline-block; margin-top: 3px; padding: 1px 6px; border-radius: 6px; background: var(--evc, var(--ora)); color: var(--ink); font-size: 10px; font-weight: 900; }
+  .wtile i.evtag { font-style: normal; font-size: 8px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; padding: 1px 5px; margin-top: 2px; border-radius: 5px; background: var(--evc); color: var(--ink); white-space: nowrap; }
+  .wtile.locked i.evtag { background: transparent; color: var(--evc); border: 1px solid var(--evc); }
+  .evrow { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(157,144,191,.2); font-size: 12px; font-weight: 700; color: var(--crm); line-height: 1.35; } .evrow b { flex: none; width: 82px; color: var(--mute); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  .evcos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; } .evcos span { display: flex; flex-direction: column; align-items: center; padding: 4px 2px; border-radius: 12px; background: #1f1940; border: 2px dashed var(--lild); }
+  .evcos span.own { background: var(--plum); border: 2px solid var(--ink); } .evcos img { width: 48px; height: 48px; } .evcos i { font-style: normal; font-size: 9.5px; font-weight: 800; text-align: center; line-height: 1.15; color: var(--mute); } .evcos .own i { color: var(--crm); }
+  .hordecard.special { background: linear-gradient(160deg, color-mix(in srgb, var(--evc, #f07b3c) 22%, #2a1622) 0%, #2a1622 70%); }
+  .hordecard.special .hhead .kick { color: var(--evc, var(--ora)); } .hspecial { font-size: 11px; font-weight: 800; color: var(--crm); margin-top: 2px; }
+  .volrow { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 13px; font-weight: 800; color: var(--mute); } .volrow span { width: 110px; } .volrow input { flex: 1; accent-color: var(--ora); touch-action: auto; }
+  .tipsrow small { font-weight: 700; font-size: 11px; } .mcard h3.sndh { margin-top: 16px; }
+  .devev { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -455,7 +484,7 @@
       <div class="bar" id="hp"><i></i><span>HP</span><b id="hpv">100</b></div>
       <div class="bar" id="st"><i></i></div>
       <div><span id="room">STOOP</span></div>
-      <div id="evchip"><svg viewBox="0 0 20 20" width="14" height="14"><path d="M10 1 L12 6 L17 4 L15 9 L19 11 L14 13 L15 18 L10 15 L5 18 L6 13 L1 11 L5 9 L3 4 L8 6 Z" fill="#f07b3c" stroke="#11142f" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 15 L10 20" stroke="#11142f" stroke-width="1.6"/></svg>Thanksgiving</div>
+      <div id="evchip"></div>
     </div>
     <div class="right">
       <div class="rowr">
@@ -500,17 +529,19 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.5"></script>
-<script src="art.js?v=0.5"></script>
-<script src="net.js?v=0.5"></script>
-<script src="netpanel.js?v=0.5"></script>
-<script src="syncguide.js?v=0.5"></script>
-<script src="data.js?v=0.5"></script>
-<script src="engine.js?v=0.5"></script>
-<script src="gen.js?v=0.5"></script>
-<script src="house.js?v=0.5"></script>
-<script src="horde.js?v=0.5"></script>
-<script src="base.js?v=0.5"></script>
-<script src="game.js?v=0.5"></script>
+<script src="s2art.js?v=0.6"></script>
+<script src="art.js?v=0.6"></script>
+<script src="net.js?v=0.6"></script>
+<script src="netpanel.js?v=0.6"></script>
+<script src="syncguide.js?v=0.6"></script>
+<script src="events.js?v=0.6"></script>
+<script src="data.js?v=0.6"></script>
+<script src="engine.js?v=0.6"></script>
+<script src="music.js?v=0.6"></script>
+<script src="gen.js?v=0.6"></script>
+<script src="house.js?v=0.6"></script>
+<script src="horde.js?v=0.6"></script>
+<script src="base.js?v=0.6"></script>
+<script src="game.js?v=0.6"></script>
 </body>
 </html>

@@ -701,7 +701,7 @@
   B.start = function (o = {}) {
     if (DM.scene) return;
     const shift = !!o.shift, w = H.next();
-    S = { shift, edit: false, sel: null, pend: null, hudT: 0, spawned: 0, week: o.week || (w && w.week), traps: {}, sh: { t: 0, total: 14 + 2 * Math.min(6, H.weekIndex((w && w.week) || H.FIRST_WEEK)), next: 3.5, over: false } };
+    S = { shift, edit: false, sel: null, pend: null, hudT: 0, spawned: 0, week: o.week || (w && w.week), traps: {}, sh: { t: 0, total: Math.round((14 + 2 * Math.min(6, H.weekIndex((w && w.week) || H.FIRST_WEEK))) * H.special(o.week || (w && w.week)).size), next: 3.5, over: false } };
     const b = base(); barrels();
     for (const k of ['spikes', 'wire']) if (b.built[k] && !b.broken[k]) for (const [x, y] of trapTiles(k, b.built[k])) S.traps[x + ',' + y] = k;
     const L = layout();
