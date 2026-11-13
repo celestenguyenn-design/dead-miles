@@ -70,6 +70,8 @@ window.DM = window.DM || {};
         case 'alert': this.tone('triangle', 520, 300, .18, .06); break;
         case 'gobble': for (let i = 0; i < 5; i++) this.tone('sawtooth', 420 - i * 30 + Math.random() * 60, 260, .07, .035, i * .065); break;
         case 'ui': this.tone('sine', 520, 700, .06, .05); break;
+        case 'creak': this.tone('sawtooth', 190, 120, .5, .022); this.tone('triangle', 260, 330, .3, .02, .18); this.noise(.4, 'bandpass', 700, 400, .05, 6); break;
+        case 'unlock': this.noise(.05, 'highpass', 3000, 2500, .14, 1); this.noise(.05, 'highpass', 2600, 2200, .12, 1, .13); this.tone('sine', 880, 1320, .1, .07, .2); this.tone('sine', 1320, 1760, .16, .06, .3); break;
       }
     },
   };

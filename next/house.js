@@ -9,6 +9,7 @@
   const cv = E.cv, ctx = E.ctx;
   const { ITEMS, stackMax, toStacks, rollLoot, LOCKS, EVENT, WEAPONS } = D;
   const EVS = DM.Events, EVA = D.EV;   // the running seasonal event (events.js) or null
+  const F = DM.Food;                   // 0.8: hunger + thirst (food.js)
 
   // ---------------------------------------------------------------- layout
   let L = null, ROWS = [], MW = 0, MH = 0, opts = {};
@@ -32,7 +33,7 @@
   const job = () => (S() && S().job) || 'scavenger';
   const scavLvl = () => D.scavLvl(S() ? S().xp : 0);
   const XPCUM = D.XPCUM, PERKS = D.PERKS;
-  const searchMul = () => 1.5 * (1 - .06 * (scavLvl() - 1)) * (job() === 'scavenger' ? .85 : 1);   // slow at first, faster with skill
+  const searchMul = () => 1.5 * (1 - .06 * (scavLvl() - 1)) * (job() === 'scavenger' ? .85 : 1) * F.searchMul();   // slow at first, faster with skill; thirsty = slower
   const extraChance = () => .04 * (scavLvl() - 1) + (job() === 'scavenger' ? .1 : 0);
   const packSlots = () => 12 + (S().packBonus || 0) + (scavLvl() >= 9 ? 2 : 0);
   const gatePct = () => job() === 'scavenger' ? .65 : .75;
@@ -40,6 +41,7 @@
   const SNAP_T = () => (job() === 'thief' ? 2.4 : 1.2) * (S().lockset ? 1.5 : 1);    // ... and picks break half as often
   const maxHp = () => D.maxHp(S());
   function gainXP(n, x, y) {
+    n += F.xpBonus(n);   // well fed + hydrated: +10%
     const before = scavLvl(); S().xp += n; DM.Game && DM.Game.save();
     G.nums.push({ x: x + 16, y: y - 112, v: '+' + n + ' xp', t: 0, col: P.GRN, small: 1 });
     const after = scavLvl();
@@ -54,18 +56,19 @@
     L = layout; opts = o || {};
     ROWS = L.rows; MW = ROWS[0].length; MH = ROWS.length;
     const st = L.start;
+    if (S() && S().food) S().hp = F.tick(S(), S().hp);   // hunger/thirst catch up before she goes in
     G = {
       t: 0, secretOpen: false, paused: false, over: false, hitstop: 0, shake: 0, redFlash: 0,
       p: {
         x: st.x * T, y: st.y * T, vx: 0, vy: 0, fx: 0, fy: -1, flip: false, hw: 13, hh: 9,
-        hp: Math.min(S().hp, maxHp()), sta: 100, staDelay: 0, st: 'free', stT: 0, inv: 0, ph: 0, stepAcc: 0, kbx: 0, kby: 0,
+        hp: Math.min(S().hp, maxHp()), sta: F.staMax(), staDelay: 0, st: 'free', stT: 0, inv: 0, ph: 0, stepAcc: 0, kbx: 0, kby: 0,
         swingQ: false, search: null, flash: 0, swingHit: false, downRot: 0,
       },
       zs: [], furn: [], pack: S().pack, drops: [], arrows: [], parts: [], rings: [], nums: [], decals: [], banners: [],
       sec: (L.secrets || []).map(s => Object.assign({ st: 0, found: false }, JSON.parse(JSON.stringify(s)))),
       fog: {}, visited: {}, room: streetRoom(), noiseLvl: 0, cam: { x: st.x * T, y: st.y * T - 120 }, z3: false,
       stats: { searched: 0, kills: 0, start: performance.now() }, entered: false, lastNoise: null, field: null, fieldT: 0, fieldCell: -1,
-      secretHint: 0, sheet: null,
+      secretHint: 0, sheet: null, food: { h: 0, t: 0 }, foodT: 0,
     };
     for (const k in L.rooms) { const R = L.rooms[k]; G.fog[k] = R.hidden || R.isolated ? .99 : .97; G.visited[k] = false; }
     G.fog[streetRoom()] = 0.12; G.visited[streetRoom()] = true;
@@ -127,16 +130,17 @@
     wallCells = []; doorLeaves = []; wallRects = new Array(MW * MH).fill(null).map(() => []);
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
       if (isVoid(x, y)) { wallRects[y * MW + x].push({ x: x * T, y: y * T, w: T, h: T }); continue; }
+      const shut = keyShut(x, y);
       const horizDoor = isDoor(x, y) && isWall(x - 1, y) && isWall(x + 1, y);
       if (horizDoor) {
         wallCells.push({ x, y, lintel: true, key: (y + 1) * T, cut: 1 });
-        if (ch(x, y) !== '=') { // open door leaf, hinged on the west jamb, swung into the room below (front door: into the hall)
+        if (ch(x, y) !== '=' && !shut) { // open door leaf, hinged on the west jamb, swung into the room below (front door: into the hall)
           const dir = (x + ',' + y) === L.frontDoor ? -1 : 1, g0 = (y + 1) * T - WT / 2, g1 = g0 + dir * T * .72;
           doorLeaves.push({ x0: x * T + 2, x1: x * T + 8, y0: Math.min(g0, g1), y1: Math.max(g0, g1), key: Math.max(g0, g1), vert: true });
         }
         continue;
       }
-      if (isDoor(x, y) && isWall(x, y - 1) && isWall(x, y + 1)) { // vertical doorway: leaf swung into the hall (east)
+      if (isDoor(x, y) && !shut && isWall(x, y - 1) && isWall(x, y + 1)) { // vertical doorway: leaf swung into the hall (east)
         const gy = y * T + 4;
         doorLeaves.push({ x0: (x + 1) * T - 4, x1: (x + 1) * T - 4 + T * .7, y0: gy, y1: gy, key: gy + 1, vert: false });
       }
@@ -161,6 +165,7 @@
     }
     faceCache.clear(); fogMap = null;
   }
+  const keyShut = (x, y) => G.furn.some(f => f.keyDoor && (f.swing || 0) < 1 && f.tx === x && f.ty === y);
   let solidCell = new Uint8Array(MW * MH);
   function buildSolid() {
     solidCell = new Uint8Array(MW * MH);
@@ -171,6 +176,8 @@
     }
     G.fieldCell = -1;
   }
+  // 0.8: what she bumps into is the drawn base of the piece, a little inset, so she can squeeze past corners
+  function collRect(f) { const s = (f.slide || 0) * T; return { x: f.x + 4 + s, y: f.y + 3, w: f.w - 8, h: f.h - 8 }; }
   function furnRect(f) { const s = (f.slide || 0) * T; return { x: f.x + 2 + s, y: f.y, w: f.w - 4, h: f.h - 5 }; }
   function overlapsSolid(e, x, y) {
     const x0 = x - e.hw, x1 = x + e.hw, y0 = y - e.hh, y1 = y + e.hh;
@@ -181,7 +188,7 @@
     }
     for (const f of G.furn) {
       if (!f.solid) continue;
-      const r = furnRect(f);
+      const r = collRect(f);
       if (x0 < r.x + r.w && x1 > r.x && y0 < r.y + r.h && y1 > r.y) return r;
     }
     return null;
@@ -287,7 +294,8 @@
   function dmgNum(x, y, v, col) { G.nums.push({ x, y, v, t: 0, col }); }
   // ---------------------------------------------------------------- interaction
   // secrets stay invisible until most of the house has been searched; no announcement when that happens
-  function gateOpen() { const C = G.furn.filter(f => f.lootable && !f.secretLoot && !f.lock); return C.filter(f => f.searched).length >= Math.ceil(C.length * gatePct()); }
+  const gateSet = () => G.furn.filter(f => f.lootable && !f.secretLoot && !f.lock && !f.car && !f.keyRoom);   // 0.8: brass-key spots never count
+  function gateOpen() { const C = gateSet(); return C.filter(f => f.searched).length >= Math.ceil(C.length * gatePct()); }
   const hasItem = k => G.pack.some(e => e.k === k) || (S().hands && S().hands.k === k);
   const hasPry = () => hasItem('crowbar') || hasItem('prybar');
   const packCount = k => G.pack.reduce((a, e) => a + (e.k === k ? e.n : 0), 0);
@@ -336,7 +344,7 @@
       if (here) { s.hintAt = now; toast(msg, 3); return; }
     }
   }
-  function searchedCount() { const C = G.furn.filter(f => f.lootable && !f.secretLoot && !f.lock); return [C.filter(f => f.searched).length, C.length]; }
+  function searchedCount() { const C = gateSet(); return [C.filter(f => f.searched).length, C.length]; }
   function foundSecret(s) { if (!s.found) { s.found = true; gainXP(8, G.p.x, G.p.y); if (DM.Game && DM.Game.onSecret) DM.Game.onSecret(); } }
   function moveRug(s) { s.st = 1; SFX.play('whoosh'); const R = rugRect(s); puff(R.x + R.w * .8, R.y + R.h * .7, 2, 8, 'rgba(234,210,164,.5)', 50, .7, 3); }
   function pryBoard(s) {
@@ -363,7 +371,9 @@
   function interactables() {
     const out = [];
     for (const f of G.furn) {
+      if (f.keyDoor) { if (f.keyLock) out.push({ obj: f, act: hasKeyNow() ? 'Unlock' : 'KeyLocked', rect: furnRect(f), name: 'door', keyLock: 1 }); continue; }   // 0.8: key-locked room
       if (!f.lootable) continue;
+      if (f.keyLock) { out.push({ obj: f, act: hasKeyNow() ? 'Unlock' : 'KeyLocked', rect: furnRect(f), name: 'car', keyLock: 1 }); continue; }   // 0.8: locked car
       if (f.bedOf && (f.bedOf.st === 'sleep' || f.bedOf.st === 'rise')) continue; // someone is sleeping on it
       let act = null;
       if (f.locked) act = 'Locked';
@@ -403,6 +413,8 @@
     if (it.act === 'Open') { openLoot(o, it); return; }
     if (it.drop) { pickUp(o); return; }
     if (it.act === 'Locked') { openLockChoice(it); return; }
+    if (it.act === 'KeyLocked') { toast(it.name === 'car' ? 'Locked - needs a brass key in your pack' : 'Key-locked door - needs a brass key in your pack', 2); SFX.play('alert'); return; }
+    if (it.act === 'Unlock') { useKey(it); return; }
     const dur = it.dur || (it.act === 'Push' ? 1.7 : (it.corpse ? 1.4 : o.time) * searchMul());
     p.st = 'search'; p.stT = 0; p.search = { it, t: 0, dur, nextNoise: .25, nextFx: 0 };
     if (it.act === 'Search' && (o.art === 'fridge' || o.art === 'wardrobe' || o.art === 'coat' || o.art === 'pantry')) SFX.play('open');
@@ -426,6 +438,24 @@
     gainXP(it.corpse ? 2 : 2 + (o.time >= 2.2 ? 1 : 0) + (o.rare ? 6 : 0), G.p.x, G.p.y);
     o._key = null;
     openLoot(o, it);
+  }
+  // ---- 0.8: brass keys open locked cars and key-locked rooms (nothing else does). The key is used up.
+  const hasKeyNow = () => G.pack.some(e => e.k === 'key');
+  function useKey(it) {
+    const o = it.obj, i = G.pack.findIndex(e => e.k === 'key'); if (i < 0) return;
+    const e = G.pack[i]; e.n--; if (!e.n) G.pack.splice(i, 1);
+    lastHud = ''; SFX.play('unlock'); DM.Game && DM.Game.save();
+    if (o.keyDoor) {
+      o.keyLock = null; o.solid = 0; o.swing = .001; o._key = null; buildSolid();
+      setTimeout(() => SFX.play('creak'), 260);
+      emitNoise(o.x + o.w / 2, o.y + o.h, 2.5);
+      toast('Click. The brass key turns - the door swings open', 2.2); gainXP(4, G.p.x, G.p.y);
+    } else {
+      for (const f of G.furn) if (f.car && f.keyLock) { f.keyLock = null; f._key = null; }
+      setTimeout(() => SFX.play('creak'), 220);
+      emitNoise(o.x + o.w / 2, o.y + o.h, 3);
+      toast('Unlocked the car - glove box and trunk are open to search', 2.2); gainXP(3, G.p.x, G.p.y);
+    }
   }
   function cancelSearch() { const p = G.p; if (p.st === 'search') { p.st = 'free'; p.search = null; } }
 
@@ -457,8 +487,13 @@
       p.auto = { it, gx: goal[0], gy: goal[1], px, py, field: bfs(goal[0], goal[1]), t: 0 };
       G.tapMark = { x: best.bx.x + best.bx.w / 2, y: best.bx.y + best.bx.h, t: 0, obj: true };
     } else {
-      const tx = Math.floor(wx / T), ty = Math.floor(wy / T);
-      if (tx < 0 || ty < 0 || tx >= MW || ty >= MH || solidCell[ty * MW + tx]) return;
+      let tx = Math.floor(wx / T), ty = Math.floor(wy / T);
+      if (tx < 0 || ty < 0 || tx >= MW || ty >= MH) return;
+      if (solidCell[ty * MW + tx]) { // 0.8: a tap on the open part of a wall/furniture tile walks to the closest open tile beside it
+        let bd = 1e9, bc = null;
+        for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) { const x = tx + dx, y = ty + dy; if (x < 0 || y < 0 || x >= MW || y >= MH || solidCell[y * MW + x]) continue; const d = Math.hypot((x + .5) * T - wx, (y + .5) * T - wy); if (d < bd) { bd = d; bc = [x, y]; } }
+        if (!bc || bd > T * 1.2) return; [tx, ty] = bc;
+      }
       p.auto = { gx: tx, gy: ty, px: wx, py: wy, field: bfs(tx, ty), t: 0 };
       G.tapMark = { x: wx, y: wy, t: 0 };
     }
@@ -519,7 +554,10 @@
     p.staDelay -= dt;
     // Refill whenever she is not ACTUALLY sprinting. Before, holding the joystick far out with no
     // stamina left blocked the refill too, so she was stuck winded until she let go of the stick.
-    if (p.staDelay <= 0 && !p.running) p.sta = Math.min(100, p.sta + (inp.m > .1 ? 13 : 20) * dt);
+    // 0.8: Hungry = refills 40% slower; Thirsty = max stamina 80
+    const smax = F.staMax();
+    if (p.staDelay <= 0 && !p.running) p.sta = Math.min(smax, p.sta + (inp.m > .1 ? 13 : 20) * F.regenMul() * dt);
+    if (p.sta > smax) p.sta = smax;
     if (p.sta <= 1) p.winded = true; else if (p.sta >= 30) p.winded = false;
 
     if (LP.on) { p.vx *= .8; p.vy *= .8; inp = { x: 0, y: 0, m: 0, run: false }; }
@@ -538,6 +576,7 @@
       running = inp.run && inp.m > .5 && p.sta > 1 && !p.winded && p.st === 'free';
       spd = (running ? 4.5 : 2.75) * T * inp.m * (p.st === 'swing' ? .35 : 1);
       if (running) { p.sta = Math.max(0, p.sta - 24 * dt); p.staDelay = .7; }
+      if (!G.over) F.runDrain(dt, running, G);   // a run makes you hungry and thirsty a little faster
       const tvx = inp.x * spd, tvy = inp.y * spd;
       const k = 1 - Math.exp(-(inp.m ? 16 : 22) * dt);
       p.vx = lerp(p.vx, tvx, k); p.vy = lerp(p.vy, tvy, k);
@@ -614,7 +653,7 @@
     if (best && !weapon().ranged) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; p.fx = dx / d; p.fy = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; }
     const W = weapon(); SW_WIND = W.wind; SW_STRIKE = W.strike; SW_REC = W.rec; p.swRanged = !!W.ranged;
     if (W.ranged && !arrowsLeft()) { toast('No arrows - press R or tap the weapon to swap', 1.6); return; }
-    p.st = 'swing'; p.stT = 0; p.swingHit = false; p.swingQ = false; p.sta = Math.max(0, p.sta - (W.ranged ? 3 : 7)); p.staDelay = .5;
+    p.st = 'swing'; p.stT = 0; p.swingHit = false; p.swingQ = false; p.sta = Math.max(0, p.sta - (W.ranged ? 3 : 7)); p.staDelay = .5; F.fight(G);
   }
   let SW_WIND = .12, SW_STRIKE = .1, SW_REC = .22;
   function updateSwing() {
@@ -823,6 +862,7 @@
       G.fog[k] = lerp(G.fog[k], target, 1 - Math.exp(-(target < G.fog[k] ? 5 : 2) * dt));
     }
     G.noiseLvl = Math.max(0, G.noiseLvl - dt * .28);
+    for (const f of G.furn) if (f.keyDoor && f.swing && f.swing < 1) { f.swing = Math.min(1, f.swing + dt * 2.4); f._key = null; if (f.swing >= 1) { buildWalls(); buildSolid(); } }
     // particles
     for (const q of G.parts) {
       q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= Math.exp(-2.2 * dt); q.vy *= Math.exp(-2.2 * dt);
@@ -868,13 +908,14 @@
     const k = 1 - Math.exp(-6 * dt);
     G.cam.x = lerp(G.cam.x, tx, k); G.cam.y = lerp(G.cam.y, ty, k);
     // wall cutaway near the player
+    // 0.8: subtle - only the wall segment actually in front of her sprite fades, only to ~65%, and only walls of rooms she has been in
     for (const c of wallCells) {
       if (!c.face && !c.lintel) continue;
-      const cx = c.x * T + T / 2, behind = p.y < c.key && p.y > c.key - WH - 48 && Math.abs(p.x - cx) < T * 1.25;
-      let zb = false;
-      if (!behind) for (const z of G.zs) if (!z.dead && z.y < c.key && z.y > c.key - WH - 30 && Math.abs(z.x - cx) < T && Math.hypot(z.x - p.x, z.y - p.y) < 5 * T) { zb = true; break; }
-      const target = behind ? .28 : zb ? .5 : 1;
-      c.cut = lerp(c.cut, target, 1 - Math.exp(-10 * dt));
+      const x0 = c.face ? c.face.x0 : c.x * T, x1 = c.face ? c.face.x1 : (c.x + 1) * T;
+      const fr = c.face ? c.face.room : roomAt(c.x, c.y + 1);
+      const covers = p.y < c.key - 4 && p.y > c.key - WH - 6 && p.x + 12 > x0 && p.x - 12 < x1;
+      const target = covers && (!fr || G.visited[fr] || fr === G.room) ? .65 : 1;
+      c.cut = lerp(c.cut, target, 1 - Math.exp(-7 * dt));
     }
   }
 
@@ -978,7 +1019,7 @@
     }
   }
   function furnCanvas(f) {
-    const key = (f.searched ? 1 : 0) + ':' + (f.slide || 0).toFixed(2);
+    const key = (f.searched ? 1 : 0) + ':' + (f.slide || 0).toFixed(2) + (f.keyLock ? ':k' : '') + (f.swing ? ':' + f.swing.toFixed(2) : '');
     if (f._key === key && f._c) return f._c;
     const fs = DEV.fs, g = ART.geo(f);
     const bx = f.x - 16, by = g.ty0 - 40, bw = f.w + 32, bh = f.y + f.h + 8 - by;
@@ -1334,7 +1375,7 @@
     fogSrc.forEach((s, i) => {
       if (s.fixed) { al[i] = 1; return; }
       let a = minOf(s.rooms);
-      if (s.wall && s.wall.cut < .99) a = lerp(minOf(s.capRooms), a, (s.wall.cut - .28) / .72);
+      if (s.wall && s.wall.cut < .99) a = lerp(minOf(s.capRooms), a, clamp((s.wall.cut - .65) / .35, 0, 1));
       al[i] = a;
     });
     const d = fogImg.data;
@@ -1504,6 +1545,7 @@
   function hud() {
     const p = G.p;
     hpFill.style.width = (p.hp / maxHp() * 100) + '%'; stFill.style.width = p.sta + '%';
+    needsHud(p);
     const hudKey = [Math.round(p.hp), G.pack.length, packCount('lockpick'), G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5), S().xp, S().hands ? S().hands.k + S().hands.d : '-', arrowsLeft()].join('|');
     if (hudKey !== lastHud) {
       lastHud = hudKey;
@@ -1527,6 +1569,8 @@
         useBtn.classList.add('on'); useLbl.classList.add('on');
         const loud = !t.corpse && t.act === 'Search' && t.noise >= 4;
         if (t.act === 'Locked') { const n = packCount('lockpick'), cb = hasPry(); useLbl.innerHTML = `Locked <b>${t.name}</b>` + (n || cb ? `<em class="opt">${[n ? `pick ${n}` : '', cb ? 'pry' : ''].filter(Boolean).join(' / ')}</em>` : ''); }
+        else if (t.act === 'KeyLocked') useLbl.innerHTML = `Locked <b>${t.name}</b><em class="opt">needs a brass key</em>`;
+        else if (t.act === 'Unlock') useLbl.innerHTML = `Unlock <b>${t.name}</b><em class="opt">uses a brass key</em>`;
         else useLbl.innerHTML = `${t.act} <b>${t.name}</b>${loud ? '<em>loud</em>' : ''}`;
       } else { useBtn.classList.remove('on'); useLbl.classList.remove('on'); }
     }
@@ -1535,6 +1579,34 @@
     $('#hp').classList.toggle('low', p.hp < maxHp() * .35);
     drawMini();
   }
+  // 0.8: hunger + thirst bars under stamina (tap them to eat or drink from the pack)
+  const needsEl = $('#needs'); let needsKey = '';
+  function needsHud(p) {
+    const s = S(); if (!s || !s.food) { needsEl.style.display = 'none'; return; }
+    needsEl.style.display = '';
+    G.foodT -= 1 / 60;
+    if (G.foodT <= 0) { G.foodT = 5; p.hp = F.tick(s, p.hp); if (s.food.h < F.LOW || s.food.t < F.LOW) DM.Game && DM.Game.tip && DM.Game.tip('food'); }
+    const f = s.food, k = Math.round(f.h * 2) + '|' + Math.round(f.t * 2) + '|' + F.staMax();
+    if (k === needsKey && needsEl.firstChild) return; needsKey = k;
+    if (!needsEl.firstChild) needsEl.innerHTML = `<span class="nd h" id="ndH">${F.ICON.h}<span class="nbar"><i></i></span></span><span class="nd t" id="ndT">${F.ICON.t}<span class="nbar"><i></i></span></span>`;
+    for (const [id, v] of [['#ndH', f.h], ['#ndT', f.t]]) { const el = $(id); el.className = 'nd ' + (id === '#ndH' ? 'h ' : 't ') + F.lvl(v); el.querySelector('i').style.width = Math.max(0, Math.min(100, v)) + '%'; }
+    $('#st').classList.toggle('capped', F.staMax() < 100);
+  }
+  // quick eat / drink: the food and drinks in the pack, one tap each
+  function openFood() {
+    if (G.over) return;
+    G.sheet = { kind: 'food' };
+    const f = S().food, foods = G.pack.map((e, i) => [e, i]).filter(([e]) => F.isFood(e.k));
+    $('#shKick').textContent = `Hunger ${Math.round(f.h)} · Thirst ${Math.round(f.t)}`;
+    $('#shTitle').textContent = 'Eat & drink';
+    const grid = $('#shGrid'); grid.innerHTML = ''; $('#shActs').innerHTML = '';
+    if (!foods.length) grid.innerHTML = '<div class="empty">No food or drinks in your pack. Kitchens, pantries, fridges and stores have them.</div>';
+    for (const [e, i] of foods) grid.appendChild(itemCard(e, () => { useItem(i, true); }, `<small class="tag">${F.label(e.k)}</small>`));
+    $('#shCap').textContent = foods.length ? 'Tap one to eat or drink it' : '';
+    $('#shTake').style.display = 'none';
+    sheet.classList.add('on');
+  }
+  needsEl.addEventListener('click', ev => { ev.stopPropagation(); SFX.init(); if (G && !G.over && DM.scene) { SFX.play('ui'); openFood(); } });
   function drawMini() {
     const s = Math.min(144 / MW, 180 / MH), w = 144, h = 180;
     if (mini.width !== w) { mini.width = w; mini.height = h; }
@@ -1638,7 +1710,7 @@
     }
     sheet.classList.add('on');
   }
-  function useItem(i) {
+  function useItem(i, fromFood) {
     const e = G.pack[i], it = ITEMS[e.k], p = G.p;
     if ((it.slots || it.bp || e.k === 'shoes' || e.k === 'lockset') && DM.Game && DM.Game.applyUse) {
       const msg = DM.Game.applyUse(e.k); if (!msg) return;
@@ -1650,10 +1722,12 @@
       $('#shActs').innerHTML = `<div class="note">${nd.text || '"...the rest is torn away."'}<br><small>Found at <b>${nd.addr || 'a house'}</b>${here ? ' - this house.' : ' - not this house. The clue is about that place.'}</small></div>`;
       SFX.play('pick'); return; }
     if (it.hp) p.hp = Math.min(maxHp(), p.hp + it.hp);
-    if (it.sta) p.sta = Math.min(100, p.sta + it.sta);
+    const fed = F.isFood(e.k) ? F.eat(S(), e.k) : '';
+    if (it.sta) p.sta = Math.min(F.staMax(), p.sta + it.sta);
     e.n--; if (!e.n) G.pack.splice(i, 1);
-    SFX.play('pick'); toast(`${it.use === 'Use' ? 'Used' : it.use === 'Take' ? 'Took' : it.use === 'Eat' ? 'Ate' : 'Drank'} ${it.n.toLowerCase()}`, 1.3);
-    openPack(e.n ? i : -1);
+    SFX.play('pick'); toast(`${it.use === 'Use' ? 'Used' : it.use === 'Take' ? 'Took' : it.use === 'Eat' ? 'Ate' : 'Drank'} ${it.n.toLowerCase()}${fed ? ' · ' + fed : ''}`, 1.6);
+    needsKey = ''; DM.Game && DM.Game.save();
+    if (fromFood) openFood(); else openPack(e.n ? i : -1);
   }
   function dropItem(i) {
     const e = G.pack.splice(i, 1)[0], p = G.p;
