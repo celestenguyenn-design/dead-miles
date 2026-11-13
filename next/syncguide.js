@@ -59,8 +59,8 @@
       + '     Key: p\n     Value: ' + code() + ' immediately followed by the variable Today,\n'
       + '            with no space between the | and Today\n'
       + '     Key: y\n     Value: the variable Yesterday, nothing else\n\n'
-      + '13. Show Result: the Contents of URL from action 12\n\n'
-      + 'Do not add any other actions. Do not add a notification.\n'
+      + '\n'
+      + 'Do not add any other actions. Do not add a Show Result or Show Notification action - it must run silently.\n'
       + 'Name the shortcut exactly: ' + SC_NAME;
   }
 
@@ -293,6 +293,7 @@
     if (NET.ok && NET.stepKey) h += '<div class="note"><b>Fastest: let your iPhone build it.</b> Copy this, open the <b>Shortcuts</b> app, ask the <b>Shortcuts AI</b> (Apple Intelligence) to make a shortcut, and paste it in. Your personal code is already inside. Then run <b>' + SC_NAME + '</b> once, tap <b>Allow</b>, and check the <b>Automation</b> tab has four "' + SC_NAME + '" automations (if the AI could not make them, add them by hand: step 9 below).'
       + '<textarea readonly id="sg-v-aisetup">' + esc((VALUES.aisetup = fullSetupPrompt())) + '</textarea>' + btn('copy:aisetup', 'Copy setup for Shortcuts AI', 'g') + msg('copy:aisetup')
       + '<p class="help">No Shortcuts AI on your phone? Follow the steps below instead.</p></div>';
+    h += '<div class="note"><b>Getting a pop-up every time it runs?</b> Open <b>' + SC_NAME + '</b> in Shortcuts, scroll to the last step <b>Show Contents of URL</b> and tap its <b>&#x24E7;</b> to delete it. The sync keeps working, silently.</div>';
     h += '<div class="note"><b>Steps only update when you run it yourself?</b> iPhone hides Health data while the phone is locked, so a timed run at 4 PM in your pocket sends nothing. Fix: also run it whenever you open an app you use a lot (unlocked, silent). Copy this into the <b>Shortcuts AI</b> while editing <b>' + SC_NAME + '</b> (swap in your favourite apps):'
       + '<textarea readonly id="sg-v-trig">' + esc((VALUES.trig = triggersPrompt())) + '</textarea>' + btn('copy:trig', 'Copy "add unlocked triggers" prompt', 'g') + msg('copy:trig')
       + '<p class="help">By hand: open the shortcut &rarr; <b>+ Add Trigger</b> (or Automation tab &rarr; <b>+</b>) &rarr; <b>App</b> &rarr; pick the app &rarr; <b>Is Opened</b> &rarr; <b>Run Immediately</b>.</p></div>';
@@ -434,7 +435,7 @@
       + '<p>A Shortcut can look right and still be broken by something you can\'t see. Rebuilding it fixes that.</p>'
       + '<p class="help">Open the Shortcut, ask the <b>Shortcuts AI</b> (Apple Intelligence) to edit it, and paste this in. Your address and code are already in it.</p>'
       + (NET.ok ? (NET.stepKey ? '<textarea readonly id="sg-v-rebuild">' + esc((VALUES.rebuild = rebuildPrompt())) + '</textarea>' + btn('copy:rebuild', 'Copy the rebuild prompt', 'g') + msg('copy:rebuild') : keyBox('x', '', () => '')) : '<p class="help">Sign in first.</p>')
-      + '<p class="help" style="margin-top:8px">Run it once: a box should say <b>ok - ... steps for @' + esc(NET.handle || 'you') + '</b>. No Apple Intelligence? Follow the iPhone guide again from step 2 in a new Shortcut.</p>'
+      + '<p class="help" style="margin-top:8px">Run it once, then tap <b>Test it</b> here to see your steps arrive (the Shortcut itself stays silent). No Apple Intelligence? Follow the iPhone guide again from step 2 in a new Shortcut.</p>'
       + '<button class="btn g" data-go="iphone">iPhone guide</button><button class="btn g" data-go="android">Android guide</button><button class="btn g" data-go="typed">Type my steps instead</button></div>';
     return h;
   }
