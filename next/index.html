@@ -496,6 +496,7 @@
   .cbar { display: block; height: 6px; border-radius: 4px; background: var(--ink); overflow: hidden; } .cbar > i { display: block; height: 100%; background: #3fa7a0; border-radius: 4px; }
   .cpast { font-size: 11px; font-weight: 700; color: var(--mute); font-style: italic; margin-top: 2px; } .cpast b { font-style: normal; }
   .linkbtn { align-self: flex-start; margin-top: 4px; padding: 0; background: none; border: 0; color: #ff8a7a; font: 800 12px Inter, system-ui, sans-serif; text-decoration: underline; }
+  .cname { display: flex; align-items: baseline; gap: 6px; } .cname b { font-size: 16px; font-weight: 900; } .ccmorn .linkbtn.ok { align-self: flex-end; margin-top: 2px; color: #3fa7a0; }
   .linkbtn.inl { display: inline; margin: 0 0 0 6px; color: var(--mute); font-size: 11px; }
   .crewsheet .crow .mbtn { width: auto; align-self: flex-start; margin-top: 6px; height: 34px; font-size: 13px; }
   .pactive { align-self: flex-start; margin-top: 6px; padding: 3px 8px; border-radius: 8px; background: var(--ora); color: var(--ink); font-size: 11px; font-weight: 900; }
@@ -522,8 +523,8 @@
   .bosscard.dead .bname { text-decoration: line-through; text-decoration-color: var(--bc); }
   .hcard.bossh { box-shadow: 0 4px 0 var(--bc, #9e2b35); background: #24162a; } .bossic { display: grid; place-items: center; } .bossic svg { width: 40px; height: 40px; }
   .hcard.bossh .hbtns .mbtn { background: #ff6b5a; }
-  body.bossfight #shiftbar { display: flex; left: 50%; transform: translateX(-50%); top: calc(10px + var(--st)); width: min(340px, 86%); border-color: #ff6b5a; }
-  body.bossfight #hud .bars #room, body.bossfight #qchip, body.bossfight #mini { display: none !important; }
+  body.bossfight #shiftbar { display: flex; left: 50%; transform: translateX(-50%); top: calc(58px + var(--st)); width: min(350px, 92%); border-color: #ff6b5a; }
+  body.bossfight #hud .bars #room, body.bossfight #qchip, body.bossfight #mini, body.bossfight #skill, body.bossfight #noise, body.bossfight #evchip { display: none !important; }
   .bfb { flex: 1; min-width: 0; display: flex; flex-direction: column; } .bfb span { font-size: 10px; font-weight: 900; letter-spacing: .1em; color: #ff8a7a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bfb .bbar.sm { margin: 3px 0 1px; } .bfb em { font-style: normal; font-size: 10px; font-weight: 800; color: var(--mute); }
   .bosswin .bwrow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 6px; border-radius: 12px; background: #262044; border: 2px solid var(--ink); }

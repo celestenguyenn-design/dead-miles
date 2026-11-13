@@ -14,6 +14,7 @@
   const icon = k => `<img alt="" src="${ART.iconURL[D.ITEMS[k].i]}">`;
   const fmt = n => Math.round(n).toLocaleString('en-US');
   B.STEPS = 5000; B.PER_DAY = 2; B.FIGHT_S = 90; B.SOLO_MAX = 5000;
+  B.ARMOR = .55;   // the boss shrugs off part of every hit: a good fight takes ~1,000-1,400 off its shared health
   B.maxFor = n => Math.round(5000 * (1 + .8 * (Math.max(1, Math.min(6, n)) - 1)));   // same formula as the server
 
   // ---------------------------------------------------------------- the bosses (rotating by week)
@@ -196,10 +197,10 @@
     rows.push('#'.repeat(7) + '+' + '#'.repeat(7));
     rows.push('o'.repeat(W)); rows.push('o'.repeat(W));
     const furn = {
-      butcher: [{ art: 'counter', at: [2, 1, 3, 1], H: 34 }, { art: 'fridge', at: [10, 1, 1, 1], H: 62 }, { art: 'fridge', at: [11, 1, 1, 1], H: 62 }, { art: 'crate', at: [3, 9, 1, 1], H: 30 }, { art: 'crate', at: [11, 6, 1, 1], H: 30 }, { art: 'table', at: [6, 4, 3, 1], H: 24 }],
-      ash: [{ art: 'bench', at: [2, 5, 2, 1], H: 20 }, { art: 'bench', at: [11, 5, 2, 1], H: 20 }, { art: 'bench', at: [2, 9, 2, 1], H: 20 }, { art: 'bench', at: [11, 9, 2, 1], H: 20 }, { art: 'heater', at: [7, 1, 1, 1], H: 54 }],
-      warden: [{ art: 'car', at: [2, 3, 2, 3], H: 34 }, { art: 'crate', at: [11, 8, 1, 1], H: 30 }, { art: 'supply', at: [10, 1, 2, 1], H: 56 }, { art: 'crate', at: [4, 10, 1, 1], H: 30 }],
-      nurse: [{ art: 'bed', at: [2, 2, 2, 3], H: 18 }, { art: 'bed', at: [11, 2, 2, 3], H: 18 }, { art: 'shelves', at: [6, 1, 2, 1], H: 58 }, { art: 'locker', at: [12, 9, 1, 1], H: 62 }, { art: 'chair', at: [3, 9, 1, 1], H: 16, solid: 0 }],
+      butcher: [{ art: 'counter', at: [2, 1, 3, 1], H: 34 }, { art: 'fridge', at: [10, 1, 1, 1], H: 62 }, { art: 'fridge', at: [11, 1, 1, 1], H: 62 }, { art: 'crate', at: [2, 8, 1, 1], H: 30 }, { art: 'crate', at: [12, 6, 1, 1], H: 30 }, { art: 'table', at: [10, 10, 2, 1], H: 24 }],
+      ash: [{ art: 'bench', at: [1, 5, 2, 1], H: 20 }, { art: 'bench', at: [12, 5, 2, 1], H: 20 }, { art: 'bench', at: [1, 9, 2, 1], H: 20 }, { art: 'bench', at: [12, 9, 2, 1], H: 20 }, { art: 'heater', at: [2, 1, 1, 1], H: 54 }],
+      warden: [{ art: 'car', at: [1, 3, 2, 3], H: 34 }, { art: 'crate', at: [12, 8, 1, 1], H: 30 }, { art: 'supply', at: [11, 1, 2, 1], H: 56 }, { art: 'crate', at: [2, 11, 1, 1], H: 30 }],
+      nurse: [{ art: 'bed', at: [1, 2, 2, 3], H: 18 }, { art: 'bed', at: [12, 2, 2, 3], H: 18 }, { art: 'shelves', at: [2, 9, 2, 1], H: 58 }, { art: 'locker', at: [12, 9, 1, 1], H: 62 }, { art: 'chair', at: [3, 12, 1, 1], H: 16, solid: 0 }],
     }[boss.id] || [];
     return {
       id: 'boss', type: 'boss', name: boss.name, address: boss.place, rows, doors: { '7,15': 'a' },
@@ -231,7 +232,7 @@
     };
     H().start(L, DM.Crew ? DM.Crew.wrap(O, 'boss') : O);
     const g = H().G;
-    const z = H().spawn(7.5 * T, 4 * T, { kind: 'wboss', hp: st.hp, maxHp: st.max, hw: 18, hh: 12, scale: 1.55, over: OVER[boss.id], st: 'chase', bst: 'intro', bT: 0, gT: 3, gi: 0, cdS: 0, hunter: true });
+    const z = H().spawn(7.5 * T, 3.6 * T, { kind: 'wboss', hp: st.hp / B.ARMOR, maxHp: st.max / B.ARMOR, hp0: st.hp / B.ARMOR, hw: 18, hh: 12, scale: 1.55, over: OVER[boss.id], st: 'chase', bst: 'intro', bT: 0, gT: 3, gi: 0, cdS: 0, hunter: true });
     z.flip = false; F.z = z;
     g.banners.push({ text: boss.name.toUpperCase(), sub: 'weekly boss', t: 0 }); SFX.play('groan');
   };
@@ -250,7 +251,8 @@
   function tick(dt, g) {
     if (!F || F.over) return;
     F.t += dt;
-    const z = F.z; F.dealt = Math.min(F.hp0, F.hp0 - Math.max(0, z.hp));
+    const z = F.z; F.dealt = Math.min(F.hp0, Math.min(2000, (z.hp0 - Math.max(0, z.hp)) * B.ARMOR));
+    if (F.dealt >= 2000 && !z.dead) { endFight('time'); return; }   // one fight counts up to 2,000 (the server's limit): it staggers off
     const left = Math.max(0, B.FIGHT_S - F.t), hp = Math.max(0, F.hp0 - F.dealt);
     const k = Math.ceil(left) + '|' + Math.round(hp);
     if (k !== F.hk) { F.hk = k; $('#shiftbar').innerHTML = `<div class="bfb"><span>${esc(F.boss.name.toUpperCase())}</span><i class="bbar sm"><i style="width:${hp / F.max * 100}%"></i></i><em>${fmt(F.dealt)} dmg</em></div><b>${Math.floor(left / 60)}:${pad(Math.floor(left % 60))}</b>`; }
@@ -376,5 +378,5 @@
   };
 
   // test hook (local copies): pretend this week's steps are walked
-  B.dev = { steps: () => { bs().w0 = Math.max(0, (SV().walked || 0) - B.STEPS - 100); G().save(); }, fights: () => { bs().fights = {}; G().save(); }, hurt: n => { const st = B.state(); st.hp = Math.max(1, st.hp - n); G().save(); } };
+  B.dev = { steps: () => { B.roll(); bs().w0 = (SV().walked || 0) - B.STEPS - 100; G().save(); }, fights: () => { bs().fights = {}; G().save(); }, hurt: n => { const st = B.state(); st.hp = Math.max(1, st.hp - n); G().save(); } };
 })();

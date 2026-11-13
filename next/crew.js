@@ -501,13 +501,14 @@
       <div class="ccrow" id="ccRow">${cl.map(m => `<canvas class="ccport${m.hungry ? ' hungry' : ''}" data-cp="${m.id}" width="72" height="92"></canvas>`).join('')}${pl.map(p => `<canvas class="ccpet${p.away ? ' away' : ''}" data-pp="${p.id}" width="80" height="60"></canvas>`).join('')}
         ${!cl.length && !pl.length ? '<div class="ccempty">Nobody yet. Survivors hide in closets and secret rooms; strays hide under furniture. Look carefully.</div>' : ''}</div>
       ${cl.length ? `<div class="ccfood${days < 2 ? ' low' : ''}">${icon('beans')} ${food} food in the stash · the crew eats ${cl.length}/day${days != null ? ` · ${days < 1 ? 'not enough for tomorrow!' : `enough for ${days} day${days === 1 ? '' : 's'}`}` : ''}</div>` : ''}
-      ${mo ? `<div class="ccmorn"><b>This morning</b>${mo.lines.map(l => `<span>${l}</span>`).join('')}</div>` : ''}
+      ${mo ? `<div class="ccmorn"><b>This morning</b>${mo.lines.map(l => `<span>${l}</span>`).join('')}<button class="linkbtn ok" id="ccMornOk">OK</button></div>` : ''}
       ${nNote ? `<div class="ccmorn bad"><b>${nNote} note${nNote > 1 ? 's' : ''} on your bunk</b><span>Open the crew sheet to read.</span></div>` : ''}
       <button class="mbtn sm" id="ccOpen">Crew${nNote ? ' · notes' : ''}</button></div>`;
   };
   C.bindCard = function (onChange) {
     C.onChange = onChange;
-    const v = SV(); if (v.crew.morning && !v.crew.morning.seen) { v.crew.morning.seen = true; G().save(); }   // shown once
+    const v = SV(), mo = $('#ccMornOk');
+    if (mo) mo.onclick = () => { if (v.crew.morning) v.crew.morning.seen = true; G().save(); SFX.play('ui'); onChange(); };
     const btn = $('#ccOpen'); if (btn) btn.onclick = () => { SFX.play('ui'); C.openSheet(); };
     drawCardPorts();
   };
@@ -535,7 +536,7 @@
       <div class="kick sect">Strays · ${pl.length}/${C.MAX_PETS}</div>
       ${pl.length ? pl.map(p => { const lv = C.plv(p), nx = PLV[lv] || null, away = p.away && p.away >= dayNo(); return `<div class="crow pet${p.active ? ' act' : ''}">
         <canvas data-pp="${p.id}" width="96" height="72"></canvas>
-        <div class="cinfo"><b>${esc(p.name)}</b> <button class="linkbtn inl" data-ren="${p.id}">rename</button><div class="crole">${COATS[p.kind][p.coat].n} ${p.kind} · Lv ${lv}</div>
+        <div class="cinfo"><div class="cname"><b>${esc(p.name)}</b><button class="linkbtn inl" data-ren="${p.id}">rename</button></div><div class="crole">${COATS[p.kind][p.coat].n} ${p.kind} · Lv ${lv}</div>
           <div class="cperk">${p.kind === 'dog' ? `Barks when a zombie spots you · sniffs out good containers${lv > 1 ? ' (more often)' : ''}` : `Footsteps ${Math.round((.15 + .03 * lv) * 100)}% quieter · ${30 + 5 * lv}% chance of a morning present`}</div>
           <div class="cbars"><span>${nx ? `Lv ${lv + 1}: ${Math.floor(p.xp).toLocaleString('en-US')}k/${nx}k of your steps` : 'Max level'}</span><i class="cbar"><i style="width:${nx ? Math.min(100, (p.xp - PLV[lv - 1]) / (nx - PLV[lv - 1]) * 100) : 100}%"></i></i></div>
           ${away ? '<div class="cpast"><b class="bad">Ran off after a zombie scare - back tomorrow.</b></div>' : ''}
@@ -543,7 +544,7 @@
         : '<div class="empty">No strays yet. Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Approach slowly, or offer food.</div>'}
       <button class="mbtn ghost" id="csClose">Close</button></div>`;
     el.classList.add('on'); el.onclick = e => { if (e.target === el) closeSheet(); };
-    for (const n of notes) n.seen = true; if (notes.length) G().save();
+    for (const n of notes) n.seen = true; if (v.crew.morning) v.crew.morning.seen = true; G().save();
     drawCardPorts();
     $('#csClose').onclick = closeSheet;
     el.querySelectorAll('[data-dis]').forEach(b => b.onclick = () => {
