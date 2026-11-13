@@ -71,7 +71,17 @@
       + 'delete all of its actions first. ' + rebuildPrompt().replace(/^Rebuild this shortcut from scratch\. Keep its run times \(the "At" times at the top\) exactly as they are\. Delete every existing action, then add/, 'Then add')
       + '\n\nPART 2 - Make it run by itself. Create four Personal Automations, each one:\n'
       + '   Trigger: Time of Day, Daily\n   Times: 12:00 PM, 4:00 PM, 8:00 PM and 11:00 PM (one automation for each)\n'
-      + '   Action: Run Shortcut "' + SC_NAME + '"\n   Run Immediately: ON\n   Notify When Run: OFF';
+      + '   Action: Run Shortcut "' + SC_NAME + '"\n   Run Immediately: ON\n   Notify When Run: OFF'
+      + '\n\nPART 3 - Also run it when my phone is unlocked (iPhone hides Health data while locked, so timed runs can miss). '
+      + 'Create three more Personal Automations, each with Action: Run Shortcut "' + SC_NAME + '", Run Immediately ON, Notify When Run OFF:\n'
+      + '   1. App - when "Messages" is opened\n   2. App - when "Safari" is opened\n   3. Charger - when iPhone connects to power';
+  }
+  // For people who already have the shortcut: only add the unlocked-phone triggers.
+  function triggersPrompt() {
+    return 'Edit my shortcut "' + SC_NAME + '". Do not change, add or remove any of its actions. Keep its existing Time of Day triggers exactly as they are.\n\n'
+      + 'Only add these new automation triggers, each set to Run Immediately with Notify turned OFF:\n'
+      + '1. App - when "Messages" is opened\n2. App - when "Instagram" is opened\n3. App - when "Safari" is opened\n4. Charger - when iPhone connects to power\n\n'
+      + 'Do not add a notification. Do not ask before running.';
   }
 
   /* ---------------- CSS ---------------- */
@@ -283,6 +293,9 @@
     if (NET.ok && NET.stepKey) h += '<div class="note"><b>Fastest: let your iPhone build it.</b> Copy this, open the <b>Shortcuts</b> app, ask the <b>Shortcuts AI</b> (Apple Intelligence) to make a shortcut, and paste it in. Your personal code is already inside. Then run <b>' + SC_NAME + '</b> once, tap <b>Allow</b>, and check the <b>Automation</b> tab has four "' + SC_NAME + '" automations (if the AI could not make them, add them by hand: step 9 below).'
       + '<textarea readonly id="sg-v-aisetup">' + esc((VALUES.aisetup = fullSetupPrompt())) + '</textarea>' + btn('copy:aisetup', 'Copy setup for Shortcuts AI', 'g') + msg('copy:aisetup')
       + '<p class="help">No Shortcuts AI on your phone? Follow the steps below instead.</p></div>';
+    h += '<div class="note"><b>Steps only update when you run it yourself?</b> iPhone hides Health data while the phone is locked, so a timed run at 4 PM in your pocket sends nothing. Fix: also run it whenever you open an app you use a lot (unlocked, silent). Copy this into the <b>Shortcuts AI</b> while editing <b>' + SC_NAME + '</b> (swap in your favourite apps):'
+      + '<textarea readonly id="sg-v-trig">' + esc((VALUES.trig = triggersPrompt())) + '</textarea>' + btn('copy:trig', 'Copy "add unlocked triggers" prompt', 'g') + msg('copy:trig')
+      + '<p class="help">By hand: open the shortcut &rarr; <b>+ Add Trigger</b> (or Automation tab &rarr; <b>+</b>) &rarr; <b>App</b> &rarr; pick the app &rarr; <b>Is Opened</b> &rarr; <b>Run Immediately</b>.</p></div>';
     h += '<div class="note"><b>Already had the Dead Miles Steps Shortcut from the old game?</b> Nothing to change. It keeps working here. Skip to <b>Test it</b> (step 8).</div>';
     h += step(1, 'Open the Shortcuts app', '<p>It is already on your iPhone (a blue and pink icon). Can\'t find it? Swipe down on the home screen and search <b>Shortcuts</b>. Deleted it? Get it free from the App Store.</p>');
     h += step(2, 'Make a new Shortcut', '<p>Tap <b>+</b> at the top right. Tap the name at the top and call it <b>' + SC_NAME + '</b>.</p>');
