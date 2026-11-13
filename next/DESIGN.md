@@ -42,6 +42,34 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Keep the backend: Supabase accounts (players), step posts (iPhone Shortcut,
   Android companion app), friends board, parties, bosses, gifts, camps.
 
+## Houses (decided)
+- Houses come ONLY from walking ("no walking, no houses"); further walks reach
+  bigger/rarer buildings. Every house is generated and different, 7DTD-style:
+  rowhouses, apartments, mansions, police station, pharmacy, bodega, school,
+  garage... Hidden compartments (cracked wall, sliding bookshelf, floor safe,
+  attic hatch), rarer and better the further you walk. Danger fits the place.
+- Looting by hand with the joystick is THE game. Auto-search is a fallback
+  the owner loves: a player's crew can search a house for them (less loot, no
+  hidden rooms) so walk-only friends are not left behind.
+- Loot runs short: about 3-5 minutes per house.
+
+## Shared party base, farming, party horde night (decided)
+- The shared camp IS the party's home base. Everyone lives there despite the
+  distance. Everyone's steps build it (walls, gate, watchtower, traps,
+  workbench, rain barrels, garden beds); each player also has a personal locker.
+- Farming: plant seeds found while looting. Watering costs steps (a few hundred
+  per plant per day) and ANY party member can water. Plants grow over real days;
+  unwatered plants wilt. Grown food is the reliable food supply.
+- Party horde night: announced days ahead with one deadline for everyone.
+  "Showing up" = a watch shift any time in the 24 h before: a 2-3 minute
+  real-time defense at the base (same joystick combat). Each shift thins the
+  horde; walls/traps/tower add defense. At the deadline it resolves: hold =
+  loot for everyone who did a shift; fall short = something breaks (a wall
+  section, the garden, the generator, an item from the shared stash) and the
+  party walks to repair it. Skippers get nothing but can help repair. Two
+  people online together can share a shift as a bonus, never required.
+  Horde size grows slowly; tuned so a party of two is not crushed.
+
 ## Build order
 1. Prototype one house: joystick, rooms with lootable furniture, timed search,
    loot window, a hidden room, zombies that hear noise, real-time combat. (next/)
