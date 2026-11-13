@@ -3648,11 +3648,18 @@ function takeItem(it,loc){
   S.pack.push(item);if(loc)loc.found.push({...item,ft:Date.now()});rarToast(it);return true;
 }
 function searchRoom(i){pushSoon();
+  if(typeof hvActive==='function'&&hvActive()){hvEnterRoom(i);return;}
   const loc=S.loc;if(!loc||!loc.cleared)return;const r=loc.rooms[i];if(r.done)return;
   if(r.sealed){breakSeal(i);return;}if(loc.stronghold&&r.stage>loc.stage){toast('Locked until stage '+r.stage+'. Push to '+['','the gate','the yard','the boss trailer'][loc.stage+1]+' first.','d');return;}
   if(roomTagBefore(i))return;
-  const tl=roomTagLoot(r);r.done=true;S.roomsSearched=(S.roomsSearched||0)+1;
+  const tl=roomTagLoot(r);
   for(const it of tl.items)takeItem(it,loc);
+  roomAfter(loc,r,tl.noise);
+}
+// v8.0: everything that happens once a room is finished, shared by the old room
+// buttons and the Season 2 walk-around search screen (which hands out the loot itself).
+function roomAfter(loc,r,tlNoise,skipNoise){
+  r.done=true;S.roomsSearched=(S.roomsSearched||0)+1;
   ctEvent('rooms',1);
   {const sl=roleLvl('scavenger');if(veteran('scavenger')&&Math.random()<0.15){S.parts=(S.parts||0)+1;log(roleBy('scavenger').name+' found a weapon part.');}if(sl&&Math.random()<(10+sl*5)/100){S.stock.scrap+=1+sl;log(roleBy('scavenger').name+' pried '+(1+sl)+' scrap out of the '+r.n.toLowerCase()+'.');toast('+'+(1+sl)+' scrap from '+roleBy('scavenger').name);}}
   if(typeof landmarkPayout==='function')try{landmarkPayout(loc);}catch(e){}
@@ -3664,10 +3671,12 @@ function searchRoom(i){pushSoon();
      wave needs 100. The perk did not reduce waves, it ABOLISHED them: no place
      in the game could reach the threshold. It is a percentage now, so it always
      helps and can never zero the mechanic out. */
-  let noise=Math.max(4,Math.round((r.noise+tl.noise+rint(-6,8))*(1-sk('lightstep')*0.12)*(wxKind()==='rain'?0.75:1)*(dayMod().noise||1)));loc.noise=Math.min(100,loc.noise+noise);
+  if(!skipNoise){let noise=roomNoise(r,tlNoise);loc.noise=Math.min(100,loc.noise+noise);}
   crewXp(1);save();render();
-  if(loc.noise>=100){loc.noise=55;loc.wave++;setTimeout(()=>startCombat([mk('walker'),mk(Math.random()<0.4?'runner':'walker')].concat(loc.wave>1?[mk('bloater')]:[]),'wave'),350);}
+  noiseWave(loc);
 }
+function roomNoise(r,tlNoise){return Math.max(4,Math.round((r.noise+(tlNoise||0)+rint(-6,8))*(1-sk('lightstep')*0.12)*(wxKind()==='rain'?0.75:1)*(dayMod().noise||1)));}
+function noiseWave(loc){if(loc.noise>=100){loc.noise=55;loc.wave++;setTimeout(()=>startCombat([mk('walker'),mk(Math.random()<0.4?'runner':'walker')].concat(loc.wave>1?[mk('bloater')]:[]),'wave'),350);return true;}return false;}
 /* ================= THE SEALED ROOM (v6.77) =================
    Her ask: "make some houses have a rare loot room ... we have to kill some
    type of zombie boss and gives good rewards. Don't make it easy but make it
@@ -5582,6 +5591,7 @@ function render(){
   ensureState();rollDay();rollWeek();ctRoll();checkRaids();storyCheck();
   try{renderSeason();}catch(e){}   // after ensureState - it writes to S
   try{campMorning();renderScout();renderCond();renderCamp();renderMusic();}catch(e){console.warn(e);}
+  try{if(typeof hvEligible==='function'){if(C&&HV.open)hvClose();else if(hvEligible(S.loc)){if(!S.loc.hvSeen){S.loc.hvSeen=1;setTimeout(hvOpen,60);}else if(HV.open)setTimeout(hvRender,0);}else if(HV.open)hvClose();}}catch(e){console.warn(e);}
   $('#hpNum').textContent=S.hp+' / '+maxHp();$('#hpBar').style.width=clamp(S.hp/maxHp()*100,0,100)+'%';
   countTo($('#topSteps'),S.steps.today);
   $('#sceneTag').textContent=district().n+' · '+S.walk.houses+' places';$('#arriveTag').hidden=!S.loc;
@@ -5732,6 +5742,9 @@ function renderLoc(){
       +'<b>'+esc(_ft.n)+'.</b> '+esc(_ft.d)+'</div>':'');
   if(!loc.cleared){el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.geo?esc(_ft.n):'unknown'}</span></h2><p>Door is ajar. No telling what is inside. Threat here: ${'☠'.repeat(Math.min(5,Math.round(district().threat*loc.threat+(isNight()?1:0))))}${isNight()?' · horde night':''}</p>${tierLine}${bankedLine()}${crewDownWarn()}<div class="grid2" style="margin-top:12px"><button class="btn r" onclick="enterLoc()">Go in</button><button class="btn" onclick="leaveLoc()">Keep walking</button></div>`;return;}
   const done=loc.rooms.every(r=>r.done);
+  if(typeof hvEligible==='function'&&hvEligible(loc)){
+    el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.rooms.filter(r=>r.done).length}/${loc.rooms.length} rooms searched</span></h2><p class="help">Noise ${loc.noise||0}/100. ${done?'Nothing left to search.':'Walk through the house and search the furniture.'}</p>${bankedLine()}<div class="grid2" style="margin-top:12px"><button class="btn r" onclick="hvOpen()">${done?'Look again':'Go inside'}</button><button class="btn" onclick="leaveLoc()">${done?'Keep walking':'Leave the rest'}</button></div>`;
+    return;}
   el.innerHTML=`<h2>${loc.e} ${esc(loc.n)} <span class="sub">${loc.rooms.filter(r=>r.done).length}/${loc.rooms.length} searched</span></h2>${tierLine}
   <div class="row" style="margin:8px 0 4px;justify-content:space-between"><span class="section-label">Noise</span><span class="help">${loc.noise>=70?'Something is stirring':loc.noise>=40?'Keep it down':'Quiet'}</span></div><div class="noise"><i style="width:${loc.noise}%"></i></div>${lureBtn(loc)}
   <div class="rooms" style="margin-top:12px">${loc.rooms.map((r,i)=>`<button class="room${r.done?' done':''}" onclick="searchRoom(${i})" ${r.done?'disabled':''}><span class="n">${r.sealed?'🔒 ':''}${esc(r.n)}</span><span class="m">${r.done?'searched':r.sealed?'<b style="color:var(--blood)">SEALED - something is in there</b>':'noise +'+r.noise}</span>${r.peek&&!r.done?`<span class="peek">🔭 ${esc(r.peek)}</span>`:''}${!r.done?roomTagLine(r):''}</button>`).join('')}</div>
@@ -5949,6 +5962,7 @@ const NEWS=[
  {v:'8.0',d:'Nov 13',t:'Season 2: a fresh start',
   i:['Everyone starts over. Your Season 1 character is archived, not deleted. You keep your name, your look, every cosmetic and your strays.',
      'You never stop walking. Places you pass are scouted and wait on a list (up to 10). Search them whenever you sit down.',
+     'New house search: go inside and the house opens up like a dollhouse. Tap a room, tap the furniture, and your survivor walks over and searches it. Then pick what to keep. Loud furniture (fridges, workbenches) makes more noise, and too much noise brings the dead.',
      'Every day counts about the same. Your first 7,000 steps a day count fully, the next 8,000 count half, and anything past 15,000 counts a little. Steps typed in by hand count half, up to 4,000 a day.',
      'The slow grind. Rare, epic and legendary finds are much rarer. Raids and the weekly boss are where the good gear is.',
      'Morning check-in: put in your sleep and readiness from your ring. A great night gives +15% XP. A rough one means you take less damage. Workouts like pickleball give training, which slowly raises your HP and damage.',
