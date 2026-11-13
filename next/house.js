@@ -321,6 +321,22 @@
       }
     }
   }
+  // Standing exactly on a secret before the house is searched enough: a quiet nudge, once in a while.
+  // It only fires where the note's clue points, so the secret is still earned.
+  function secretHint() {
+    if (gateOpen()) return;
+    const p = G.p, now = performance.now();
+    for (const s of G.sec) {
+      if (s.found || (s.st || 0) > 0 || (s.hintAt && now - s.hintAt < 25000)) continue;
+      let here = false, msg = '';
+      if (s.type === 'rug') { const R = rugRect(s); here = p.x > R.x - 6 && p.x < R.x + R.w + 6 && p.y > R.y - 6 && p.y < R.y + R.h + 6; msg = 'The floor creaks here... look around the rest of the house first.'; }
+      else if (s.type === 'shelf') { const sh = G.furn[s.furn]; here = sh && !sh.slideState && p.x > sh.x + 4 && p.x < sh.x + sh.w - 4 && p.y - (sh.y + sh.h) < 24 && p.y > sh.y + sh.h - 4; msg = 'This shelf feels wrong... look around the rest of the house first.'; }
+      else if (s.type === 'attic') { here = Math.hypot(p.x - px(s.hatch.x), p.y - px(s.hatch.y)) < .75 * T; msg = 'There is a hatch up there... look around the rest of the house first.'; }
+      else if (s.type === 'panel') { const f = G.furn[s.furn]; here = f && !f.opened && Math.abs(p.x - (f.x + f.w / 2)) < f.w / 2 && p.y - (f.y + f.h) < 30 && p.y > f.y + f.h - 4; msg = 'This wall sounds hollow... look around the rest of the house first.'; }
+      if (here) { s.hintAt = now; toast(msg, 3); return; }
+    }
+  }
+  function searchedCount() { const C = G.furn.filter(f => f.lootable && !f.secretLoot && !f.lock); return [C.filter(f => f.searched).length, C.length]; }
   function foundSecret(s) { if (!s.found) { s.found = true; gainXP(8, G.p.x, G.p.y); if (DM.Game && DM.Game.onSecret) DM.Game.onSecret(); } }
   function moveRug(s) { s.st = 1; SFX.play('whoosh'); const R = rugRect(s); puff(R.x + R.w * .8, R.y + R.h * .7, 2, 8, 'rgba(234,210,164,.5)', 50, .7, 3); }
   function pryBoard(s) {
@@ -371,7 +387,10 @@
     for (const it of interactables()) {
       const d = rectDist(p.x, p.y, it.rect);
       if (d > 36) continue;
-      const score = d + rectDist(fx, fy, it.rect) * .5;
+      // A secret action (Move rug, Pry floorboard, Push bookshelf...) only exists while she is standing
+      // in its spot, so it must win over the furniture beside it - a desk with a leftover item kept
+      // showing "Open Desk" and hid the rug.
+      const score = d + rectDist(fx, fy, it.rect) * .5 - (it.secret ? 1000 : 0);
       if (score < bd) { bd = score; best = it; }
     }
     return best;
@@ -400,6 +419,8 @@
     const keys = it.corpse ? (EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse')) : o.pre.slice();
     if (keys.length && Math.random() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot); if (more.length) keys.push(more[0]); }
     o.loot0 = toStacks(keys);
+    // A torn note remembers the house it came from, so reading it somewhere else is not misleading.
+    for (const e of o.loot0) if (e.k === 'note') e.d = { addr: L.address, text: L.note || '' };
     if (it.pry && o.loot0.length && Math.random() < .25) { const i = Math.floor(Math.random() * o.loot0.length), sm = o.loot0[i]; sm.n--; if (!sm.n) o.loot0.splice(i, 1); toast('Smashed: ' + ITEMS[sm.k].n.toLowerCase(), 1.8); }
     // xp: bigger containers teach more, the hidden stash a lot
     gainXP(it.corpse ? 2 : 2 + (o.time >= 2.2 ? 1 : 0) + (o.rare ? 6 : 0), G.p.x, G.p.y);
@@ -1499,6 +1520,8 @@
       const n = Math.round(G.noiseLvl * 5);
       noiseBars.forEach((b, i) => b.classList.toggle('on', i < n));
       $('#noise').classList.toggle('hot', n >= 4);
+      { const [a, b] = searchedCount(), el = $('#srch'); if (el) el.textContent = b ? `searched ${a}/${b}` : ''; }
+      if (p.st !== 'down') secretHint();
       const t = G.target;
       if (t && p.st !== 'down') {
         useBtn.classList.add('on'); useLbl.classList.add('on');
@@ -1621,7 +1644,11 @@
       const msg = DM.Game.applyUse(e.k); if (!msg) return;
       e.n--; if (!e.n) G.pack.splice(i, 1); lastHud = ''; SFX.play('pick'); toast(msg, 1.8); openPack(); return;
     }
-    if (e.k === 'note') { $('#shActs').innerHTML = `<div class="note">${L.note || '"...the rest is torn away."'}</div>`; SFX.play('pick'); return; }
+    if (e.k === 'note') {
+      const nd = e.d && typeof e.d === 'object' ? e.d : { addr: L.address, text: L.note };   // old notes: assume this house
+      const here = nd.addr === L.address;
+      $('#shActs').innerHTML = `<div class="note">${nd.text || '"...the rest is torn away."'}<br><small>Found at <b>${nd.addr || 'a house'}</b>${here ? ' - this house.' : ' - not this house. The clue is about that place.'}</small></div>`;
+      SFX.play('pick'); return; }
     if (it.hp) p.hp = Math.min(maxHp(), p.hp + it.hp);
     if (it.sta) p.sta = Math.min(100, p.sta + it.sta);
     e.n--; if (!e.n) G.pack.splice(i, 1);
