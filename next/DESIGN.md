@@ -72,6 +72,22 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   nothing. Two people online together can share a shift as a bonus, never
   required. Horde size grows slowly; a party of two must not be crushed.
 
+## Looting rules (decided after playing the prototype)
+- Searches start slow; a Scavenging skill (levels from searching) makes them
+  faster and finds more; later this becomes skill points.
+- Pack is 12 slots. Items stack with LIMITS (ammo 30, bandages/meds 5,
+  food/water/snacks/drinks 3, scrap 10...); weapons/tools don't stack.
+- Dropping an item destroys it. No coming back for it ("think about what you
+  should actually loot").
+- A bit fewer lootable things per house; some containers are empty.
+
+## Steps -> houses (decided)
+- ALL daily steps count (no dedicated walks needed). Houses scouted per day
+  follow the taper: ~3 at 3k, ~6 at 7k, ~9 at 15k, cap 10 at ~25k.
+- More steps in a day = slightly better odds at bigger buildings, but luck
+  still matters. Extra houses beyond what you can loot go to crew auto-search.
+- Consistency (horde shifts, watering, streak) matters as much as volume.
+
 ## Build order
 1. Prototype one house: joystick, rooms with lootable furniture, timed search,
    loot window, a hidden room, zombies that hear noise, real-time combat. (next/)
