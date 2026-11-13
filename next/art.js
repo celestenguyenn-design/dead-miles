@@ -116,6 +116,11 @@ const ART = (() => {
       }
     };
     pass('o'); pass('c');
+    if (pose.over) { // something worn on the head (the Krampus walker's Santa hat): drawn in rig coordinates, follows the head
+      const hp = rig.parts.find(p => p.name === 'head'), t = pp.head; ctx.save();
+      if (hp && t && t.r) { ctx.translate(hp.pivot[0], hp.pivot[1]); ctx.rotate(t.r); ctx.translate(-hp.pivot[0], -hp.pivot[1]); }
+      pose.over(ctx); ctx.restore();
+    }
     if (pose.flash > 0) pass(pose.flashRed ? 'r' : 'o', pose.flash);
     ctx.restore();
   }
@@ -272,6 +277,19 @@ const ART = (() => {
       SP('M-14,-157 L-10,-198 Q6,-202 22,-198 L26,-157 Q6,-153 -14,-157 Z', '#2a2440', 3.4) +
       SP('M-13,-170 Q6,-166 25,-170 L25.5,-161 Q6,-157 -13.5,-161 Z', '#5a4a87', 2.4) +
       `<rect x="1" y="-171" width="11" height="10" rx="1" fill="none" stroke="#e0b94a" stroke-width="3"/>` + SL('M-6,-194 L-9,-172', 'rgba(246,227,187,.22)', 2) },
+    // ---- event hats (phase 5a)
+    feathers: { slot: 'hat', svg: () => [[-26, '#8a4a2b'], [-13, '#e2863a'], [0, '#b53a2f'], [13, '#e2863a'], [26, '#8a4a2b']].map(([a, c]) =>
+      `<g transform="rotate(${a} 6 -160)">` + SP('M6,-160 Q-2,-182 6,-206 Q14,-182 6,-160 Z', c, 2.6) + SL('M6,-162 L6,-200', 'rgba(17,20,47,.45)', 1.2) + SD('M2.6,-196 Q6,-208 9.4,-196 Q6,-199 2.6,-196 Z', CRM2) + '</g>').join('') +
+      SP('M-21,-156 Q6,-166 33,-156 L33,-148 Q6,-158 -21,-148 Z', '#6e3f26', 3) + SL('M-14,-154 l4,0 M-2,-157 l4,0 M10,-158 l4,0 M22,-156 l4,0', '#e0b94a', 2) },
+    pietin: { slot: 'hat', svg: () => SP('M-26,-155 Q6,-166 40,-155 Q42,-149 36,-147 Q6,-157 -22,-147 Q-29,-149 -26,-155 Z', '#c9cedf', 3.2) +
+      SL('M-21,-152 l1,4 M-14,-154 l1,4 M-7,-155.6 l.6,4 M0,-156.4 l.4,4 M7,-156.8 v4 M14,-156.4 l-.4,4 M21,-155.6 l-.6,4 M28,-154 l-1,4 M34,-152 l-1,4', '#8a90a8', 1.4) +
+      SP('M-16,-157 Q-16,-183 6,-185 Q28,-183 28,-157 Q6,-162 -16,-157 Z', '#dfe2ee', 3.4) +
+      SL('M-8,-160 Q-9,-174 -4,-181 M4,-161 Q4,-176 6,-184 M16,-160 Q18,-174 20,-180', '#aab0c4', 1.6) + SL('M-10,-176 Q-2,-182 8,-182', 'rgba(255,255,255,.75)', 2.2) +
+      SP('M18,-170 l5,-3 l2,4 Z', '#aab0c4', 1.4) + SD('M-26,-151 Q-30,-146 -27,-142 Q-24,-146 -22,-148 Z', '#d9772e') },
+    santa: { slot: 'hat', svg: () => SP('M-16,-156 Q-14,-186 8,-188 Q24,-188 28,-170 Q34,-158 30,-156 Q6,-161 -16,-156 Z', '#d9483a', 3.6) +
+      SP('M-14,-170 Q-24,-176 -34,-168 Q-38,-160 -34,-150 Q-30,-160 -22,-162 Z', '#d9483a', 3.2) + SL('M0,-182 Q12,-184 20,-176', 'rgba(255,255,255,.3)', 2.2) +
+      SP('M-22,-160 Q6,-170 36,-160 Q38,-150 34,-148 Q6,-158 -20,-150 Q-25,-154 -22,-160 Z', '#f4efe6', 3.2) +
+      circ(-34, -147, 6.5, '#f4efe6', 3) + SL('M-14,-157 q3,-3 6,0 M4,-160 q3,-3 6,0 M22,-159 q3,-3 6,0', '#d8d2c4', 1.4) },
     // ---- face
     round: { slot: 'face', svg: () => SL('M-2.8,-140 L-12,-143', CI, 2.2) + circ(4.6, -139, 7.4, 'rgba(246,227,187,.22)', 2.6) + circ(21, -139, 7.4, 'rgba(246,227,187,.22)', 2.6) +
       `<circle cx="4.6" cy="-139" r="6" fill="none" stroke="#b07a46" stroke-width="1.2"/><circle cx="21" cy="-139" r="6" fill="none" stroke="#b07a46" stroke-width="1.2"/>` + SL('M12,-140 Q12.8,-143 13.6,-140', CI, 2.2) },
@@ -307,6 +325,9 @@ const ART = (() => {
     lights: { slot: 'back', svg: () => { const pts = [[-49, -110], [-40, -104], [-31, -111], [-21, -105], [-47, -86], [-38, -80], [-28, -86], [-19, -80]], cols = ['#ffe27a', '#f07aa9', '#7ee0d8', '#ffe27a', '#f07aa9', '#7ee0d8', '#ffe27a', '#f07aa9'];
       return SL('M-51,-108 Q-45,-100 -40,-104 Q-35,-110 -31,-111 Q-26,-102 -21,-105 Q-16,-106 -14,-100', '#2a2838', 1.2) + SL('M-50,-84 Q-44,-78 -38,-80 Q-33,-88 -28,-86 Q-23,-77 -19,-80 Q-15,-82 -14,-78', '#2a2838', 1.2) +
         pts.map(([x, y], i) => `<circle cx="${x}" cy="${y + 2.6}" r="5.6" fill="${cols[i]}" opacity=".28"/>` + circ(x, y + 2.6, 2.6, cols[i], 1.2)).join(''); } },
+    candycane: { slot: 'back', svg: () => SL('M-40,-56 L-30,-132 Q-28,-146 -16,-146 Q-6,-145 -7,-134', CI, 10) + SL('M-40,-56 L-30,-132 Q-28,-146 -16,-146 Q-6,-145 -7,-134', '#f4efe6', 6) +
+      SL('M-40,-56 L-30,-132 Q-28,-146 -16,-146 Q-6,-145 -7,-134', '#d9483a', 6).replace('/>', 'stroke-dasharray="5 6"/>') +
+      SL('M-46,-102 L-22,-96', '#6e3f26', 3.2) + SL('M-35,-140 Q-30,-146 -24,-147', 'rgba(255,255,255,.65)', 1.6) },
     // ---- outfits (jacket styles; col = [main, shade] replaces the jacket colour while worn)
     denim: { slot: 'outfit', col: ['#5a7ab9', '#3e5a95', 'Denim'], svg: () => SL('M-25,-104 Q-2,-97 20,-104', CRM2, 1.4, ) .replace('/>', 'stroke-dasharray="3 2.4"/>') +
       `<rect x="-22" y="-100" width="11" height="8" rx="1.5" fill="#3e5a95" stroke="${CI}" stroke-width="1.6"/>` + SL('M-21,-96 h9', CRM2, 1).replace('/>', 'stroke-dasharray="2 1.6"/>') +
@@ -409,6 +430,12 @@ const ART = (() => {
     stuffing: `<g transform="rotate(6)"><path d="M-18,-22 L18,-22 L20,24 L-20,24 Z" fill="#e8a24a" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/><rect x="-14" y="-10" width="28" height="16" rx="3" fill="#f6e3bb" stroke="#11142f" stroke-width="1.8"/><circle cx="-6" cy="-2" r="2.4" fill="#93a86c"/><circle cx="2" cy="-1" r="2.4" fill="#c95f2c"/><circle cx="8" cy="-3" r="2" fill="#93a86c"/></g>`,
     pie: `<path d="M-26,4 Q0,-26 26,4 L22,12 L-22,12 Z" fill="#e0a050" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/><path d="M-20,2 Q0,-18 20,2 Z" fill="#d9772e"/><path d="M-12,-6 Q-6,-10 0,-8 M4,-8 Q10,-8 12,-4" stroke="#f6e3bb" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M-22,12 L22,12 L20,18 L-20,18 Z" fill="#b9bdcc" stroke="#11142f" stroke-width="2.2" stroke-linejoin="round"/>`,
     turkey: `<ellipse cx="0" cy="14" rx="28" ry="8" fill="#e8e2d4" stroke="#11142f" stroke-width="2.4"/><path d="M-22,8 Q-24,-16 0,-18 Q24,-16 22,8 Z" fill="#c9782e" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/><path d="M-12,-10 Q-4,-14 4,-12" stroke="#f0b06a" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M18,-6 L28,-14 M-18,-6 L-28,-14" stroke="#11142f" stroke-width="5" stroke-linecap="round"/><circle cx="28" cy="-15" r="4" fill="#f6e3bb" stroke="#11142f" stroke-width="2"/><circle cx="-28" cy="-15" r="4" fill="#f6e3bb" stroke="#11142f" stroke-width="2"/>`,
+    gift: `<rect x="-22" y="-10" width="44" height="32" rx="3" fill="#d9483a" stroke="#11142f" stroke-width="2.6"/><rect x="-25" y="-18" width="50" height="11" rx="2.5" fill="#e65a4a" stroke="#11142f" stroke-width="2.6"/>
+      <rect x="-5" y="-18" width="10" height="40" fill="#93a86c" stroke="#11142f" stroke-width="2.2"/><path d="M0,-18 Q-16,-34 -18,-22 Q-16,-16 0,-18 Q16,-34 18,-22 Q16,-16 0,-18" fill="#a9c27c" stroke="#11142f" stroke-width="2.4" stroke-linejoin="round"/>
+      <path d="M-18,-4 L-12,-4" stroke="#f6e3bb" stroke-width="2" stroke-linecap="round" opacity=".6"/>`,
+    candy: `<g transform="rotate(25)"><path d="M4,26 L4,-14 Q4,-26 -6,-26 Q-16,-26 -16,-16" fill="none" stroke="#11142f" stroke-width="12" stroke-linecap="round"/>
+      <path d="M4,26 L4,-14 Q4,-26 -6,-26 Q-16,-26 -16,-16" fill="none" stroke="#f4efe6" stroke-width="7" stroke-linecap="round"/>
+      <path d="M4,26 L4,-14 Q4,-26 -6,-26 Q-16,-26 -16,-16" fill="none" stroke="#d9483a" stroke-width="7" stroke-dasharray="5 5"/></g>`,
     hat: `<ellipse cx="0" cy="14" rx="30" ry="9" fill="#2a2440" stroke="#11142f" stroke-width="2.6"/><path d="M-16,12 L-12,-22 L12,-22 L16,12 Z" fill="#2a2440" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/><rect x="-15" y="2" width="30" height="8" fill="#5a4a86" stroke="#11142f" stroke-width="1.8"/><rect x="-6" y="0" width="12" height="12" rx="1" fill="none" stroke="#e0b94a" stroke-width="3"/>`,
   });
   const iconURL = {};

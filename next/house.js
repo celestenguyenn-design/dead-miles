@@ -8,6 +8,7 @@
   const { T, WH, WT, PSCALE, ZSCALE, $, DEV, SFX, clamp, lerp, angDiff, rectDist, toast, buzz, keys, btn } = E;
   const cv = E.cv, ctx = E.ctx;
   const { ITEMS, stackMax, toStacks, rollLoot, LOCKS, EVENT, WEAPONS } = D;
+  const EVS = DM.Events, EVA = D.EV;   // the running seasonal event (events.js) or null
 
   // ---------------------------------------------------------------- layout
   let L = null, ROWS = [], MW = 0, MH = 0, opts = {};
@@ -37,10 +38,11 @@
   const gatePct = () => job() === 'scavenger' ? .65 : .75;
   const LOCK_EASE = () => (job() === 'thief' ? 1.6 : 1) * (S().lockset ? 1.25 : 1);   // the Thief job widens sweet spots
   const SNAP_T = () => (job() === 'thief' ? 2.4 : 1.2) * (S().lockset ? 1.5 : 1);    // ... and picks break half as often
-  const maxHp = () => job() === 'brawler' ? 130 : 100;
+  const maxHp = () => D.maxHp(S());   // job + training (phase 5a)
   function gainXP(n, x, y) {
-    const before = scavLvl(); S().xp += n; DM.Game && DM.Game.save();
-    G.nums.push({ x: x + 16, y: y - 112, v: '+' + n + ' xp', t: 0, col: P.GRN, small: 1 });
+    const mul = D.xpMul(S());           // well rested (morning check-in): +15% scavenging XP
+    const before = scavLvl(); S().xp += n * mul; DM.Game && DM.Game.save();
+    G.nums.push({ x: x + 16, y: y - 112, v: '+' + (mul > 1 ? (n * mul).toFixed(1) : n) + ' xp', t: 0, col: P.GRN, small: 1 });
     const after = scavLvl();
     if (after > before) { levelUp(after); if (DM.Game && DM.Game.onLevel) DM.Game.onLevel(after); }
   }
@@ -92,7 +94,9 @@
       if (zd.sleep) { z.sleep = zd.sleep; const sf = G.furn.find(f => f.fid === zd.sleep.furn); if (sf) sf.bedOf = z; }
       G.zs.push(z);
     }
-    if (EVENT && L.turkey) { const tk = mkZombie(L.turkey.x * T, L.turkey.y * T, 'idle', streetRoom()); Object.assign(tk, { kind: 'turkey', hp: 170, maxHp: 170, hw: 10, hh: 7 }); G.zs.push(tk); }
+    // the event mini-boss (zombie turkey, Krampus walker) in about 1 in 3 yards / kitchens
+    const bs = EVS && !opts.noBoss ? EVS.bossFor(L) : null;
+    if (bs) { const bz = mkZombie(bs.x * T, bs.y * T, 'idle', bs.where === 'yard' ? streetRoom() : null); Object.assign(bz, { kind: bs.kind, hp: bs.hp, maxHp: bs.hp, boss: 1 }, bs.props); G.zs.push(bz); }
     buildWalls(); buildSolid();
     G.p.flip = false;
     hideCards(); closeSheet(true);
@@ -102,6 +106,13 @@
     $('#joyhint').classList.remove('gone');
     lastHud = '';
     toast(opts.hint || 'Joystick to move  ·  SEARCH near furniture', 3.2);
+    hudChips();
+  }
+  // top-left chips: the running event, and today's condition from the morning check-in
+  function hudChips() {
+    const ev = $('#evchip'), cc = $('#condchip');
+    if (ev) { ev.style.display = EVA ? '' : 'none'; if (EVA) { ev.innerHTML = EVS.glyph(EVA.id) + '<span>' + EVA.ev.short + '</span>'; ev.style.background = EVA.ev.accent.c; } }
+    if (cc) { const t = D.condToday(S()); cc.className = t ? 'on c-' + t : ''; cc.innerHTML = t ? `<b>${D.COND[t].chip}</b>${t === 'rested' ? ' +15% xp' : t === 'low' ? ' −25% dmg' : ''}` : ''; }
   }
   function mkZombie(x, y, st, room) {
     return {
@@ -352,7 +363,7 @@
     for (const z of G.zs) {
       if (!z.dead || z.rot === 0) continue;
       let act = !z.searched ? 'Search' : (z.loot0 && z.loot0.length ? 'Open' : null);
-      if (act) out.push({ obj: z, act, rect: z.kind === 'turkey' ? { x: z.x - 24, y: z.y - 14, w: 48, h: 26 } : { x: z.x + (z.fallDir || 1) * 34 - 38, y: z.y - 14, w: 76, h: 26 }, name: z.kind === 'turkey' ? 'Zombie turkey' : 'Zombie', noise: 1.5, corpse: true });
+      if (act) out.push({ obj: z, act, rect: z.kind === 'turkey' ? { x: z.x - 24, y: z.y - 14, w: 48, h: 26 } : { x: z.x + (z.fallDir || 1) * 34 - 38, y: z.y - 14, w: 76, h: 26 }, name: EVS.isBoss(z) ? EVS.bossName(z.kind) : 'Zombie', noise: 1.5, corpse: true });
     }
     return out;
   }
@@ -388,7 +399,7 @@
       return;
     }
     o.searched = true; G.stats.searched++;
-    const keys = it.corpse ? (o.kind === 'turkey' ? ['turkey', D.cosOwned().pilgrim ? 'cos_harvest' : 'cos_pilgrim'] : rollLoot('corpse')) : o.pre.slice();
+    const keys = it.corpse ? (EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse')) : o.pre.slice();
     if (keys.length && Math.random() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot); if (more.length) keys.push(more[0]); }
     o.loot0 = toStacks(keys);
     if (it.pry && o.loot0.length && Math.random() < .25) { const i = Math.floor(Math.random() * o.loot0.length), sm = o.loot0[i]; sm.n--; if (!sm.n) o.loot0.splice(i, 1); toast('Smashed: ' + ITEMS[sm.k].n.toLowerCase(), 1.8); }
@@ -599,7 +610,7 @@
           const dx = z.x - p.x, dy = (z.y - p.y) * 1.15, d = Math.hypot(dx, dy);
           if (d > W.reach * T) continue;
           if (d > 18 && Math.abs(angDiff(Math.atan2(dy, dx), fa)) > 1.35) continue;
-          hitZombie(z, fa, W.dmg * (job() === 'brawler' ? 1.3 : 1)); any = true;
+          hitZombie(z, fa, W.dmg * (job() === 'brawler' ? 1.3 : 1) + D.trainDmg(S())); any = true;   // training: +1 melee per 25 points
         }
         if (any) { G.hitstop = .055; G.shake = Math.max(G.shake, 5); wearWeapon(); }
         emitNoise(p.x, p.y, any ? W.noise : 1.5, any);
@@ -616,6 +627,7 @@
     if (ranged && z.st !== 'chase') alertZombie(z, G.p.x, G.p.y, true);
     z.hp -= dmg; z.flash = 1; z.hurtDir = Math.cos(fa) >= 0 ? 1 : -1;
     z.kbx = Math.cos(fa) * 5.5 * T; z.kby = Math.sin(fa) * 5.5 * T * .8;
+    if (z.kind === 'krampus') { z.kbx *= .45; z.kby *= .45; }   // heavy: barely budges
     dmgNum(z.x + 20 * (Math.random() < .5 ? -1 : 1), z.y - 104, dmg, sneak ? P.ORA : P.CRM);
     splat(z.x, z.y, fa, z.hp <= 0);
     puff(z.x, z.y, 44, 5, P.CRM, 90, .25, 2.2);
@@ -633,7 +645,7 @@
     const p = G.p;
     if (p.inv > 0 || p.st === 'down') return;
     cancelSearch(); p.auto = null; if (G.sheet) closeSheet(); if (LP.on) closeLock('You flinched - the pick slipped out');
-    dmg = Math.round(dmg * (z && z.dmgMul || 1));
+    dmg = Math.round(dmg * (z && z.dmgMul || 1) * D.guard(S()));   // lay low (bad night): 25% less damage today
     p.hp = Math.max(0, p.hp - dmg); p.inv = .7; p.flash = .55;
     p.kbx = dx * 6 * T; p.kby = dy * 6 * T * .8;
     p.st = 'hurt'; p.stT = 0;
@@ -1023,10 +1035,21 @@
     ctx.drawImage(E.vignette, 0, 0, W, H);
     if (G.redFlash > 0) { ctx.fillStyle = `rgba(181,58,46,${G.redFlash * .32})`; ctx.fillRect(0, 0, W, H); }
     if (p.hp < 35 && p.st !== 'down') { ctx.fillStyle = `rgba(181,58,46,${.08 + .06 * Math.sin(G.t * 5)})`; ctx.fillRect(0, 0, W, H); }
+    if (EVA && EVA.ev.accent.snow) drawSnow(W, H);
     drawBanners();
     drawLock();
   }
 
+  // Christmas: a cold blue tint and slow snow, drawn in screen space (light: ~40 flakes)
+  function drawSnow(W, H) {
+    ctx.fillStyle = 'rgba(150,190,255,.06)'; ctx.fillRect(0, 0, W, H);
+    const out = G.room === streetRoom(), n = out ? 46 : 18, sc = DEV.dpr * DEV.zoom;
+    ctx.fillStyle = out ? 'rgba(246,240,255,.75)' : 'rgba(246,240,255,.28)';
+    for (let i = 0; i < n; i++) {
+      const sp = 18 + (i * 37 % 23), x = ((i * 97.3 + Math.sin(G.t * .6 + i) * 18 - G.cam.x * .2) % W + W) % W, y = ((i * 61.7 + G.t * sp * sc - G.cam.y * .2) % H + H) % H;
+      ctx.beginPath(); ctx.arc(x, y, (1.2 + (i % 3) * .7) * sc, 0, 6.29); ctx.fill();
+    }
+  }
   function drawWall(w) {
     const a = w.cut;
     if (a < .99) ctx.globalAlpha = a;
@@ -1192,6 +1215,16 @@
     if (z.flash > 0) { ctx.globalAlpha = z.flash * .8; ctx.beginPath(); ctx.ellipse(0, -26, 19, 15, -.1, 0, 6.28); ctx.fillStyle = '#ffffff'; ctx.fill(); ART.dot(ctx, hx, hy, 7, '#ffffff'); ctx.globalAlpha = 1; }
     ctx.restore();
   }
+  // the Krampus walker's Santa hat, in zombie-rig coordinates (head faces left, pivot at the neck -20,-108)
+  function santaHat(c) {
+    c.lineJoin = 'round'; c.lineWidth = 4; c.strokeStyle = P.INK;
+    c.beginPath(); c.moveTo(-50, -164); c.quadraticCurveTo(-46, -200, -16, -204); c.quadraticCurveTo(10, -204, 16, -186); c.quadraticCurveTo(26, -176, 22, -162); c.quadraticCurveTo(-14, -172, -50, -164); c.closePath();
+    c.fillStyle = '#d9483a'; c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(16, -186); c.quadraticCurveTo(34, -190, 40, -172); c.lineTo(32, -170); c.quadraticCurveTo(28, -180, 18, -178); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(-54, -168); c.quadraticCurveTo(-16, -182, 26, -168); c.quadraticCurveTo(28, -158, 24, -155); c.quadraticCurveTo(-14, -168, -52, -156); c.quadraticCurveTo(-58, -160, -54, -168); c.closePath();
+    c.fillStyle = '#e9e3d6'; c.fill(); c.stroke();
+    c.beginPath(); c.arc(38, -168, 8, 0, 6.29); c.fill(); c.stroke();
+  }
   function drawZombie(z) {
     if (z.kind === 'turkey') { drawTurkey(z); return; }
     const dir = z.flip ? 1 : -1; // facing direction (+1 = right)
@@ -1231,8 +1264,9 @@
     if (z.st === 'dead') { // corpse lies along the floor
       y = z.y + 6;
     }
-    z._pose = [x, y + yo, ZSCALE, z.flip, { rot, sy, parts, alpha: 1 }];
-    ART.drawRig(ctx, 'zombie', x, y + yo, ZSCALE, z.flip, { rot, sy, parts, flash: z.flash, alpha });
+    const zs = z.kind === 'krampus' ? ZSCALE * 1.18 : ZSCALE, over = z.kind === 'krampus' ? santaHat : null;
+    z._pose = [x, y + yo, zs, z.flip, { rot, sy, parts, alpha: 1, over }];
+    ART.drawRig(ctx, 'zombie', x, y + yo, zs, z.flip, { rot, sy, parts, flash: z.flash, alpha, over });
   }
 
   // Fog is sampled on a fine grid (4 per tile) that knows what is *drawn* there: wall faces
@@ -1403,7 +1437,7 @@
         ctx.globalAlpha = 1;
       }
       if (z.alertT > 0 || z.st === 'windup') {
-        const x = z.x, y = z.y - (z.kind === 'turkey' ? 84 : 92) - (z.st === 'windup' ? 4 : 0);
+        const x = z.x, y = z.y - (z.kind === 'turkey' ? 84 : z.kind === 'krampus' ? 112 : 92) - (z.st === 'windup' ? 4 : 0);
         const red = z.st === 'windup';
         const sc = red ? 1 + Math.sin(G.t * 30) * .08 : 1;
         ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);
@@ -1413,7 +1447,7 @@
         if (red) { ctx.globalAlpha = .25 + .2 * Math.sin(G.t * 30); ctx.fillStyle = P.RED; ctx.beginPath(); ctx.ellipse(z.x + Math.sign(G.p.x - z.x) * 22, z.y, 34, 14, 0, 0, 6.28); ctx.fill(); ctx.globalAlpha = 1; }
       }
       if (!z.dead && z.hp < (z.maxHp || 100)) {
-        const w = 40, x = z.x - w / 2, y = z.y - (z.kind === 'turkey' ? 76 : 84);
+        const w = z.boss ? 52 : 40, x = z.x - w / 2, y = z.y - (z.kind === 'turkey' ? 76 : z.kind === 'krampus' ? 104 : 84);
         ART.rr(ctx, x - 2, y - 2, w + 4, 9, 4); ctx.fillStyle = P.INK; ctx.fill();
         ART.rr(ctx, x, y, w * Math.max(0, z.hp) / (z.maxHp || 100), 5, 2.5); ctx.fillStyle = P.GRN; ctx.fill();
       }
@@ -1516,7 +1550,7 @@
     const rm = it.corpse ? 'Zombie' : RN(o.room) || '';
     G.sheet = { kind: 'loot', o, it };
     $('#shKick').textContent = (it.corpse ? 'Corpse' : rm) + ' · searched';
-    $('#shTitle').textContent = it.corpse ? (o.kind === 'turkey' ? 'Zombie turkey' : 'Zombie remains') : o.name;
+    $('#shTitle').textContent = it.corpse ? (EVS.isBoss(o) ? EVS.bossName(o.kind) : 'Zombie remains') : o.name;
     renderLoot();
     sheet.classList.add('on');
     tip('loot');
@@ -1866,7 +1900,7 @@
     }
   }
 
-  function zombieCount() { const zs = G.zs.filter(z => z.kind !== 'turkey'); return { dead: zs.filter(z => z.dead).length, total: zs.length }; }
+  function zombieCount() { const zs = G.zs.filter(z => !EVS.isBoss(z)); return { dead: zs.filter(z => z.dead).length, total: zs.length }; }
   // ---------------------------------------------------------------- finishing a run
   function finishRun(kind) {
     S().hp = Math.max(kind === 'down' ? 20 : 1, Math.round(G.p.hp));
@@ -1906,7 +1940,7 @@
     blocked: () => !!(G && (G.sheet || G.over)), resized: () => { if (G) buildStatic(); },
   };
   DM.House = {
-    start(layout, o) { startRun(layout, o); document.body.classList.add('inrun'); document.body.classList.toggle('event', !!EVENT); DM.scene = scene; },
+    start(layout, o) { startRun(layout, o); document.body.classList.add('inrun'); document.body.classList.toggle('event', !!EVA); DM.scene = scene; },
     get G() { return G; }, get L() { return L; }, zombieCount: () => G ? zombieCount() : { dead: 0, total: 0 },
     // used by the base (base.js): live furniture, spawning, damage, leaving
     addFurn(d) {

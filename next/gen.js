@@ -403,10 +403,11 @@
     for (const r of rooms) { const def = ROOMS[r.t]; L.rooms[r.ch] = r.hidden ? { name: 'Hidden room', style: 's', hidden: true } : r.isolated ? { name: 'Attic', style: 'a', isolated: true } : { name: def ? def.n : 'Room', style: def ? def.st : 'h', kind: r.t }; }
     L.rooms.o = { name: front ? 'Sidewalk' : 'Stoop', style: 'o' };
     const num = ri(2, 480), street = pick(D.STREETS);
+    rnd();   // 0.4-0.5 rolled the Thanksgiving turkey here: keep the sequence so a seed still makes the same house
     Object.assign(L, {
       type, name: bt.n, size: bt.size, rows: g.map(row => row.join('')), street: 'o', streetY: yB + 1, frontDoor: fdx + ',' + yB,
       stoop: { x: fdx + .5 }, start, houseNum: num, address: num + ' ' + street, secrets: secOut,
-      turkey: D.EVENT && rnd() < .35 ? { x: Math.max(1.5, fdx - 9), y: yB + 1.95 } : null,
+      boss: bossSpots(seed, rooms, zCells, fdx, yB),
       wanderer: rnd() < .55 || type === 'police', wandererT: ri(60, 110), wanderHp: rc.tough ? 150 : 100,
       emptyPct: .2, danger: bt.danger + (nZ > rc.zombies[0] + 1 ? 1 : 0),
       nZombies: L.zombies.length, nLocks: furn.filter(f => f.lock).length,
@@ -416,6 +417,14 @@
     // furniture: drop generator-only fields
     for (const f of furn) { delete f.lockable; delete f.mustLock; delete f.used; delete f.mustReach; }
     return L;
+  }
+  // Event mini-boss spots (events.js decides whether one shows up): rolled from their own random stream so the
+  // event never changes the house itself. yard = the sidewalk left of the stoop; kitchen = a free kitchen floor tile.
+  function bossSpots(seed, rooms, zCells, fdx, yB) {
+    const br = D.mulberry32((seed ^ 0x7b3a1f29) >>> 0), roll = br(), roll2 = br();
+    const kc = zCells.filter(c => c[2] && (c[2].t === 'kitchen' || c[2].t === 'breakroom'));
+    const k = kc.length ? kc[Math.floor(br() * kc.length)] : null;
+    return { roll, roll2, yard: { x: Math.max(1.5, fdx - 9), y: yB + 1.95 }, kitchen: k ? { x: k[0] + .5, y: k[1] + .6 } : null };
   }
   function range(a, b) { const o = []; for (let i = a; i <= b; i++) o.push(i); return o; }
 
