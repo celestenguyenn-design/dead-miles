@@ -214,7 +214,7 @@ const NEXT_VERSION = '0.8';
     const L = layoutOf(h), rnd = D.mulberry32(h.seed ^ 0x5bd1e995);
     const got = [], share = DM.Crew.autoShare(), skip = DM.Crew.lockSkip(), n = SV.crew.list.length;
     for (const f of L.furn) {
-      if (!f.loot || f.secretLoot) continue;
+      if (!f.loot || f.secretLoot || f.keyLock || f.keyRoom) continue;   // 0.8: the crew has no brass key
       if (f.lock && rnd() < skip) continue; // the crew skips some of the locked stuff (scavengers fewer)
       for (const k of D.rollLoot(f.loot, rnd)) if (rnd() < share) got.push(k);
     }
@@ -235,7 +235,7 @@ const NEXT_VERSION = '0.8';
     const q = h.quest && questById(h.quest);
     if (q && q.type === 'fetch' && !q.done) { // plant Dot's lockbox in one container of this house
       L.furn = L.furn.map(f => Object.assign({}, f));
-      const cs = L.furn.filter(f => f.loot && !f.secretLoot && !f.lock && f.room !== 'o');
+      const cs = L.furn.filter(f => f.loot && !f.secretLoot && !f.lock && !f.keyRoom && f.room !== 'o');
       const f = cs[D.hashStr(q.id) % cs.length]; f.extra = (f.extra || []).concat('parcel'); f.noEmpty = 1;
     }
     if ((h.type === 'mansion' || h.type === 'apt') && !q) { // decor turns up more often in mansions and apartments
@@ -569,7 +569,7 @@ const NEXT_VERSION = '0.8';
     medcab: 'medicine cabinets', shelves: 'utility shelves', toolbox: 'toolboxes', crate: 'hidden stashes', books: 'bookshelves', night: 'nightstands', wardrobe: 'closets', dresser: 'dressers', desk: 'desks',
     tv: 'TV stands', coat: 'coat closets', hall: 'hall tables', hutch: 'hutches', side: 'side tables', corpse: 'zombies', safe: 'gun safes', cache: 'hidden caches', attic: 'attics', wallcache: 'wall caches',
     store: 'store shelves', register: 'registers', storage: 'storage rooms', pharm: 'pharmacy shelves', pharmstore: 'pharmacies', cage: 'pharmacy cages', locker: 'police lockers', evidence: 'evidence rooms',
-    armory: 'armories', filing: 'filing cabinets', gym: 'gym lockers', nurse: "nurse's offices", workbench: 'garage workbenches', garage: 'garages', washer: 'washers', wine: 'wine racks', cellar: 'cellars' };
+    armory: 'armories', filing: 'filing cabinets', gym: 'gym lockers', nurse: "nurse's offices", workbench: 'garage workbenches', garage: 'garages', washer: 'washers', wine: 'wine racks', cellar: 'cellars', car: 'locked cars', lockedroom: 'key-locked rooms' };
   function whereFrom(k) {
     const sc = [];
     for (const t in D.LOOT) { if (!PLACE[t]) continue; const tab = D.LOOT[t][1], w = tab[k] || 0; if (!w) continue; const tot = Object.values(tab).reduce((a, b) => a + b, 0); sc.push([PLACE[t], w / tot + (D.LOOT[t][2] && D.LOOT[t][2].includes(k) ? .5 : 0)]); }
@@ -585,7 +585,7 @@ const NEXT_VERSION = '0.8';
     if (it.slots) return `Fit it to your pack: +${it.slots} pack slots for good`;
     if (it.hp || it.sta || it.hu || it.th) return [DM.Food.label(k), it.hp ? `heals ${it.hp} HP` : '', it.sta ? `+${it.sta} stamina` : ''].filter(Boolean).join(' · ').replace(/^./, c => c.toUpperCase());
     return { lockpick: 'Opens locks silently with the lockpick mini-game. Snaps if you force it.', arrow: 'Ammo for the hunting bow. You can pick most of them back up.', shoes: 'Wear them: your footsteps make 30% less noise.',
-      lockset: 'Keep it in your kit: locks feel easier (wider sweet spot, picks last longer).', prybar: 'A quiet way to pry things open; also a weapon.' }[k] || '';
+      lockset: 'Keep it in your kit: locks feel easier (wider sweet spot, picks last longer).', key: 'Brass key - opens a locked car or a key-locked room. Used up. Carry it in your pack.', prybar: 'A quiet way to pry things open; also a weapon.' }[k] || '';
   }
   let benchSel = null;
   function benchRows(keys, known) {
@@ -1247,7 +1247,7 @@ const NEXT_VERSION = '0.8';
   const HOWTO = [
     ['Steps & houses', 'All your daily steps count. About every 1,000 steps scouts another house (up to 10 a day; the more you walk, the better the odds of big places like police stations and mansions). Houses wait 3 days. Loot one yourself, or send your Crew - they bring back less and never find secrets.'],
     ['Looting', 'Walk with the joystick (drag anywhere). Stand by furniture and tap the magnifier to search. Searching makes noise. Your pack has 12 slots; things stack. Leave by the front door - anything you dropped stays behind. Your Scavenging level makes searches faster and luckier.'],
-    ['Locks & secrets', 'Locked doors, safes and cages hold the best loot. Lockpicks are silent but snap; a crowbar always works but is loud. After you search most of a house, hidden spots can open: a loose floorboard under a rug, a sliding bookshelf, an attic hatch (needs a hook pole), a cracked wall panel. Torn notes give hints.'],
+    ['Locks & secrets', 'Locked doors, safes and cages hold the best loot. Lockpicks are silent but snap; a crowbar always works but is loud. Brass keys open the two locks nothing else can: a parked car outside some houses (glove box + trunk) and a key-locked room with a keyhole sign on its door (better loot inside). Carry the key in your pack; it is used up. After you search most of a house, hidden spots can open: a loose floorboard under a rug, a sliding bookshelf, an attic hatch (needs a hook pole), a cracked wall panel. Torn notes give hints.'],
     ['Weapons & equipping', 'The weapon in your hand is what you fight with. At home: Pack & stash > tap a weapon > Equip. In a house: tap the Swap button (bottom right) to pick any weapon in your pack. Weapons wear out - repair them with scrap. Zombies hear noise; you can run (push the stick far) and dodge.'],
     ['Cosmetics & wardrobe', 'Cosmetics are earned: rare finds in houses and on zombies, better in mansions and police stations, plus Dot\'s shop and jobs, horde-night crates and events. They unlock straight into your Wardrobe and never use pack space. Wardrobe (home screen) > tap one to wear it. Spares are sold to Dot automatically.'],
     ['Food & water', 'Two bars under your HP: Hunger (drumstick) and Thirst (droplet). They drain with real time, even while the app is closed - about one meal and two drinks a day - and a little faster during runs (sprinting and fighting most). Tap the bars, or a food in Pack & stash, to eat or drink: beans and pie fill Hunger, water and soda fill Thirst, cranberry sauce and tomatoes a bit of both, coffee gives stamina. Garden crops are food, and a rain barrel at the base gives a drink (+50 thirst). Below 30: Hungry means slower stamina and no overnight healing; Thirsty means slower searches and max stamina 80. At 0 you lose 1 HP an hour, but never below 10 from hunger alone. Above 80 on both: +10% scavenging XP. Your crew eats from the stash separately.'],
