@@ -591,6 +591,7 @@ const NEXT_VERSION = '0.4';
           <b>${d.scouted}</b> house${d.scouted === 1 ? '' : 's'} scouted${nxt ? ` · next at ${nxt.toLocaleString('en-US')}` : ' · that\'s the max today'}</div>
         <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="My total today" maxlength="8"><button id="mLog" class="mbtn sm">Log</button></div>
         <div id="msync" class="msync"></div>
+        ${window.SYNC ? (window.NET && NET.ok && !d.phone && new Date().getHours() >= 14 ? '<button class="synclink nudge" id="mSyncG" data-m="fix">No phone steps yet today? Fix step sync</button>' : '<button class="synclink" id="mSyncG">How to sync steps</button>') : ''}
       </div>
       ${SV.tutorialDone || SV.stats.runs ? baseCards() : ''}
       <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Pack &amp; stash</button><button data-t="bench">Workbench</button></div>
@@ -604,6 +605,7 @@ const NEXT_VERSION = '0.4';
     };
     $('#mnet').onclick = openAccount;
     bindBaseCards();
+    if ($('#mSyncG')) $('#mSyncG').onclick = () => { SFX.play('ui'); try { SYNC.open($('#mSyncG').dataset.m || undefined); } catch (e) { toast('Sync guide failed to open', 1.6); } };
     $('#mLook').onclick = () => { SFX.play('ui'); editLook(); };
     let vt = 0, vtT = 0; $('#mver').onclick = () => { const n = performance.now(); if (n - vtT > 1200) vt = 0; vtT = n; if (++vt >= 5) { vt = 0; if (DM_DEV_OK) openDev(); } };
     $('#mset').onclick = openSettings;
