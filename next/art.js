@@ -449,6 +449,8 @@ const ART = (() => {
     candy: `<g transform="rotate(25)"><path d="M4,26 L4,-14 Q4,-26 -6,-26 Q-16,-26 -16,-16" fill="none" stroke="#11142f" stroke-width="12" stroke-linecap="round"/>
       <path d="M4,26 L4,-14 Q4,-26 -6,-26 Q-16,-26 -16,-16" fill="none" stroke="#f4efe6" stroke-width="7" stroke-linecap="round"/>
       <path d="M4,26 L4,-14 Q4,-26 -6,-26 Q-16,-26 -16,-16" fill="none" stroke="#d9483a" stroke-width="7" stroke-dasharray="5 5"/></g>`,
+    coffee: `<g transform="rotate(-8)"><rect x="-14" y="-22" width="28" height="44" rx="5" fill="#6b4a33" stroke="#11142f" stroke-width="2.6"/><rect x="-14" y="-22" width="28" height="7" rx="3" fill="#b9bdcc" stroke="#11142f" stroke-width="2.2"/>
+      <rect x="-14" y="-6" width="28" height="18" fill="#f6e3bb" stroke="#11142f" stroke-width="2"/><path d="M-6,8 Q-7,0 0,-2 Q7,0 6,8 Z" fill="#8a5a36" stroke="#11142f" stroke-width="1.6"/><path d="M0,-1 Q-2,3 0,7" stroke="#11142f" stroke-width="1.3" fill="none"/><path d="M-10,16 L-10,19" stroke="#f6e3bb" stroke-width="2" stroke-linecap="round" opacity=".5"/></g>`,
     hat: `<ellipse cx="0" cy="14" rx="30" ry="9" fill="#2a2440" stroke="#11142f" stroke-width="2.6"/><path d="M-16,12 L-12,-22 L12,-22 L16,12 Z" fill="#2a2440" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/><rect x="-15" y="2" width="30" height="8" fill="#5a4a86" stroke="#11142f" stroke-width="1.8"/><rect x="-6" y="0" width="12" height="12" rx="1" fill="none" stroke="#e0b94a" stroke-width="3"/>`,
   });
   const iconURL = {};

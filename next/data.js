@@ -12,12 +12,13 @@ window.DM = window.DM || {};
   D.hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 
   // ---------------------------------------------------------------- items
-  // use: action label in the pack; hp/sta: what eating/using restores; w: weapon key
+  // use: action label in the pack; hp/sta: what eating/using restores; hu/th: hunger/thirst it fills (0.8, food.js); w: weapon key
   D.ITEMS = {
-    beans: { n: 'Canned beans', i: 'beans', use: 'Eat', hp: 8 },
-    water: { n: 'Water bottle', i: 'water', use: 'Drink', sta: 50, hp: 2 },
-    snack: { n: 'Chips', i: 'snack', use: 'Eat', hp: 5 },
-    drink: { n: 'Soda', i: 'drink', use: 'Drink', sta: 35, hp: 2 },
+    beans: { n: 'Canned beans', i: 'beans', use: 'Eat', hp: 5, hu: 30 },
+    water: { n: 'Water bottle', i: 'water', use: 'Drink', sta: 50, th: 40 },
+    snack: { n: 'Chips', i: 'snack', use: 'Eat', hp: 3, hu: 10 },
+    drink: { n: 'Soda', i: 'drink', use: 'Drink', sta: 35, th: 25, hu: 5 },
+    coffee: { n: 'Canned coffee', i: 'coffee', use: 'Drink', sta: 60, th: 15 },
     bandage: { n: 'Bandage', i: 'bandage', use: 'Use', hp: 25 },
     meds: { n: 'Painkillers', i: 'meds', use: 'Take', hp: 40 },
     wrench: { n: 'Rusty wrench', i: 'wrench' },
@@ -36,14 +37,14 @@ window.DM = window.DM || {};
     book: { n: 'Paperback', i: 'book' },
     note: { n: 'Torn note', i: 'note', use: 'Read' },
     lockpick: { n: 'Lockpick', i: 'lockpick' },
-    cranberry: { n: 'Cranberry sauce', i: 'cranberry', use: 'Eat', hp: 8 },
-    stuffing: { n: 'Stuffing mix', i: 'stuffing', use: 'Eat', hp: 7 },
-    pie: { n: 'Pumpkin pie', i: 'pie', use: 'Eat', hp: 12 },
-    turkey: { n: 'Whole turkey', i: 'turkey', use: 'Eat', hp: 50, rare: 1 },
+    cranberry: { n: 'Cranberry sauce', i: 'cranberry', use: 'Eat', hp: 5, hu: 15, th: 15 },
+    stuffing: { n: 'Stuffing mix', i: 'stuffing', use: 'Eat', hp: 4, hu: 25 },
+    pie: { n: 'Pumpkin pie', i: 'pie', use: 'Eat', hp: 8, hu: 50 },
+    turkey: { n: 'Whole turkey', i: 'turkey', use: 'Eat', hp: 30, hu: 90, rare: 1 },
     hat: { n: 'Pilgrim hat', i: 'hat', rare: 1, tag: 'event cosmetic' },
     // Christmas (phase 5a): gift boxes are opened at home (Pack & stash > Open)
     gift: { n: 'Gift box', i: 'gift', gift: 1, rare: 1, tag: 'open it at home' },
-    candy: { n: 'Candy cane', i: 'candy', use: 'Eat', hp: 4, sta: 25 },
+    candy: { n: 'Candy cane', i: 'candy', use: 'Eat', hp: 2, sta: 25, hu: 6 },
     pole: { n: 'Hook pole', i: 'hook' },
     watch: { n: 'Pocket watch', i: 'watch', rare: 1 },
     jewelry: { n: 'Gold ring', i: 'ring', rare: 1 },
@@ -66,11 +67,11 @@ window.DM = window.DM || {};
     seed_carrot: { n: 'Carrot seeds', i: 'seed_carrot', seed: 'carrot', tag: 'plant at the base' },
     seed_corn: { n: 'Corn seeds', i: 'seed_corn', seed: 'corn', tag: 'plant at the base' },
     seed_herbs: { n: 'Herb seeds', i: 'seed_herbs', seed: 'herbs', tag: 'plant at the base' },
-    tomato: { n: 'Tomatoes', i: 'tomato', use: 'Eat', hp: 7, sta: 10 },
-    potato: { n: 'Potatoes', i: 'potato', use: 'Eat', hp: 10 },
-    carrot: { n: 'Carrots', i: 'carrot', use: 'Eat', hp: 7, sta: 10 },
-    corn: { n: 'Corn', i: 'corn', use: 'Eat', hp: 9 },
-    herbs: { n: 'Fresh herbs', i: 'herbs', use: 'Eat', hp: 14 },
+    tomato: { n: 'Tomatoes', i: 'tomato', use: 'Eat', hp: 4, sta: 10, hu: 14, th: 8 },
+    potato: { n: 'Potatoes', i: 'potato', use: 'Eat', hp: 6, hu: 25 },
+    carrot: { n: 'Carrots', i: 'carrot', use: 'Eat', hp: 4, sta: 10, hu: 14, th: 4 },
+    corn: { n: 'Corn', i: 'corn', use: 'Eat', hp: 5, hu: 20 },
+    herbs: { n: 'Fresh herbs', i: 'herbs', use: 'Eat', hp: 10, hu: 8 },
   };
   // crops: watered days to grow, harvest yield
   D.CROPS = {
@@ -170,11 +171,11 @@ window.DM = window.DM || {};
   // what the trader pays (caps each); she sells for about 4x
   D.VALUE = { beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
     lockpick: 3, gift: 8, candy: 1, cranberry: 3, stuffing: 3, pie: 4, turkey: 20, hat: 0, pole: 2, watch: 25, jewelry: 20, wood: 1, nails: .25, spikedbat: 20, machete: 22, prybar: 14, packplus: 15, backpack: 40, shoes: 10, lockset: 18, note: 0, parcel: 0 };
-  Object.assign(D.VALUE, { seed_tomato: 2, seed_potato: 2, seed_carrot: 2, seed_corn: 3, seed_herbs: 2, tomato: 2, potato: 2, carrot: 2, corn: 2, herbs: 3 });
+  Object.assign(D.VALUE, { seed_tomato: 2, seed_potato: 2, seed_carrot: 2, seed_corn: 3, seed_herbs: 2, tomato: 2, potato: 2, carrot: 2, corn: 2, herbs: 3, coffee: 2 });
   for (const k in D.DECOR) D.VALUE[k] = D.DECOR[k].v;
   D.valueOf = (k, d) => { if (k.startsWith('bp_')) return 25; let v = D.VALUE[k] || 1; if (d != null && D.ITEMS[k] && D.ITEMS[k].w) v = Math.max(1, Math.round(v * (.3 + .7 * d / D.WEAPONS[D.ITEMS[k].w].dur))); return v; };
   // how many fit in one slot (anything not listed does not stack)
-  D.STACK = { gift: 3, candy: 5, seed_tomato: 10, seed_potato: 10, seed_carrot: 10, seed_corn: 10, seed_herbs: 10, tomato: 3, potato: 3, carrot: 3, corn: 3, herbs: 3, wood: 10, nails: 20, lockpick: 5, arrow: 20, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
+  D.STACK = { gift: 3, candy: 5, seed_tomato: 10, seed_potato: 10, seed_carrot: 10, seed_corn: 10, seed_herbs: 10, tomato: 3, potato: 3, carrot: 3, corn: 3, herbs: 3, wood: 10, nails: 20, lockpick: 5, arrow: 20, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, coffee: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
   D.stackMax = k => D.STACK[k] || 1;
   D.QUIVER = 60;   // 0.7: arrows live in a quiver (survivor.quiver.n), not in a pack slot
 
@@ -212,9 +213,9 @@ window.DM = window.DM || {};
 
   // ---------------------------------------------------------------- loot tables: [[min,max], weights, guaranteed]
   D.LOOT = {
-    fridge: [[2, 3], { drink: 3, water: 3, beans: 1, snack: 2 }],
+    fridge: [[2, 3], { drink: 3, water: 3, beans: 1, snack: 2, coffee: .5 }],
     cooler: [[2, 4], { drink: 5, water: 4 }],
-    cabinet: [[1, 3], { beans: 3, snack: 2, water: 1 }],
+    cabinet: [[1, 3], { beans: 3, snack: 2, water: 1, coffee: .6 }],
     kdrawers: [[1, 2], { knife: 3, scrap: 1, battery: 2, tape: 1 }],
     pantry: [[2, 4], { beans: 4, snack: 3, water: 2 }],
     trash: [[0, 2], { wood: 1, nails: 1, scrap: 3, snack: 1 }],
@@ -240,7 +241,7 @@ window.DM = window.DM || {};
     attic: [[3, 4], { 'bp_*': 1, watch: 2, jewelry: 2, ammo: 3, meds: 2, battery: 1, bow: 1 }, ['watch']],
     wallcache: [[2, 3], { 'bp_*': 1, ammo: 3, meds: 2, jewelry: 2, lockpick: 2 }, ['ammo']],
     // commercial / civic
-    store: [[1, 3], { beans: 3, snack: 4, drink: 2, water: 2, battery: 1 }],
+    store: [[1, 3], { beans: 3, snack: 4, drink: 2, water: 2, coffee: 1, battery: 1 }],
     register: [[1, 2], { battery: 2, key: 1, snack: 1, lockpick: 1 }],
     storage: [[2, 3], { wood: 2, nails: 1, beans: 2, water: 2, cloth: 2, scrap: 2, tape: 1 }],
     pharm: [[1, 3], { bandage: 3, meds: 2, water: 1, snack: 1 }],
@@ -345,7 +346,7 @@ window.DM = window.DM || {};
   };
   D.QUEST_HOUSE = { 1: ['rowS', 'apt'], 2: ['bodega', 'laundro', 'rowL'], 3: ['pharmacy', 'garage'], 4: ['school', 'rowL'], 5: ['police', 'mansion'] };
   D.SHOP = [ // [item, count, price, min trader level, chance]
-    ['beans', 3, 9, 1, .9], ['water', 3, 8, 1, .9], ['snack', 3, 5, 1, .6], ['bandage', 3, 12, 1, .8], ['meds', 2, 24, 1, .6], ['lockpick', 3, 14, 1, .8],
+    ['beans', 3, 9, 1, .9], ['water', 3, 8, 1, .9], ['snack', 3, 5, 1, .6], ['coffee', 2, 7, 1, .5], ['bandage', 3, 12, 1, .8], ['meds', 2, 24, 1, .6], ['lockpick', 3, 14, 1, .8],
     ['arrow', 10, 3, 1, .8], ['cloth', 4, 4, 1, .5], ['tape', 2, 8, 1, .5], ['nails', 12, 1, 1, .5], ['wood', 4, 4, 1, .5], ['crowbar', 1, 60, 1, .6], ['bat', 1, 45, 1, .5], ['knife', 1, 25, 1, .5],
     ['backpack', 1, 150, 2, 1], ['machete', 1, 90, 2, .5], ['ammo', 15, 2, 2, .6], ['prybar', 1, 65, 2, .5], ['axe', 1, 120, 3, .5], ['bow', 1, 130, 3, .4], ['lockset', 1, 80, 3, .5],
     ['bp_*', 1, 110, 2, .45], ['bp_*', 1, 110, 4, .6],

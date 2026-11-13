@@ -9,6 +9,7 @@
   const cv = E.cv, ctx = E.ctx;
   const { ITEMS, stackMax, toStacks, rollLoot, LOCKS, EVENT, WEAPONS } = D;
   const EVS = DM.Events, EVA = D.EV;   // the running seasonal event (events.js) or null
+  const F = DM.Food;                   // 0.8: hunger + thirst (food.js)
 
   // ---------------------------------------------------------------- layout
   let L = null, ROWS = [], MW = 0, MH = 0, opts = {};
@@ -32,7 +33,7 @@
   const job = () => (S() && S().job) || 'scavenger';
   const scavLvl = () => D.scavLvl(S() ? S().xp : 0);
   const XPCUM = D.XPCUM, PERKS = D.PERKS;
-  const searchMul = () => 1.5 * (1 - .06 * (scavLvl() - 1)) * (job() === 'scavenger' ? .85 : 1);   // slow at first, faster with skill
+  const searchMul = () => 1.5 * (1 - .06 * (scavLvl() - 1)) * (job() === 'scavenger' ? .85 : 1) * F.searchMul();   // slow at first, faster with skill; thirsty = slower
   const extraChance = () => .04 * (scavLvl() - 1) + (job() === 'scavenger' ? .1 : 0);
   const packSlots = () => 12 + (S().packBonus || 0) + (scavLvl() >= 9 ? 2 : 0);
   const gatePct = () => job() === 'scavenger' ? .65 : .75;
@@ -40,6 +41,7 @@
   const SNAP_T = () => (job() === 'thief' ? 2.4 : 1.2) * (S().lockset ? 1.5 : 1);    // ... and picks break half as often
   const maxHp = () => D.maxHp(S());
   function gainXP(n, x, y) {
+    n += F.xpBonus(n);   // well fed + hydrated: +10%
     const before = scavLvl(); S().xp += n; DM.Game && DM.Game.save();
     G.nums.push({ x: x + 16, y: y - 112, v: '+' + n + ' xp', t: 0, col: P.GRN, small: 1 });
     const after = scavLvl();
@@ -54,18 +56,19 @@
     L = layout; opts = o || {};
     ROWS = L.rows; MW = ROWS[0].length; MH = ROWS.length;
     const st = L.start;
+    if (S() && S().food) S().hp = F.tick(S(), S().hp);   // hunger/thirst catch up before she goes in
     G = {
       t: 0, secretOpen: false, paused: false, over: false, hitstop: 0, shake: 0, redFlash: 0,
       p: {
         x: st.x * T, y: st.y * T, vx: 0, vy: 0, fx: 0, fy: -1, flip: false, hw: 13, hh: 9,
-        hp: Math.min(S().hp, maxHp()), sta: 100, staDelay: 0, st: 'free', stT: 0, inv: 0, ph: 0, stepAcc: 0, kbx: 0, kby: 0,
+        hp: Math.min(S().hp, maxHp()), sta: F.staMax(), staDelay: 0, st: 'free', stT: 0, inv: 0, ph: 0, stepAcc: 0, kbx: 0, kby: 0,
         swingQ: false, search: null, flash: 0, swingHit: false, downRot: 0,
       },
       zs: [], furn: [], pack: S().pack, drops: [], arrows: [], parts: [], rings: [], nums: [], decals: [], banners: [],
       sec: (L.secrets || []).map(s => Object.assign({ st: 0, found: false }, JSON.parse(JSON.stringify(s)))),
       fog: {}, visited: {}, room: streetRoom(), noiseLvl: 0, cam: { x: st.x * T, y: st.y * T - 120 }, z3: false,
       stats: { searched: 0, kills: 0, start: performance.now() }, entered: false, lastNoise: null, field: null, fieldT: 0, fieldCell: -1,
-      secretHint: 0, sheet: null,
+      secretHint: 0, sheet: null, food: { h: 0, t: 0 }, foodT: 0,
     };
     for (const k in L.rooms) { const R = L.rooms[k]; G.fog[k] = R.hidden || R.isolated ? .99 : .97; G.visited[k] = false; }
     G.fog[streetRoom()] = 0.12; G.visited[streetRoom()] = true;
@@ -498,7 +501,10 @@
     p.staDelay -= dt;
     // Refill whenever she is not ACTUALLY sprinting. Before, holding the joystick far out with no
     // stamina left blocked the refill too, so she was stuck winded until she let go of the stick.
-    if (p.staDelay <= 0 && !p.running) p.sta = Math.min(100, p.sta + (inp.m > .1 ? 13 : 20) * dt);
+    // 0.8: Hungry = refills 40% slower; Thirsty = max stamina 80
+    const smax = F.staMax();
+    if (p.staDelay <= 0 && !p.running) p.sta = Math.min(smax, p.sta + (inp.m > .1 ? 13 : 20) * F.regenMul() * dt);
+    if (p.sta > smax) p.sta = smax;
     if (p.sta <= 1) p.winded = true; else if (p.sta >= 30) p.winded = false;
 
     if (LP.on) { p.vx *= .8; p.vy *= .8; inp = { x: 0, y: 0, m: 0, run: false }; }
@@ -517,6 +523,7 @@
       running = inp.run && inp.m > .5 && p.sta > 1 && !p.winded && p.st === 'free';
       spd = (running ? 4.5 : 2.75) * T * inp.m * (p.st === 'swing' ? .35 : 1);
       if (running) { p.sta = Math.max(0, p.sta - 24 * dt); p.staDelay = .7; }
+      if (!G.over) F.runDrain(dt, running, G);   // a run makes you hungry and thirsty a little faster
       const tvx = inp.x * spd, tvy = inp.y * spd;
       const k = 1 - Math.exp(-(inp.m ? 16 : 22) * dt);
       p.vx = lerp(p.vx, tvx, k); p.vy = lerp(p.vy, tvy, k);
@@ -593,7 +600,7 @@
     if (best && !weapon().ranged) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; p.fx = dx / d; p.fy = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; }
     const W = weapon(); SW_WIND = W.wind; SW_STRIKE = W.strike; SW_REC = W.rec; p.swRanged = !!W.ranged;
     if (W.ranged && !arrowsLeft()) { toast('No arrows - press R or tap the weapon to swap', 1.6); return; }
-    p.st = 'swing'; p.stT = 0; p.swingHit = false; p.swingQ = false; p.sta = Math.max(0, p.sta - (W.ranged ? 3 : 7)); p.staDelay = .5;
+    p.st = 'swing'; p.stT = 0; p.swingHit = false; p.swingQ = false; p.sta = Math.max(0, p.sta - (W.ranged ? 3 : 7)); p.staDelay = .5; F.fight(G);
   }
   let SW_WIND = .12, SW_STRIKE = .1, SW_REC = .22;
   function updateSwing() {
@@ -1483,6 +1490,7 @@
   function hud() {
     const p = G.p;
     hpFill.style.width = (p.hp / maxHp() * 100) + '%'; stFill.style.width = p.sta + '%';
+    needsHud(p);
     const hudKey = [Math.round(p.hp), G.pack.length, packCount('lockpick'), G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5), S().xp, S().hands ? S().hands.k + S().hands.d : '-', arrowsLeft()].join('|');
     if (hudKey !== lastHud) {
       lastHud = hudKey;
@@ -1512,6 +1520,34 @@
     $('#hp').classList.toggle('low', p.hp < maxHp() * .35);
     drawMini();
   }
+  // 0.8: hunger + thirst bars under stamina (tap them to eat or drink from the pack)
+  const needsEl = $('#needs'); let needsKey = '';
+  function needsHud(p) {
+    const s = S(); if (!s || !s.food) { needsEl.style.display = 'none'; return; }
+    needsEl.style.display = '';
+    G.foodT -= 1 / 60;
+    if (G.foodT <= 0) { G.foodT = 5; p.hp = F.tick(s, p.hp); if (s.food.h < F.LOW || s.food.t < F.LOW) DM.Game && DM.Game.tip && DM.Game.tip('food'); }
+    const f = s.food, k = Math.round(f.h * 2) + '|' + Math.round(f.t * 2) + '|' + F.staMax();
+    if (k === needsKey && needsEl.firstChild) return; needsKey = k;
+    if (!needsEl.firstChild) needsEl.innerHTML = `<span class="nd h" id="ndH">${F.ICON.h}<span class="nbar"><i></i></span></span><span class="nd t" id="ndT">${F.ICON.t}<span class="nbar"><i></i></span></span>`;
+    for (const [id, v] of [['#ndH', f.h], ['#ndT', f.t]]) { const el = $(id); el.className = 'nd ' + (id === '#ndH' ? 'h ' : 't ') + F.lvl(v); el.querySelector('i').style.width = Math.max(0, Math.min(100, v)) + '%'; }
+    $('#st').classList.toggle('capped', F.staMax() < 100);
+  }
+  // quick eat / drink: the food and drinks in the pack, one tap each
+  function openFood() {
+    if (G.over) return;
+    G.sheet = { kind: 'food' };
+    const f = S().food, foods = G.pack.map((e, i) => [e, i]).filter(([e]) => F.isFood(e.k));
+    $('#shKick').textContent = `Hunger ${Math.round(f.h)} · Thirst ${Math.round(f.t)}`;
+    $('#shTitle').textContent = 'Eat & drink';
+    const grid = $('#shGrid'); grid.innerHTML = ''; $('#shActs').innerHTML = '';
+    if (!foods.length) grid.innerHTML = '<div class="empty">No food or drinks in your pack. Kitchens, pantries, fridges and stores have them.</div>';
+    for (const [e, i] of foods) grid.appendChild(itemCard(e, () => { useItem(i, true); }, `<small class="tag">${F.label(e.k)}</small>`));
+    $('#shCap').textContent = foods.length ? 'Tap one to eat or drink it' : '';
+    $('#shTake').style.display = 'none';
+    sheet.classList.add('on');
+  }
+  needsEl.addEventListener('click', ev => { ev.stopPropagation(); SFX.init(); if (G && !G.over && DM.scene) { SFX.play('ui'); openFood(); } });
   function drawMini() {
     const s = Math.min(144 / MW, 180 / MH), w = 144, h = 180;
     if (mini.width !== w) { mini.width = w; mini.height = h; }
@@ -1615,7 +1651,7 @@
     }
     sheet.classList.add('on');
   }
-  function useItem(i) {
+  function useItem(i, fromFood) {
     const e = G.pack[i], it = ITEMS[e.k], p = G.p;
     if ((it.slots || it.bp || e.k === 'shoes' || e.k === 'lockset') && DM.Game && DM.Game.applyUse) {
       const msg = DM.Game.applyUse(e.k); if (!msg) return;
@@ -1623,10 +1659,12 @@
     }
     if (e.k === 'note') { $('#shActs').innerHTML = `<div class="note">${L.note || '"...the rest is torn away."'}</div>`; SFX.play('pick'); return; }
     if (it.hp) p.hp = Math.min(maxHp(), p.hp + it.hp);
-    if (it.sta) p.sta = Math.min(100, p.sta + it.sta);
+    const fed = F.isFood(e.k) ? F.eat(S(), e.k) : '';
+    if (it.sta) p.sta = Math.min(F.staMax(), p.sta + it.sta);
     e.n--; if (!e.n) G.pack.splice(i, 1);
-    SFX.play('pick'); toast(`${it.use === 'Use' ? 'Used' : it.use === 'Take' ? 'Took' : it.use === 'Eat' ? 'Ate' : 'Drank'} ${it.n.toLowerCase()}`, 1.3);
-    openPack(e.n ? i : -1);
+    SFX.play('pick'); toast(`${it.use === 'Use' ? 'Used' : it.use === 'Take' ? 'Took' : it.use === 'Eat' ? 'Ate' : 'Drank'} ${it.n.toLowerCase()}${fed ? ' · ' + fed : ''}`, 1.6);
+    needsKey = ''; DM.Game && DM.Game.save();
+    if (fromFood) openFood(); else openPack(e.n ? i : -1);
   }
   function dropItem(i) {
     const e = G.pack.splice(i, 1)[0], p = G.p;
