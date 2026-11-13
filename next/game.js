@@ -620,10 +620,18 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
       <div class="grid g4">${s.hands ? slot({ k: s.hands.k, n: 1, d: s.hands.d }, 'hands', 0) : '<div class="slot ph"><span>Fists</span></div>'}</div>
       <div class="kick sect">Backpack · ${s.pack.length}/${packSlots()}</div>
       <div class="grid g4">${s.pack.map((e, i) => slot(e, 'pack', i)).join('')}${empty(packSlots() - s.pack.length)}</div>
+      ${s.pack.length && !sel ? '<button class="mbtn sm" id="sAll" style="margin-top:8px;width:100%">Stash all</button>' : ''}
       <div id="sacts"></div>
       <div class="kick sect">Home stash · ${s.stash.length}/${STASH_SLOTS}</div>
       <div class="grid g5">${s.stash.map((e, i) => slot(e, 'stash', i)).join('')}${empty(Math.min(10, STASH_SLOTS - s.stash.length))}</div>`;
     el.querySelectorAll('.slot[data-from]').forEach(b => b.onclick = () => { const f = b.dataset.from, i = +b.dataset.i; sel = sel && sel.from === f && sel.i === i ? null : { from: f, i }; SFX.play('ui'); renderStash(); });
+    const all = $('#sAll');
+    if (all) all.onclick = () => {   // one tap to empty the backpack into the stash (stacks top up first)
+      let moved = 0;
+      for (let i = s.pack.length - 1; i >= 0; i--) { const e = s.pack[i]; const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d); moved += n; e.n -= n; if (!e.n) s.pack.splice(i, 1); }
+      SFX.play('ui'); Game.save(); renderStash();
+      toast(s.pack.length ? 'Stash is full - some things stayed in your pack' : 'Everything is in the stash', 1.8);
+    };
     if (sel) stashActions();
   }
   function stashActions() {
