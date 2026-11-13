@@ -247,6 +247,10 @@
       const cell = { x, y, rects, key: gy1, cut: 1, W, E, N, S };
       if (!S && !isVoid(x, y + 1)) {
         cell.face = { x0: W ? x * T : cx - WT / 2, x1: E ? (x + 1) * T : cx + WT / 2, room: roomAt(x, y + 1) || 'h', decor: DECOR[x + ',' + y] };
+      } else if (S) { // T-junction: the horizontal wall's south face still shows either side of the wall below
+        cell.sub = [];
+        if (W && roomAt(x - 1, y + 1)) cell.sub.push({ x, y, key: gy1, face: { x0: x * T, x1: cx - WT / 2, room: roomAt(x - 1, y + 1), decor: null } });
+        if (E && roomAt(x + 1, y + 1)) cell.sub.push({ x, y, key: gy1, face: { x0: cx + WT / 2, x1: (x + 1) * T, room: roomAt(x + 1, y + 1), decor: null } });
       }
       wallCells.push(cell);
     }
@@ -524,6 +528,7 @@
     const out = [];
     for (const f of G.furn) {
       if (!f.lootable) continue;
+      if (f.id === 'sofa' && G.zs.some(z => z.st === 'sleep' || z.st === 'rise')) continue; // someone is sleeping on it
       let act = null;
       if (!f.searched) act = 'Search';
       else if (f.secret && !G.secretOpen && f.slideState !== 'sliding') act = 'Push';
@@ -691,7 +696,7 @@
       if (s.t >= s.dur) finishSearch();
     } else if (p.st === 'dodge') {
       const k = Math.max(0, 1 - p.stT / .3);
-      p.vx = p.dodx * 8 * T * k + p.vx * 0; p.vy = p.dody * 8 * T * k;
+      p.vx = p.dodx * 9.5 * T * k; p.vy = p.dody * 9.5 * T * k;
       if (p.stT > .32) p.st = 'free';
     } else if (p.st === 'hurt') {
       p.vx *= Math.exp(-8 * dt); p.vy *= Math.exp(-8 * dt);
@@ -734,7 +739,7 @@
 
   function startDodge(inp) {
     const p = G.p;
-    p.st = 'dodge'; p.stT = 0; p.sta -= 25; p.staDelay = .7; p.inv = .34;
+    p.st = 'dodge'; p.stT = 0; p.sta -= 25; p.staDelay = .7; p.inv = .42;
     const dx = inp.m ? inp.x : p.fx, dy = inp.m ? inp.y : p.fy;
     const d = Math.hypot(dx, dy) || 1; p.dodx = dx / d; p.dody = dy / d;
     if (Math.abs(p.dodx) > .2) p.flip = p.dodx < 0;
@@ -775,7 +780,7 @@
     const dmg = Math.round((sneak ? 50 : 34) + Math.random() * 4);
     z.hp -= dmg; z.flash = 1; z.hurtDir = Math.cos(fa) >= 0 ? 1 : -1;
     z.kbx = Math.cos(fa) * 5.5 * T; z.kby = Math.sin(fa) * 5.5 * T * .8;
-    dmgNum(z.x, z.y - 82, dmg, sneak ? P.ORA : P.CRM);
+    dmgNum(z.x + 20 * (Math.random() < .5 ? -1 : 1), z.y - 104, dmg, sneak ? P.ORA : P.CRM);
     splat(z.x, z.y, fa, z.hp <= 0);
     puff(z.x, z.y, 44, 5, P.CRM, 90, .25, 2.2);
     SFX.play(z.hp <= 0 ? 'kill' : 'hit');
@@ -848,14 +853,18 @@
         if (look()) break;
         if (!z.target) { z.st = 'idle'; break; }
         const d = Math.hypot(z.target.x - z.x, z.target.y - z.y);
-        if (d < T * .7) { z.stT = 0; z.st = 'search'; z.target = null; break; }
+        if (d < T * .7) {
+          if (z.hunter && G.p.st !== 'down') { z.target = { x: G.p.x, y: G.p.y }; z.path = null; z.stT = 0; break; } // it can smell her
+          z.stT = 0; z.st = 'search'; z.target = null; break;
+        }
         const [tx, ty] = cellOf(z.target);
         if (!z.path || z.pathKey !== ty * MW + tx) { z.path = bfs(tx, ty); z.pathKey = ty * MW + tx; }
         const st = nextStep(z, z.path);
         const tgt = st.same ? z.target : st;
         const dx = tgt.x - z.x, dy = tgt.y - z.y, dd = Math.hypot(dx, dy) || 1;
-        spd = 1.25 * T; vx = dx / dd; vy = dy / dd; face(vx);
-        if (z.stT > 14) { z.st = 'idle'; z.target = null; }
+        spd = (z.hunter ? 1.5 : 1.25) * T; vx = dx / dd; vy = dy / dd; face(vx);
+        if (z.stT > 14 && !z.hunter) { z.st = 'idle'; z.target = null; }
+        if (z.hunter && z.stT > 6) { z.target = { x: G.p.x, y: G.p.y }; z.path = null; z.stT = 0; }
         break;
       }
       case 'search': // look around after reaching noise
@@ -885,7 +894,7 @@
         if (z.stT >= .62) { const d = dp || 1; z.lunge = { x: dxp / d, y: dyp / d, hit: false }; z.st = 'lunge'; z.stT = 0; SFX.play('whoosh'); }
         break;
       case 'lunge': {
-        const L = z.lunge; spd = 5.4 * T * Math.max(0, 1 - z.stT / .24); vx = L.x; vy = L.y;
+        const L = z.lunge; spd = 4.8 * T * Math.max(0, 1 - z.stT / .24); vx = L.x; vy = L.y;
         if (!L.hit && p.inv <= 0 && p.st !== 'down') {
           const d = Math.hypot(p.x - z.x, (p.y - z.y) * 1.2);
           if (d < .85 * T) { L.hit = true; hurtPlayer(16 + Math.round(Math.random() * 6), L.x, L.y, z); }
@@ -961,7 +970,7 @@
     }
     // the third zombie wanders in from the street
     if (!G.z3 && (G.t > 70 || (G.stats.searched >= 9 && G.t > 35))) {
-      G.z3 = true; const z = mkZombie(1.5 * T, 29.4 * T, 'investigate', 'o'); z.target = { x: 20.5 * T, y: 25 * T }; G.zs.push(z);
+      G.z3 = true; const z = mkZombie(1.5 * T, 29.4 * T, 'investigate', 'o'); z.target = { x: 20.5 * T, y: 25 * T }; z.hunter = true; G.zs.push(z);
       toast('Something is shuffling up the stoop...', 3); SFX.play('groan');
     }
     // camera
@@ -1011,7 +1020,7 @@
     c.strokeStyle = 'rgba(234,210,164,.13)'; c.lineWidth = 1.6;
     for (let i = 0; i < 3; i++) { c.beginPath(); c.arc(3 * T + 6, 15.9 * T, T * (1.05 + i * .12), -.02, .7); c.stroke(); }
     // ambient occlusion under wall faces
-    for (const w of wallCells) if (w.face) {
+    for (const w of wallCells.concat(...wallCells.map(c => c.sub || []))) if (w.face) {
       const g = c.createLinearGradient(0, w.key, 0, w.key + 16); g.addColorStop(0, 'rgba(10,8,24,.45)'); g.addColorStop(1, 'rgba(10,8,24,0)');
       c.fillStyle = g; c.fillRect(w.face.x0, w.key, w.face.x1 - w.face.x0, 16);
     }
@@ -1193,6 +1202,7 @@
       // cap rim
       ctx.fillStyle = '#3a2c5c'; ctx.fillRect(w.face.x0, w.key - WH - WT, w.face.x1 - w.face.x0, 3);
     }
+    if (w.sub) for (const sb of w.sub) ctx.drawImage(faceCanvas(sb), sb.face.x0, sb.key - WH, sb.face.x1 - sb.face.x0, WH);
     ctx.globalAlpha = 1;
   }
 
@@ -1311,6 +1321,7 @@
       const cap = fogSrc.length; fogSrc.push({ rooms });
       if (w.lintel) { paint(w.x * T, w.key - WH - WT, T, WT + 10, cap); continue; }
       for (const r of w.rects) paint(r.x, r.y - WH, r.w, r.h, cap);
+      if (w.sub) for (const sb of w.sub) paint(sb.face.x0, sb.key - WH, sb.face.x1 - sb.face.x0, WH, roomSrc[sb.face.room]);
       if (w.face) { const fsrc = fogSrc.length; fogSrc.push({ rooms: [w.face.room], capRooms: rooms, wall: w }); paint(w.face.x0, w.key - WH, w.face.x1 - w.face.x0, WH, fsrc); }
     }
   }
@@ -1618,7 +1629,7 @@
     DEV.zoom = clamp(Math.min(rc.width / 396, rc.height / 760), .8, 2.2);
     cv.width = Math.round(rc.width * DEV.dpr); cv.height = Math.round(rc.height * DEV.dpr);
     cv.style.width = rc.width + 'px'; cv.style.height = rc.height + 'px';
-    const fs = Math.min(2.5, DEV.dpr * DEV.zoom);
+    const fs = Math.min(2, DEV.dpr * DEV.zoom);
     if (Math.abs(fs - DEV.fs) > .01 || !floorCv) { DEV.fs = fs; if (G) buildStatic(); }
   }
   let last = 0, fpsAcc = 0, fpsN = 0;
@@ -1649,7 +1660,7 @@
     await Promise.all([ART.buildRig('survivor', res), ART.buildRig('zombie', res)]);
     buildVignette();
     newGame();
-    DEV.fs = Math.min(2.5, DEV.dpr * DEV.zoom); buildStatic();
+    DEV.fs = Math.min(2, DEV.dpr * DEV.zoom); buildStatic();
     G.cam.x = G.p.x; G.cam.y = G.p.y - 120;
     addEventListener('resize', resize);
     $('#loading').remove();
