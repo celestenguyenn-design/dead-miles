@@ -1031,8 +1031,11 @@ const NEXT_VERSION = '0.6';
     if (el.querySelector('#eqFists')) el.querySelector('#eqFists').onclick = () => toast(s.pack.concat(s.stash).some(e => D.isWeapon(e.k)) ? 'Tap a weapon below, then Equip' : 'No weapon yet - they turn up in kitchens, garages and lockers', 2);
     el.querySelectorAll('[data-from]').forEach(b => b.onclick = () => { const f = b.dataset.from, i = +b.dataset.i; sel = sel && sel.from === f && sel.i === i ? null : { from: f, i }; SFX.play('ui'); renderStash(); });
     if (el.querySelector('#sAll')) el.querySelector('#sAll').onclick = () => {
-      for (let i = s.pack.length - 1; i >= 0; i--) { const e = s.pack[i]; const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d); e.n -= n; if (!e.n) s.pack.splice(i, 1); }
-      SFX.play('ui'); Game.save(); renderStash(); toast(s.pack.length ? 'Stash is full - some things stayed in your pack' : 'Everything is in the stash', 1.8);
+      // Arrows stay with you: hunters were stashing them with everything else and having to fetch them back.
+      const keep = k => k === 'arrow';
+      for (let i = s.pack.length - 1; i >= 0; i--) { const e = s.pack[i]; if (keep(e.k)) continue; const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d); e.n -= n; if (!e.n) s.pack.splice(i, 1); }
+      const left = s.pack.filter(e => !keep(e.k)).length;
+      SFX.play('ui'); Game.save(); renderStash(); toast(left ? 'Stash is full - some things stayed in your pack' : s.pack.length ? 'Stashed everything - kept your arrows' : 'Everything is in the stash', 1.8);
     };
     if (sel) stashActions();
   }
