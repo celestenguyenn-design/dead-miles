@@ -1151,7 +1151,7 @@ const NEXT_VERSION = '0.7';
     }
     if (it.use && it.use !== 'Read' && (it.hp || it.sta) && !it.slots) btns.push([it.use, () => { s.hp = Math.min(maxHp(s), s.hp + (it.hp || 0)); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(`${it.n}: +${it.hp || 0} HP`); }]);
     if (it.slots || it.bp || e.k === 'shoes' || e.k === 'lockset') btns.push([it.use, () => { const msg = Game.applyUse(e.k); if (!msg) return; e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(msg); }]);
-    if (e.k === 'note') btns.push(['Read', () => toast('The note is too faded to make sense of here.', 2)]);
+    if (e.k === 'note') btns.push(['Read', () => { const nd = e.d && typeof e.d === 'object' ? e.d : null; toast(nd && nd.text ? nd.text + '  (found at ' + nd.addr + ')' : 'The note is too faded to make sense of here.', nd ? 5 : 2); }]);
     if (it.gift) btns.push(['Open', () => {
       e.n--; if (!e.n) s[sel.from].splice(sel.i, 1);
       const stacks = D.toStacks(D.rollLoot('giftbox')), lost = [];
