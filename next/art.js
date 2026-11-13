@@ -79,7 +79,9 @@ const ART = (() => {
         loadImg(svgURL(`<g filter="url(#wob)"><g transform="${R.oshift}">${outline}</g></g>`, vb, W, H)),
         loadImg(svgURL(`<g filter="url(#wob)">${colour}</g>`, vb, W, H)),
       ]);
-      out.parts[idx] = { name: p.name, pivot: p.pivot, o: toCanvas(io, W, H), c: toCanvas(ic, W, H) };
+      const o = toCanvas(io, W, H), red = toCanvas(io, W, H), rc = red.getContext('2d');
+      rc.globalCompositeOperation = 'source-in'; rc.fillStyle = '#ff5a48'; rc.fillRect(0, 0, W, H);
+      out.parts[idx] = { name: p.name, pivot: p.pivot, o, c: toCanvas(ic, W, H), r: red };
     }));
     out.byName = {}; out.parts.forEach(p => out.byName[p.name] = p);
     rigs[key] = out;
@@ -106,12 +108,12 @@ const ART = (() => {
           if (t.r) { ctx.translate(p.pivot[0], p.pivot[1]); ctx.rotate(t.r); ctx.translate(-p.pivot[0], -p.pivot[1]); }
         }
         if (alphaMul != null) ctx.globalAlpha *= alphaMul;
-        ctx.drawImage(layer === 'o' ? p.o : p.c, VB.x, VB.y, VB.w, VB.h);
+        ctx.drawImage(p[layer], VB.x, VB.y, VB.w, VB.h);
         ctx.restore();
       }
     };
     pass('o'); pass('c');
-    if (pose.flash > 0) pass('o', pose.flash);
+    if (pose.flash > 0) pass(pose.flashRed ? 'r' : 'o', pose.flash);
     ctx.restore();
   }
 
@@ -593,6 +595,15 @@ const ART = (() => {
       blk(ctx, g.x + 4, g.ty0 + 4, g.w - 8, g.fy1 - g.ty0 - 6, '#5e6b48', 4, 2.4);
       blk(ctx, g.x + 8, g.ty0 + 8, g.w - 16, 14, P.CRMD, 5, 1.8);
       ctx.fillStyle = 'rgba(17,20,47,.25)'; ctx.fillRect(g.x + 8, g.ty0 + 30, g.w - 16, 4);
+    },
+    lamppost(ctx, f, g) {
+      const cx = g.x + g.w / 2, base = g.fy1 - 6, top = g.fy1 - f.H;
+      blk(ctx, cx - 7, base - 8, 14, 10, P.INK, 2, 0);
+      ctx.fillStyle = P.INK; ctx.fillRect(cx - 2.5, top + 10, 5, base - top - 10);
+      ctx.beginPath(); ctx.moveTo(cx - 12, top + 12); ctx.lineTo(cx + 12, top + 12); ctx.lineTo(cx + 7, top); ctx.lineTo(cx - 7, top); ctx.closePath(); ctx.fillStyle = P.INK; ctx.fill();
+      blk(ctx, cx - 7, top + 12, 14, 9, '#ffe2a8', 2, 2);
+      const gl = ctx.createRadialGradient(cx, top + 18, 2, cx, top + 18, 40); gl.addColorStop(0, 'rgba(255,226,168,.35)'); gl.addColorStop(1, 'rgba(255,226,168,0)');
+      ctx.fillStyle = gl; ctx.fillRect(cx - 40, top - 22, 80, 80);
     },
     shoerack(ctx, f, g) {
       box(ctx, g, P.WOOD, P.WOODD, 2);

@@ -151,6 +151,9 @@
     { art: 'coat', name: 'Coat closet', at: [21, 10, 1, 1], H: 64, time: 2.4, noise: 4.5, loot: 'coat' },
     { art: 'sidetable', name: 'Hall table', at: [21, 19, 1, 1], H: 24, time: 1.4, noise: 2, loot: 'hall' },
     { art: 'shoerack', at: [21, 26, 1, 1], H: 14, solid: 1 },
+    // street
+    { art: 'trash', name: 'Garbage bin', at: [15, 28, 1, 1], H: 26, time: 1.4, noise: 3, loot: 'trash' },
+    { art: 'lamppost', at: [12, 28, 1, 1], H: 112, solid: 1 },
   ];
 
   // wall decorations on wall faces, keyed "x,y" of the wall cell
@@ -183,7 +186,7 @@
       stats: { searched: 0, kills: 0, start: performance.now() }, entered: false, lastNoise: null, field: null, fieldT: 0, fieldCell: -1,
       secretHint: 0, sheet: null,
     };
-    for (const k in ROOMNAME) { G.fog[k] = k === 's' ? .985 : .93; G.visited[k] = false; }
+    for (const k in ROOMNAME) { G.fog[k] = k === 's' ? .99 : .97; G.visited[k] = false; }
     G.fog.o = 0.12; G.visited.o = true;
     let fid = 0;
     for (const d of FDEF) {
@@ -412,11 +415,13 @@
 
   const touch = $('#touch'), joyEl = $('#joy'), knob = $('#joy .knob');
   const JR = 52;
+  const taps = new Map();
   touch.addEventListener('pointerdown', e => {
     SFX.init();
     if (G.sheet) return;
+    taps.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() });
     const rc = touch.getBoundingClientRect();
-    if (e.clientX - rc.left > rc.width * .55 || joy.id !== null) return;
+    if (e.clientX - rc.left > rc.width * .55 || joy.id !== null) { e.preventDefault(); return; }
     joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.x = 0; joy.y = 0; joy.active = true;
     touch.setPointerCapture(e.pointerId);
     joyEl.style.left = (e.clientX - rc.left) + 'px'; joyEl.style.top = (e.clientY - rc.top) + 'px';
@@ -437,6 +442,11 @@
     knob.style.transform = `translate(calc(-50% + ${kx}px), calc(-50% + ${ky}px))`;
     joyEl.classList.toggle('run', m > .86);
   });
+  touch.addEventListener('pointerup', e => {
+    const tp = taps.get(e.pointerId); taps.delete(e.pointerId);
+    if (tp && performance.now() - tp.t < 300 && Math.hypot(e.clientX - tp.x, e.clientY - tp.y) < 14) tapWorld(e.clientX, e.clientY);
+  });
+  touch.addEventListener('pointercancel', e => taps.delete(e.pointerId));
   const endJoy = e => { if (e.pointerId !== joy.id) return; joy.id = null; joy.active = false; joy.x = joy.y = 0; joyEl.classList.remove('on', 'run'); };
   touch.addEventListener('pointerup', endJoy); touch.addEventListener('pointercancel', endJoy);
 
@@ -563,6 +573,59 @@
   }
   function cancelSearch() { const p = G.p; if (p.st === 'search') { p.st = 'free'; p.search = null; } }
 
+  // ---------------------------------------------------------------- tap to walk / tap to search
+  function tapWorld(cx, cy) {
+    if (!G || G.sheet || G.over || G.p.st === 'down') return;
+    const rc = touch.getBoundingClientRect();
+    const wx = G.cam.x + (cx - rc.left - DEV.W / 2) / DEV.zoom, wy = G.cam.y + (cy - rc.top - DEV.H / 2) / DEV.zoom;
+    let best = null, bk = -1e9;
+    for (const it of interactables()) {
+      const o = it.obj; let bx;
+      if (it.corpse) bx = { x: it.rect.x, y: it.rect.y - 34, w: it.rect.w, h: it.rect.h + 40 };
+      else if (o.wall) bx = { x: o.x + 4, y: o.y + o.h - 60, w: o.w - 8, h: 60 };
+      else { const g = ART.geo(o); bx = { x: o.x + (o.slide || 0) * T, y: g.ty0 - 8, w: o.w, h: g.fy1 - g.ty0 + 8 }; }
+      if (rm(it) && G.fog[rm(it)] > .6) continue;
+      if (wx >= bx.x - 6 && wx <= bx.x + bx.w + 6 && wy >= bx.y - 6 && wy <= bx.y + bx.h + 6) { const k = bx.y + bx.h; if (k > bk) { bk = k; best = { it, bx }; } }
+    }
+    const p = G.p;
+    if (best) {
+      const it = best.it;
+      if (rectDist(p.x, p.y, it.rect) <= 36 && p.st === 'free') { startSearch(it); return; }
+      const goal = goalCellFor(it);
+      if (!goal) return;
+      const rc = it.rect, gx0 = goal[0] * T, gy0 = goal[1] * T;
+      const px = clamp(rc.x + rc.w / 2, gx0 + 14, gx0 + T - 14), py = clamp(rc.y + rc.h / 2, gy0 + 10, gy0 + T - 10);
+      p.auto = { it, gx: goal[0], gy: goal[1], px, py, field: bfs(goal[0], goal[1]), t: 0 };
+      G.tapMark = { x: best.bx.x + best.bx.w / 2, y: best.bx.y + best.bx.h, t: 0, obj: true };
+    } else {
+      const tx = Math.floor(wx / T), ty = Math.floor(wy / T);
+      if (tx < 0 || ty < 0 || tx >= MW || ty >= MH || solidCell[ty * MW + tx]) return;
+      p.auto = { gx: tx, gy: ty, px: wx, py: wy, field: bfs(tx, ty), t: 0 };
+      G.tapMark = { x: wx, y: wy, t: 0 };
+    }
+  }
+  function rm(it) { return it.corpse ? null : it.obj.room; }
+  function goalCellFor(it) {
+    const o = it.obj;
+    if (it.corpse) return cellOf({ x: it.rect.x + it.rect.w / 2, y: o.y });
+    const tx = o.tx + Math.round(o.slide || 0), cx = tx + Math.floor((o.tw - 1) / 2), cy = o.ty + Math.floor((o.th - 1) / 2);
+    const cand = [[cx, o.ty + o.th], [cx + (o.tw > 1 ? 1 : 0), o.ty + o.th], [cx, o.ty - 1], [tx - 1, cy], [tx + o.tw, cy]];
+    for (const [x, y] of cand) if (x >= 0 && y >= 0 && x < MW && y < MH && !solidCell[y * MW + x]) return [x, y];
+    return null;
+  }
+  function autoInput() {
+    const p = G.p, a = p.auto;
+    if (a.it) {
+      if (rectDist(p.x, p.y, a.it.rect) <= 30) { p.auto = null; startSearch(a.it); return null; }
+    }
+    const st = nextStep(p, a.field);
+    const tgt = st.same ? { x: a.px, y: a.py } : st;
+    const dx = tgt.x - p.x, dy = tgt.y - p.y, d = Math.hypot(dx, dy);
+    if (st.same && d < 5) { p.auto = null; if (a.it && rectDist(p.x, p.y, a.it.rect) <= 44) startSearch(a.it); return null; }
+    if (a.t > 9) { p.auto = null; return null; }
+    return { x: dx / (d || 1), y: dy / (d || 1), m: st.same ? Math.min(1, d / 20 + .35) : 1, run: false };
+  }
+
   // ---------------------------------------------------------------- update
   function update(dt) {
     G.t += dt;
@@ -573,7 +636,12 @@
     if (G.hitstop > 0) { G.hitstop -= dt; return; }
     if (G.paused) return;
 
-    const inp = moveInput();
+    let inp = moveInput();
+    if (G.p.auto) {
+      if (inp.m > 0 || btn.atkPressed || btn.dodge || G.p.st === 'hurt' || G.p.st === 'down' || G.sheet) G.p.auto = null;
+      else if (G.p.st === 'free') { G.p.auto.t += dt; const ai = autoInput(); if (ai) inp = ai; }
+    }
+    if (G.tapMark) { G.tapMark.t += dt; if (G.tapMark.t > .7) G.tapMark = null; }
     updatePlayer(dt, inp);
     for (const z of G.zs) updateZombie(z, dt);
     separate();
@@ -721,7 +789,7 @@
   function hurtPlayer(dmg, dx, dy, z) {
     const p = G.p;
     if (p.inv > 0 || p.st === 'down') return;
-    cancelSearch();
+    cancelSearch(); p.auto = null; if (G.sheet) closeSheet();
     p.hp = Math.max(0, p.hp - dmg); p.inv = .7; p.flash = .55;
     p.kbx = dx * 6 * T; p.kby = dy * 6 * T * .8;
     p.st = 'hurt'; p.stT = 0;
@@ -861,7 +929,7 @@
   function updateWorld(dt) {
     // fog
     for (const k in G.fog) {
-      const target = k === G.room ? 0 : k === 'o' ? .12 : G.visited[k] ? .42 : k === 's' ? .985 : .93;
+      const target = k === G.room ? 0 : k === 'o' ? .12 : G.visited[k] ? .45 : k === 's' ? .99 : .97;
       G.fog[k] = lerp(G.fog[k], target, 1 - Math.exp(-(target < G.fog[k] ? 5 : 2) * dt));
     }
     G.noiseLvl = Math.max(0, G.noiseLvl - dt * .28);
@@ -901,7 +969,7 @@
     const vw = DEV.W / DEV.zoom, vh = DEV.H / DEV.zoom;
     let tx = p.x + p.fx * T * .5, ty = p.y - 34 + p.fy * T * .4;
     tx = clamp(tx, vw / 2 + T * .6, MW * T - vw / 2 - T * .6); if (vw > MW * T) tx = MW * T / 2;
-    ty = clamp(ty, vh / 2 - T * 2, MH * T - vh / 2 + T * 3.2);
+    ty = clamp(ty, vh / 2 - T * 2, MH * T - vh / 2 + T * 5.5);
     const k = 1 - Math.exp(-6 * dt);
     G.cam.x = lerp(G.cam.x, tx, k); G.cam.y = lerp(G.cam.y, ty, k);
     // wall cutaway near the player
@@ -930,7 +998,8 @@
     }
     // street + curb
     c.fillStyle = '#23223c'; c.fillRect(0, 29.55 * T, MW * T, T); ART.line(c, 0, 29.55 * T, MW * T, 29.55 * T, '#4a4870', 3);
-    for (let x = 1; x < MW; x += 3) { c.fillStyle = '#c9a85a'; c.globalAlpha = .4; c.fillRect(x * T, 29.85 * T, T * 1.3, 3); c.globalAlpha = 1; }
+    // street lamp pool
+    { const g = c.createRadialGradient(12.5 * T, 28.9 * T, 4, 12.5 * T, 28.9 * T, T * 3.2); g.addColorStop(0, 'rgba(246,227,187,.22)'); g.addColorStop(1, 'rgba(246,227,187,0)'); c.fillStyle = g; c.fillRect(8 * T, 25.5 * T, 9 * T, 6 * T); }
     // stoop steps
     for (let i = 0; i < 3; i++) ART.blk(c, 19 * T + 6 - i * 4, 28 * T + i * 13, 2 * T + 20 + i * 8 - 12 + 12, 13, ['#5a5878', '#4f4d6c', '#45435f'][i], 2, 2);
     // rugs
@@ -1046,6 +1115,8 @@
     const vx0 = camx - W / S / 2 - T * 2, vx1 = camx + W / S / 2 + T * 2, vy0 = camy - H / S / 2 - T * 2, vy1 = camy + H / S / 2 + T * 3;
 
     ctx.imageSmoothingEnabled = true;
+    ctx.fillStyle = '#23223c'; ctx.fillRect(-T * 4, MH * T - 2, MW * T + T * 8, T * 8);
+    ctx.fillStyle = 'rgba(201,168,90,.35)'; for (let x = -3; x < MW + 4; x += 3) ctx.fillRect(x * T, (MH + 1.6) * T, T * 1.3, 3);
     ctx.drawImage(floorCv, 0, 0, MW * T, MH * T);
     // decals
     for (const d of G.decals) {
@@ -1169,7 +1240,8 @@
     else if (p.st === 'down') { rot = -p.downRot * 1.45 * dir; }
     if (p.inv > 0 && p.st !== 'dodge' && p.st !== 'down') alpha = .65 + .35 * Math.sin(G.t * 40);
     drawShadow(p.x, p.y + 1, 18);
-    ART.drawRig(ctx, 'survivor', p.x, p.y + yo, PSCALE, p.flip, { rot, sx, sy, parts, flash: p.flash, alpha });
+    p._pose = [p.x, p.y + yo, PSCALE, p.flip, { rot, sx, sy, parts, alpha: 1 }];
+    ART.drawRig(ctx, 'survivor', p.x, p.y + yo, PSCALE, p.flip, { rot, sx, sy, parts, flash: p.flash, flashRed: true, alpha });
   }
 
   function drawZombie(z) {
@@ -1207,6 +1279,7 @@
     if (z.st === 'dead') { // corpse lies along the floor
       y = z.y + 6;
     }
+    z._pose = [x, y + yo, ZSCALE, z.flip, { rot, sy, parts, alpha: 1 }];
     ART.drawRig(ctx, 'zombie', x, y + yo, ZSCALE, z.flip, { rot, sy, parts, flash: z.flash, alpha });
   }
 
@@ -1255,9 +1328,40 @@
     for (let i = 0, n = FW * FH; i < n; i++) { const j = i * 4; d[j] = 9; d[j + 1] = 7; d[j + 2] = 24; d[j + 3] = al[fogMap[i]] * 255; }
     fogCtx.putImageData(fogImg, 0, 0);
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(fogCv, 0, 0, MW * T, MH * T);
-    ctx.fillStyle = 'rgba(9,7,24,1)'; ctx.fillRect(-T * 20, -T * 20, T * 20, T * 80); ctx.fillRect(MW * T, -T * 20, T * 20, T * 80); ctx.fillRect(-T * 20, -T * 20, T * 70, T * 20);
+    // draw the fog on its own layer, then cut out characters standing in lit areas so tall
+    // sprites are not darkened where they overlap an unexplored tile behind them
+    // cheap path: no character overlaps a darker tile than the one it stands on
+    const fogAt = (x, y) => { const fx = clamp(Math.floor(x / T * FQ), 0, FW - 1), fy = clamp(Math.floor(y / T * FQ), 0, FH - 1); return al[fogMap[fy * FW + fx]]; };
+    const needCut = e => { if (!e._pose) return false; const f0 = fogAt(e.x, e.y); if (f0 > .9) return false; for (const dy of [30, 55, 80]) for (const dx of [-22, 0, 22]) if (fogAt(e.x + dx, e.y - dy) > f0 + .08) return true; return false; };
+    if (!needCut(G.p) && !G.zs.some(z => z.st !== 'sleep' && needCut(z))) {
+      ctx.drawImage(fogCv, 0, 0, MW * T, MH * T);
+      ctx.fillStyle = 'rgba(9,7,24,1)'; ctx.fillRect(-T * 20, -T * 20, T * 20, T * 48); ctx.fillRect(MW * T, -T * 20, T * 20, T * 48); ctx.fillRect(-T * 20, -T * 20, T * 70, T * 20);
+      ctx.fillStyle = 'rgba(9,7,24,.12)'; ctx.fillRect(-T * 20, MH * T, T * 70, T * 20); ctx.fillRect(-T * 20, 28 * T, T * 20, T * 2); ctx.fillRect(MW * T, 28 * T, T * 20, T * 2);
+      return;
+    }
+    const fsc = Math.min(1, 1.5 / DEV.dpr); // fog is soft: render it at reduced resolution
+    const fw = Math.ceil(cv.width * fsc), fh = Math.ceil(cv.height * fsc);
+    if (fogLayer.width !== fw || fogLayer.height !== fh) { fogLayer.width = fw; fogLayer.height = fh; }
+    const fc = fogLayer.getContext('2d');
+    fc.setTransform(1, 0, 0, 1, 0, 0); fc.clearRect(0, 0, fw, fh);
+    const m = ctx.getTransform(); fc.setTransform(m.a * fsc, 0, 0, m.d * fsc, m.e * fsc, m.f * fsc); fc.imageSmoothingEnabled = true;
+    fc.drawImage(fogCv, 0, 0, MW * T, MH * T);
+    fc.fillStyle = 'rgba(9,7,24,1)'; fc.fillRect(-T * 20, -T * 20, T * 20, T * 48); fc.fillRect(MW * T, -T * 20, T * 20, T * 48); fc.fillRect(-T * 20, -T * 20, T * 70, T * 20);
+    fc.fillStyle = 'rgba(9,7,24,.12)'; fc.fillRect(-T * 20, MH * T, T * 70, T * 20); fc.fillRect(-T * 20, 28 * T, T * 20, T * 2); fc.fillRect(MW * T, 28 * T, T * 20, T * 2);
+    fc.globalCompositeOperation = 'destination-out';
+    const cut = (e, key) => {
+      if (!e._pose) return;
+      const [cx, cy] = cellOf(e), rmm = roomAt(cx, cy) || (cy >= 28 ? 'o' : null);
+      const a = 1 - (rmm ? G.fog[rmm] : 1); if (a < .05) return;
+      const ps = e._pose; ps[4].alpha = a;
+      ART.drawRig(fc, key, ps[0], ps[1], ps[2], ps[3], ps[4]);
+    };
+    cut(G.p, 'survivor');
+    for (const z of G.zs) if (z.st !== 'sleep') cut(z, 'zombie');
+    fc.globalCompositeOperation = 'source-over';
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(fogLayer, 0, 0, cv.width, cv.height); ctx.restore();
   }
+  const fogLayer = document.createElement('canvas');
 
   function drawOverlays() {
     const p = G.p;
@@ -1267,6 +1371,11 @@
       ctx.beginPath(); ctx.ellipse(r.x, r.y, r.r * k, r.r * k * .62, 0, 0, 6.28); ctx.stroke();
     }
     ctx.globalAlpha = 1;
+    if (G.tapMark) {
+      const m = G.tapMark, k = m.t / .7;
+      ctx.globalAlpha = 1 - k; ctx.strokeStyle = P.CRM; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.ellipse(m.x, m.y, 8 + k * 14, (8 + k * 14) * .5, 0, 0, 6.28); ctx.stroke(); ctx.globalAlpha = 1;
+    }
     // swing trail
     if (p.st === 'swing' && p.stT > SW_WIND - .02 && p.stT < SW_WIND + SW_STRIKE + .12) {
       const fa = Math.atan2(p.fy, p.fx), k = Math.min(1, (p.stT - SW_WIND + .02) / (SW_STRIKE + .02)), fade = p.stT > SW_WIND + SW_STRIKE ? 1 - (p.stT - SW_WIND - SW_STRIKE) / .12 : 1;
@@ -1344,7 +1453,7 @@
     for (const n of G.nums) {
       const k = n.t / .9; ctx.globalAlpha = 1 - k * k;
       ctx.font = `900 ${16 + (1 - k) * 4}px system-ui,sans-serif`; ctx.textAlign = 'center';
-      ctx.lineWidth = 4; ctx.strokeStyle = P.INK; ctx.strokeText(n.v, n.x, n.y - k * 26); ctx.fillStyle = n.col; ctx.fillText(n.v, n.x, n.y - k * 26);
+      ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = P.INK; ctx.strokeText(n.v, n.x, n.y - k * 26); ctx.fillStyle = n.col; ctx.fillText(n.v, n.x, n.y - k * 26);
     }
     ctx.globalAlpha = 1;
   }
@@ -1352,7 +1461,7 @@
     for (const b of G.banners) {
       const k = b.t, a = k < .3 ? k / .3 : k > 1.8 ? Math.max(0, 1 - (k - 1.8) / .6) : 1;
       const W = cv.width, dpr = DEV.dpr, y = 236 * dpr;
-      ctx.globalAlpha = a; ctx.textAlign = 'center';
+      ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
       ctx.font = `900 ${24 * dpr}px system-ui, sans-serif`;
       ctx.lineWidth = 6 * dpr; ctx.strokeStyle = P.INK; ctx.strokeText(b.text, W / 2, y); ctx.fillStyle = P.CRM; ctx.fillText(b.text, W / 2, y);
       ctx.font = `800 ${12 * dpr}px system-ui, sans-serif`; ctx.fillStyle = P.ORA; ctx.strokeText(b.sub.toUpperCase(), W / 2, y + 20 * dpr); ctx.fillText(b.sub.toUpperCase(), W / 2, y + 20 * dpr);
@@ -1516,13 +1625,15 @@
   function frame(ts) {
     const dt = Math.min(.05, (ts - last) / 1000 || .016); last = ts;
     fpsAcc += dt; fpsN++; if (fpsAcc > 1) { DM.fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+    const t0 = performance.now();
     update(dt); render(); hud();
+    DM.ms = DM.ms * .95 + (performance.now() - t0) * .05;
     requestAnimationFrame(frame);
   }
 
   // debug / test hooks
   const DM = window.DM = {
-    get G() { return G; }, fps: 0,
+    get G() { return G; }, fps: 0, ms: 0,
     tp(tx, ty) { G.p.x = tx * T; G.p.y = ty * T; G.p.vx = G.p.vy = 0; G.cam.x = G.p.x; G.cam.y = G.p.y - 34; },
     face(x, y) { G.p.fx = x; G.p.fy = y; if (x) G.p.flip = x < 0; },
     target() { const t = findTarget(); return t ? { act: t.act, name: t.name } : null; },
