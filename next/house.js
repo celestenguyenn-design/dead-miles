@@ -388,7 +388,7 @@
       return;
     }
     o.searched = true; G.stats.searched++;
-    const keys = it.corpse ? (o.kind === 'turkey' ? ['turkey', 'hat'] : rollLoot('corpse')) : o.pre.slice();
+    const keys = it.corpse ? (o.kind === 'turkey' ? ['turkey', D.cosOwned().pilgrim ? 'cos_harvest' : 'cos_pilgrim'] : rollLoot('corpse')) : o.pre.slice();
     if (keys.length && Math.random() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot); if (more.length) keys.push(more[0]); }
     o.loot0 = toStacks(keys);
     if (it.pry && o.loot0.length && Math.random() < .25) { const i = Math.floor(Math.random() * o.loot0.length), sm = o.loot0[i]; sm.n--; if (!sm.n) o.loot0.splice(i, 1); toast('Smashed: ' + ITEMS[sm.k].n.toLowerCase(), 1.8); }
@@ -1490,12 +1490,15 @@
   // ---------------------------------------------------------------- sheets & cards
   const sheet = $('#sheet');
   // ---- pack with stacks: G.pack = [{k, n}], each entry one slot
+  const isCos = k => !!(ITEMS[k] && ITEMS[k].cos);   // cosmetics skip the pack: they unlock into the wardrobe
   function roomFor(k) { // how many of k the pack can still take
+    if (isCos(k)) return 99;
     let room = 0; const m = stackMax(k);
     for (const e of G.pack) if (e.k === k) room += m - e.n;
     return room + (packSlots() - G.pack.length) * m;
   }
   function addToPack(k, n, d) { // tops up existing stacks first, then new slots; returns how many fit
+    if (isCos(k)) { if (DM.Game && DM.Game.unlockCos) DM.Game.unlockCos(k); return n; }
     const m = stackMax(k); let left = n;
     for (const e of G.pack) if (e.k === k && e.n < m && left) { const t = Math.min(left, m - e.n); e.n += t; left -= t; }
     while (left && G.pack.length < packSlots()) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; G.pack.push(e); left -= t; }
@@ -1516,7 +1519,9 @@
     $('#shTitle').textContent = it.corpse ? (o.kind === 'turkey' ? 'Zombie turkey' : 'Zombie remains') : o.name;
     renderLoot();
     sheet.classList.add('on');
+    tip('loot');
   }
+  const tip = id => { if (DM.Game && DM.Game.tip) DM.Game.tip(id); };
   function renderLoot(note) {
     const s = G.sheet, o = s.o, grid = $('#shGrid'); grid.innerHTML = '';
     $('#shActs').innerHTML = '';
@@ -1533,18 +1538,19 @@
     const got = addToPack(e.k, e.n, e.d);
     if (!got) { toast(`No room for ${ITEMS[e.k].n.toLowerCase()}`, 1.4); $('#shCap').classList.add('shake'); setTimeout(() => $('#shCap').classList.remove('shake'), 400); return; }
     e.n -= got; if (!e.n) o.loot0.splice(i, 1);
-    SFX.play('pick');
+    SFX.play('pick'); lootedWeapon(e.k);
     if (e.k === 'ammo' || e.k === 'key') toast(ITEMS[e.k].n + (got > 1 ? ' x' + got : '') + '!', 1.2);
     renderLoot(e.n ? `Only ${got} fit - ${e.n} left here` : null); o._key = null;
   }
   function takeAll() {
     const o = G.sheet && G.sheet.o; if (!o || G.sheet.kind !== 'loot') return;
     let took = 0;
-    for (const e of o.loot0) { const got = addToPack(e.k, e.n, e.d); e.n -= got; took += got; }
+    for (const e of o.loot0) { const got = addToPack(e.k, e.n, e.d); e.n -= got; took += got; if (got) lootedWeapon(e.k); }
     o.loot0 = o.loot0.filter(e => e.n > 0);
     if (took) SFX.play('pick');
     if (o.loot0.length) { const left = o.loot0.reduce((a, e) => a + e.n, 0); toast(`Pack full - left ${left} item${left > 1 ? 's' : ''} here`, 1.8); renderLoot(); } else closeSheet();
   }
+  function lootedWeapon(k) { if (D.isWeapon(k) && DM.Game && DM.Game.onWeaponLoot) DM.Game.onWeaponLoot(k, true); }
   function closeSheet(silent) { sheet.classList.remove('on'); if (G) G.sheet = null; }
   function openPack(sel = -1) {
     if (G.over) return;
@@ -1559,8 +1565,8 @@
     if (sel >= 0) {
       const e = G.pack[sel], it = ITEMS[e.k], acts = $('#shActs');
       acts.innerHTML = `<span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}</span>`;
+      if (it.w) { const b = document.createElement('button'); b.textContent = 'Equip'; b.onclick = ev => { ev.stopPropagation(); equipFromPack(sel); openPack(); }; acts.appendChild(b); }
       if (it.use) { const b = document.createElement('button'); b.textContent = it.use; b.onclick = ev => { ev.stopPropagation(); useItem(sel); }; acts.appendChild(b); }
-      if (it.w) { const b = document.createElement('button'); b.textContent = 'Equip'; b.onclick = ev => { ev.stopPropagation(); const cur = S().hands; S().hands = { k: e.k, d: e.d }; if (cur) G.pack[sel] = { k: cur.k, n: 1, d: cur.d }; else G.pack.splice(sel, 1); lastHud = ''; SFX.play('pick'); openPack(); }; acts.appendChild(b); }
       const d = document.createElement('button'); d.className = 'ghost'; d.textContent = 'Drop';
       d.onclick = ev => { ev.stopPropagation(); dropItem(sel); }; acts.appendChild(d);
     }
@@ -1597,6 +1603,7 @@
 
   // ---- locks: choose pick or pry (two buttons in the sheet)
   function openLockChoice(it) {
+    tip('lock');
     const o = it.obj, LK = LOCKS[o.locked], n = packCount('lockpick'), cb = hasPry();
     if (!n && !cb) { toast('Locked. You need lockpicks or a crowbar.', 1.8); SFX.play('alert'); return; }
     G.sheet = { kind: 'lock', it };
@@ -1788,6 +1795,30 @@
     if (cur) { const moved = G.pack.splice(i, 1)[0]; G.pack.push(moved); }
     SFX.play('pick'); toast('Equipped ' + ITEMS[e.k].n.toLowerCase(), 1); lastHud = '';
   }
+  // the weapon chip: a list of every weapon in the pack, tap one to fight with it
+  function openSwap() {
+    if (G.over) return;
+    const h = S().hands, cur = h ? WEAPONS[ITEMS[h.k].w].dmg : WEAPONS.fists.dmg;
+    const ws = G.pack.map((e, i) => [e, i]).filter(([e]) => D.isWeapon(e.k));
+    G.sheet = { kind: 'swap' };
+    $('#shKick').textContent = 'Swap weapon · holding ' + (h ? ITEMS[h.k].n.toLowerCase() : 'nothing') + ', ' + cur + ' dmg';
+    $('#shTitle').textContent = ws.length ? 'Weapons in your pack' : 'No other weapons';
+    const grid = $('#shGrid'); grid.innerHTML = ''; $('#shActs').innerHTML = '';
+    if (!ws.length) grid.innerHTML = '<div class="empty">Weapons you loot go in your pack. Come back here to swap to one mid-run.</div>';
+    ws.forEach(([e, i]) => { const dm = WEAPONS[ITEMS[e.k].w].dmg, df = dm - cur;
+      grid.appendChild(itemCard(e, () => { equipFromPack(i); closeSheet(); }, `<em class="wdmg${df > 0 ? ' up' : df < 0 ? ' down' : ''}">${dm} dmg${df ? ` ${df > 0 ? '+' : ''}${df}` : ''}</em>`)); });
+    $('#shCap').textContent = ws.length ? 'Tap one to fight with it' : '';
+    $('#shTake').style.display = 'none';
+    sheet.classList.add('on');
+  }
+  function equipFromPack(i) {
+    const e = G.pack[i]; if (!e || !D.isWeapon(e.k)) return;
+    const cur = S().hands;
+    S().hands = { k: e.k, d: e.d == null ? WEAPONS[ITEMS[e.k].w].dur : e.d };
+    if (cur) G.pack[i] = { k: cur.k, n: 1, d: cur.d }; else G.pack.splice(i, 1);
+    if (DM.Game && DM.Game.onEquip) DM.Game.onEquip();
+    SFX.play('pick'); toast('Equipped ' + ITEMS[e.k].n.toLowerCase(), 1.1); lastHud = '';
+  }
   function fireArrow() {
     const p = G.p;
     if (!packCount('arrow')) { toast('No arrows', 1.1); return false; }
@@ -1868,7 +1899,7 @@
     if (e.code === 'KeyI' || e.code === 'Tab') { e.preventDefault(); openPack(); }
   }
   $('#pack').addEventListener('click', () => { SFX.init(); if (G && !G.over) openPack(); });
-  $('#wpn').addEventListener('click', e => { e.stopPropagation(); SFX.init(); if (G && !G.over) swapWeapon(); });
+  $('#wpn').addEventListener('click', e => { e.stopPropagation(); SFX.init(); if (G && !G.over) { if (G.sheet && G.sheet.kind === 'swap') closeSheet(); else openSwap(); } });
 
   const scene = {
     update, render, hud, key: onKey, tap: (x, y) => tapWorld(x, y),
@@ -1898,7 +1929,7 @@
   };
   // debug / test hooks
   Object.assign(DM, {
-    gateOpen: () => gateOpen(), LP, EVENT, openPack, dropItem, swapWeapon,
+    gateOpen: () => gateOpen(), LP, EVENT, openPack, dropItem, swapWeapon, openSwap,
     tp(tx, ty) { G.p.x = tx * T; G.p.y = ty * T; G.p.vx = G.p.vy = 0; G.cam.x = G.p.x; G.cam.y = G.p.y - 34; },
     face(x, y) { G.p.fx = x; G.p.fy = y; if (x) G.p.flip = x < 0; },
     target() { const t = findTarget(); return t ? { act: t.act, name: t.name } : null; },
