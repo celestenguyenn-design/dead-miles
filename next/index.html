@@ -147,9 +147,6 @@
   .slot small.tag { font-size: 8.5px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--ora); }
   #evchip { display: none; align-self: flex-start; margin-top: 2px; align-items: center; gap: 5px; padding: 4px 9px 4px 6px; border-radius: 99px; background: var(--ora); color: var(--ink); font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; border: 2px solid var(--ink); }
   body.event #evchip { display: inline-flex; }
-  #condchip { display: none; align-self: flex-start; margin-top: 2px; padding: 3px 8px; border-radius: 99px; background: rgba(17,20,47,.9); border: 2px solid var(--plum); color: var(--mute); font-size: 10px; font-weight: 800; letter-spacing: .04em; }
-  #condchip.on { display: inline-block; } #condchip b { color: var(--crm); text-transform: uppercase; letter-spacing: .08em; }
-  #condchip.c-rested { border-color: #93a86c; } #condchip.c-rested b { color: #b9d48a; } #condchip.c-low { border-color: #6f8fd0; } #condchip.c-low b { color: #a9c2f0; }
   body.event #room::after { content: ""; display: inline-block; width: 9px; height: 9px; margin-left: 6px; background: #c95f2c; border-radius: 0 60% 0 60%; transform: rotate(20deg); }
   .bars { gap: 5px; }
   #useLbl em.opt { background: var(--lild); text-transform: none; letter-spacing: .02em; font-size: 10px; }
@@ -459,7 +456,6 @@
       <div class="bar" id="st"><i></i></div>
       <div><span id="room">STOOP</span></div>
       <div id="evchip"></div>
-      <div id="condchip"></div>
     </div>
     <div class="right">
       <div class="rowr">

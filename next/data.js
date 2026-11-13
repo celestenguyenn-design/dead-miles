@@ -281,17 +281,7 @@ window.DM = window.DM || {};
     return out;
   };
 
-  // ---------------------------------------------------------------- condition + training (phase 5a: Oura morning check-in, workouts)
-  // s.cond = { date, sleep, ready, tier: 'rested'|'steady'|'low'|'', work (minutes today) }; s.train = training points (all time)
-  const tkey = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
-  D.condTier = (ready, sleep) => { const v = ready != null ? ready : sleep; return v == null ? '' : v >= 85 ? 'rested' : v >= 70 ? 'steady' : 'low'; };
-  D.condToday = s => (s && s.cond && s.cond.date === tkey() && s.cond.tier) || '';
-  D.COND = { rested: { n: 'Well rested', chip: 'Rested', fx: '+15% scavenging XP today', heal: 20 }, steady: { n: 'Steady', chip: 'Steady', fx: 'a normal day', heal: 10 }, low: { n: 'Lay low', chip: 'Lay low', fx: 'you take 25% less damage today', heal: 0 } };
-  D.xpMul = s => D.condToday(s) === 'rested' ? 1.15 : 1;
-  D.guard = s => D.condToday(s) === 'low' ? .75 : 1;
-  D.trainHp = s => Math.min(40, Math.floor(((s && s.train) || 0) / 5));
-  D.trainDmg = s => Math.min(8, Math.floor(((s && s.train) || 0) / 25));
-  D.maxHp = s => (s && s.job === 'brawler' ? 130 : 100) + D.trainHp(s);
+  D.maxHp = s => s && s.job === 'brawler' ? 130 : 100;
 
   // ---------------------------------------------------------------- scavenging skill
   D.XPCUM = L => L <= 1 ? 0 : Math.round(14 * Math.pow(L - 1, 1.75) + (L > 5 ? 30 * (L - 5) * (L - 5) : 0));

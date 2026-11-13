@@ -38,11 +38,10 @@
   const gatePct = () => job() === 'scavenger' ? .65 : .75;
   const LOCK_EASE = () => (job() === 'thief' ? 1.6 : 1) * (S().lockset ? 1.25 : 1);   // the Thief job widens sweet spots
   const SNAP_T = () => (job() === 'thief' ? 2.4 : 1.2) * (S().lockset ? 1.5 : 1);    // ... and picks break half as often
-  const maxHp = () => D.maxHp(S());   // job + training (phase 5a)
+  const maxHp = () => D.maxHp(S());
   function gainXP(n, x, y) {
-    const mul = D.xpMul(S());           // well rested (morning check-in): +15% scavenging XP
-    const before = scavLvl(); S().xp += n * mul; DM.Game && DM.Game.save();
-    G.nums.push({ x: x + 16, y: y - 112, v: '+' + (mul > 1 ? (n * mul).toFixed(1) : n) + ' xp', t: 0, col: P.GRN, small: 1 });
+    const before = scavLvl(); S().xp += n; DM.Game && DM.Game.save();
+    G.nums.push({ x: x + 16, y: y - 112, v: '+' + n + ' xp', t: 0, col: P.GRN, small: 1 });
     const after = scavLvl();
     if (after > before) { levelUp(after); if (DM.Game && DM.Game.onLevel) DM.Game.onLevel(after); }
   }
@@ -108,11 +107,10 @@
     toast(opts.hint || 'Joystick to move  ·  SEARCH near furniture', 3.2);
     hudChips();
   }
-  // top-left chips: the running event, and today's condition from the morning check-in
+  // top-left chip: the running event
   function hudChips() {
-    const ev = $('#evchip'), cc = $('#condchip');
+    const ev = $('#evchip');
     if (ev) { ev.style.display = EVA ? '' : 'none'; if (EVA) { ev.innerHTML = EVS.glyph(EVA.id) + '<span>' + EVA.ev.short + '</span>'; ev.style.background = EVA.ev.accent.c; } }
-    if (cc) { const t = D.condToday(S()); cc.className = t ? 'on c-' + t : ''; cc.innerHTML = t ? `<b>${D.COND[t].chip}</b>${t === 'rested' ? ' +15% xp' : t === 'low' ? ' −25% dmg' : ''}` : ''; }
   }
   function mkZombie(x, y, st, room) {
     return {
@@ -610,7 +608,7 @@
           const dx = z.x - p.x, dy = (z.y - p.y) * 1.15, d = Math.hypot(dx, dy);
           if (d > W.reach * T) continue;
           if (d > 18 && Math.abs(angDiff(Math.atan2(dy, dx), fa)) > 1.35) continue;
-          hitZombie(z, fa, W.dmg * (job() === 'brawler' ? 1.3 : 1) + D.trainDmg(S())); any = true;   // training: +1 melee per 25 points
+          hitZombie(z, fa, W.dmg * (job() === 'brawler' ? 1.3 : 1)); any = true;
         }
         if (any) { G.hitstop = .055; G.shake = Math.max(G.shake, 5); wearWeapon(); }
         emitNoise(p.x, p.y, any ? W.noise : 1.5, any);
@@ -645,7 +643,7 @@
     const p = G.p;
     if (p.inv > 0 || p.st === 'down') return;
     cancelSearch(); p.auto = null; if (G.sheet) closeSheet(); if (LP.on) closeLock('You flinched - the pick slipped out');
-    dmg = Math.round(dmg * (z && z.dmgMul || 1) * D.guard(S()));   // lay low (bad night): 25% less damage today
+    dmg = Math.round(dmg * (z && z.dmgMul || 1));
     p.hp = Math.max(0, p.hp - dmg); p.inv = .7; p.flash = .55;
     p.kbx = dx * 6 * T; p.kby = dy * 6 * T * .8;
     p.st = 'hurt'; p.stT = 0;
