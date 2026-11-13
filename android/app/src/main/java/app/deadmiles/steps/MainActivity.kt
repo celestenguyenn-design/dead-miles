@@ -1,3 +1,5 @@
+@file:OptIn(androidx.health.connect.client.feature.ExperimentalFeatureAvailabilityApi::class)
+
 package app.deadmiles.steps
 
 import android.content.Context
