@@ -70,7 +70,9 @@ const ART = (() => {
     await Promise.all(R.parts.map(async (p, idx) => {
       const lines = p.lines === 'rest' ? colourLines.filter(i => !used.has(i) && i !== L.length - 1) : p.lines;
       let colour = lines.map(i => L[i]).join('\n');
-      let outline = lines.map(i => L[i - mid]).join('\n');
+      colour = colour.replace(/<\/g><\/g><\/g>\s*$/, '');
+      // cream sticker copy: same shapes, every non-none fill/stroke turned cream
+      let outline = colour.replace(/(fill|stroke)="(?!none)[^"]*"/g, '$1="#f6e3bb"');
       // the last colour line may carry the closing tags of the whole group
       colour = colour.replace(/<\/g><\/g><\/g>\s*$/, '');
       const [io, ic] = await Promise.all([
@@ -160,8 +162,8 @@ const ART = (() => {
     c: { a: '#3a2f52', b: '#30274a', kind: 'boards' },
     s: { a: '#33304a', b: '#2a2840', kind: 'concrete' },
     r: { a: '#4f3a66', b: '#463360', kind: 'carpet' },
-    l: { a: '#4d3a5e', b: '#3f2f52', kind: 'planks' },
-    h: { a: '#453453', b: '#3a2b48', kind: 'planks' },
+    l: { a: '#4d3a5e', b: '#43335a', kind: 'planks' },
+    h: { a: '#453453', b: '#3c2e4b', kind: 'planks' },
     o: { a: '#353452', b: '#2c2b46', kind: 'sidewalk' },
   };
   function drawFloorTile(ctx, room, tx, ty, T) {
@@ -182,9 +184,8 @@ const ART = (() => {
     } else if (f.kind === 'planks' || f.kind === 'boards') {
       const n = 4, ph = T / n;
       for (let i = 0; i < n; i++) {
-        const off = ((tx * 17 + i * 23 + ty * 7) % 3) * (T / 3);
-        line(ctx, x, y + i * ph, x + T, y + i * ph, f.b, 1.6);
-        line(ctx, x + off, y + i * ph, x + off, y + (i + 1) * ph, f.b, 1.4);
+        line(ctx, x, y + i * ph, x + T, y + i * ph, f.b, 1.3);
+        if (hash(tx, ty, i + 7) < .3) { const off = 6 + hash(tx, ty, i) * (T - 12); line(ctx, x + off, y + i * ph, x + off, y + (i + 1) * ph, f.b, 1.2); }
         if (hash(tx, ty, i) < .25) { ctx.fillStyle = 'rgba(255,255,255,.03)'; ctx.fillRect(x, y + i * ph + 2, T, 3); }
       }
       if (v < .06) { dot(ctx, x + 30, y + 20, 1.6, 'rgba(17,20,47,.5)'); }

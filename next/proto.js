@@ -183,7 +183,7 @@
       stats: { searched: 0, kills: 0, start: performance.now() }, entered: false, lastNoise: null, field: null, fieldT: 0, fieldCell: -1,
       secretHint: 0, sheet: null,
     };
-    for (const k in ROOMNAME) { G.fog[k] = 0.93; G.visited[k] = false; }
+    for (const k in ROOMNAME) { G.fog[k] = k === 's' ? .985 : .93; G.visited[k] = false; }
     G.fog.o = 0.12; G.visited.o = true;
     let fid = 0;
     for (const d of FDEF) {
@@ -214,29 +214,40 @@
   }
 
   // ---------------------------------------------------------------- walls & collision
-  let wallCells = [], wallRects = [], faceCache = new Map();
+  let wallCells = [], wallRects = [], faceCache = new Map(), doorLeaves = [];
   function buildWalls() {
-    wallCells = []; wallRects = new Array(MW * MH).fill(null).map(() => []);
+    wallCells = []; doorLeaves = []; wallRects = new Array(MW * MH).fill(null).map(() => []);
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
       if (isVoid(x, y)) { wallRects[y * MW + x].push({ x: x * T, y: y * T, w: T, h: T }); continue; }
       const horizDoor = isDoor(x, y) && isWall(x - 1, y) && isWall(x + 1, y);
-      if (horizDoor) { wallCells.push({ x, y, lintel: true, key: (y + 1) * T, cut: 1 }); continue; }
+      if (horizDoor) {
+        wallCells.push({ x, y, lintel: true, key: (y + 1) * T, cut: 1 });
+        if (ch(x, y) !== 'X') { // open door leaf, hinged on the west jamb, swung into the room below (front door: into the hall)
+          const dir = ch(x, y) === 'F' ? -1 : 1, g0 = (y + 1) * T - WT / 2, g1 = g0 + dir * T * .72;
+          doorLeaves.push({ x0: x * T + 2, x1: x * T + 8, y0: Math.min(g0, g1), y1: Math.max(g0, g1), key: Math.max(g0, g1), vert: true });
+        }
+        continue;
+      }
+      if (isDoor(x, y) && isWall(x, y - 1) && isWall(x, y + 1)) { // vertical doorway: leaf swung into the hall (east)
+        const gy = y * T + 4;
+        doorLeaves.push({ x0: (x + 1) * T - 4, x1: (x + 1) * T - 4 + T * .7, y0: gy, y1: gy, key: gy + 1, vert: false });
+      }
       if (!isWall(x, y)) continue;
       const cx = x * T + T / 2, gy1 = (y + 1) * T, gy0 = gy1 - WT;
       const W = isWall(x - 1, y) || isDoor(x - 1, y), E = isWall(x + 1, y) || isDoor(x + 1, y), N = isWall(x, y - 1);
       const S = isWall(x, y + 1);
-      const rects = [{ x: cx - WT / 2, y: gy0, w: WT, h: WT }];
-      if (W) rects.push({ x: x * T, y: gy0, w: T / 2, h: WT });
-      if (E) rects.push({ x: cx, y: gy0, w: T / 2, h: WT });
-      if (N) rects.push({ x: cx - WT / 2, y: y * T, w: WT, h: T - WT });
+      const rects = [{ x: cx - WT / 2, y: gy0, w: WT, h: WT, k: 'c' }];
+      if (W) rects.push({ x: x * T, y: gy0, w: T / 2, h: WT, k: 'w' });
+      if (E) rects.push({ x: cx, y: gy0, w: T / 2, h: WT, k: 'e' });
+      if (N) rects.push({ x: cx - WT / 2, y: y * T, w: WT, h: T - WT, k: 'n' });
       wallRects[y * MW + x].push(...rects);
-      const cell = { x, y, rects, key: gy1, cut: 1 };
+      const cell = { x, y, rects, key: gy1, cut: 1, W, E, N, S };
       if (!S && !isVoid(x, y + 1)) {
         cell.face = { x0: W ? x * T : cx - WT / 2, x1: E ? (x + 1) * T : cx + WT / 2, room: roomAt(x, y + 1) || 'h', decor: DECOR[x + ',' + y] };
       }
       wallCells.push(cell);
     }
-    faceCache.clear();
+    faceCache.clear(); fogMap = null;
   }
   let solidCell = new Uint8Array(MW * MH);
   function buildSolid() {
@@ -439,6 +450,7 @@
   bindBtn($('#bDodge'), () => { btn.dodge = true; });
   $('#pack').addEventListener('click', () => { SFX.init(); openPack(); });
   document.addEventListener('contextmenu', e => e.preventDefault());
+  $('#app').addEventListener('scroll', e => { e.target.scrollTop = 0; e.target.scrollLeft = 0; });
 
   function moveInput() {
     let x = 0, y = 0;
@@ -511,7 +523,7 @@
     for (const z of G.zs) {
       if (!z.dead || z.rot === 0) continue;
       let act = !z.searched ? 'Search' : (z.loot0 && z.loot0.length ? 'Open' : null);
-      if (act) out.push({ obj: z, act, rect: { x: z.x - 34, y: z.y - 12, w: 68, h: 24 }, name: 'Zombie', noise: 1.5, corpse: true });
+      if (act) out.push({ obj: z, act, rect: { x: z.x + (z.fallDir || 1) * 34 - 38, y: z.y - 14, w: 76, h: 26 }, name: 'Zombie', noise: 1.5, corpse: true });
     }
     return out;
   }
@@ -520,7 +532,7 @@
     const fx = p.x + p.fx * 10, fy = p.y + p.fy * 8;
     for (const it of interactables()) {
       const d = rectDist(p.x, p.y, it.rect);
-      if (d > 30) continue;
+      if (d > 36) continue;
       const score = d + rectDist(fx, fy, it.rect) * .5;
       if (score < bd) { bd = score; best = it; }
     }
@@ -642,7 +654,7 @@
       G.room = room;
       if (!G.visited[room]) {
         G.visited[room] = true;
-        if (room !== 'o') banner(ROOMNAME[room].toUpperCase(), room === 's' ? 'hidden room found' : 'explored');
+        if (room !== 'o') banner(ROOMNAME[room].toUpperCase(), room === 's' ? 'a secret stash!' : 'new room');
         if (room === 's') SFX.play('alert');
       }
       if (room !== 'o') G.entered = true;
@@ -710,7 +722,7 @@
     const p = G.p;
     if (p.inv > 0 || p.st === 'down') return;
     cancelSearch();
-    p.hp = Math.max(0, p.hp - dmg); p.inv = .7; p.flash = 1;
+    p.hp = Math.max(0, p.hp - dmg); p.inv = .7; p.flash = .55;
     p.kbx = dx * 6 * T; p.kby = dy * 6 * T * .8;
     p.st = 'hurt'; p.stT = 0;
     G.shake = 12; G.redFlash = 1; G.hitstop = .06;
@@ -746,7 +758,7 @@
     const face = (x) => { if (Math.abs(x) > .15) { z.fx = Math.sign(x); z.flip = x > 0; } };
     switch (z.st) {
       case 'sleep':
-        if (dp < 1.2 * T && p.st !== 'down') alertZombie(z, p.x, p.y, false);
+        if ((dp < .7 * T || (dp < 1.6 * T && p.running)) && p.st !== 'down') alertZombie(z, p.x, p.y, false);
         break;
       case 'rise': {
         z.rot = lerp(-Math.PI / 2, 0, Math.min(1, z.stT / .9));
@@ -849,7 +861,7 @@
   function updateWorld(dt) {
     // fog
     for (const k in G.fog) {
-      const target = k === G.room ? 0 : k === 'o' ? .12 : G.visited[k] ? .42 : .93;
+      const target = k === G.room ? 0 : k === 'o' ? .12 : G.visited[k] ? .42 : k === 's' ? .985 : .93;
       G.fog[k] = lerp(G.fog[k], target, 1 - Math.exp(-(target < G.fog[k] ? 5 : 2) * dt));
     }
     G.noiseLvl = Math.max(0, G.noiseLvl - dt * .28);
@@ -888,7 +900,7 @@
     const p = G.p;
     const vw = DEV.W / DEV.zoom, vh = DEV.H / DEV.zoom;
     let tx = p.x + p.fx * T * .5, ty = p.y - 34 + p.fy * T * .4;
-    tx = clamp(tx, vw / 2 - T * .5, MW * T - vw / 2 + T * .5); if (vw > MW * T) tx = MW * T / 2;
+    tx = clamp(tx, vw / 2 + T * .6, MW * T - vw / 2 - T * .6); if (vw > MW * T) tx = MW * T / 2;
     ty = clamp(ty, vh / 2 - T * 2, MH * T - vh / 2 + T * 3.2);
     const k = 1 - Math.exp(-6 * dt);
     G.cam.x = lerp(G.cam.x, tx, k); G.cam.y = lerp(G.cam.y, ty, k);
@@ -935,9 +947,6 @@
       c.fillStyle = g; c.fillRect(w.face.x0, w.key, w.face.x1 - w.face.x0, 16);
     }
     // vertical wall side shadows
-    for (const w of wallCells) if (!w.face && !w.lintel && w.rects) for (const r of w.rects) if (r.h > WT) {
-      c.fillStyle = 'rgba(10,8,24,.28)'; c.fillRect(r.x + r.w, r.y - 4, 8, r.h + 8); c.fillRect(r.x - 8, r.y - 4, 8, r.h + 8);
-    }
     faceCache.clear();
     for (const f of G.furn) f._key = null;
   }
@@ -1019,8 +1028,6 @@
   }
 
   // ---------------------------------------------------------------- render
-  const fogCv = document.createElement('canvas'); fogCv.width = MW; fogCv.height = MH;
-  const fogCtx = fogCv.getContext('2d'); const fogImg = fogCtx.createImageData(MW, MH);
   let vignette = null;
   function buildVignette() {
     vignette = document.createElement('canvas'); vignette.width = 256; vignette.height = 256;
@@ -1054,13 +1061,15 @@
     // y-sorted world
     const list = [];
     for (const w of wallCells) { if (w.key < vy0 || w.key - WH - T > vy1 || (w.x + 1) * T < vx0 || w.x * T > vx1) continue; list.push({ k: w.key, w }); }
+    for (const d of doorLeaves) list.push({ k: d.key, d });
     for (const f of G.furn) { const k = f.wall ? f.y + f.h + .5 : f.y + f.h; if (k + 10 < vy0 || f.y - 120 > vy1) continue; list.push({ k, f }); }
-    for (const z of G.zs) list.push({ k: z.st === 'sleep' || z.st === 'rise' && z.stT < .5 ? 21.9 * T + 1 : z.dead ? z.y - 14 : z.y, z });
+    for (const z of G.zs) list.push({ k: z.st === 'sleep' || z.st === 'rise' && z.stT < .5 ? 22 * T + 1 : z.dead ? z.y - 14 : z.y, z });
     list.push({ k: p.y, pl: 1 });
     list.sort((a, b) => a.k - b.k);
     for (const it of list) {
       if (it.w) drawWall(it.w);
-      else if (it.f) { const f = it.f, cvs = furnCanvas(f); if (f.lootable && f.searched && !(f.loot0 && f.loot0.length) && !(f.secret && !G.secretOpen)) ctx.globalAlpha = .82; ctx.drawImage(cvs, f._b.x, f._b.y, f._b.w, f._b.h); ctx.globalAlpha = 1; if (f.art === 'crate' && !f.searched) ART.candle(ctx, f.x + f.w - 12, ART.geo(f).ty0 + 12, G.t); }
+      else if (it.d) drawDoor(it.d);
+      else if (it.f) { const f = it.f, cvs = furnCanvas(f); if (f.lootable && f.searched && !(f.loot0 && f.loot0.length) && !(f.secret && !G.secretOpen)) ctx.globalAlpha = .82; ctx.drawImage(cvs, f._b.x + (f.slide || 0) * T, f._b.y, f._b.w, f._b.h); ctx.globalAlpha = 1; if (f.art === 'crate' && !f.searched) ART.candle(ctx, f.x + f.w - 12, ART.geo(f).ty0 + 12, G.t); }
       else if (it.z) drawZombie(it.z);
       else drawPlayer();
     }
@@ -1097,6 +1106,14 @@
       ctx.fillStyle = '#3d2d61'; ctx.fillRect(x, y - WH, 4, WH); ctx.fillRect(x + T - 4, y - WH, 4, WH);
       ctx.globalAlpha = 1; return;
     }
+    // rim first (only on exposed sides, so neighbouring cells never draw seams), then the dark top
+    ctx.fillStyle = '#4a3a72';
+    for (const r of w.rects) {
+      const y = r.y - WH;
+      if (r.k === 'n') ctx.fillRect(r.x - 2.5, y, r.w + 5, r.h);
+      else if (r.k === 'w' || r.k === 'e') ctx.fillRect(r.x, y - 2.5, r.w, r.h + (w.face ? 2.5 : 5));
+      else ctx.fillRect(r.x - (w.W ? 0 : 2.5), y - (w.N ? 0 : 2.5), r.w + (w.W ? 0 : 2.5) + (w.E ? 0 : 2.5), r.h + (w.N ? 0 : 2.5) + (w.S || w.face ? 0 : 2.5));
+    }
     ctx.fillStyle = '#1d1636';
     for (const r of w.rects) ctx.fillRect(r.x - .3, r.y - WH - .3, r.w + .6, r.h + .6);
     if (w.face) {
@@ -1108,6 +1125,20 @@
     ctx.globalAlpha = 1;
   }
 
+  const DOORH = 50;
+  function drawDoor(d) {
+    if (d.vert) { // leaf seen edge-on running north-south: a tall thin strip
+      const x = d.x0, w = d.x1 - d.x0, top = d.y0 - DOORH, h = d.y1 - top;
+      ART.blk(ctx, x, top, w, h, ART.P.WOOD, 2, 2);
+      ctx.fillStyle = ART.P.WOODD; ctx.fillRect(x + 1.5, d.y1 - DOORH + 2, w - 3, DOORH - 4);
+    } else { // leaf running east-west: we see its face
+      const x = d.x0, w = d.x1 - d.x0, top = d.y1 - DOORH;
+      ART.blk(ctx, x, top - 8, w, 8, '#7a5048', 2, 2);
+      ART.blk(ctx, x, top, w, DOORH, ART.P.WOOD, 2, 2.4);
+      ART.blk(ctx, x + 5, top + 5, w - 10, DOORH * .38, null, 2, 1.4); ART.blk(ctx, x + 5, top + 9 + DOORH * .38, w - 10, DOORH * .38, null, 2, 1.4);
+      ART.dot(ctx, x + w - 6, top + DOORH * .5, 2.4, ART.P.CRMD);
+    }
+  }
   function drawShadow(x, y, rx, a = .42) { ctx.fillStyle = `rgba(8,6,22,${a})`; ctx.beginPath(); ctx.ellipse(x, y, rx, rx * .36, 0, 0, 6.28); ctx.fill(); }
 
   function drawPlayer() {
@@ -1154,7 +1185,7 @@
     let x = z.x, y = z.y;
     if (z.st === 'sleep') {
       rot = -Math.PI / 2; parts.head = { r: .2 }; parts.armF = { r: -.5 }; sy = 1 + Math.sin(G.t * 1.6) * .03;
-      x = 6.55 * T; y = 21.55 * T;
+      x = 6.45 * T; y = 21.12 * T;
     } else if (z.st === 'rise') {
       rot = z.rot; x = z.x; y = z.y;
     } else if (z.st === 'windup') {
@@ -1179,20 +1210,52 @@
     ART.drawRig(ctx, 'zombie', x, y + yo, ZSCALE, z.flip, { rot, sy, parts, flash: z.flash, alpha });
   }
 
-  function drawFog() {
-    const d = fogImg.data;
-    for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
-      let a;
-      const rm = roomAt(x, y);
-      if (rm) a = G.fog[rm];
-      else if (isVoid(x, y)) a = y >= 28 ? G.fog.o : 1;
-      else { a = 1; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const r2 = roomAt(x + dx, y + dy); if (r2) a = Math.min(a, G.fog[r2]); } }
-      const i = (y * MW + x) * 4; d[i] = 9; d[i + 1] = 7; d[i + 2] = 24; d[i + 3] = a * 255;
+  // Fog is sampled on a fine grid (4 per tile) that knows what is *drawn* there: wall faces
+  // belong to the room they face, wall tops to the darkest-of-neighbours rule.
+  const FQ = 4, FW = MW * FQ, FH = MH * FQ;
+  const fogCv = document.createElement('canvas'); fogCv.width = FW; fogCv.height = FH;
+  const fogCtx = fogCv.getContext('2d'); const fogImg = fogCtx.createImageData(FW, FH);
+  let fogSrc = [], fogMap = null;
+  function buildFogMap() {
+    fogSrc = []; fogMap = new Int16Array(FW * FH);
+    const roomSrc = {};
+    for (const k in ROOMNAME) { roomSrc[k] = fogSrc.length; fogSrc.push({ rooms: [k] }); }
+    const VOID = fogSrc.length; fogSrc.push({ fixed: 1 });
+    const nbRooms = (x, y) => { const out = new Set(); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const r2 = roomAt(x + dx, y + dy); if (r2) out.add(r2); } return [...out]; };
+    for (let fy = 0; fy < FH; fy++) for (let fx = 0; fx < FW; fx++) {
+      const tx = Math.floor(fx / FQ), ty = Math.floor(fy / FQ);
+      let rm = roomAt(tx, ty);
+      if (!rm && isWall(tx, ty)) rm = roomAt(tx, ty - 1) || null;
+      if (!rm && isVoid(tx, ty) && ty >= 28) rm = 'o';
+      fogMap[fy * FW + fx] = rm ? roomSrc[rm] : VOID;
     }
+    const paint = (x, y, w, h, src) => {
+      for (let fy = Math.max(0, Math.floor(y / T * FQ)); fy < Math.min(FH, Math.ceil((y + h) / T * FQ)); fy++)
+        for (let fx = Math.max(0, Math.floor(x / T * FQ)); fx < Math.min(FW, Math.ceil((x + w) / T * FQ)); fx++) fogMap[fy * FW + fx] = src;
+    };
+    for (const w of wallCells) {
+      const rooms = nbRooms(w.x, w.y); if (!rooms.length) continue;
+      const cap = fogSrc.length; fogSrc.push({ rooms });
+      if (w.lintel) { paint(w.x * T, w.key - WH - WT, T, WT + 10, cap); continue; }
+      for (const r of w.rects) paint(r.x, r.y - WH, r.w, r.h, cap);
+      if (w.face) { const fsrc = fogSrc.length; fogSrc.push({ rooms: [w.face.room], capRooms: rooms, wall: w }); paint(w.face.x0, w.key - WH, w.face.x1 - w.face.x0, WH, fsrc); }
+    }
+  }
+  function drawFog() {
+    if (!fogMap) buildFogMap();
+    const al = new Float32Array(fogSrc.length);
+    const minOf = rs => { let a = 1; for (const r of rs) a = Math.min(a, G.fog[r]); return a; };
+    fogSrc.forEach((s, i) => {
+      if (s.fixed) { al[i] = 1; return; }
+      let a = minOf(s.rooms);
+      if (s.wall && s.wall.cut < .99) a = lerp(minOf(s.capRooms), a, (s.wall.cut - .28) / .72);
+      al[i] = a;
+    });
+    const d = fogImg.data;
+    for (let i = 0, n = FW * FH; i < n; i++) { const j = i * 4; d[j] = 9; d[j + 1] = 7; d[j + 2] = 24; d[j + 3] = al[fogMap[i]] * 255; }
     fogCtx.putImageData(fogImg, 0, 0);
     ctx.imageSmoothingEnabled = true;
-    // shift up a little so tall wall faces are covered with their room
-    ctx.drawImage(fogCv, 0, 0, MW, MH, 0, -T * .45, MW * T, MH * T);
+    ctx.drawImage(fogCv, 0, 0, MW * T, MH * T);
     ctx.fillStyle = 'rgba(9,7,24,1)'; ctx.fillRect(-T * 20, -T * 20, T * 20, T * 80); ctx.fillRect(MW * T, -T * 20, T * 20, T * 80); ctx.fillRect(-T * 20, -T * 20, T * 70, T * 20);
   }
 
@@ -1226,7 +1289,7 @@
       if (d > 3 * T) continue;
       const rm = it.corpse ? null : o.room; if (rm && G.fog[rm] > .6) continue;
       let mx, my;
-      if (it.corpse) { mx = o.x; my = o.y - 30; }
+      if (it.corpse) { mx = o.x + (o.fallDir || 1) * 34; my = o.y - 34; }
       else { const g = ART.geo(o); mx = o.x + o.w / 2 + (o.slide || 0) * T; my = (o.wall ? o.y + o.h - 62 : g.ty0) - 14; }
       const isT = tgt && tgt.obj === o;
       const bob = isT ? Math.sin(G.t * 6) * 2 : 0;
@@ -1288,9 +1351,9 @@
   function drawBanners() {
     for (const b of G.banners) {
       const k = b.t, a = k < .3 ? k / .3 : k > 1.8 ? Math.max(0, 1 - (k - 1.8) / .6) : 1;
-      const W = cv.width, dpr = DEV.dpr, y = cv.height * .3;
+      const W = cv.width, dpr = DEV.dpr, y = 236 * dpr;
       ctx.globalAlpha = a; ctx.textAlign = 'center';
-      ctx.font = `900 ${26 * dpr}px system-ui, sans-serif`;
+      ctx.font = `900 ${24 * dpr}px system-ui, sans-serif`;
       ctx.lineWidth = 6 * dpr; ctx.strokeStyle = P.INK; ctx.strokeText(b.text, W / 2, y); ctx.fillStyle = P.CRM; ctx.fillText(b.text, W / 2, y);
       ctx.font = `800 ${12 * dpr}px system-ui, sans-serif`; ctx.fillStyle = P.ORA; ctx.strokeText(b.sub.toUpperCase(), W / 2, y + 20 * dpr); ctx.fillText(b.sub.toUpperCase(), W / 2, y + 20 * dpr);
       ctx.globalAlpha = 1;

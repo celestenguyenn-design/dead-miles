@@ -24,7 +24,7 @@
   .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 7px; transition: width .15s; }
   #hp i { background: linear-gradient(#f58a52, var(--ora)); width: 100%; }
   #hp.low i { background: linear-gradient(#d4523f, var(--red)); animation: pulse .7s infinite alternate; }
-  #hp span, #hp b { position: absolute; top: -1px; font-size: 10px; font-weight: 900; letter-spacing: .06em; color: var(--ink); line-height: 16px; }
+  #hp span, #hp b { position: absolute; top: -1px; font-size: 10px; font-weight: 900; letter-spacing: .06em; color: var(--crm); line-height: 16px; text-shadow: 0 1px 0 var(--ink), 0 0 3px var(--ink), 0 0 2px var(--ink); }
   #hp span { left: 8px; } #hp b { right: 8px; }
   #st { height: 9px; } #st i { background: var(--crm); width: 100%; }
   #room { margin-top: 3px; align-self: flex-start; display: inline-block; font-size: 11px; font-weight: 900; letter-spacing: .14em; padding: 5px 10px; border-radius: 99px; background: rgba(17,20,47,.88); border: 2px solid var(--plum); color: var(--crm); }
@@ -41,7 +41,7 @@
   #noise::before { content: "NOISE"; font-size: 8px; font-weight: 900; letter-spacing: .12em; color: var(--mute); writing-mode: vertical-rl; transform: rotate(180deg); margin-right: 3px; align-self: center; }
   #mini { width: 72px; height: 90px; border-radius: 10px; background: rgba(9,7,24,.85); border: 2.5px solid var(--plum); }
 
-  #toast { position: absolute; left: 50%; top: calc(132px + var(--st)); transform: translate(-50%, -6px); max-width: 86%; padding: 9px 14px; border-radius: 12px; background: rgba(17,20,47,.94); border: 2px solid var(--ora);
+  #toast { position: absolute; left: 50%; top: calc(150px + var(--st)); transform: translate(-50%, -6px); max-width: 86%; padding: 9px 14px; border-radius: 12px; background: rgba(17,20,47,.94); border: 2px solid var(--ora);
     font-size: 13px; font-weight: 800; text-align: center; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
   #toast.on { opacity: 1; transform: translate(-50%, 0); }
 
@@ -77,6 +77,7 @@
   #sheet { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 16px calc(16px + var(--sb)); background: #1c1538; border-top: 3px solid var(--ink); border-radius: 22px 22px 0 0;
     box-shadow: 0 -6px 0 rgba(61,45,97,.9), 0 -30px 60px rgba(0,0,0,.5); transform: translateY(105%); transition: transform .22s cubic-bezier(.2,.9,.3,1.1); }
   #sheet.on { transform: none; }
+  #sheet:not(.on) { visibility: hidden; transition: transform .22s, visibility 0s .22s; }
   .kick { font-size: 11px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; color: var(--ora); }
   #shTitle { font-size: 30px; font-weight: 900; letter-spacing: -.02em; margin: 2px 0 12px; line-height: 1; }
   #shGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; min-height: 108px; }
@@ -97,6 +98,7 @@
   /* cards */
   #card { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(7,8,26,.72); opacity: 0; pointer-events: none; transition: opacity .3s; padding: 18px; }
   #card.on { opacity: 1; pointer-events: auto; }
+  #card:not(.on) { visibility: hidden; transition: opacity .3s, visibility 0s .3s; }
   #cardBody { width: 100%; max-width: 360px; padding: 20px 18px 18px; border-radius: 22px; background: #1c1538; border: 3px solid var(--ink); box-shadow: 0 6px 0 var(--plum), 0 30px 80px rgba(0,0,0,.6); }
   #cardBody h2 { margin: 4px 0 10px; font-size: 30px; line-height: 1.02; font-weight: 900; letter-spacing: -.02em; }
   #cardBody p { margin: 0 0 12px; color: var(--mute); font-weight: 700; font-size: 14px; line-height: 1.35; }
