@@ -57,7 +57,49 @@ window.DM = window.DM || {};
     lockset: { n: 'Lockpick set', i: 'lockset', use: 'Use', rare: 1 },
     parcel: { n: "Dot's lockbox", i: 'parcel', quest: 1, tag: 'quest item' },
     caps: { n: 'Bottle caps', i: 'caps' },
+    // farming (phase 4): seeds are planted in garden beds at the base; grown food is the reliable food supply
+    seed_tomato: { n: 'Tomato seeds', i: 'seed_tomato', seed: 'tomato', tag: 'plant at the base' },
+    seed_potato: { n: 'Seed potatoes', i: 'seed_potato', seed: 'potato', tag: 'plant at the base' },
+    seed_carrot: { n: 'Carrot seeds', i: 'seed_carrot', seed: 'carrot', tag: 'plant at the base' },
+    seed_corn: { n: 'Corn seeds', i: 'seed_corn', seed: 'corn', tag: 'plant at the base' },
+    seed_herbs: { n: 'Herb seeds', i: 'seed_herbs', seed: 'herbs', tag: 'plant at the base' },
+    tomato: { n: 'Tomatoes', i: 'tomato', use: 'Eat', hp: 7, sta: 10 },
+    potato: { n: 'Potatoes', i: 'potato', use: 'Eat', hp: 10 },
+    carrot: { n: 'Carrots', i: 'carrot', use: 'Eat', hp: 7, sta: 10 },
+    corn: { n: 'Corn', i: 'corn', use: 'Eat', hp: 9 },
+    herbs: { n: 'Fresh herbs', i: 'herbs', use: 'Eat', hp: 14 },
   };
+  // crops: watered days to grow, harvest yield
+  D.CROPS = {
+    tomato: { n: 'Tomato', days: 4, yield: [2, 4], col: '#d9483a' },
+    potato: { n: 'Potato', days: 3, yield: [2, 4], col: '#c9a06a' },
+    carrot: { n: 'Carrot', days: 3, yield: [2, 3], col: '#f07b3c' },
+    corn: { n: 'Corn', days: 5, yield: [2, 3], col: '#e0b94a' },
+    herbs: { n: 'Herbs', days: 3, yield: [2, 3], col: '#7c9a4c' },
+  };
+  // decor: furniture, posters, rugs, lights, plants found while looting, placed at the base.
+  // art: ART.FURN key; w,h footprint in tiles; H height; rot 'flip' (mirror) or 'swap' (turns the footprint); wall: hangs on a wall
+  D.DECOR = {
+    d_armchair: { n: 'Armchair', art: 'armchair', w: 1, h: 1, H: 22, rot: 'flip', v: 6 },
+    d_sofa: { n: 'Old sofa', art: 'sofa', w: 3, h: 1, H: 26, rot: 'flip', v: 8 },
+    d_bookshelf: { n: 'Bookshelf', art: 'bookshelf', w: 2, h: 1, H: 62, rot: 'flip', v: 6 },
+    d_table: { n: 'Coffee table', art: 'coffee', w: 2, h: 1, H: 16, rot: 'swap', v: 4 },
+    d_bench: { n: 'Park bench', art: 'bench', w: 2, h: 1, H: 20, rot: 'swap', v: 4 },
+    d_plant: { n: 'Potted plant', art: 'plant', w: 1, h: 1, H: 20, rot: 'flip', v: 3 },
+    d_cactus: { n: 'Cactus', art: 'dcactus', w: 1, h: 1, H: 30, rot: 'flip', v: 3 },
+    d_flowers: { n: 'Flower box', art: 'dflowers', w: 2, h: 1, H: 16, rot: 'swap', v: 4 },
+    d_lamp: { n: 'Floor lamp', art: 'dlamp', w: 1, h: 1, H: 70, rot: 'flip', glow: 1, v: 6 },
+    d_lantern: { n: 'Camp lantern', art: 'dlantern', w: 1, h: 1, H: 18, rot: 'flip', glow: 1, solid: 0, v: 5 },
+    d_lights: { n: 'String lights', art: 'dlights', w: 3, h: 1, H: 0, rot: 'flip', wall: 1, glow: 1, v: 6 },
+    d_rug: { n: 'Woven rug', art: 'drug', w: 3, h: 2, H: 0, rot: 'swap', solid: 0, floor: 1, col: 0, v: 5 },
+    d_rug2: { n: 'Round rug', art: 'drug2', w: 2, h: 2, H: 0, rot: 'swap', solid: 0, floor: 1, v: 5 },
+    d_poster: { n: 'Band poster', art: 'dposter', w: 1, h: 1, H: 0, rot: 'flip', wall: 1, v: 3 },
+    d_poster2: { n: 'Movie poster', art: 'dposter2', w: 1, h: 1, H: 0, rot: 'flip', wall: 1, v: 3 },
+    d_map: { n: 'Map of Brooklyn', art: 'dmap', w: 2, h: 1, H: 0, rot: 'flip', wall: 1, v: 5 },
+    d_gnome: { n: 'Garden gnome', art: 'dgnome', w: 1, h: 1, H: 26, rot: 'flip', v: 7 },
+    d_flamingo: { n: 'Lawn flamingo', art: 'dflamingo', w: 1, h: 1, H: 40, rot: 'flip', solid: 0, v: 5 },
+  };
+  for (const k in D.DECOR) D.ITEMS[k] = { n: D.DECOR[k].n, i: k, decor: 1, tag: 'decor' };
   // blueprints: one item per recipe, e.g. bp_machete
   D.RECIPES = {
     bandage: { out: ['bandage', 2], in: { cloth: 2 }, n: 'Bandages' },
@@ -75,9 +117,11 @@ window.DM = window.DM || {};
   // what the trader pays (caps each); she sells for about 4x
   D.VALUE = { beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
     lockpick: 3, cranberry: 3, stuffing: 3, pie: 4, turkey: 20, hat: 0, pole: 2, watch: 25, jewelry: 20, wood: 1, nails: .25, spikedbat: 20, machete: 22, prybar: 14, packplus: 15, backpack: 40, shoes: 10, lockset: 18, note: 0, parcel: 0 };
+  Object.assign(D.VALUE, { seed_tomato: 2, seed_potato: 2, seed_carrot: 2, seed_corn: 3, seed_herbs: 2, tomato: 2, potato: 2, carrot: 2, corn: 2, herbs: 3 });
+  for (const k in D.DECOR) D.VALUE[k] = D.DECOR[k].v;
   D.valueOf = (k, d) => { if (k.startsWith('bp_')) return 25; let v = D.VALUE[k] || 1; if (d != null && D.ITEMS[k] && D.ITEMS[k].w) v = Math.max(1, Math.round(v * (.3 + .7 * d / D.WEAPONS[D.ITEMS[k].w].dur))); return v; };
   // how many fit in one slot (anything not listed does not stack)
-  D.STACK = { wood: 10, nails: 20, lockpick: 5, arrow: 20, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
+  D.STACK = { seed_tomato: 10, seed_potato: 10, seed_carrot: 10, seed_corn: 10, seed_herbs: 10, tomato: 3, potato: 3, carrot: 3, corn: 3, herbs: 3, wood: 10, nails: 20, lockpick: 5, arrow: 20, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
   D.stackMax = k => D.STACK[k] || 1;
 
   // melee: dmg, wind/strike/rec seconds, reach in tiles, durability. bow is ranged.
@@ -98,7 +142,7 @@ window.DM = window.DM || {};
   D.toStacks = function (keys, rnd = Math.random) {
     const out = [];
     for (const k of keys) {
-      const n = k === 'ammo' ? 4 + Math.floor(rnd() * 9) : k === 'arrow' ? 3 + Math.floor(rnd() * 5) : k === 'nails' ? 3 + Math.floor(rnd() * 6) : 1;
+      const n = k === 'ammo' ? 4 + Math.floor(rnd() * 9) : k === 'arrow' ? 3 + Math.floor(rnd() * 5) : k === 'nails' ? 3 + Math.floor(rnd() * 6) : D.ITEMS[k] && D.ITEMS[k].seed ? 2 + Math.floor(rnd() * 3) : 1;
       if (D.isWeapon(k)) { const W = D.WEAPONS[D.ITEMS[k].w]; out.push({ k, n: 1, d: Math.round(W.dur * (.45 + rnd() * .5)) }); continue; }
       const e = out.find(e => e.k === k && D.STACK[k]);
       if (e) e.n += n; else out.push({ k, n });
@@ -158,6 +202,10 @@ window.DM = window.DM || {};
     wine: [[1, 2], { drink: 3, jewelry: 1 }],
     cellar: [[2, 3], { wood: 2, beans: 3, water: 2, axe: 1, ammo: 1 }],
   };
+  // phase 4: decor and seeds turn up now and then (decor more often in mansions and apartments - see game.js loot())
+  for (const [t, w] of [['dresser', .3], ['wardrobe', .25], ['hutch', .5], ['side', .3], ['books', .4], ['storage', .35], ['desk', .2], ['tv', .25], ['cellar', .4], ['washer', .3]]) D.LOOT[t][1]['decor_*'] = w;
+  for (const [t, w] of [['pantry', .5], ['cabinet', .3], ['storage', .6], ['garage', .4], ['shelves', .4], ['store', .4], ['cellar', .6], ['trash', .3], ['workbench', .3]]) D.LOOT[t][1]['seed_*'] = w;
+  D.LOOT.hordecrate = [[3, 4], { 'decor_*': 1, 'seed_*': 1.2, ammo: 2, meds: 2, bandage: 2, scrap: 2, nails: 2, wood: 2, tape: 1, battery: 1, 'bp_*': .5 }];
   if (D.EVENT) {
     Object.assign(D.LOOT.fridge[1], { cranberry: 2, pie: 2 }); Object.assign(D.LOOT.pantry[1], { stuffing: 3, cranberry: 2 }); Object.assign(D.LOOT.cabinet[1], { stuffing: 2, cranberry: 1 });
     Object.assign(D.LOOT.store[1], { cranberry: 2, stuffing: 2 }); Object.assign(D.LOOT.storage[1], { stuffing: 1, pie: 1 });
@@ -170,6 +218,8 @@ window.DM = window.DM || {};
     const ks = Object.keys(tab), tot = ks.reduce((s, k) => s + tab[k], 0);
     for (let i = 0; i < n; i++) { let v = rnd() * tot; for (const k of ks) { v -= tab[k]; if (v <= 0) { out.push(k); break; } } }
     for (let i = 0; i < out.length; i++) if (out[i] === 'bp_*') { const b = Object.keys(D.ITEMS).filter(x => x.startsWith('bp_')); out[i] = b[Math.floor(rnd() * b.length)]; }
+      else if (out[i] === 'decor_*') { const b = Object.keys(D.DECOR); out[i] = b[Math.floor(rnd() * b.length)]; }
+      else if (out[i] === 'seed_*') { const b = Object.keys(D.ITEMS).filter(x => D.ITEMS[x].seed); out[i] = b[Math.floor(rnd() * b.length)]; }
     return out;
   };
 

@@ -323,6 +323,8 @@ const ART = (() => {
     x: { a: '#342a36', b: '#2a222c', kind: 'concrete' },
     t: { a: '#4a4466', b: '#3e3a5a', kind: 'check' },
     q: { a: '#3e5068', b: '#34465e', kind: 'check' },
+    Y: { a: '#2f3f3c', b: '#283633', kind: 'grass' },   // base yard
+    X: { a: '#2a2638', b: '#232031', kind: 'dirt' },    // outside the base walls
   };
   function drawFloorTile(ctx, room, tx, ty, T) {
     const f = FLOOR[room]; if (!f) return;
@@ -353,6 +355,14 @@ const ART = (() => {
     } else if (f.kind === 'concrete') {
       if (v < .35) line(ctx, x + v * 40, y + 4, x + v * 20 + 14, y + 30, 'rgba(17,20,47,.5)', 1.3);
       ctx.fillStyle = 'rgba(255,255,255,.025)'; ctx.fillRect(x + 6, y + 8, 12, 6);
+    } else if (f.kind === 'grass') {
+      for (let i = 0; i < 5; i++) { const gx = x + 4 + hash(tx, ty, i) * (T - 8), gy = y + 6 + hash(tx, ty, i + 9) * (T - 10); line(ctx, gx, gy, gx - 2, gy - 6, i % 2 ? '#3d5246' : '#45604f', 1.6); line(ctx, gx + 2, gy, gx + 4, gy - 5, '#3d5246', 1.4); }
+      if (v < .15) { dot(ctx, x + 10 + v * 120, y + 30, 2, 'rgba(246,227,187,.35)'); }
+      if (v > .8) { ctx.fillStyle = f.b; ctx.beginPath(); ctx.ellipse(x + 22, y + 24, 14, 8, v * 3, 0, 6.28); ctx.fill(); }
+    } else if (f.kind === 'dirt') {
+      ctx.fillStyle = f.b; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(x + 8 + hash(tx, ty, i) * 28, y + 8 + hash(tx, ty, i + 3) * 28, 6, 3, 0, 0, 6.28); ctx.fill(); }
+      if (v < .18) line(ctx, x + 6, y + 30, x + 30, y + 26, 'rgba(17,20,47,.5)', 1.3);
+      if (v > .88) { dot(ctx, x + 30, y + 14, 3, '#3a3448'); dot(ctx, x + 33, y + 16, 2, '#4a4458'); }
     } else if (f.kind === 'sidewalk') {
       line(ctx, x, y, x + T, y, f.b, 2); line(ctx, x, y, x, y + T, f.b, 2);
       if (v < .2) line(ctx, x + 8, y + 10, x + 26, y + 22, 'rgba(17,20,47,.5)', 1.3);
@@ -864,5 +874,7 @@ const ART = (() => {
     ctx.beginPath(); ctx.ellipse(x, y - 14, 2.6 * fl, 5 * fl, 0, 0, 6.28); ctx.fillStyle = '#ffd27a'; ctx.fill();
   }
 
-  return { P, LOOK, rigs, buildRig, drawRig, buildIcons, iconURL, rr, blk, line, dot, hash, drawFloorTile, drawWallFace, FURN, geo, candle, VB };
+  // later screens (base.js) register their own icons: raw SVG bodies in the same -36..36 box, or ready URLs
+  function addIcons(o) { for (const k in o) { if (/^data:/.test(o[k])) iconURL[k] = o[k]; else { EXTRA_ICONS[k] = o[k]; iconURL[k] = svgURL(o[k], '-36 -36 72 72', 96, 96); } } }
+  return { addIcons, P, LOOK, rigs, buildRig, drawRig, buildIcons, iconURL, rr, blk, line, dot, hash, drawFloorTile, drawWallFace, FURN, geo, candle, VB };
 })();

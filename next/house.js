@@ -68,6 +68,7 @@
     };
     for (const k in L.rooms) { const R = L.rooms[k]; G.fog[k] = R.hidden || R.isolated ? .99 : .97; G.visited[k] = false; }
     G.fog[streetRoom()] = 0.12; G.visited[streetRoom()] = true;
+    if (opts.noFog) for (const k in L.rooms) { G.fog[k] = 0; G.visited[k] = true; }
     let fid = 0;
     for (const d of L.furn) {
       const f = Object.assign({}, d);
@@ -347,6 +348,7 @@
     }
     for (const d of G.drops) out.push({ obj: d, act: 'Pick up', rect: { x: d.x - 12, y: d.y - 8, w: 24, h: 14 }, name: ITEMS[d.k].n + (d.n > 1 ? ' x' + d.n : ''), drop: true });
     secretActs(out);
+    if (opts.acts) opts.acts(out, G);
     for (const z of G.zs) {
       if (!z.dead || z.rot === 0) continue;
       let act = !z.searched ? 'Search' : (z.loot0 && z.loot0.length ? 'Open' : null);
@@ -402,6 +404,7 @@
     if (!G || G.sheet || G.over || G.p.st === 'down') return;
     const rc = $('#touch').getBoundingClientRect();
     const wx = G.cam.x + (cx - rc.left - DEV.W / 2) / DEV.zoom, wy = G.cam.y + (cy - rc.top - DEV.H / 2) / DEV.zoom;
+    if (opts.tap && opts.tap(wx, wy)) return;
     let best = null, bk = -1e9;
     for (const it of interactables()) {
       if (it.secret) continue;
@@ -473,13 +476,14 @@
     for (const z of G.zs) updateZombie(z, dt);
     separate();
     updateWorld(dt);
+    if (opts.tick) opts.tick(dt, G);
     btn.atkPressed = false; btn.use = false; btn.dodge = false;
   }
 
   function updatePlayer(dt, inp) {
     const p = G.p;
     p.stT += dt; p.inv = Math.max(0, p.inv - dt); p.flash = Math.max(0, p.flash - dt * 5);
-    if (p.st === 'down') { p.downRot = Math.min(1, p.downRot + dt * 3); if (p.stT > 1.3 && !G.over) showDeath(); return; }
+    if (p.st === 'down') { p.downRot = Math.min(1, p.downRot + dt * 3); if (p.stT > 1.3 && !G.over) { if (opts.onDown) { G.over = true; opts.onDown(); } else showDeath(); } return; }
     let spd = 0, running = false;
     // stamina
     p.staDelay -= dt;
@@ -558,7 +562,7 @@
       $('#room').textContent = RN(room).toUpperCase();
     }
     // leave via front door
-    if (G.entered && p.y > (L.streetY + 1.35) * T && Math.abs(p.x - L.stoop.x * T) < 2.6 * T && !G.over) showSummary(); // step off the stoop to leave
+    if (!opts.noExit && G.entered && p.y > (L.streetY + 1.35) * T && Math.abs(p.x - L.stoop.x * T) < 2.6 * T && !G.over) showSummary(); // step off the stoop to leave
   }
 
   function startDodge(inp) {
@@ -753,6 +757,7 @@
         break;
     }
     if (z.st === 'sleep' || z.st === 'rise') return;
+    if (opts.zslow && !z.dead) spd *= opts.zslow(z);
     const tvx = vx * spd, tvy = vy * spd;
     const k = 1 - Math.exp(-10 * dt);
     z.vx = lerp(z.vx, tvx, k); z.vy = lerp(z.vy, tvy, k);
@@ -760,6 +765,7 @@
     moveEnt(z, (z.vx + z.kbx) * dt, (z.vy + z.kby) * dt);
     z.kbx *= Math.exp(-9 * dt); z.kby *= Math.exp(-9 * dt);
     z.ph += Math.hypot(z.x - ox, z.y - oy) / (T * .5) * Math.PI * .5;
+    if (opts.ztick && !z.dead) opts.ztick(z, dt, Math.hypot(z.x - ox, z.y - oy));
   }
   function separate() {
     const all = G.zs.filter(z => !z.dead && z.st !== 'sleep' && z.st !== 'rise');
@@ -776,7 +782,7 @@
 
   function updateWorld(dt) {
     // fog
-    for (const k in G.fog) {
+    if (!opts.noFog) for (const k in G.fog) {
       const R = L.rooms[k], cur = L.rooms[G.room] || {};
       const target = k === G.room ? 0 : R.isolated ? .99 : cur.isolated ? 1 : k === streetRoom() ? .12 : G.visited[k] ? .45 : R.hidden ? .99 : .97;
       G.fog[k] = lerp(G.fog[k], target, 1 - Math.exp(-(target < G.fog[k] ? 5 : 2) * dt));
@@ -853,11 +859,13 @@
     }
     // street + curb
     const sy = L.streetY;
+    if (!L.noStreet) {
     c.fillStyle = '#23223c'; c.fillRect(0, (sy + 1.55) * T, MW * T, T); ART.line(c, 0, (sy + 1.55) * T, MW * T, (sy + 1.55) * T, '#4a4870', 3);
     // street lamp pools
     for (const f of G.furn) if (f.art === 'lamppost') { const lx = f.x + f.w / 2, ly = f.y + f.h * .9; const g = c.createRadialGradient(lx, ly, 4, lx, ly, T * 3.2); g.addColorStop(0, 'rgba(246,227,187,.22)'); g.addColorStop(1, 'rgba(246,227,187,0)'); c.fillStyle = g; c.fillRect(lx - 4.5 * T, ly - 3.4 * T, 9 * T, 6 * T); }
     // stoop steps
     for (let i = 0; i < 3; i++) ART.blk(c, (L.stoop.x - 1.5) * T + 6 - i * 4, sy * T + i * 13, 2 * T + 20 + i * 8, 13, ['#5a5878', '#4f4d6c', '#45435f'][i], 2, 2);
+    }
     // rugs
     for (const r of L.rugs || []) rug(c, r[0] * T, r[1] * T, r[2] * T, r[3] * T, ...RUGS[r[4] || 0]);
     // ambient occlusion under wall faces
@@ -960,10 +968,11 @@
     const vx0 = camx - W / S / 2 - T * 2, vx1 = camx + W / S / 2 + T * 2, vy0 = camy - H / S / 2 - T * 2, vy1 = camy + H / S / 2 + T * 3;
 
     ctx.imageSmoothingEnabled = true;
-    ctx.fillStyle = '#23223c'; ctx.fillRect(-T * 4, MH * T - 2, MW * T + T * 8, T * 8);
-    ctx.fillStyle = 'rgba(201,168,90,.35)'; for (let x = -3; x < MW + 4; x += 3) ctx.fillRect(x * T, (MH + 1.6) * T, T * 1.3, 3);
+    if (!L.noStreet) ctx.fillStyle = '#23223c', ctx.fillRect(-T * 4, MH * T - 2, MW * T + T * 8, T * 8);
+    if (!L.noStreet) ctx.fillStyle = 'rgba(201,168,90,.35)'; for (let x = -3; x < MW + 4; x += 3) ctx.fillRect(x * T, (MH + 1.6) * T, T * 1.3, 3);
     ctx.drawImage(floorCv, 0, 0, MW * T, MH * T);
     drawSecretsFloor();
+    if (opts.drawUnder) opts.drawUnder(ctx, G);
     // decals
     for (const d of G.decals) {
       ctx.globalAlpha = d.a; ctx.fillStyle = d.col; ctx.beginPath(); ctx.ellipse(d.x, d.y, d.r, d.r * .55, d.rot, 0, 6.28); ctx.fill();
@@ -1005,8 +1014,9 @@
     // candle glow in hidden stashes
     for (const f of G.furn) if (f.art === 'crate' && f.secretLoot && (G.visited[f.room] || G.secretOpen)) { const gx = f.x + f.w - 12, gy = f.y + 10; const cg = ctx.createRadialGradient(gx, gy, 2, gx, gy, T * 2.5); cg.addColorStop(0, 'rgba(255,190,110,.22)'); cg.addColorStop(1, 'rgba(255,190,110,0)'); ctx.fillStyle = cg; ctx.fillRect(gx - 2.5 * T, gy - 2.5 * T, 5 * T, 5 * T); }
 
-    if (!dbg) drawFog();
+    if (!dbg && !opts.noFog) drawFog();
     drawOverlays();
+    if (opts.drawOver) opts.drawOver(ctx, G);
 
     // screen space
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1212,6 +1222,9 @@
       rot = z.hurtDir * .25 * Math.max(0, 1 - z.stT / .32); parts.head = { r: -z.hurtDir * .3 };
     } else if (z.st === 'dead') {
       rot = z.rot; alpha = 1;
+    } else if (z.st === 'bash') { // hammering at a wall or gate
+      const k = (Math.sin(z.stT * 7) + 1) / 2;
+      rot = -dir * .22 * k; parts.armF = { r: .9 * k }; parts.armB = { r: .7 * (1 - k) }; parts.head = { r: -.15 * k };
     }
     // dir: sprite faces left by default, flip when facing right
     if (z.st !== 'sleep') drawShadow(z.x, z.y + 1, z.dead ? 26 : 17, z.dead ? .3 : .42);
@@ -1377,7 +1390,7 @@
       ctx.lineWidth = 4.5; ctx.strokeStyle = P.LILD; ctx.beginPath(); ctx.arc(x, y, 13, 0, 6.28); ctx.stroke();
       ctx.strokeStyle = P.ORA; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(x, y, 13, -Math.PI / 2, -Math.PI / 2 + k * 6.283); ctx.stroke(); ctx.lineCap = 'butt';
       ctx.fillStyle = P.CRM; ctx.font = '800 9px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.fillText(Math.floor(k * 100) + '%', x, y + 3.5);
-      const lbl = ({ Push: 'pushing', Pry: 'prying', Move: 'moving', 'Pull down': 'pulling', Climb: 'climbing' }[s.it.act] || 'searching') + ' · ' + s.it.name.toLowerCase();
+      const lbl = s.it.verb ? s.it.verb + ' · ' + s.it.name.toLowerCase() : ({ Push: 'pushing', Pry: 'prying', Move: 'moving', 'Pull down': 'pulling', Climb: 'climbing' }[s.it.act] || 'searching') + ' · ' + s.it.name.toLowerCase();
       ctx.font = '800 10px system-ui,sans-serif'; const tw = ctx.measureText(lbl).width + 14;
       ctx.fillStyle = 'rgba(17,20,47,.85)'; ART.rr(ctx, x - tw / 2, y - 37, tw, 16, 8); ctx.fill();
       ctx.fillStyle = P.CRM; ctx.fillText(lbl, x, y - 25.5);
@@ -1864,6 +1877,24 @@
   DM.House = {
     start(layout, o) { startRun(layout, o); document.body.classList.add('inrun'); document.body.classList.toggle('event', !!EVENT); DM.scene = scene; },
     get G() { return G; }, get L() { return L; }, zombieCount: () => G ? zombieCount() : { dead: 0, total: 0 },
+    // used by the base (base.js): live furniture, spawning, damage, leaving
+    addFurn(d) {
+      const f = Object.assign({}, d);
+      f.fid = G.furn.length ? Math.max(...G.furn.map(x => x.fid)) + 1 : 0;
+      f.tx = d.at[0]; f.ty = d.at[1]; f.tw = d.at[2]; f.th = d.at[3];
+      f.x = f.tx * T; f.y = f.ty * T; f.w = f.tw * T; f.h = f.th * T;
+      if (f.solid == null) f.solid = 1;
+      f.lootable = !!d.loot; f.searched = false; f.slide = 0; f.room = d.room || roomAt(f.tx, f.wall ? f.ty + 1 : f.ty);
+      f._key = null; f._c = null;
+      G.furn.push(f); buildSolid(); return f;
+    },
+    removeFurn(f) { const i = G.furn.indexOf(f); if (i >= 0) G.furn.splice(i, 1); buildSolid(); },
+    refresh() { buildSolid(); for (const f of G.furn) f._key = null; },
+    spawn(x, y, props) { const z = mkZombie(x, y, 'investigate', null); Object.assign(z, props || {}); G.zs.push(z); return z; },
+    hurtZombie(z, dmg, fa = 0, soft) { const kb = [z.kbx, z.kby]; hitZombie(z, fa, dmg, true); if (soft && !z.dead) { z.kbx = kb[0]; z.kby = kb[1]; if (z.st === 'hurt') z.st = 'chase'; } },
+    solidAt: (tx, ty) => !!solidCell[ty * MW + tx],
+    exit(kind) { if (G && !G.over || kind) finishRun(kind || 'leave'); },
+    get opts() { return opts; },
   };
   // debug / test hooks
   Object.assign(DM, {
