@@ -184,9 +184,7 @@ window.DM = window.DM || {};
     requestAnimationFrame(t => { last = t; frame(t); });
   };
   // survivor sprite in her chosen hood colour
-  E.buildSurvivor = async function (look) {
-    const L = DM.D.LOOKS[look] || DM.D.LOOKS[0];
-    const map = L.c[0] === '#f07b3c' ? null : { '#f07b3c': L.c[0], '#c95f2c': L.c[1] };
-    await ART.buildRig('survivor', E.rigRes || 1.4, map);
+  E.buildSurvivor = async function (look, as) {
+    await ART.buildRig('survivor', E.rigRes || 1.4, ART.LOOK.recolor(look), as, ART.LOOK.patch(look));
   };
 })();
