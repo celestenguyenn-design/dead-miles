@@ -56,7 +56,9 @@ window.DM = window.DM || {};
   const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
   H.rand = (...k) => (hash(k.join('|')) % 100000) / 100000;
   // size grows gently with party size and slowly week by week; a party of two must not be crushed
-  H.size = (n, week, solo) => Math.round((solo ? 34 : 50 + 22 * (Math.max(1, n) - 1)) * (1 + Math.min(.5, .02 * H.weekIndex(week))));
+  H.size = (n, week, solo) => Math.round((solo ? 34 : 50 + 22 * (Math.max(1, n) - 1)) * (1 + Math.min(.5, .02 * H.weekIndex(week))) * H.special(week).size);
+  // a seasonal horde night (events.js), e.g. the Black Friday horde: { name, size, crate, caps } - plain weeks get size 1
+  H.special = week => (DM.Events && DM.Events.hordeFor(week)) || { size: 1 };
   H.KILL = 2; // each kill thins the horde by this much
   /* ctx: { code (party or ''), week, members: [handles], shifts: {handle: {k,d,n}}, me (handle or 'me'), defense (my base now) }
      returns { S, K, R, A, hold, shifted, n, perBase, members } */

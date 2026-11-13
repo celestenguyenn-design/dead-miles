@@ -41,6 +41,9 @@ window.DM = window.DM || {};
     pie: { n: 'Pumpkin pie', i: 'pie', use: 'Eat', hp: 12 },
     turkey: { n: 'Whole turkey', i: 'turkey', use: 'Eat', hp: 50, rare: 1 },
     hat: { n: 'Pilgrim hat', i: 'hat', rare: 1, tag: 'event cosmetic' },
+    // Christmas (phase 5a): gift boxes are opened at home (Pack & stash > Open)
+    gift: { n: 'Gift box', i: 'gift', gift: 1, rare: 1, tag: 'open it at home' },
+    candy: { n: 'Candy cane', i: 'candy', use: 'Eat', hp: 4, sta: 25 },
     pole: { n: 'Hook pole', i: 'hook' },
     watch: { n: 'Pocket watch', i: 'watch', rare: 1 },
     jewelry: { n: 'Gold ring', i: 'ring', rare: 1 },
@@ -124,19 +127,25 @@ window.DM = window.DM || {};
     beanie: { n: 'Knit beanie', slot: 'hat', r: 'c', src: 'loot' }, cap: { n: 'Baseball cap', slot: 'hat', r: 'c', src: 'loot' }, bucket: { n: 'Bucket hat', slot: 'hat', r: 'c', src: 'loot' },
     hardhat: { n: 'Hard hat', slot: 'hat', r: 'r', src: 'loot' }, beret: { n: 'Beret', slot: 'hat', r: 'r', src: 'mansion' },
     frog: { n: 'Frog hat', slot: 'hat', r: 'e', src: 'trader', lv: 2 }, bunny: { n: 'Bunny-ear beanie', slot: 'hat', r: 'e', src: 'trader', lv: 3 },
-    pilgrim: { n: 'Pilgrim hat', slot: 'hat', r: 'l', src: 'event' },
+    pilgrim: { n: 'Pilgrim hat', slot: 'hat', r: 'l', src: 'event', ev: 'thanksgiving' },
+    feathers: { n: 'Turkey-feather headband', slot: 'hat', r: 'r', src: 'event', ev: 'thanksgiving' }, pietin: { n: 'Pie-tin helmet', slot: 'hat', r: 'e', src: 'event', ev: 'thanksgiving' },
+    santa: { n: 'Santa hat', slot: 'hat', r: 'r', src: 'event', ev: 'christmas' },
     round: { n: 'Round glasses', slot: 'face', r: 'c', src: 'loot' }, bandana: { n: 'Bandana', slot: 'face', r: 'c', src: 'corpse' },
     aviators: { n: 'Aviators', slot: 'face', r: 'r', src: 'police' }, hearts: { n: 'Heart shades', slot: 'face', r: 'r', src: 'quest' },
     gasmask: { n: 'Gas mask', slot: 'face', r: 'e', src: 'police' },
     scarf: { n: 'Knit scarf', slot: 'neck', r: 'c', src: 'loot' }, tags: { n: 'Dog tags', slot: 'neck', r: 'r', src: 'corpse' },
-    pearls: { n: 'Pearl necklace', slot: 'neck', r: 'e', src: 'mansion' }, harvest: { n: 'Harvest scarf', slot: 'neck', r: 'e', src: 'event' },
+    pearls: { n: 'Pearl necklace', slot: 'neck', r: 'e', src: 'mansion' }, harvest: { n: 'Harvest scarf', slot: 'neck', r: 'e', src: 'event', ev: 'thanksgiving' },
     patched: { n: 'Patched pack', slot: 'back', r: 'c', src: 'loot' }, camo: { n: 'Camo pack', slot: 'back', r: 'r', src: 'horde' },
     teddy: { n: 'Teddy charm', slot: 'back', r: 'e', src: 'quest' }, lights: { n: 'Fairy-light pack', slot: 'back', r: 'l', src: 'trader', lv: 5 },
+    candycane: { n: 'Candy-cane bat', slot: 'back', r: 'e', src: 'event', ev: 'christmas' },
     denim: { n: 'Denim jacket', slot: 'outfit', r: 'c', src: 'loot' }, raincoat: { n: 'Raincoat', slot: 'outfit', r: 'c', src: 'loot' },
     varsity: { n: 'Varsity jacket', slot: 'outfit', r: 'r', src: 'loot' }, puffer: { n: 'Puffer jacket', slot: 'outfit', r: 'e', src: 'trader', lv: 4 },
     leather: { n: 'Biker jacket', slot: 'outfit', r: 'l', src: 'police' },
   };
-  D.cosHint = k => { const c = D.COS[k]; return { loot: 'Found in houses', corpse: 'Found on zombies', police: 'Police stations', mansion: 'Mansions', horde: 'Horde-night crates', quest: "Dot's quest rewards", trader: 'Trader level ' + c.lv, event: c.slot === 'hat' ? 'Thanksgiving: the zombie turkey' : 'Thanksgiving event' }[c.src]; };
+  D.cosHint = k => { const c = D.COS[k]; return { loot: 'Found in houses', corpse: 'Found on zombies', police: 'Police stations', mansion: 'Mansions', horde: 'Horde-night crates', quest: "Dot's quest rewards", trader: 'Trader level ' + c.lv, event: D.EVHINT[k] || 'Seasonal event' }[c.src]; };
+  // where each event cosmetic comes from (the wardrobe also tags them "Thanksgiving 2026" etc.)
+  D.EVHINT = { pilgrim: 'Thanksgiving: the zombie turkey', feathers: 'Thanksgiving: zombie turkeys', pietin: "Thanksgiving: Dot's dinner job", harvest: "Thanksgiving: Dot's jobs",
+    santa: 'Christmas: the Krampus walker', candycane: "Christmas: Dot's gift job" };
   for (const k in D.COS) D.ITEMS['cos_' + k] = { n: D.COS[k].n, i: 'cos_' + k, cos: k, rare: D.COS[k].r !== 'c' ? 1 : 0, tag: D.RARITY[D.COS[k].r].n.toLowerCase() + ' cosmetic' };
   D.ITEMS.hat.cos = 'pilgrim';   // the old pack item (0.4) is the same pilgrim hat: picking one up unlocks it
   D.cosOwned = () => ({});       // game.js points this at the save's wardrobe, so rolls prefer cosmetics you do not have yet
@@ -156,12 +165,12 @@ window.DM = window.DM || {};
   D.COS_POOL = { 'cos_*': [], 'cosZ_*': ['corpse'], 'cosP_*': ['police'], 'cosM_*': ['mansion'], 'cosH_*': ['horde'] };
   // what the trader pays (caps each); she sells for about 4x
   D.VALUE = { beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
-    lockpick: 3, cranberry: 3, stuffing: 3, pie: 4, turkey: 20, hat: 0, pole: 2, watch: 25, jewelry: 20, wood: 1, nails: .25, spikedbat: 20, machete: 22, prybar: 14, packplus: 15, backpack: 40, shoes: 10, lockset: 18, note: 0, parcel: 0 };
+    lockpick: 3, gift: 8, candy: 1, cranberry: 3, stuffing: 3, pie: 4, turkey: 20, hat: 0, pole: 2, watch: 25, jewelry: 20, wood: 1, nails: .25, spikedbat: 20, machete: 22, prybar: 14, packplus: 15, backpack: 40, shoes: 10, lockset: 18, note: 0, parcel: 0 };
   Object.assign(D.VALUE, { seed_tomato: 2, seed_potato: 2, seed_carrot: 2, seed_corn: 3, seed_herbs: 2, tomato: 2, potato: 2, carrot: 2, corn: 2, herbs: 3 });
   for (const k in D.DECOR) D.VALUE[k] = D.DECOR[k].v;
   D.valueOf = (k, d) => { if (k.startsWith('bp_')) return 25; let v = D.VALUE[k] || 1; if (d != null && D.ITEMS[k] && D.ITEMS[k].w) v = Math.max(1, Math.round(v * (.3 + .7 * d / D.WEAPONS[D.ITEMS[k].w].dur))); return v; };
   // how many fit in one slot (anything not listed does not stack)
-  D.STACK = { seed_tomato: 10, seed_potato: 10, seed_carrot: 10, seed_corn: 10, seed_herbs: 10, tomato: 3, potato: 3, carrot: 3, corn: 3, herbs: 3, wood: 10, nails: 20, lockpick: 5, arrow: 20, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
+  D.STACK = { gift: 3, candy: 5, seed_tomato: 10, seed_potato: 10, seed_carrot: 10, seed_corn: 10, seed_herbs: 10, tomato: 3, potato: 3, carrot: 3, corn: 3, herbs: 3, wood: 10, nails: 20, lockpick: 5, arrow: 20, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
   D.stackMax = k => D.STACK[k] || 1;
 
   // melee: dmg, wind/strike/rec seconds, reach in tiles, durability. bow is ranged.
@@ -190,8 +199,10 @@ window.DM = window.DM || {};
     return out;
   };
 
-  // Thanksgiving event: in the prototype an early preview from Nov 10 (the real game: around Nov 19 - Dec 2); ?event=thanksgiving or #thanksgiving forces it
-  D.EVENT = (() => { const d = new Date(), m = d.getMonth(), dd = d.getDate(); return /[?&]event=thanksgiving\b/.test(location.search) || location.hash === '#thanksgiving' || (m === 10 && dd >= 10) || (m === 11 && dd <= 2); })();
+  // Seasonal events (events.js): D.EV is the running event ({ id, ev, y, start, end }) or null.
+  // D.EVENT stays true while Thanksgiving runs (0.4-0.5 code reads it). ?event=<id|none> or #thanksgiving forces one.
+  D.EV = (DM.Events && DM.Events.active) || null;
+  D.EVENT = !!(D.EV && D.EV.id === 'thanksgiving');
   D.LOCKS = { easy: { w: 22, xp: 4, name: 'Easy' }, medium: { w: 14, xp: 6, name: 'Medium' }, hard: { w: 8, xp: 12, name: 'Hard' } };
 
   // ---------------------------------------------------------------- loot tables: [[min,max], weights, guaranteed]
@@ -250,10 +261,12 @@ window.DM = window.DM || {};
   for (const [t, w] of [['wardrobe', .1], ['dresser', .08], ['coat', .09], ['hutch', .06], ['washer', .07], ['night', .04], ['gym', .05]]) D.LOOT[t][1]['cos_*'] = w;
   D.LOOT.corpse[1]['cosZ_*'] = 1;   // ~4.5% per body vs ~2.5-3.7% per wardrobe or dresser
   for (const [t, w] of [['locker', .22], ['evidence', .25], ['armory', .15]]) D.LOOT[t][1]['cosP_*'] = w;
-  if (D.EVENT) {
-    Object.assign(D.LOOT.fridge[1], { cranberry: 2, pie: 2 }); Object.assign(D.LOOT.pantry[1], { stuffing: 3, cranberry: 2 }); Object.assign(D.LOOT.cabinet[1], { stuffing: 2, cranberry: 1 });
-    Object.assign(D.LOOT.store[1], { cranberry: 2, stuffing: 2 }); Object.assign(D.LOOT.storage[1], { stuffing: 1, pie: 1 });
-  }
+  // event loot: the running event adds its foods / gifts to the tables
+  if (D.EV && D.EV.ev.loot) for (const t in D.EV.ev.loot) if (D.LOOT[t]) Object.assign(D.LOOT[t][1], D.EV.ev.loot[t]);
+  // a Christmas gift box (opened at home)
+  D.LOOT.giftbox = [[2, 3], { candy: 3, snack: 2, meds: 1.2, battery: 1, ammo: 1, lockpick: 1, 'decor_*': .8, d_lights: .6, 'bp_*': .35, 'cos_*': .25 }];
+  // the Black Friday horde crate: more, better, and a taste of the holiday
+  D.LOOT.hordecrate_bf = [[5, 6], { 'decor_*': 1, 'seed_*': 1, ammo: 2, meds: 2.5, bandage: 2, scrap: 1.5, nails: 1.5, wood: 1.5, tape: 1, battery: 1, 'bp_*': 1.2, 'cosH_*': .7, turkey: .5, pie: 1.5, cranberry: 1, lockset: .3, backpack: .15 }, ['meds']];
   D.rollLoot = function (key, rnd = Math.random) {
     const [[a, b], tab, guaranteed] = D.LOOT[key];
     const out = guaranteed ? guaranteed.slice() : [];
@@ -267,6 +280,8 @@ window.DM = window.DM || {};
       else if (D.COS_POOL[out[i]]) out[i] = D.pickCos(D.COS_POOL[out[i]], rnd);
     return out;
   };
+
+  D.maxHp = s => s && s.job === 'brawler' ? 130 : 100;
 
   // ---------------------------------------------------------------- scavenging skill
   D.XPCUM = L => L <= 1 ? 0 : Math.round(14 * Math.pow(L - 1, 1.75) + (L > 5 ? 30 * (L - 5) * (L - 5) : 0));
