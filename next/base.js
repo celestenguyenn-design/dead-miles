@@ -18,13 +18,13 @@
   // steps + materials per tier; def = defence it adds at that tier
   const PIECES = B.PIECES = {
     walls: { n: 'Walls', d: 'A ring around the yard. Zombies have to break through.', tiers: [
-      { n: 'Wood fence', s: 3000, m: { wood: 8, nails: 16 }, def: 20, hp: 120 },
-      { n: 'Scrap wall', s: 6000, m: { scrap: 10, nails: 16, wood: 4 }, def: 40, hp: 220 },
-      { n: 'Reinforced wall', s: 12000, m: { scrap: 18, tape: 4, nails: 20 }, def: 65, hp: 340 }] },
+      { n: 'Wood fence', s: 3000, m: { wood: 8, nails: 16 }, def: 20, hp: 180 },
+      { n: 'Scrap wall', s: 6000, m: { scrap: 10, nails: 16, wood: 4 }, def: 40, hp: 330 },
+      { n: 'Reinforced wall', s: 12000, m: { scrap: 18, tape: 4, nails: 20 }, def: 65, hp: 500 }] },
     gate: { n: 'Gate', d: 'Closes the gap in the south wall.', need: ['walls', 1], tiers: [
-      { n: 'Wood gate', s: 1500, m: { wood: 4, nails: 8 }, def: 6, hp: 160 },
-      { n: 'Scrap gate', s: 3000, m: { scrap: 6, nails: 8 }, def: 12, hp: 280 },
-      { n: 'Steel gate', s: 6000, m: { scrap: 10, tape: 3 }, def: 20, hp: 420 }] },
+      { n: 'Wood gate', s: 1500, m: { wood: 4, nails: 8 }, def: 6, hp: 240 },
+      { n: 'Scrap gate', s: 3000, m: { scrap: 6, nails: 8 }, def: 12, hp: 400 },
+      { n: 'Steel gate', s: 6000, m: { scrap: 10, tape: 3 }, def: 20, hp: 600 }] },
     tower: { n: 'Watchtower', d: 'See them coming: on a watch shift, arrows point at zombies off screen.', tiers: [
       { n: 'Watchtower', s: 5000, m: { wood: 10, nails: 16, tape: 2 }, def: 10 }] },
     spikes: { n: 'Spike traps', d: 'Sharpened stakes outside the walls. Zombies that walk in get hurt.', tiers: [
@@ -465,7 +465,7 @@
       if (cur >= max) { rows.push(`<div class="recipe built"><div class="rinfo"><b>${Pc.tiers[max - 1].n}</b><div class="bdesc">${Pc.d}</div></div><em class="bdone">${max > 1 ? (Pc.unit ? `${max}/${max}` : 'max tier') : 'built'}</em></div>`); continue; }
       const t = Pc.tiers[cur], c = costOf(k, cur + 1), need = Pc.need && b.built[Pc.need[0]] < Pc.need[1];
       const ok = !need && canPay(c);
-      rows.push(`<div class="recipe${ok ? '' : ' no'}"><div class="rinfo"><b>${t.n}${cur && !Pc.unit ? ` <em class="tier">tier ${cur + 1}</em>` : ''}${Pc.unit && cur ? ` <em class="tier">${cur}/${max}</em>` : ''}</b><div class="bdesc">${Pc.d}${t.def ? ` <b>+${t.def} defence</b>` : ''}</div>
+      rows.push(`<div class="recipe${ok ? '' : ' no'}"><div class="rinfo"><b>${t.n}${cur && !Pc.unit ? ` <em class="tier">tier ${cur + 1}</em>` : ''}${Pc.unit && cur ? ` <em class="tier">${cur}/${max}</em>` : ''}</b><div class="bdesc">${Pc.d}${t.def ? ` <b>${cur && !Pc.unit ? '' : '+'}${t.def} defence</b>` : ''}</div>
         <div class="rin"><span class="${b.pool >= c.s ? 'ok' : 'miss'}"><i class="stp">STEPS</i>${fmt(c.s)}</span>${matsHTML(c.m)}</div>${need ? '<div class="bdesc miss">Needs walls first</div>' : ''}</div>
         <button class="mbtn sm${ok ? '' : ' ghost'}" data-build="${k}"${ok ? '' : ' disabled'}>${cur && !Pc.unit ? 'Upgrade' : 'Build'}</button></div>`);
     }
@@ -618,7 +618,7 @@
       if (Math.hypot(p.x - z.x, p.y - z.y) < 1.1 * T && p.st !== 'down' && Math.abs(p.y - z.y) < 30) { z.st = 'chase'; z.stT = 0; return; }
       z.hitT = (z.hitT || 0) - dt;
       if (z.hitT <= 0) {
-        z.hitT = 1.1; f.hp -= 8 * (z.dmgMul || 1); f._key = null; SFX.play('thunk');
+        z.hitT = 1.2; f.hp -= 7 * (z.dmgMul || 1); f._key = null; SFX.play('thunk');
         for (let i = 0; i < 4; i++) g.parts.push({ x: f.x + f.w / 2 + (Math.random() - .5) * 20, y: f.y + f.h, z: 18 + Math.random() * 20, vx: (Math.random() - .5) * 80, vy: (Math.random() - .5) * 30, vz: 40 + Math.random() * 60, g: 400, life: .6, max: .6, col: f.tier === 1 ? '#a0704f' : '#9aa0b4', size: 3 });
         g.shake = Math.max(g.shake, 1.5);
         if (f.hp <= 0) { f.broken = true; f.solid = 0; f._key = null; House().refresh(); SFX.play('break'); toast(f.piece === 'gate' ? 'They broke the gate!' : 'A wall section gave way!', 1.8); z.st = 'chase'; z.stT = 0; }
