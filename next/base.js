@@ -442,6 +442,9 @@
       if (f.piece === 'chest') A('Stash', 'chest', openStash, { verb: 'opening' });
       else if (f.piece === 'bench') A('Craft', 'at the workbench', openBench, { verb: 'setting up' });
       else if (f.piece === 'gate') A(b.gateOpen ? 'Close' : 'Unlatch', 'gate', () => { b.gateOpen = !b.gateOpen; SFX.play('open'); G().save(); syncPieces(); });
+      else if (f.piece === 'barrel' && barrels().n > 0 && DM.S && DM.S.food && DM.S.food.t < 95) A('Drink', 'from the rain barrel', () => { // 0.8: a charge of water is a drink (+50 thirst)
+        const w = barrels(); if (w.n <= 0) return; w.n--; DM.S.food.t = Math.min(100, DM.S.food.t + 50); SFX.play('pick'); G().save(); syncPieces();
+        toast(`You drink from the rain barrel: +50 thirst (${w.n} charge${w.n === 1 ? '' : 's'} left)`, 2.2); }, { dur: .8, verb: 'drinking' });
       else if (f.piece === 'barrel') A('Check', 'rain barrel', () => { const w = barrels(); toast(`Rain barrels: ${w.n} charge${w.n === 1 ? '' : 's'} of water (fills ${b.built.barrel}/day, max ${3 * b.built.barrel})`, 2.4); });
       else if (f.piece === 'tower') A('Look out', 'from the tower', () => { const n = H.next(); toast(n ? `Quiet out there. Horde night in ${until(n.at)}.` : 'Quiet out there.', 2.2); });
       else if (f.piece === 'gen') A('Check', 'generator', () => toast('Humming. The floodlight keeps the yard lit. More perks later.', 2.2));
@@ -734,6 +737,7 @@
     if (shift) { g.cam.y = g.p.y - 60; g.banners.push({ text: 'WATCH SHIFT', sub: 'they are coming', t: 0 }); }
     hudSync();
   };
+  B.barrelCharges = () => barrels().n;
   B.active = () => !!S;
   B.isShift = () => !!(S && S.shift);
   B.defenseNow = () => B.defense();

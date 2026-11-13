@@ -307,18 +307,21 @@
     }
     if (secTypes.includes('rug')) {
       const tables = furn.filter(f => (f.table || f.art === 'coffee' || f.desk) && !f.pocket);
+      const rdist = reach();   // the loose board must be a floor cell she can actually stand on
       for (const t of shuffle(tables)) {
         const r = roomOfCh[t.room];
         const rx0 = Math.max(r.x0, t.at[0] - 1), ry0 = Math.max(r.y0, t.at[1] - 1), rx1 = Math.min(r.x1, t.at[0] + t.at[2]), ry1 = Math.min(r.y1, t.at[1] + t.at[3]);
-        const cells = [];
+        const cells = [], good = [];
         for (let y = ry0; y <= ry1; y++) for (let x = rx0; x <= rx1; x++) if (!occ[y][x] && (y === t.at[1] + t.at[3] || x === t.at[0] + t.at[2])) cells.push([x, y]);
         if (!cells.length) continue;
-        const [bx, by] = pick(cells); occ[by][bx] = 3;
+        // 0.8: prefer a board cell she can stand on (also left of the table). Same single roll as before, so seeds keep their houses.
+        for (let y = ry0; y <= ry1; y++) for (let x = rx0; x <= rx1; x++) if (!occ[y][x] && rdist[y * MW + x] >= 0 && (y === t.at[1] + t.at[3] || x === t.at[0] + t.at[2] || x === t.at[0] - 1)) good.push([x, y]);
+        const v = rnd(), orig = cells[Math.floor(v * cells.length)], use = good.length ? good : cells, [bx, by] = use[Math.floor(v * use.length)]; occ[orig[1]][orig[0]] = 3;   // reserve the old cell: the rest of the house rolls exactly as before
         const holders = conts().filter(f => f.room !== t.room && !f.lockable);
         if (!holders.length) continue;
         const holder = pick(holders); (holder.extra = holder.extra || []).push('note'); holder.noEmpty = 1;
         L.note = t.table && ['kitchen', 'dining', 'breakroom'].includes(r.t) ? NOTES.supper : t.art === 'coffee' ? NOTES.tv : t.desk ? NOTES.desk : NOTES.any;
-        secOut.push({ type: 'rug', rug: { x: rx0 + .15, y: ry0 + .2, w: rx1 - rx0 + .7, h: ry1 - ry0 + .6 }, board: { x: bx, y: by }, room: t.room });
+        secOut.push({ type: 'rug', rug: { x: rx0 + .15, y: ry0 + .2, w: rx1 - rx0 + .7, h: ry1 - ry0 + .6 }, board: { x: bx, y: by }, orig: { x: orig[0], y: orig[1] }, room: t.room });
         break;
       }
     }
@@ -399,6 +402,8 @@
     for (const r of rooms) { if (r.hidden || r.isolated) continue; let any = false; for (let y = r.y0; y <= r.y1 && !any; y++) for (let x = r.x0; x <= r.x1; x++) if (fd[y * MW + x] >= 0) { any = true; break; } if (!any) return null; }
     for (const f of furn) if ((f.loot || f.mustReach) && !f.pocket && !accessible(f, fd)) return null;
 
+    // 0.8: if anything later landed on the preferred board cell (or it cannot be stood on), fall back to the old cell
+    for (const sc of secOut) if (sc.type === 'rug' && sc.orig) { const b = sc.board; if (occ[b.y][b.x] === 1 || fd[b.y * MW + b.x] < 0) sc.board = sc.orig; delete sc.orig; }
     // ---- output
     for (const r of rooms) { const def = ROOMS[r.t]; L.rooms[r.ch] = r.hidden ? { name: 'Hidden room', style: 's', hidden: true } : r.isolated ? { name: 'Attic', style: 'a', isolated: true } : { name: def ? def.n : 'Room', style: def ? def.st : 'h', kind: r.t }; }
     L.rooms.o = { name: front ? 'Sidewalk' : 'Stoop', style: 'o' };
@@ -414,6 +419,75 @@
       lockNames: furn.filter(f => f.lock).map(f => f.name),
     });
     L.danger = Math.min(5, L.danger);
+    keyExtras();
+    // ---- 0.8: brass-key extras (a locked room, a parked car). They roll from their OWN random stream after
+    // the house is finished, so every seed still makes exactly the same house as before - plus, now and then, these.
+    function keyExtras() {
+      const kr = D.mulberry32((seed ^ 0x4b1d5eed) >>> 0);
+      const kshuf = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(kr() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+      const pRoom = { mansion: .5, police: .5, school: .3 }[type] || .2, pCar = .42;
+      const wantRoom = kr() < pRoom, wantCar = kr() < pCar;
+      if (wantRoom) lockedRoom();
+      if (wantCar) parkedCar();
+      function roomAtCell(x, y) { return roomOfCh[g[Math.floor(y)] && g[Math.floor(y)][Math.floor(x)]] || null; }
+      function lockedRoom() {
+        const bad = new Set(secOut.map(s => s.room));
+        for (const f of furn) if (f.secret || f.panel || f.wall && f.panel || (f.extra && f.extra.length)) bad.add(f.room);
+        for (const s of secOut) if (s.hatch) { const r = roomAtCell(s.hatch.x, s.hatch.y); if (r) bad.add(r.ch); }
+        for (const z of L.zombies) { const r = roomAtCell(z.x, z.y); if (r) bad.add(r.ch); }
+        if (L.boss && L.boss.kitchen) { const r = roomAtCell(L.boss.kitchen.x, L.boss.kitchen.y); if (r) bad.add(r.ch); }
+        const PREF = ['study', 'evidence', 'armory', 'office', 'bedroom', 'storage', 'cellar', 'backroom', 'pharmback', 'lockers', 'closet', 'janitor', 'nurse'];
+        const cands = kshuf(rooms.filter(r => !r.spine && r !== front && !r.hidden && !r.isolated && PREF.includes(r.t) && !bad.has(r.ch) && doors.filter(d => d.a === r.id || d.b === r.id).length === 1))
+          .sort((a, b) => PREF.indexOf(a.t) - PREF.indexOf(b.t));
+        for (const r of cands.slice(0, 3)) {
+          const d = doors.find(d => d.a === r.id || d.b === r.id), other = rooms[d.a === r.id ? d.b : d.a];
+          const prev = occ[d.y][d.x]; occ[d.y][d.x] = 1;
+          // everything outside the room must still be reachable with the door shut
+          const dist = reach(); let ok = true;
+          for (const q of rooms) { if (q === r || q.hidden || q.isolated) continue; let any = false; for (let y = q.y0; y <= q.y1 && !any; y++) for (let x = q.x0; x <= q.x1; x++) if (dist[y * MW + x] >= 0) { any = true; break; } if (!any) { ok = false; break; } }
+          if (ok) for (const f of furn) if ((f.loot || f.mustReach) && !f.pocket && f.room !== r.ch && !accessible(f, dist)) { ok = false; break; }
+          if (!ok) { occ[d.y][d.x] = prev; continue; }
+          // the room's containers get the better table; add a strongbox if it has fewer than 2
+          let conts = furn.filter(f => f.room === r.ch && f.loot && !f.secretLoot);
+          if (conts.length < 2) {
+            occ[d.y][d.x] = prev; // check the strongbox against the room with the door open
+            const cells = []; for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) if (!occ[y][x]) cells.push([x, y]);
+            for (const [x, y] of kshuf(cells)) {
+              const f = { art: 'toolbox', name: 'Strongbox', at: [x, y, 1, 1], H: 20, time: 2.2, noise: 2.5, loot: 'lockedroom', room: r.ch };
+              occ[y][x] = 1; furn.push(f); const dd = reach();
+              if (furn.every(o => !(o.loot || o.mustReach) || o.pocket || accessible(o, dd)) && dd[d.y * MW + d.x] >= 0) break;
+              furn.pop(); occ[y][x] = 0;
+            }
+            occ[d.y][d.x] = 1; conts = furn.filter(f => f.room === r.ch && f.loot && !f.secretLoot);
+          }
+          if (!conts.length) { occ[d.y][d.x] = prev; continue; }
+          for (const f of conts.slice(0, 3)) f.loot = 'lockedroom';
+          for (const f of furn) if (f.room === r.ch) { f.keyRoom = 1; if (f.loot) f.noEmpty = 1; }
+          furn.push({ art: 'keydoor', name: 'Locked door', at: [d.x, d.y, 1, 1], H: 56, keyDoor: 1, keyLock: 'room', vert: d.horiz ? 0 : 1, room: other.ch, inner: r.ch });
+          L.keyRoom = { room: r.ch, kind: r.t, door: [d.x, d.y] };
+          return;
+        }
+      }
+      function parkedCar() {
+        const y = yB + 1, boss = fdx - 9, xs = [];
+        for (let x = 1; x + 4 <= MW - 1; x++) {
+          if (x + 4 > fdx - 2 && x < fdx + 3) continue;               // keep the stoop clear
+          if (x <= boss + 1.5 && x + 4 >= boss - 1.5) continue;        // the event mini-boss stands here
+          let ok = true;
+          for (let xx = x - 1; xx < x + 5 && ok; xx++) if (g[y][xx] !== 'o' || g[y - 1][xx] !== '#' || occ[y][xx] || furn.some(f => f.at[1] === y && xx >= f.at[0] && xx < f.at[0] + f.at[2])) ok = false;
+          if (ok) xs.push(x);
+        }
+        if (!xs.length) return;
+        const x = xs[Math.floor(kr() * xs.length)], col = Math.floor(kr() * 5), flip = kr() < .5 ? 1 : 0;
+        // two halves of one car: the glove box at the front, the trunk at the back
+        const front = { art: 'pcar', name: 'Glove box', at: [flip ? x + 2 : x, y, 2, 1], H: 34, time: 1.8, noise: 3, loot: 'car', keyLock: 'car', car: { half: 0, col, flip }, noEmpty: 1, room: 'o' };
+        const back = { art: 'pcar', name: 'Trunk', at: [flip ? x : x + 2, y, 2, 1], H: 34, time: 2.4, noise: 3.5, loot: 'car', keyLock: 'car', car: { half: 1, col, flip }, noEmpty: 1, room: 'o' };
+        furn.push(front, back);
+        for (let xx = x; xx < x + 4; xx++) occ[y][xx] = 1;
+        const dd = reach(); if (!accessible(front, dd) || !accessible(back, dd) || dd[(y + 1) * MW + fdx] < 0) { furn.splice(-2); for (let xx = x; xx < x + 4; xx++) occ[y][xx] = 0; return; }
+        L.car = { x, y };
+      }
+    }
     // furniture: drop generator-only fields
     for (const f of furn) { delete f.lockable; delete f.mustLock; delete f.used; delete f.mustReach; }
     return L;
