@@ -176,6 +176,7 @@ window.DM = window.DM || {};
   // how many fit in one slot (anything not listed does not stack)
   D.STACK = { gift: 3, candy: 5, seed_tomato: 10, seed_potato: 10, seed_carrot: 10, seed_corn: 10, seed_herbs: 10, tomato: 3, potato: 3, carrot: 3, corn: 3, herbs: 3, wood: 10, nails: 20, lockpick: 5, arrow: 20, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
   D.stackMax = k => D.STACK[k] || 1;
+  D.QUIVER = 60;   // 0.7: arrows live in a quiver (survivor.quiver.n), not in a pack slot
 
   // melee: dmg, wind/strike/rec seconds, reach in tiles, durability. bow is ranged.
   D.WEAPONS = {

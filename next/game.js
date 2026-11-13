@@ -56,6 +56,7 @@ const NEXT_VERSION = '0.7';
     v.trader.event = v.trader.event || null;   // phase 5a: Dot's seasonal job chain { key, step, kills, base }
     v.tips = v.tips || {};                  // phase 5: first-time tips already shown
     if (v.survivor) migrateCos(v.survivor);
+    if (v.survivor) migrateQuiver(v.survivor);
     DM.Crew.norm(v);                        // phase 5b: crew + strays (SV.crew, SV.pets)
     DM.Boss.norm(v);                        // phase 5b: the weekly boss (SV.boss)
     return v;
@@ -70,6 +71,12 @@ const NEXT_VERSION = '0.7';
     }
     for (const sl in s.look.cos) if (!w.own[s.look.cos[sl]]) delete s.look.cos[sl];   // only what you own can be worn
   }
+  // 0.7: the quiver. Arrows in the pack move into it (up to D.QUIVER); they no longer take a pack slot or spill on death.
+  function migrateQuiver(s) {
+    const q = s.quiver = s.quiver && typeof s.quiver === 'object' ? s.quiver : { n: 0 }; q.n = Math.max(0, Math.min(D.QUIVER, +q.n || 0));
+    for (let i = s.pack.length - 1; i >= 0 && q.n < D.QUIVER; i--) if (s.pack[i].k === 'arrow') { const t = Math.min(s.pack[i].n, D.QUIVER - q.n); q.n += t; s.pack[i].n -= t; if (!s.pack[i].n) s.pack.splice(i, 1); }
+  }
+  function toQuiver(n) { const q = SV.survivor.quiver = SV.survivor.quiver || { n: 0 }, t = Math.max(0, Math.min(n, D.QUIVER - q.n)); q.n += t; return t; }
   const cosQueue = [];   // unlock popups waiting to be shown
   D.cosOwned = () => (SV && SV.survivor && SV.survivor.wardrobe ? SV.survivor.wardrobe.own : {});
   Game.save = function () {
@@ -87,10 +94,11 @@ const NEXT_VERSION = '0.7';
   function createSurvivor(name, look, job) {
     const J = D.JOBS[job];
     let xp = 0; try { const v = JSON.parse(localStorage.getItem('dm-next-skills') || '{}'); if (v.scav) xp = +v.scav.xp || 0; } catch (e) { /* none */ }
-    const s = { name: name || 'Survivor', look, job, hp: 0, xp, pack: [], stash: [], hands: null, packBonus: 0, known: D.BASIC.concat(job === 'hunter' ? ['arrow'] : []), wardrobe: { own: {}, seen: {} } };
+    const s = { name: name || 'Survivor', look, job, hp: 0, xp, pack: [], stash: [], hands: null, quiver: { n: 0 }, packBonus: 0, known: D.BASIC.concat(job === 'hunter' ? ['arrow'] : []), wardrobe: { own: {}, seen: {} } };
     s.hp = maxHp(s);
     for (const [k, n] of J.kit) {
       if (k === J.hands) { s.hands = { k, d: D.WEAPONS[D.ITEMS[k].w].dur }; continue; }
+      if (k === 'arrow') { s.quiver = { n: Math.min(D.QUIVER, n) }; continue; }
       addTo(s.pack, 12, k, n, D.isWeapon(k) ? D.WEAPONS[D.ITEMS[k].w].dur : undefined);
     }
     return s;
@@ -210,7 +218,7 @@ const NEXT_VERSION = '0.7';
     }
     DM.Crew.onTask('scavenger', 2);
     const stacks = D.toStacks(got, rnd), lost = [];
-    for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } const n = addTo(SV.survivor.stash, STASH_SLOTS, e.k, e.n, e.d); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k); }
+    for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, STASH_SLOTS, e.k, e.n, e.d); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k); }
     h.status = 'auto'; SV.stats.auto++;
     SV.survivor.xp += 3;
     Game.save();
@@ -268,21 +276,24 @@ const NEXT_VERSION = '0.7';
   // ---------------------------------------------------------------- trader: Auntie Dot, quests, shop, crafting
   const traderLevel = () => Math.min(5, 1 + Math.floor((SV.trader.completed || 0) / 20));
   const questById = id => SV.trader.active.find(q => q.id === id) || null;
-  const countItem = k => SV.survivor.pack.concat(SV.survivor.stash).filter(e => e.k === k).reduce((a, e) => a + e.n, 0);
+  const countItem = k => SV.survivor.pack.concat(SV.survivor.stash).filter(e => e.k === k).reduce((a, e) => a + e.n, 0) + (k === 'arrow' && SV.survivor.quiver ? SV.survivor.quiver.n : 0);
   function takeItems(k, n) { // stash first, then pack; returns removed entries (weapons keep durability)
     const out = [];
     for (const list of [SV.survivor.stash, SV.survivor.pack]) for (let i = list.length - 1; i >= 0 && n > 0; i--) if (list[i].k === k) { const t = Math.min(n, list[i].n); list[i].n -= t; n -= t; out.push({ k, n: t, d: list[i].d }); if (!list[i].n) list.splice(i, 1); }
+    if (k === 'arrow' && n > 0 && SV.survivor.quiver) { const t = Math.min(n, SV.survivor.quiver.n); SV.survivor.quiver.n -= t; if (t) out.push({ k, n: t }); }
     return out;
   }
   function give(k, n, d) { // into the pack if it fits, the rest to the stash; returns what did not fit anywhere
     if (D.ITEMS[k] && D.ITEMS[k].cos) { Game.unlockCos(k); return 0; }
+    if (k === 'arrow') { n -= toQuiver(n); if (!n) return 0; }   // arrows: the quiver first
     let got = addTo(SV.survivor.pack, packSlots(), k, n, d); if (got < n) got += addTo(SV.survivor.stash, STASH_SLOTS, k, n - got, d);
     return n - got;
   }
   function canGive(items, remove = []) { // dry run of give() on copies: does everything fit in pack + stash?
     const pk = SV.survivor.pack.map(e => Object.assign({}, e)), st = SV.survivor.stash.map(e => Object.assign({}, e));
     for (let [k, n] of remove) for (const list of [st, pk]) for (let i = list.length - 1; i >= 0 && n > 0; i--) if (list[i].k === k) { const t = Math.min(n, list[i].n); list[i].n -= t; n -= t; if (!list[i].n) list.splice(i, 1); }
-    for (const [k, n] of items) { let got = addTo(pk, packSlots(), k, n, D.isWeapon(k) ? 1 : undefined); if (got < n) got += addTo(st, STASH_SLOTS, k, n - got, D.isWeapon(k) ? 1 : undefined); if (got < n) return false; }
+    let qroom = Math.max(0, D.QUIVER - ((SV.survivor.quiver || {}).n || 0));
+    for (let [k, n] of items) { if (k === 'arrow') { const t = Math.min(n, qroom); qroom -= t; n -= t; if (!n) continue; } let got = addTo(pk, packSlots(), k, n, D.isWeapon(k) ? 1 : undefined); if (got < n) got += addTo(st, STASH_SLOTS, k, n - got, D.isWeapon(k) ? 1 : undefined); if (got < n) return false; }
     return true;
   }
   Game.canGive = canGive;
@@ -1087,10 +1098,11 @@ const NEXT_VERSION = '0.7';
       <div class="kick sect">Equipped</div>
       <div class="eqrow">
         <button class="eqslot${sel && sel.from === 'hands' ? ' sel' : ''}" ${h ? 'data-from="hands" data-i="0"' : 'id="eqFists"'}><i class="eqk">Weapon · hand</i>${h ? icon(h.k) : '<span class="eqnone">✊</span>'}<b>${h ? esc(hw.n) : 'Fists'}</b><span>${hd} dmg${h && h.d != null ? ` · ${Math.round(h.d / D.WEAPONS[hw.w].dur * 100)}%` : ''}</span>${h && h.d != null ? `<i class="dur"><i style="width:${Math.max(4, h.d / D.WEAPONS[hw.w].dur * 100)}%"></i></i>` : ''}</button>
+        <button class="eqslot quiv${sel && sel.from === 'quiver' ? ' sel' : ''}" data-from="quiver" data-i="0"><i class="eqk">Quiver</i>${(s.quiver || {}).n ? icon('arrow') : `<img class="dim" alt="" src="${ART.iconURL.arrow}">`}<b>${(s.quiver || {}).n || 0} arrow${(s.quiver || {}).n === 1 ? '' : 's'}</b><span>max ${D.QUIVER} · no pack slot</span></button>
         <div class="eqslot"><i class="eqk">Backpack</i>${s.packBonus ? icon(s.packBonus >= 4 ? 'backpack' : 'packplus') : `<img class="dim" alt="" src="${ART.iconURL.backpack}">`}<b>${packSlots()} slots</b><span>${s.packBonus ? `+${s.packBonus} from upgrades` : 'No upgrade yet'}</span></div>
         <button class="eqslot cos" id="eqWard"><i class="eqk">Cosmetics</i><span class="eqcos">${worn.length ? worn.slice(0, 4).map(c => `<img alt="" src="${ART.iconURL['cos_' + c]}">`).join('') : '<img alt="" src="' + ART.iconURL.cosS_beanie + '">'}</span><b>Wardrobe →</b><span>${worn.length ? worn.length + ' worn' : 'Nothing worn'}${newCos() ? ` · <em class="newtxt">${newCos()} new</em>` : ''}</span></button>
       </div>
-      ${gear.length ? `<div class="eqgear">Also wearing: ${gear.join(' · ')}</div>` : ''}${A('hands')}
+      ${gear.length ? `<div class="eqgear">Also wearing: ${gear.join(' · ')}</div>` : ''}${A('hands')}${A('quiver')}
       <div class="kick sect">Backpack · ${s.pack.length}/${packSlots()}</div>
       <div class="grid g4">${s.pack.map((e, i) => slot(e, 'pack', i)).join('')}${empty(packSlots() - s.pack.length)}</div>
       ${s.pack.length && !sel ? '<button class="mbtn sm" id="sAll" style="margin-top:8px;width:100%">Stash all</button>' : ''}${A('pack')}
@@ -1105,8 +1117,19 @@ const NEXT_VERSION = '0.7';
     };
     if (sel) stashActions();
   }
+  // the quiver: fill it from the stash/pack, or put its arrows away in the stash
+  function quiverActions(s, acts) {
+    const q = s.quiver = s.quiver || { n: 0 }, spare = s.pack.concat(s.stash).filter(e => e.k === 'arrow').reduce((a, e) => a + e.n, 0);
+    const done = msg => { sel = null; Game.save(); reHost(); if (msg) toast(msg, 1.6); };
+    acts.innerHTML = `<div class="sact"><span><b>Quiver</b> ${q.n}/${D.QUIVER} <em>arrows here never use a pack slot and never spill when you go down</em></span></div>`;
+    const row = acts.firstChild, add = (t, fn, ghost) => { const b = document.createElement('button'); b.className = 'mbtn sm' + (ghost ? ' ghost' : ''); b.textContent = t; b.onclick = () => { SFX.play('pick'); fn(); }; row.appendChild(b); };
+    if (spare && q.n < D.QUIVER) add(`Fill from stash/pack (${Math.min(spare, D.QUIVER - q.n)})`, () => { const want = Math.min(spare, D.QUIVER - q.n); let need = want; for (const list of [s.pack, s.stash]) for (let i = list.length - 1; i >= 0 && need; i--) if (list[i].k === 'arrow') { const t = Math.min(need, list[i].n); list[i].n -= t; need -= t; if (!list[i].n) list.splice(i, 1); } q.n += want; done(`Quiver: ${q.n} arrows`); });
+    if (q.n) add('Put in stash', () => { const n = addTo(s.stash, STASH_SLOTS, 'arrow', q.n); if (!n) return toast('Stash is full', 1.4); q.n -= n; done(`${n} arrows to the stash`); }, !!spare);
+    if (!q.n && !spare) add('No arrows yet', () => toast('Arrows: Dot\'s shop, gym lockers, or craft them with the arrow blueprint', 2.2), true);
+  }
   function stashActions() {
     const s = SV.survivor, acts = (stashHost || $('#mpane')).querySelector('#sacts');
+    if (sel.from === 'quiver') { quiverActions(s, acts); return; }
     const e = sel.from === 'hands' ? { k: s.hands.k, n: 1, d: s.hands.d } : s[sel.from][sel.i];
     if (!e) { sel = null; return; }
     const it = D.ITEMS[e.k], btns = [];

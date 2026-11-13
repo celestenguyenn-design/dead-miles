@@ -589,7 +589,7 @@
     for (const z of G.zs) { if (z.dead) continue; const d = Math.hypot(z.x - p.x, z.y - p.y); if (d < bd) { bd = d; best = z; } }
     if (best && !weapon().ranged) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; p.fx = dx / d; p.fy = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; }
     const W = weapon(); SW_WIND = W.wind; SW_STRIKE = W.strike; SW_REC = W.rec; p.swRanged = !!W.ranged;
-    if (W.ranged && !packCount('arrow')) { toast('No arrows - press R or tap the weapon to swap', 1.6); return; }
+    if (W.ranged && !arrowsLeft()) { toast('No arrows - press R or tap the weapon to swap', 1.6); return; }
     p.st = 'swing'; p.stT = 0; p.swingHit = false; p.swingQ = false; p.sta = Math.max(0, p.sta - (W.ranged ? 3 : 7)); p.staDelay = .5;
   }
   let SW_WIND = .12, SW_STRIKE = .1, SW_REC = .22;
@@ -1480,7 +1480,7 @@
   function hud() {
     const p = G.p;
     hpFill.style.width = (p.hp / maxHp() * 100) + '%'; stFill.style.width = p.sta + '%';
-    const hudKey = [Math.round(p.hp), G.pack.length, packCount('lockpick'), G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5), S().xp, S().hands ? S().hands.k + S().hands.d : '-', packCount('arrow')].join('|');
+    const hudKey = [Math.round(p.hp), G.pack.length, packCount('lockpick'), G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5), S().xp, S().hands ? S().hands.k + S().hands.d : '-', arrowsLeft()].join('|');
     if (hudKey !== lastHud) {
       lastHud = hudKey;
       hpVal.textContent = Math.ceil(p.hp);
@@ -1492,7 +1492,7 @@
       const h = S().hands, wk = weaponKey();
       $('#wpn img').src = ART.iconURL[h ? ITEMS[h.k].i : 'scrap'] || ''; $('#wpn').classList.toggle('fists', !h);
       $('#wpn i').style.width = (h && h.d != null ? Math.max(0, h.d / WEAPONS[wk].dur) * 100 : 0) + '%';
-      $('#wpn b').textContent = wk === 'bow' ? packCount('arrow') : '';
+      $('#wpn b').textContent = wk === 'bow' ? arrowsLeft() : '';   // the quiver (plus any spare arrows in the pack)
       const n = Math.round(G.noiseLvl * 5);
       noiseBars.forEach((b, i) => b.classList.toggle('on', i < n));
       $('#noise').classList.toggle('hot', n >= 4);
@@ -1526,15 +1526,20 @@
   const sheet = $('#sheet');
   // ---- pack with stacks: G.pack = [{k, n}], each entry one slot
   const isCos = k => !!(ITEMS[k] && ITEMS[k].cos);   // cosmetics skip the pack: they unlock into the wardrobe
+  // 0.7: arrows go to the quiver first (no pack slot, never spilled on death); the pack only takes the overflow
+  const quiver = () => (S().quiver = S().quiver || { n: 0 });
+  const arrowsLeft = () => quiver().n + packCount('arrow');
+  function useArrow() { if (quiver().n > 0) quiver().n--; else usePack('arrow'); }
   function roomFor(k) { // how many of k the pack can still take
     if (isCos(k)) return 99;
-    let room = 0; const m = stackMax(k);
+    let room = k === 'arrow' ? Math.max(0, D.QUIVER - quiver().n) : 0; const m = stackMax(k);
     for (const e of G.pack) if (e.k === k) room += m - e.n;
     return room + (packSlots() - G.pack.length) * m;
   }
   function addToPack(k, n, d) { // tops up existing stacks first, then new slots; returns how many fit
     if (isCos(k)) { if (DM.Game && DM.Game.unlockCos) DM.Game.unlockCos(k); return n; }
     const m = stackMax(k); let left = n;
+    if (k === 'arrow') { const q = quiver(), t = Math.min(left, Math.max(0, D.QUIVER - q.n)); q.n += t; left -= t; }
     for (const e of G.pack) if (e.k === k && e.n < m && left) { const t = Math.min(left, m - e.n); e.n += t; left -= t; }
     while (left && G.pack.length < packSlots()) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; G.pack.push(e); left -= t; }
     return n - left;
@@ -1856,8 +1861,8 @@
   }
   function fireArrow() {
     const p = G.p;
-    if (!packCount('arrow')) { toast('No arrows', 1.1); return false; }
-    usePack('arrow');
+    if (!arrowsLeft()) { toast('No arrows', 1.1); return false; }
+    useArrow();
     let best = null, bd = 8 * T;
     for (const z of G.zs) {
       if (z.dead) continue;
