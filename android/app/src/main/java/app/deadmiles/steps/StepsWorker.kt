@@ -31,6 +31,10 @@ class StepsWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
 
         val steps: Long = try {
             readTodaySteps()
+        } catch (e: SecurityException) {
+            // Android 15+ refuses background reads without the background permission
+            prefs.lastError = "the phone blocked reading steps in the background - open the app, tap Allow reading steps, and turn on Access data in the background"
+            return Result.success()
         } catch (e: Exception) {
             prefs.lastError = "reading steps: ${e.message ?: e.javaClass.simpleName}"
             return Result.retry()

@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "app.deadmiles.steps"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "app.deadmiles.steps"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 35
+        versionCode = 2
+        versionName = "1.1"
     }
 
     signingConfigs {
@@ -46,6 +46,6 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
-    implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
+    implementation("androidx.health.connect:connect-client:1.1.0-alpha11")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

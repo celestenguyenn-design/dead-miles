@@ -323,15 +323,17 @@
 
   function scrAndroid() {
     let h = whoLine() + signInGate();
-    h += '<div class="note"><b>Already use the Dead Miles Steps app from the old game?</b> Nothing to change. It keeps working here. Skip to <b>Test it</b> (step 8).</div>';
-    h += step(1, 'Download the app', '<p>Tap the button. If your browser warns about the file, tap <b>Download anyway</b>.</p>'
+    h += '<div class="note"><b>Already have the Dead Miles Steps app?</b> Get the <b>new version</b> anyway (step 1) - the old one only synced while it was open. Install it over the old one; your handle and token stay.</div>';
+    h += step(1, 'Download the app', '<p>Tap the button.</p>'
       + '<a class="btn" href="' + APK + '" download="DeadMilesSteps.apk">Download Dead Miles Steps</a>'
-      + '<p class="help">A tiny app made for this game. It only reads your step count and sends it here.</p>');
-    h += step(2, 'Install it', '<p>Open the download (from the notification, or <b>Files &rarr; Downloads</b>) and tap <b>Install</b>.</p>'
-      + '<p>If Android says installs are blocked, tap <b>Settings</b>, turn on <b>Allow from this source</b>, go back and tap <b>Install</b>.</p>'
-      + '<p class="help">If Play Protect warns about an unknown app: <b>More details &rarr; Install anyway</b>.</p>');
-    h += step(3, 'Check your steps reach Health Connect', '<p>The app reads steps from <b>Health Connect</b>. Your step counter app (Samsung Health, Google Fit, Fitbit...) has to share steps into it.</p>'
-      + '<p class="help">In that app\'s settings look for <b>Health Connect</b> and allow <b>Steps</b>. Older phones: the Dead Miles app sends you to the Play Store to install Health Connect.</p>');
+      + '<p>If <b>Chrome</b> says the file might be harmful: tap <b>Download anyway</b>. (Or open Chrome&rsquo;s <b>Downloads</b>, tap the file, choose <b>Keep</b>.)</p>'
+      + '<p class="help">A tiny app made for this game. It only reads your step count and sends it here. Android is suspicious of it only because it is not from the Play Store.</p>');
+    h += step(2, 'Install it (and get past the blockers)', '<p>Open the download (from the notification, or <b>Files &rarr; Downloads</b>) and tap <b>Install</b>.</p>'
+      + '<p><b>"Installs from this source are blocked"</b>: tap <b>Settings</b>, turn on <b>Allow from this source</b>, go back, tap <b>Install</b>.</p>'
+      + '<p><b>Samsung phone and it STILL blocks it after you allow it?</b> That is Samsung <b>Auto Blocker</b>. Open <b>Settings &rarr; Security and privacy &rarr; Auto Blocker</b> and turn it <b>off</b>. Install the app, then you can turn Auto Blocker back on - the app keeps working.</p>'
+      + '<p><b>"Blocked by Play Protect"</b>: tap <b>More details &rarr; Install anyway</b>. No such button? Open the <b>Play Store</b> &rarr; your profile picture &rarr; <b>Play Protect</b> &rarr; the gear &rarr; turn off <b>Scan apps with Play Protect</b>, install, then turn it back on.</p>');
+    h += step(3, 'Check your steps reach Health Connect', '<p>The app reads steps from <b>Health Connect</b>. Your step counter (Samsung Health, Google Fit, Fitbit...) has to share steps into it.</p>'
+      + '<p class="help">Samsung Health: <b>Settings &rarr; Health Connect</b> &rarr; allow <b>Steps</b>. Google Fit and others: look for <b>Health Connect</b> in their settings. Older phones: the Dead Miles app sends you to the Play Store to install Health Connect.</p>');
     h += step(4, 'Box 1: your handle', '<p>Open <b>Dead Miles Steps</b>. Paste this in box <b>1. Handle</b>:</p>'
       + (NET.ok ? copyBox('handle', (VALUES.handle = NET.handle), 'my handle', true) : '<p class="help">Sign in first to see it.</p>'));
     let tok = '<p>Paste your token in box <b>2. Token</b>.</p>';
@@ -343,11 +345,14 @@
         + '<p class="help">This token is your account password. Only put it in the Dead Miles Steps app. Never send it to anyone.</p>';
     } else tok += '<p class="help">Sign in first to see it.</p>';
     h += step(5, 'Box 2: your token', tok);
-    h += step(6, 'Allow reading steps', '<p>Tap <b>Allow reading steps</b> and allow <b>Steps</b> on the Health Connect screen.</p>');
-    h += step(7, 'Save and send', '<p>Tap <b>Save &amp; start hourly sync</b>. Then tap <b>Send now</b>.</p>'
-      + '<p class="help">From now on it sends your steps every hour by itself. You never have to open it again.</p>');
-    h += step(8, 'Test it', testBlock('android'));
-    h += '<div class="card"><h3>Keep it running</h3><p class="help">Some phones stop apps in the background to save battery. If steps stop after a day: Settings &rarr; Apps &rarr; <b>Dead Miles Steps</b> &rarr; Battery &rarr; <b>Unrestricted</b>.</p></div>';
+    h += step(6, 'Allow reading steps - including in the background', '<p>Tap <b>Allow reading steps</b>. On the Health Connect screen turn on <b>Steps</b> AND <b>Access data in the background</b> (newer phones show it as a second switch).</p>'
+      + '<p class="warn"><b class="warn">This is the one that matters.</b> Without background access your phone only lets the app read steps while it is open - that is why steps used to sync only when you opened it.</p>'
+      + '<p class="help">Missed it? Settings &rarr; <b>Health Connect</b> (or Security and privacy &rarr; Privacy &rarr; Health Connect) &rarr; App permissions &rarr; <b>Dead Miles Steps</b> &rarr; turn on <b>Access data in the background</b>.</p>');
+    h += step(7, 'Don\'t let it fall asleep', '<p>Tap <b>Don&rsquo;t put it to sleep</b> in the app and choose <b>Allow</b>.</p>'
+      + '<p class="help">Or: Settings &rarr; Apps &rarr; <b>Dead Miles Steps</b> &rarr; Battery &rarr; <b>Unrestricted</b>. Samsung: also check it is not in <b>Sleeping apps</b> / <b>Deep sleeping apps</b> (Settings &rarr; Battery &rarr; Background usage limits).</p>');
+    h += step(8, 'Save and send', '<p>Tap <b>Save &amp; start hourly sync</b>, then <b>Send now</b>.</p>'
+      + '<p class="help">From now on it sends your steps about every hour by itself. You never have to open it again. If the app shows a warning in its status line, it tells you exactly which switch is still off.</p>');
+    h += step(9, 'Test it', testBlock('android'));
     return h;
   }
 

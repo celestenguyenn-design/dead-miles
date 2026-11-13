@@ -1,0 +1,20 @@
+name: Android app check
+# Builds the step companion app on branches that change it, so a broken build is
+# caught BEFORE it reaches main (where a failed APK build would stop the site deploy).
+on:
+  push:
+    branches-ignore: [main]
+    paths: ['android/**', '.github/workflows/android-check.yml']
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build companion APK
+        working-directory: android
+        run: gradle assembleRelease --no-daemon --warning-mode=none
