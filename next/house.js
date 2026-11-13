@@ -263,7 +263,7 @@
   }
   function alertZombie(z, x, y, seen) {
     if (z.st === 'sleep') { z.st = 'rise'; z.stT = 0; z.alertT = 1; SFX.play('groan'); z.target = { x, y }; return; }
-    if (seen) { if (z.st !== 'chase') { z.alertT = .9; SFX.play('groan'); SFX.play('alert'); } z.st = 'chase'; z.stT = 0; z.lostT = 0; return; }
+    if (seen) { if (z.st !== 'chase') { z.alertT = .9; SFX.play('groan'); SFX.play('alert'); if (opts.onAlert) opts.onAlert(z); } z.st = 'chase'; z.stT = 0; z.lostT = 0; return; }
     if (z.st !== 'investigate') { z.alertT = .7; if (Math.random() < .6) SFX.play('groan'); }
     z.st = 'investigate'; z.target = { x, y }; z.path = null; z.stT = 0;
   }
@@ -496,7 +496,10 @@
     let spd = 0, running = false;
     // stamina
     p.staDelay -= dt;
-    if (p.staDelay <= 0 && !(inp.run && inp.m > 0)) p.sta = Math.min(100, p.sta + 20 * dt);
+    // Refill whenever she is not ACTUALLY sprinting. Before, holding the joystick far out with no
+    // stamina left blocked the refill too, so she was stuck winded until she let go of the stick.
+    if (p.staDelay <= 0 && !p.running) p.sta = Math.min(100, p.sta + (inp.m > .1 ? 13 : 20) * dt);
+    if (p.sta <= 1) p.winded = true; else if (p.sta >= 30) p.winded = false;
 
     if (LP.on) { p.vx *= .8; p.vy *= .8; inp = { x: 0, y: 0, m: 0, run: false }; }
     if (p.st === 'free' && !LP.on) {
@@ -511,7 +514,7 @@
     }
 
     if (p.st === 'free' || p.st === 'swing') {
-      running = inp.run && inp.m > .5 && p.sta > 1 && p.st === 'free';
+      running = inp.run && inp.m > .5 && p.sta > 1 && !p.winded && p.st === 'free';
       spd = (running ? 4.5 : 2.75) * T * inp.m * (p.st === 'swing' ? .35 : 1);
       if (running) { p.sta = Math.max(0, p.sta - 24 * dt); p.staDelay = .7; }
       const tvx = inp.x * spd, tvy = inp.y * spd;
@@ -550,7 +553,7 @@
     const stepLen = running ? T * .72 : T * .58;
     if (p.stepAcc > stepLen) {
       p.stepAcc = 0; SFX.play(running ? 'run' : 'step');
-      const qn = (job() === 'thief' ? .6 : job() === 'hunter' ? .8 : 1) * (S().shoes ? .7 : 1); if (running) emitNoise(p.x, p.y, 3 * qn, false); else emitNoise(p.x, p.y, 1.1 * qn, false);
+      const qn = (job() === 'thief' ? .6 : job() === 'hunter' ? .8 : 1) * (S().shoes ? .7 : 1) * (opts.quiet ? opts.quiet() : 1); if (running) emitNoise(p.x, p.y, 3 * qn, false); else emitNoise(p.x, p.y, 1.1 * qn, false);
       if (running) puff(p.x, p.y, 2, 2, 'rgba(157,144,191,.6)', 30, .4, 3);
     }
     if (moved < .05 && p.st === 'free') p.ph = lerp(p.ph, Math.round(p.ph / Math.PI) * Math.PI, .2);
@@ -589,7 +592,7 @@
     for (const z of G.zs) { if (z.dead) continue; const d = Math.hypot(z.x - p.x, z.y - p.y); if (d < bd) { bd = d; best = z; } }
     if (best && !weapon().ranged) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; p.fx = dx / d; p.fy = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; }
     const W = weapon(); SW_WIND = W.wind; SW_STRIKE = W.strike; SW_REC = W.rec; p.swRanged = !!W.ranged;
-    if (W.ranged && !packCount('arrow')) { toast('No arrows - press R or tap the weapon to swap', 1.6); return; }
+    if (W.ranged && !arrowsLeft()) { toast('No arrows - press R or tap the weapon to swap', 1.6); return; }
     p.st = 'swing'; p.stT = 0; p.swingHit = false; p.swingQ = false; p.sta = Math.max(0, p.sta - (W.ranged ? 3 : 7)); p.staDelay = .5;
   }
   let SW_WIND = .12, SW_STRIKE = .1, SW_REC = .22;
@@ -670,6 +673,7 @@
     return losClear(z.x, z.y - 30, p.x, p.y - 30);
   }
   function updateZombie(z, dt) {
+    if (opts.zupdate && opts.zupdate(z, dt)) return;   // the weekly boss (boss.js) runs its own brain
     z.stT += dt; z.flash = Math.max(0, z.flash - dt * 6); z.alertT = Math.max(0, z.alertT - dt); z.cd = Math.max(0, z.cd - dt);
     const p = G.p;
     const [zx, zy] = cellOf(z); z.roomNow = roomAt(zx, zy);
@@ -1002,6 +1006,7 @@
     for (const s of G.sec) if (s.type === 'attic' && s.st === 1) list.push({ k: s.hatch.y * T - 14, lad: s });
     for (const f of G.furn) { const k = f.wall ? f.y + f.h + .5 : f.y + f.h; if (k + 10 < vy0 || f.y - 120 > vy1) continue; list.push({ k, f }); }
     for (const z of G.zs) list.push({ k: z.sleep && (z.st === 'sleep' || z.st === 'rise' && z.stT < .5) ? z.sleep.key * T + 1 : z.dead ? z.y - 14 : z.y, z });
+    if (opts.sprites) for (const s of opts.sprites(G)) list.push({ k: s.k, sp: s });   // pets, crew, hidden survivors (crew.js)
     list.push({ k: p.y, pl: 1 });
     list.sort((a, b) => a.k - b.k);
     for (const it of list) {
@@ -1010,6 +1015,7 @@
       else if (it.dr) drawDrop(it.dr);
       else if (it.lad) drawLadder(false, it.lad.hatch.x * T + 2, it.lad.hatch.y * T - 14);
       else if (it.f) { const f = it.f, cvs = furnCanvas(f); if (f.lootable && f.searched && !(f.loot0 && f.loot0.length) && !(f.secret && !G.secretOpen)) ctx.globalAlpha = .82; ctx.drawImage(cvs, f._b.x + (f.slide || 0) * T, f._b.y, f._b.w, f._b.h); ctx.globalAlpha = 1; if (f.art === 'crate' && !f.searched) ART.candle(ctx, f.x + f.w - 12, ART.geo(f).ty0 + 12, G.t); }
+      else if (it.sp) it.sp.draw(ctx);
       else if (it.z) drawZombie(it.z);
       else drawPlayer();
     }
@@ -1258,11 +1264,11 @@
       rot = -dir * .22 * k; parts.armF = { r: .9 * k }; parts.armB = { r: .7 * (1 - k) }; parts.head = { r: -.15 * k };
     }
     // dir: sprite faces left by default, flip when facing right
-    if (z.st !== 'sleep') drawShadow(z.x, z.y + 1, z.dead ? 26 : 17, z.dead ? .3 : .42);
+    if (z.st !== 'sleep') drawShadow(z.x, z.y + 1, (z.dead ? 26 : 17) * (z.scale || 1), z.dead ? .3 : .42);
     if (z.st === 'dead') { // corpse lies along the floor
       y = z.y + 6;
     }
-    const zs = z.kind === 'krampus' ? ZSCALE * 1.18 : ZSCALE, over = z.kind === 'krampus' ? santaHat : null;
+    const zs = z.kind === 'krampus' ? ZSCALE * 1.18 : ZSCALE * (z.scale || 1), over = z.kind === 'krampus' ? santaHat : z.over || null;   // z.scale / z.over: the weekly boss
     z._pose = [x, y + yo, zs, z.flip, { rot, sy, parts, alpha: 1, over }];
     ART.drawRig(ctx, 'zombie', x, y + yo, zs, z.flip, { rot, sy, parts, flash: z.flash, alpha, over });
   }
@@ -1477,7 +1483,7 @@
   function hud() {
     const p = G.p;
     hpFill.style.width = (p.hp / maxHp() * 100) + '%'; stFill.style.width = p.sta + '%';
-    const hudKey = [Math.round(p.hp), G.pack.length, packCount('lockpick'), G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5), S().xp, S().hands ? S().hands.k + S().hands.d : '-', packCount('arrow')].join('|');
+    const hudKey = [Math.round(p.hp), G.pack.length, packCount('lockpick'), G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5), S().xp, S().hands ? S().hands.k + S().hands.d : '-', arrowsLeft()].join('|');
     if (hudKey !== lastHud) {
       lastHud = hudKey;
       hpVal.textContent = Math.ceil(p.hp);
@@ -1489,7 +1495,7 @@
       const h = S().hands, wk = weaponKey();
       $('#wpn img').src = ART.iconURL[h ? ITEMS[h.k].i : 'scrap'] || ''; $('#wpn').classList.toggle('fists', !h);
       $('#wpn i').style.width = (h && h.d != null ? Math.max(0, h.d / WEAPONS[wk].dur) * 100 : 0) + '%';
-      $('#wpn b').textContent = wk === 'bow' ? packCount('arrow') : '';
+      $('#wpn b').textContent = wk === 'bow' ? arrowsLeft() : '';   // the quiver (plus any spare arrows in the pack)
       const n = Math.round(G.noiseLvl * 5);
       noiseBars.forEach((b, i) => b.classList.toggle('on', i < n));
       $('#noise').classList.toggle('hot', n >= 4);
@@ -1523,15 +1529,20 @@
   const sheet = $('#sheet');
   // ---- pack with stacks: G.pack = [{k, n}], each entry one slot
   const isCos = k => !!(ITEMS[k] && ITEMS[k].cos);   // cosmetics skip the pack: they unlock into the wardrobe
+  // 0.7: arrows go to the quiver first (no pack slot, never spilled on death); the pack only takes the overflow
+  const quiver = () => (S().quiver = S().quiver || { n: 0 });
+  const arrowsLeft = () => quiver().n + packCount('arrow');
+  function useArrow() { if (quiver().n > 0) quiver().n--; else usePack('arrow'); }
   function roomFor(k) { // how many of k the pack can still take
     if (isCos(k)) return 99;
-    let room = 0; const m = stackMax(k);
+    let room = k === 'arrow' ? Math.max(0, D.QUIVER - quiver().n) : 0; const m = stackMax(k);
     for (const e of G.pack) if (e.k === k) room += m - e.n;
     return room + (packSlots() - G.pack.length) * m;
   }
   function addToPack(k, n, d) { // tops up existing stacks first, then new slots; returns how many fit
     if (isCos(k)) { if (DM.Game && DM.Game.unlockCos) DM.Game.unlockCos(k); return n; }
     const m = stackMax(k); let left = n;
+    if (k === 'arrow') { const q = quiver(), t = Math.min(left, Math.max(0, D.QUIVER - q.n)); q.n += t; left -= t; }
     for (const e of G.pack) if (e.k === k && e.n < m && left) { const t = Math.min(left, m - e.n); e.n += t; left -= t; }
     while (left && G.pack.length < packSlots()) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; G.pack.push(e); left -= t; }
     return n - left;
@@ -1853,8 +1864,8 @@
   }
   function fireArrow() {
     const p = G.p;
-    if (!packCount('arrow')) { toast('No arrows', 1.1); return false; }
-    usePack('arrow');
+    if (!arrowsLeft()) { toast('No arrows', 1.1); return false; }
+    useArrow();
     let best = null, bd = 8 * T;
     for (const z of G.zs) {
       if (z.dead) continue;
@@ -1956,6 +1967,16 @@
     spawn(x, y, props) { const z = mkZombie(x, y, 'investigate', null); Object.assign(z, props || {}); G.zs.push(z); return z; },
     hurtZombie(z, dmg, fa = 0, soft) { const kb = [z.kbx, z.kby]; hitZombie(z, fa, dmg, true); if (soft && !z.dead) { z.kbx = kb[0]; z.kby = kb[1]; if (z.st === 'hurt') z.st = 'chase'; } },
     solidAt: (tx, ty) => !!solidCell[ty * MW + tx],
+    // phase 5b (crew.js, boss.js): move an entity with collision, path toward the player, line of sight, noise, hurting her
+    move: (e, dx, dy) => moveEnt(e, dx, dy),
+    stepToPlayer: e => nextStep(e, playerField()),
+    los: (x0, y0, x1, y1) => losClear(x0, y0, x1, y1),
+    noise: (x, y, r, show) => emitNoise(x, y, r, show),
+    hurtPlayer: (dmg, dx, dy, z) => hurtPlayer(dmg, dx, dy, z),
+    banner: (t, sub) => banner(t, sub), puff: (...a) => puff(...a),
+    roomAt: e => { const [x, y] = cellOf(e); return roomAt(x, y); },
+    fogOf: r => (G && r != null && G.fog[r] != null ? G.fog[r] : 0),
+    pause: on => { if (G) G.paused = !!on; },
     exit(kind) { if (G && !G.over || kind) finishRun(kind || 'leave'); },
     get opts() { return opts; },
   };

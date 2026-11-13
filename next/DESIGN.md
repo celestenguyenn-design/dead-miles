@@ -137,6 +137,15 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Blueprints unlock crafting at the base workbench (weapons, bigger packs,
   traps, base upgrades).
 
+## Hunger and thirst (requested, next after crew/strays/boss)
+- "There's also no food bars." Two bars, Hunger and Thirst, on the home screen
+  and in the house HUD. Drain slowly with real time (about one meal and two
+  drinks a day) and a little faster during house runs (running, fighting).
+- Food fills hunger, water/soda/coffee fill thirst; some do both; holiday food
+  extra filling. Garden food and rain-barrel water from the base.
+- Low hunger: slower stamina regen, no overnight healing. Low thirst: slower
+  searches, faster tiring. Empty: slow HP loss but never kills you outright.
+
 ## Build order
 1. Prototype one house: joystick, rooms with lootable furniture, timed search,
    loot window, a hidden room, zombies that hear noise, real-time combat. (next/)
@@ -148,3 +157,11 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 5. Weekly boss, gifts, Oura check-in, party horde night.
 6. Base, crew, strays, real-world map.
 7. Replace the old game (a deliberate switch the owner approves).
+
+## Done in 0.7 (phase 5b)
+- Crew (crew.js): survivors hiding in closets/secret rooms (~4%, ~10% mansions/police), talk + join if a bunk is free
+  (2 bunks, bunk beds build to 4). Roles Scavenger/Guard/Medic/Gardener/Tinkerer, slow levels, 1 food/day from the
+  stash, 3 hungry days = they leave a note (never take items). Crew auto-search share 35% (no crew) up to 62%.
+- Strays: dogs/cats under furniture (~3%), approach slowly or offer food, max 4, one comes along. Never die.
+- Weekly boss (boss.js): Mon-Sun New York, 5,000 steps to reach, 2 fights/day, shared health via next_boss_hit.
+- Quiver: arrows live in survivor.quiver (max 60), no pack slot, never spilled.
