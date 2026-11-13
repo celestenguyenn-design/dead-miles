@@ -33,16 +33,16 @@
   const XPCUM = D.XPCUM, PERKS = D.PERKS;
   const searchMul = () => 1.5 * (1 - .06 * (scavLvl() - 1)) * (job() === 'scavenger' ? .85 : 1);   // slow at first, faster with skill
   const extraChance = () => .04 * (scavLvl() - 1) + (job() === 'scavenger' ? .1 : 0);
-  const packSlots = () => scavLvl() >= 9 ? 14 : 12;
+  const packSlots = () => 12 + (S().packBonus || 0) + (scavLvl() >= 9 ? 2 : 0);
   const gatePct = () => job() === 'scavenger' ? .65 : .75;
-  const LOCK_EASE = () => job() === 'thief' ? 1.6 : 1;   // the Thief job widens sweet spots
-  const SNAP_T = () => job() === 'thief' ? 2.4 : 1.2;    // ... and picks break half as often
+  const LOCK_EASE = () => (job() === 'thief' ? 1.6 : 1) * (S().lockset ? 1.25 : 1);   // the Thief job widens sweet spots
+  const SNAP_T = () => (job() === 'thief' ? 2.4 : 1.2) * (S().lockset ? 1.5 : 1);    // ... and picks break half as often
   const maxHp = () => job() === 'brawler' ? 130 : 100;
   function gainXP(n, x, y) {
     const before = scavLvl(); S().xp += n; DM.Game && DM.Game.save();
     G.nums.push({ x: x + 16, y: y - 112, v: '+' + n + ' xp', t: 0, col: P.GRN, small: 1 });
     const after = scavLvl();
-    if (after > before) levelUp(after);
+    if (after > before) { levelUp(after); if (DM.Game && DM.Game.onLevel) DM.Game.onLevel(after); }
   }
   const weaponKey = () => (S().hands && S().hands.k) ? D.ITEMS[S().hands.k].w : 'fists';
   const weapon = () => WEAPONS[weaponKey()];
@@ -279,6 +279,7 @@
   // secrets stay invisible until most of the house has been searched; no announcement when that happens
   function gateOpen() { const C = G.furn.filter(f => f.lootable && !f.secretLoot && !f.lock); return C.filter(f => f.searched).length >= Math.ceil(C.length * gatePct()); }
   const hasItem = k => G.pack.some(e => e.k === k) || (S().hands && S().hands.k === k);
+  const hasPry = () => hasItem('crowbar') || hasItem('prybar');
   const packCount = k => G.pack.reduce((a, e) => a + (e.k === k ? e.n : 0), 0);
   function usePack(k) { const i = G.pack.findIndex(e => e.k === k); if (i < 0) return; if (!--G.pack[i].n) G.pack.splice(i, 1); }
   const px = v => v * T;
@@ -305,12 +306,12 @@
       } else if (s.type === 'panel') {
         const f = G.furn[s.furn], r = { x: f.x + 6, y: f.y + f.h - 10, w: f.w - 12, h: 12 };
         const facing = p.fy < -.35 && Math.abs(p.x - (f.x + f.w / 2)) < f.w / 2 && p.y - (f.y + f.h) < 30 && p.y > f.y + f.h - 4;
-        if (gate && !f.opened && facing && hasItem('crowbar')) out.push({ obj: f, act: 'Pry', name: 'wall panel', rect: r, noise: 4, dur: 2.4, secret: true, done: () => pryPanel(s, f) });
+        if (gate && !f.opened && facing && hasPry()) out.push({ obj: f, act: 'Pry', name: 'wall panel', rect: r, noise: 4, dur: 2.4, secret: true, done: () => pryPanel(s, f) });
         if (f.opened && f.loot0 && f.loot0.length) out.push({ obj: f, act: 'Open', name: 'Wall cache', rect: r, secret: true });
       }
     }
   }
-  function foundSecret(s) { if (!s.found) { s.found = true; gainXP(8, G.p.x, G.p.y); } }
+  function foundSecret(s) { if (!s.found) { s.found = true; gainXP(8, G.p.x, G.p.y); if (DM.Game && DM.Game.onSecret) DM.Game.onSecret(); } }
   function moveRug(s) { s.st = 1; SFX.play('whoosh'); const R = rugRect(s); puff(R.x + R.w * .8, R.y + R.h * .7, 2, 8, 'rgba(234,210,164,.5)', 50, .7, 3); }
   function pryBoard(s) {
     s.st = 2; SFX.play('hit'); s.name = 'Floor cache'; s.room = s.room || G.room;
@@ -536,7 +537,7 @@
     const stepLen = running ? T * .72 : T * .58;
     if (p.stepAcc > stepLen) {
       p.stepAcc = 0; SFX.play(running ? 'run' : 'step');
-      const qn = job() === 'thief' ? .6 : job() === 'hunter' ? .8 : 1; if (running) emitNoise(p.x, p.y, 3 * qn, false); else emitNoise(p.x, p.y, 1.1 * qn, false);
+      const qn = (job() === 'thief' ? .6 : job() === 'hunter' ? .8 : 1) * (S().shoes ? .7 : 1); if (running) emitNoise(p.x, p.y, 3 * qn, false); else emitNoise(p.x, p.y, 1.1 * qn, false);
       if (running) puff(p.x, p.y, 2, 2, 'rgba(157,144,191,.6)', 30, .4, 3);
     }
     if (moved < .05 && p.st === 'free') p.ph = lerp(p.ph, Math.round(p.ph / Math.PI) * Math.PI, .2);
@@ -617,6 +618,7 @@
     SFX.play(z.hp <= 0 ? 'kill' : 'hit');
     if (z.hp <= 0) {
       z.dead = true; z.st = 'dead'; z.stT = 0; z.fallDir = z.hurtDir; G.stats.kills++;
+      if (DM.Game && DM.Game.onKill) DM.Game.onKill(z);
       return;
     }
     if (z.st === 'sleep') { z.st = 'rise'; z.stT = .25; z.alertT = 1; SFX.play('groan'); }
@@ -1426,7 +1428,7 @@
   // ---------------------------------------------------------------- HUD (DOM)
   const hpFill = $('#hp i'), stFill = $('#st i'), hpVal = $('#hpv'), packEl = $('#pack b'), noiseBars = [...document.querySelectorAll('#noise span')];
   const useBtn = $('#bUse'), useLbl = $('#useLbl'), mini = $('#mini'), mctx = mini.getContext('2d');
-  let lastHud = '';
+  let lastHud = '', lastQ = null;
   function hud() {
     const p = G.p;
     hpFill.style.width = (p.hp / maxHp() * 100) + '%'; stFill.style.width = p.sta + '%';
@@ -1450,10 +1452,12 @@
       if (t && p.st !== 'down') {
         useBtn.classList.add('on'); useLbl.classList.add('on');
         const loud = !t.corpse && t.act === 'Search' && t.noise >= 4;
-        if (t.act === 'Locked') { const n = packCount('lockpick'), cb = hasItem('crowbar'); useLbl.innerHTML = `Locked <b>${t.name}</b>` + (n || cb ? `<em class="opt">${[n ? `pick ${n}` : '', cb ? 'pry' : ''].filter(Boolean).join(' / ')}</em>` : ''); }
+        if (t.act === 'Locked') { const n = packCount('lockpick'), cb = hasPry(); useLbl.innerHTML = `Locked <b>${t.name}</b>` + (n || cb ? `<em class="opt">${[n ? `pick ${n}` : '', cb ? 'pry' : ''].filter(Boolean).join(' / ')}</em>` : ''); }
         else useLbl.innerHTML = `${t.act} <b>${t.name}</b>${loud ? '<em>loud</em>' : ''}`;
       } else { useBtn.classList.remove('on'); useLbl.classList.remove('on'); }
     }
+    const q = DM.Game && DM.Game.questChip ? DM.Game.questChip() : '';
+    if (q !== lastQ) { lastQ = q; $('#qchip').innerHTML = q; $('#qchip').classList.toggle('on', !!q); }
     $('#hp').classList.toggle('low', p.hp < maxHp() * .35);
     drawMini();
   }
@@ -1551,6 +1555,10 @@
   }
   function useItem(i) {
     const e = G.pack[i], it = ITEMS[e.k], p = G.p;
+    if ((it.slots || it.bp || e.k === 'shoes' || e.k === 'lockset') && DM.Game && DM.Game.applyUse) {
+      const msg = DM.Game.applyUse(e.k); if (!msg) return;
+      e.n--; if (!e.n) G.pack.splice(i, 1); lastHud = ''; SFX.play('pick'); toast(msg, 1.8); openPack(); return;
+    }
     if (e.k === 'note') { $('#shActs').innerHTML = `<div class="note">${L.note || '"...the rest is torn away."'}</div>`; SFX.play('pick'); return; }
     if (it.hp) p.hp = Math.min(maxHp(), p.hp + it.hp);
     if (it.sta) p.sta = Math.min(100, p.sta + it.sta);
@@ -1576,7 +1584,7 @@
 
   // ---- locks: choose pick or pry (two buttons in the sheet)
   function openLockChoice(it) {
-    const o = it.obj, LK = LOCKS[o.locked], n = packCount('lockpick'), cb = hasItem('crowbar');
+    const o = it.obj, LK = LOCKS[o.locked], n = packCount('lockpick'), cb = hasPry();
     if (!n && !cb) { toast('Locked. You need lockpicks or a crowbar.', 1.8); SFX.play('alert'); return; }
     G.sheet = { kind: 'lock', it };
     $('#shKick').textContent = `${RN(o.room)} · ${LK.name.toLowerCase()} lock`;
@@ -1594,7 +1602,7 @@
   function startPry(it) {
     const p = G.p, o = it.obj;
     p.st = 'search'; p.stT = 0;
-    p.search = { it: { obj: o, act: 'Pry', name: o.name, rect: it.rect, noise: 7.5, pry: true, done: () => { o.locked = null; o.pried = true; o._key = null; SFX.play('kill'); G.shake = 8; emitNoise(o.x + o.w / 2, o.y + o.h, 9); finishPry(it); } }, t: 0, dur: 2.6 + (o.time > 2.5 ? 1 : .4), nextNoise: .2, nextFx: 0 };
+    p.search = { it: { obj: o, act: 'Pry', name: o.name, rect: it.rect, noise: 7.5 * (hasItem('prybar') && !hasItem('crowbar') ? .6 : 1), pry: true, done: () => { o.locked = null; o.pried = true; o._key = null; SFX.play('kill'); G.shake = 8; emitNoise(o.x + o.w / 2, o.y + o.h, 9 * (hasItem('prybar') && !hasItem('crowbar') ? .6 : 1) * (job() === 'mechanic' ? .5 : 1)); finishPry(it); } }, t: 0, dur: 2.6 + (o.time > 2.5 ? 1 : .4), nextNoise: .2, nextFx: 0 };
     SFX.play('scrape');
   }
   function finishPry(it) { // pried open: the normal search happens straight away (with a chance to smash something)
@@ -1814,13 +1822,14 @@
     }
   }
 
+  function zombieCount() { const zs = G.zs.filter(z => z.kind !== 'turkey'); return { dead: zs.filter(z => z.dead).length, total: zs.length }; }
   // ---------------------------------------------------------------- finishing a run
   function finishRun(kind) {
     S().hp = Math.max(kind === 'down' ? 20 : 1, Math.round(G.p.hp));
     const res = {
       kind, address: L.address, type: L.type, id: L.id,
       kills: G.stats.kills, searched: G.furn.filter(f => f.lootable && f.searched).length,
-      secrets: G.sec.filter(s => s.found).length, secretsTotal: G.sec.length, left: G.drops.map(d => ({ k: d.k, n: d.n })),
+      secrets: G.sec.filter(s => s.found).length, secretsTotal: G.sec.length, zombies: zombieCount(), left: G.drops.map(d => ({ k: d.k, n: d.n })),
     };
     G.drops = []; G.over = true; LP.on = false; lpEl.classList.remove('on');
     closeSheet(true); hideCards();
@@ -1854,7 +1863,7 @@
   };
   DM.House = {
     start(layout, o) { startRun(layout, o); document.body.classList.add('inrun'); document.body.classList.toggle('event', !!EVENT); DM.scene = scene; },
-    get G() { return G; }, get L() { return L; },
+    get G() { return G; }, get L() { return L; }, zombieCount: () => G ? zombieCount() : { dead: 0, total: 0 },
   };
   // debug / test hooks
   Object.assign(DM, {
