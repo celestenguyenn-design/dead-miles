@@ -165,3 +165,16 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Strays: dogs/cats under furniture (~3%), approach slowly or offer food, max 4, one comes along. Never die.
 - Weekly boss (boss.js): Mon-Sun New York, 5,000 steps to reach, 2 fights/day, shared health via next_boss_hit.
 - Quiver: arrows live in survivor.quiver (max 60), no pack slot, never spilled.
+
+## Done in 0.8
+- Hunger + thirst (food.js): survivor.food {h,t,at,acc,xb}; real-time drain 45/70 per day from timestamps, small capped run drain
+  (max 5 per bar per run, more sprinting/fighting). Items carry hu/th (data.js); canned coffee added. Hungry <30: stamina refill -40%,
+  no overnight heal. Thirsty <30: searches +20%, max stamina 80. Empty: -1 HP/real hour, never below 10. Both >80: +10% scav XP.
+  Pre-0.8 saves start at 80/80 from the moment they load. Home card bars + Eat & drink sheet; run HUD bars (tap = quick eat);
+  rain barrel "Drink" at the base (+50 thirst, one charge).
+- Brass keys: the only way into locked cars (street, ~22% of houses, glove box + trunk, table 'car') and key-locked rooms
+  (~18%, more in mansions/police; one leaf room, door blocks until unlocked; table 'lockedroom'). Rolled from their own seeded stream
+  after generation, so existing seeds keep the same house. Not in the 75% secret gate; crew never opens them. Keys rarer; Dot sells one (lv 2+).
+- Secrets: board cell of a rug secret is always a reachable floor tile; secret actions win the use button; quiet hint before the gate (from main).
+- Feel: furniture collision inset, taps on part-wall tiles walk next to them, wall fade only for the segment over her sprite (to ~65%).
+

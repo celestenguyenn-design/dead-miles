@@ -1032,7 +1032,7 @@ const ART = (() => {
     pcar(ctx, f, g) {
       const C = f.car || { half: 0, col: 0, flip: 0 }, cols = [['#5f8fa8', '#7eaec4', '#46708a'], ['#c95f2c', '#e07a46', '#9e4520'], ['#7c9a4c', '#9ab86a', '#5c7836'], ['#9e3434', '#bc4c4c', '#7a2626'], ['#d8c9a0', '#ece0bc', '#b0a27a']][C.col % 5];
       const W = g.w * 2, X0 = (C.half ^ C.flip) ? g.x - g.w : g.x, ty = g.ty0, fy0 = g.fy0, fy1 = g.fy1;
-      ctx.save(); ctx.beginPath(); ctx.rect(g.x, ty - 60, g.w, fy1 - ty + 70); ctx.clip();
+      ctx.save(); ctx.beginPath(); ctx.rect(g.x - .75, ty - 60, g.w + 1.5, fy1 - ty + 70); ctx.clip();
       if (C.flip) { ctx.translate(X0 * 2 + W, 0); ctx.scale(-1, 1); }   // front faces right
       // shadow, wheels (the back one flat)
       ctx.fillStyle = 'rgba(5,4,16,.4)'; ctx.beginPath(); ctx.ellipse(X0 + W / 2, fy1 - 3, W * .48, 7, 0, 0, 6.29); ctx.fill();

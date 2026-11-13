@@ -176,6 +176,8 @@
     }
     G.fieldCell = -1;
   }
+  // 0.8: what she bumps into is the drawn base of the piece, a little inset, so she can squeeze past corners
+  function collRect(f) { const s = (f.slide || 0) * T; return { x: f.x + 4 + s, y: f.y + 3, w: f.w - 8, h: f.h - 8 }; }
   function furnRect(f) { const s = (f.slide || 0) * T; return { x: f.x + 2 + s, y: f.y, w: f.w - 4, h: f.h - 5 }; }
   function overlapsSolid(e, x, y) {
     const x0 = x - e.hw, x1 = x + e.hw, y0 = y - e.hh, y1 = y + e.hh;
@@ -186,7 +188,7 @@
     }
     for (const f of G.furn) {
       if (!f.solid) continue;
-      const r = furnRect(f);
+      const r = collRect(f);
       if (x0 < r.x + r.w && x1 > r.x && y0 < r.y + r.h && y1 > r.y) return r;
     }
     return null;
@@ -485,8 +487,13 @@
       p.auto = { it, gx: goal[0], gy: goal[1], px, py, field: bfs(goal[0], goal[1]), t: 0 };
       G.tapMark = { x: best.bx.x + best.bx.w / 2, y: best.bx.y + best.bx.h, t: 0, obj: true };
     } else {
-      const tx = Math.floor(wx / T), ty = Math.floor(wy / T);
-      if (tx < 0 || ty < 0 || tx >= MW || ty >= MH || solidCell[ty * MW + tx]) return;
+      let tx = Math.floor(wx / T), ty = Math.floor(wy / T);
+      if (tx < 0 || ty < 0 || tx >= MW || ty >= MH) return;
+      if (solidCell[ty * MW + tx]) { // 0.8: a tap on the open part of a wall/furniture tile walks to the closest open tile beside it
+        let bd = 1e9, bc = null;
+        for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) { const x = tx + dx, y = ty + dy; if (x < 0 || y < 0 || x >= MW || y >= MH || solidCell[y * MW + x]) continue; const d = Math.hypot((x + .5) * T - wx, (y + .5) * T - wy); if (d < bd) { bd = d; bc = [x, y]; } }
+        if (!bc || bd > T * 1.2) return; [tx, ty] = bc;
+      }
       p.auto = { gx: tx, gy: ty, px: wx, py: wy, field: bfs(tx, ty), t: 0 };
       G.tapMark = { x: wx, y: wy, t: 0 };
     }
@@ -901,13 +908,14 @@
     const k = 1 - Math.exp(-6 * dt);
     G.cam.x = lerp(G.cam.x, tx, k); G.cam.y = lerp(G.cam.y, ty, k);
     // wall cutaway near the player
+    // 0.8: subtle - only the wall segment actually in front of her sprite fades, only to ~65%, and only walls of rooms she has been in
     for (const c of wallCells) {
       if (!c.face && !c.lintel) continue;
-      const cx = c.x * T + T / 2, behind = p.y < c.key && p.y > c.key - WH - 48 && Math.abs(p.x - cx) < T * 1.25;
-      let zb = false;
-      if (!behind) for (const z of G.zs) if (!z.dead && z.y < c.key && z.y > c.key - WH - 30 && Math.abs(z.x - cx) < T && Math.hypot(z.x - p.x, z.y - p.y) < 5 * T) { zb = true; break; }
-      const target = behind ? .28 : zb ? .5 : 1;
-      c.cut = lerp(c.cut, target, 1 - Math.exp(-10 * dt));
+      const x0 = c.face ? c.face.x0 : c.x * T, x1 = c.face ? c.face.x1 : (c.x + 1) * T;
+      const fr = c.face ? c.face.room : roomAt(c.x, c.y + 1);
+      const covers = p.y < c.key - 4 && p.y > c.key - WH - 6 && p.x + 12 > x0 && p.x - 12 < x1;
+      const target = covers && (!fr || G.visited[fr] || fr === G.room) ? .65 : 1;
+      c.cut = lerp(c.cut, target, 1 - Math.exp(-7 * dt));
     }
   }
 
@@ -1367,7 +1375,7 @@
     fogSrc.forEach((s, i) => {
       if (s.fixed) { al[i] = 1; return; }
       let a = minOf(s.rooms);
-      if (s.wall && s.wall.cut < .99) a = lerp(minOf(s.capRooms), a, (s.wall.cut - .28) / .72);
+      if (s.wall && s.wall.cut < .99) a = lerp(minOf(s.capRooms), a, clamp((s.wall.cut - .65) / .35, 0, 1));
       al[i] = a;
     });
     const d = fogImg.data;

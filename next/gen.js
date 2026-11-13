@@ -425,7 +425,7 @@
     function keyExtras() {
       const kr = D.mulberry32((seed ^ 0x4b1d5eed) >>> 0);
       const kshuf = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(kr() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-      const pRoom = { mansion: .5, police: .5, school: .3 }[type] || .2, pCar = .34;
+      const pRoom = { mansion: .5, police: .5, school: .3 }[type] || .2, pCar = .42;
       const wantRoom = kr() < pRoom, wantCar = kr() < pCar;
       if (wantRoom) lockedRoom();
       if (wantCar) parkedCar();
@@ -474,7 +474,7 @@
           if (x + 4 > fdx - 2 && x < fdx + 3) continue;               // keep the stoop clear
           if (x <= boss + 1.5 && x + 4 >= boss - 1.5) continue;        // the event mini-boss stands here
           let ok = true;
-          for (let xx = x - 1; xx < x + 5 && ok; xx++) if (g[y][xx] !== 'o' || occ[y][xx] || furn.some(f => f.at[1] === y && xx >= f.at[0] && xx < f.at[0] + f.at[2])) ok = false;
+          for (let xx = x - 1; xx < x + 5 && ok; xx++) if (g[y][xx] !== 'o' || g[y - 1][xx] !== '#' || occ[y][xx] || furn.some(f => f.at[1] === y && xx >= f.at[0] && xx < f.at[0] + f.at[2])) ok = false;
           if (ok) xs.push(x);
         }
         if (!xs.length) return;
@@ -483,6 +483,8 @@
         const front = { art: 'pcar', name: 'Glove box', at: [flip ? x + 2 : x, y, 2, 1], H: 34, time: 1.8, noise: 3, loot: 'car', keyLock: 'car', car: { half: 0, col, flip }, noEmpty: 1, room: 'o' };
         const back = { art: 'pcar', name: 'Trunk', at: [flip ? x : x + 2, y, 2, 1], H: 34, time: 2.4, noise: 3.5, loot: 'car', keyLock: 'car', car: { half: 1, col, flip }, noEmpty: 1, room: 'o' };
         furn.push(front, back);
+        for (let xx = x; xx < x + 4; xx++) occ[y][xx] = 1;
+        const dd = reach(); if (!accessible(front, dd) || !accessible(back, dd) || dd[(y + 1) * MW + fdx] < 0) { furn.splice(-2); for (let xx = x; xx < x + 4; xx++) occ[y][xx] = 0; return; }
         L.car = { x, y };
       }
     }

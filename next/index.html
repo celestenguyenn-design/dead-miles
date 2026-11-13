@@ -50,7 +50,7 @@
   .fdrow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 12px; background: #251c47; border: 2px solid var(--ink); }
   .fdrow img { width: 34px; height: 34px; flex: none; }
   .fdrow div { flex: 1; min-width: 0; font-size: 12px; font-weight: 800; line-height: 1.25; } .fdrow div em { display: block; font-style: normal; font-size: 10.5px; color: var(--mute); font-weight: 700; }
-  .fdrow .mbtn { flex: none; }
+  .mcard .fdrow .mbtn { flex: none; width: auto; min-width: 72px; margin: 0; }
   .fdbars { margin: 6px 0 4px; } .fdbars .needs .nbar { height: 12px; } .fdbars .nico { width: 20px; height: 20px; } .fdbars .needs .need b { font-size: 12px; }
   .fdfx { font-size: 12px; font-weight: 700; color: var(--mute); margin: 6px 0 0; padding-left: 16px; } .fdfx li { margin: 2px 0; }
   #room { margin-top: 3px; align-self: flex-start; display: inline-block; font-size: 11px; font-weight: 900; letter-spacing: .14em; padding: 5px 10px; border-radius: 99px; background: rgba(17,20,47,.88); border: 2px solid var(--plum); color: var(--crm); }
@@ -583,7 +583,8 @@
       <div class="bar" id="hp"><i></i><span>HP</span><b id="hpv">100</b></div>
       <div class="bar" id="st"><i></i><b class="cap"></b></div>
       <button id="needs" aria-label="Eat or drink"></button>
-      <div><span id="room">STOOP</span><span id="srch" style="margin-left:6px;font-size:10px;font-weight:800;letter-spacing:.06em;color:#9d90bf;text-transform:uppercase"></span></div>
+      <div><span id="room">STOOP</span></div>
+      <div id="srch" style="margin:-2px 0 0 4px;font-size:9.5px;font-weight:800;letter-spacing:.06em;color:#9d90bf;text-transform:uppercase;white-space:nowrap;text-shadow:0 1px 0 #11142f"></div>
       <div id="evchip"></div>
     </div>
     <div class="right">
