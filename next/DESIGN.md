@@ -137,6 +137,15 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Blueprints unlock crafting at the base workbench (weapons, bigger packs,
   traps, base upgrades).
 
+## Hunger and thirst (requested, next after crew/strays/boss)
+- "There's also no food bars." Two bars, Hunger and Thirst, on the home screen
+  and in the house HUD. Drain slowly with real time (about one meal and two
+  drinks a day) and a little faster during house runs (running, fighting).
+- Food fills hunger, water/soda/coffee fill thirst; some do both; holiday food
+  extra filling. Garden food and rain-barrel water from the base.
+- Low hunger: slower stamina regen, no overnight healing. Low thirst: slower
+  searches, faster tiring. Empty: slow HP loss but never kills you outright.
+
 ## Build order
 1. Prototype one house: joystick, rooms with lootable furniture, timed search,
    loot window, a hidden room, zombies that hear noise, real-time combat. (next/)
