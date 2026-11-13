@@ -15,49 +15,39 @@
 const SEASON=2;
 
 /* ---------------- 1. FRESH START ----------------
-   Any save from before Season 2 is archived (this phone + the cloud keeps its own
-   restore points) and replaced by a new character. Kept: name, look, every
-   cosmetic, the strays (back to level 1), class and background, online identity. */
-const S2_KEEP=['name','av','cosmetics','online','pets','pet','petName','petCoat','petActive','sfx','mapSkin','hidden','rival','created','town','cls','bg','goal','music'];
+   "I want this to be a new game entirely... start fresh, cosmetics are earned.
+   Clean wipe." Any save from before is archived on this phone (deadmiles.s1) and
+   the cloud keeps its own restore points, but nothing carries into the new game:
+   not the name, look, cosmetics, strays, class or progress.
+   Kept, because they are plumbing and not progress: the online account (so the
+   iPhone step Shortcut, the Android app and the friends list keep working) and
+   the sound/music settings. */
+const S2_KEEP=['online','sfx','music'];
 function seasonize(o){
   if(!o||o.era===SEASON)return o;
   if(!o.onboarded){o.era=SEASON;return o;}
   try{localStorage.setItem('deadmiles.s1',JSON.stringify({t:Date.now(),s:o}));}catch(e){}
   const n=fresh();
   for(const k of S2_KEEP)if(o[k]!==undefined)n[k]=JSON.parse(JSON.stringify(o[k]));
-  for(const p of (n.pets||[]))p.xp=0;
-  n.petXp=0;
-  n.era=SEASON;n.onboarded=true;n.s2Kit=false;n.s2Intro=true;
-  n.s1={lvl:o.lvl||1,steps:(o.steps&&o.steps.total)||0,kills:o.kills||0,legend:(o.gear||[]).filter(g=>g.r==='legendary').length};
+  n.era=SEASON;n.onboarded=false;n.s2Fresh=true;
+  n.s1={lvl:o.lvl||1,steps:(o.steps&&o.steps.total)||0,name:o.name||''};
   return n;
 }
-// Runs once the new save is live (needs S): the class and background starter kit.
-function season2Kit(){
-  if(!S||S.era!==SEASON||S.s2Kit)return;S.s2Kit=true;
-  const k=CLASSES[S.cls];
-  if(k){for(const id of k.kit){const g={uid:uid(),id,...GEAR[id]};S.gear.push(g);if(!S.eq[g.slot])S.eq[g.slot]=g.uid;}if(k.ammo)S.stock.ammo=k.ammo;if(k.extra&&ITEMS[k.extra])S.pack.push({id:k.extra,...ITEMS[k.extra],uid:uid()});S.sp=1;}
-  if(S.bg){S.bgKit=false;try{giveBgKit(S.bg);}catch(e){}S.sp=(S.sp||0)+1;}
-  try{newDistance();}catch(e){}
-  log('Season 2. A new road, the same county.');
-}
-function season2Intro(){
-  if(!S||!S.s2Intro)return false;
-  const s1=S.s1||{};
-  openSheet(`<h2>Season 2</h2><div class="big">🏮</div>
-  <p>Everyone starts over. Your old character is archived, not deleted.</p>
-  <div class="kv"><span>Kept</span><b>your name, look, every cosmetic, your strays</b><span>Season 1</span><b>level ${s1.lvl||1} · ${fmt(s1.steps||0)} steps</b></div>
-  <h3 style="margin-top:12px">What changed</h3>
+// The new game's front door, shown before the usual "pick a class" onboarding.
+function s2FreshStart(){
+  const s1=S&&S.s1;
+  openSheet(`<h2>Dead Miles</h2><div class="big">🧟</div>
+  <p><b>A new game.</b> Everyone starts from nothing - no gear, no cosmetics, no crew.</p>
+  ${s1&&s1.lvl?`<p class="help">Your old character (${esc(s1.name||'Survivor')}, level ${s1.lvl}) is archived on this phone. It does not come with you.</p>`:''}
   <ul class="journal" style="margin-top:6px">
-   <li><b>You never stop walking.</b> Houses you pass are scouted and wait for you. Search them later, from the couch.</li>
-   <li><b>Every day counts the same.</b> Your first 7,000 steps count fully, then less, so big walkers cannot run away with it.</li>
-   <li><b>Slow grind.</b> Rare things are rare again. Raids and the weekly boss are where the good gear is.</li>
-   <li><b>Your ring counts.</b> Morning check-in with your sleep and readiness, and pickleball or any workout trains you.</li>
-   <li><b>Shared camp.</b> Your party builds one camp together, whenever each of you walks.</li>
+   <li><b>Walk, don't stop.</b> Houses you pass are scouted. Search them later, room by room.</li>
+   <li><b>Every day counts.</b> Your first 7,000 steps count fully, then less, so big walkers cannot run away with it.</li>
+   <li><b>The slow grind.</b> Good gear is rare. Raids and the weekly boss are where it lives.</li>
+   <li><b>Your ring counts.</b> Morning check-in with sleep and readiness; workouts train you.</li>
+   <li><b>Cosmetics are earned.</b> Every outfit you wear, you found or won.</li>
   </ul>
-  <button class="btn r wide" style="margin-top:12px" onclick="S.s2Intro=false;save();closeSheet();render();">Start walking</button>`,true);
-  return true;
+  <button class="btn r wide" style="margin-top:12px" onclick="closeSheet();onboard();">Make a survivor</button>`,true);
 }
-
 /* ---------------- 2. PACING ----------------
    Steps are counted honestly (leaderboard, story, the phone sync) but what they are
    WORTH for progress tapers through the day. 7k = 7k. 15k = 11k. 25k = 12.5k.

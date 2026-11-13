@@ -377,7 +377,7 @@ const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic co
 
 /* ================= state ================= */
 let S=null;
-function fresh(){return {v:3,era:SEASON,s2Kit:true,created:Date.now(),name:'',onboarded:false,muster:null,caches:{},keeps:{},keepsTotal:0,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},infect:null,diff:'normal',mapSkin:'bloom',checkin:{date:'',n:0},ladder:{date:'',hit:[]},
+function fresh(){return {v:3,era:SEASON,created:Date.now(),name:'',onboarded:false,muster:null,caches:{},keeps:{},keepsTotal:0,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},infect:null,diff:'normal',mapSkin:'bloom',checkin:{date:'',n:0},ladder:{date:'',hit:[]},
   steps:{total:0,today:0,date:todayStr(),lastSync:0,lastSyncDate:''},
   walk:{toNext:0,dist:500,district:0,houses:0,progress:0,banked:0},
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
@@ -455,7 +455,7 @@ function migrateGear(){
   }
   if(changed)save();
 }
-function ensureState(){if(!S)return;if(S.onboarded)try{season2Kit();}catch(e){}try{migrateGear();}catch(e){}try{migrateHandsFeet();}catch(e){}S.bossPity=S.bossPity||0;S.dust=S.dust||0;S.scrolls=S.scrolls||0;S.pins=S.pins||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
+function ensureState(){if(!S)return;try{migrateGear();}catch(e){}try{migrateHandsFeet();}catch(e){}S.bossPity=S.bossPity||0;S.dust=S.dust||0;S.scrolls=S.scrolls||0;S.pins=S.pins||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;crewBackfill();for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
   if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(S.diff&&S.diff!=='normal'){log('Difficulty settings are gone: everyone plays the same county now. You were on '+(DIFF[S.diff]?DIFF[S.diff].n:S.diff)+'.');}S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};if(S.eq&&S.eq.hands===undefined)S.eq.hands=null;if(S.eq&&S.eq.feet===undefined)S.eq.feet=null;
   // free any slot a downed crew member is still sitting in (they never gave it
@@ -4897,7 +4897,8 @@ async function goOnline(handle,token){
     o.handle=handle;o.ok=true;o.err='';identWrite(handle,o.token);log('Online as @'+handle+'.');toast('Online as @'+handle,'z');save();render();
     if(token&&token.trim()){try{let b=null;try{b=await rpc('get_my_state',{p_handle:handle,p_token:o.token});}catch(e){}   // key-checked (v7.43 SQL); before that SQL runs it throws
       if(!b)b=await rpc('get_base',{p_handle:handle});const cs=cloudSaveOf(b);
-      if(cs&&cs.onboarded){const cloudAt=cs.savedAt||0;const localAt=S.savedAt||0;const localNewer=S.onboarded&&(localAt>cloudAt+60000||(S.steps&&S.steps.total)>((cs.steps&&cs.steps.total)||0));
+      if(cs&&cs.onboarded&&cs.era!==SEASON&&!S.onboarded){S.s2Fresh=true;S.s1={lvl:cs.lvl||1,name:cs.name||''};save();closeSheet();render();s2FreshStart();return;}
+      if(cs&&cs.onboarded&&cs.era===SEASON){const cloudAt=cs.savedAt||0;const localAt=S.savedAt||0;const localNewer=S.onboarded&&(localAt>cloudAt+60000||(S.steps&&S.steps.total)>((cs.steps&&cs.steps.total)||0));
         if(!S.onboarded){const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),seasonize(cs));S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();log('Brought your character back from the server.');save();closeSheet();render();toast('Welcome back, '+(S.name||handle),'z');identWrite(handle,o.token);pushPlayer();return;}
         openSheet(`<h2>Found your save</h2><div class="big">${ART.avatarSVG(cs.av||S.av,70)}</div><p><b style="color:var(--bone)">${esc(cs.name||handle)}</b>, level ${cs.lvl||1}, ${fmt((cs.steps&&cs.steps.total)||0)} lifetime steps${cs.base?', base at '+esc(cs.base.n):''}.<br><span class="help">Cloud copy saved ${cloudAt?ago(cloudAt):'at an unknown time'}${S.onboarded?' · this phone saved '+(localAt?ago(localAt):'at an unknown time'):''}.</span></p>${localNewer?'<p style="color:#ff8a92"><b>Careful:</b> what is on this phone looks NEWER than the cloud copy. Restoring would roll you back. Keep this one unless you know the cloud copy is the right one.</p>':'<p>Restore it here? What is on this device right now gets replaced (a backup is kept under Settings for 7 days).</p>'}<div class="grid2"><button class="btn${localNewer?' r':''}" onclick="closeSheet();pushPlayer()">Keep this one</button><button class="btn${localNewer?'':' r'}" id="restoreBtn">Restore the cloud copy</button></div>`,true);
         $('#restoreBtn').onclick=()=>{try{localStorage.setItem('deadmiles.backup',JSON.stringify({t:Date.now(),why:'before cloud restore',s:S}));}catch(e){}const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),seasonize(cs));S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();log('Restored your save from the cloud.');save();closeSheet();render();toast('Save restored. Undo is under Settings.','z');pushPlayer();};return;}
@@ -5959,8 +5960,8 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
- {v:'8.0',d:'Nov 13',t:'Season 2: a fresh start',
-  i:['Everyone starts over. Your Season 1 character is archived, not deleted. You keep your name, your look, every cosmetic and your strays.',
+ {v:'8.0',d:'Nov 13',t:'Dead Miles, the new game',
+  i:['A new game. Everyone starts from nothing: no gear, no cosmetics, no crew, no strays. Cosmetics are earned. Your old character is archived on your phone but does not carry over. Your online account stays linked, so step syncing and your friends list keep working.',
      'You never stop walking. Places you pass are scouted and wait on a list (up to 10). Search them whenever you sit down.',
      'New house search: go inside and the house opens up like a dollhouse. Tap a room, tap the furniture, and your survivor walks over and searches it. Then pick what to keep. Loud furniture (fridges, workbenches) makes more noise, and too much noise brings the dead.',
      'Every day counts about the same. Your first 7,000 steps a day count fully, the next 8,000 count half, and anything past 15,000 counts a little. Steps typed in by hand count half, up to 4,000 a day.',
@@ -7528,7 +7529,7 @@ function onboard(){
   <label class="section-label" style="display:block;margin-top:12px">Your name</label><input id="obName" type="text" maxlength="18" placeholder="e.g. Celeste" style="margin:6px 0 12px" value="${esc($('#obName')?$('#obName').value:'')}"><button class="btn r wide" id="obGo">Next: your look</button><button class="btn ghost wide" style="margin-top:8px" onclick="restoreSheet()">I already have a character on another phone or browser</button>`;
     $('#sheet').querySelectorAll('.starter button[data-k]').forEach(b=>b.onclick=()=>{cls=b.dataset.k;draw();});$('#sheet').querySelectorAll('[data-bg]').forEach(b=>b.onclick=()=>{bgSel=b.dataset.bg;draw();});
     $('#obGo').onclick=()=>{S.name=($('#obName').value||'Survivor').trim();S.cls=cls;S.sp=1;const k=CLASSES[cls];for(const id of k.kit){const g={uid:uid(),id,...GEAR[id]};S.gear.push(g);S.eq[g.slot]=g.uid;}if(k.ammo)S.stock.ammo=k.ammo;if(k.extra)S.pack.push({id:k.extra,...ITEMS[k.extra],uid:uid()});if(k.cos){S.cosmetics.push(k.cos);S.av.top=k.cos.split(':')[1];}
-      S.bg=bgSel;giveBgKit(bgSel);S.onboarded=true;newDistance();log('You left the shelter as a '+k.n.toLowerCase()+' who used to be a '+BACKGROUNDS[bgSel].n.toLowerCase()+'.');save();lookSheet(()=>{render();});};};
+      S.bg=bgSel;giveBgKit(bgSel);S.onboarded=true;S.s2Fresh=false;newDistance();log('You left the shelter as a '+k.n.toLowerCase()+' who used to be a '+BACKGROUNDS[bgSel].n.toLowerCase()+'.');save();lookSheet(()=>{render();});};};
   draw();$('#modal').classList.add('on');$('#modal').dataset.lock='1';
 }
 function giveBgKit(id){if(S.bgKit)return;S.bgKit=true;const k=id;
@@ -7750,7 +7751,7 @@ function start(){
   // A keyed address is handled before anything else: this copy may be a blank
   // Safari tab that would otherwise try to onboard her instead of delivering.
   stepsBeacon();
-  if(!S.onboarded){identBoot().then(found=>{if(!found)onboard();});}else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else if(!season2Intro()){whileYouWereOut();newsCheck();recapCheck();}condFromUrl();autoSyncFromUrl();}
+  if(!S.onboarded){if(S.s2Fresh)s2FreshStart();else identBoot().then(found=>{if(!found)onboard();});}else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else{whileYouWereOut();newsCheck();recapCheck();}condFromUrl();autoSyncFromUrl();}
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){LAST_ACTIVE=Date.now();S.lastOpen=Date.now();const bb=board();S.lastRank=bb.findIndex(r=>r.me)+1;save();}else{onResume();}});
   window.addEventListener('pageshow',e=>{if(e.persisted)onResume();});
   window.addEventListener('focus',()=>{if(Date.now()-LAST_ACTIVE>30000)onResume();});
