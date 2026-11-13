@@ -247,3 +247,54 @@ function receiveSupply(row){
   const g=GIFT_SUPPLIES.find(x=>x.k===it.supply);S.sgot.n++;S.stock[g.k]=(S.stock[g.k]||0)+g.q;
   return {n:g.e+' '+g.n,from:row.from,note:row.note||''};
 }
+
+/* ---------------- 7. MUSIC ----------------
+   "If I can change the music that I want." Built-in tracks are generated live in
+   the browser (WebAudio), so they are ours outright - fine for a public release.
+   "My own song" plays a file from her phone; it is stored on the phone only and
+   never uploaded. */
+const MUSIC_TRACKS={
+  off:{n:'Off'},
+  campfire:{n:'Campfire',d:'slow, warm, a guitar by the fire',bpm:68,root:57,scale:[0,2,4,7,9],chords:[[0,4,7],[-3,0,4],[5,9,12],[7,11,14]],wave:'triangle',pad:'sine'},
+  rain:{n:'Rainy walk',d:'soft and sleepy, lo-fi',bpm:74,root:55,scale:[0,3,5,7,10],chords:[[0,3,7,10],[5,8,12],[3,7,10],[-2,2,5]],wave:'sine',pad:'triangle',rain:true},
+  dusk:{n:'Dusk road',d:'a little eerie, still cute',bpm:84,root:52,scale:[0,2,3,7,8],chords:[[0,3,7],[8,12,15],[5,8,12],[7,10,14]],wave:'square',pad:'sine'},
+  own:{n:'My own song',d:'a file from your phone'},
+};
+const MUSIC={ctx:null,gain:null,timer:null,beat:0,el:null,url:null,noise:null};
+function musicPick(){return (S&&S.music)||'off';}
+function musicStop(){clearInterval(MUSIC.timer);MUSIC.timer=null;if(MUSIC.el){MUSIC.el.pause();}if(MUSIC.noise){try{MUSIC.noise.stop();}catch(e){}MUSIC.noise=null;}if(MUSIC.gain){try{MUSIC.gain.gain.setTargetAtTime(0,MUSIC.ctx.currentTime,0.3);}catch(e){}}}
+function musicNote(t,midi,dur,type,vol){const c=MUSIC.ctx;const o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.value=440*Math.pow(2,(midi-69)/12);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g);g.connect(MUSIC.gain);o.start(t);o.stop(t+dur+0.05);}
+function musicRain(){const c=MUSIC.ctx;const b=c.createBuffer(1,c.sampleRate*2,c.sampleRate);const d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.5;
+  const s=c.createBufferSource();s.buffer=b;s.loop=true;const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=1200;const g=c.createGain();g.gain.value=0.05;s.connect(f);f.connect(g);g.connect(MUSIC.gain);s.start();MUSIC.noise=s;}
+function musicPlay(){
+  musicStop();const k=musicPick();if(k==='off'||document.visibilityState==='hidden')return;
+  if(k==='own'){musicOwnPlay();return;}
+  const tr=MUSIC_TRACKS[k];if(!tr)return;
+  try{if(!MUSIC.ctx){MUSIC.ctx=new (window.AudioContext||window.webkitAudioContext)();MUSIC.gain=MUSIC.ctx.createGain();MUSIC.gain.connect(MUSIC.ctx.destination);}}catch(e){return;}
+  const c=MUSIC.ctx;if(c.state==='suspended')c.resume();MUSIC.gain.gain.cancelScheduledValues(c.currentTime);MUSIC.gain.gain.setTargetAtTime(0.35,c.currentTime,0.5);
+  if(tr.rain)musicRain();
+  const spb=60/tr.bpm;MUSIC.beat=0;let next=c.currentTime+0.1;
+  MUSIC.timer=setInterval(()=>{
+    while(next<c.currentTime+0.5){
+      const bar=Math.floor(MUSIC.beat/8)%tr.chords.length,step=MUSIC.beat%8,ch=tr.chords[bar];
+      if(step===0)for(const n of ch)musicNote(next,tr.root+n,spb*8,tr.pad,0.05);
+      if(step===0||step===4)musicNote(next,tr.root-12+ch[0],spb*2,'sine',0.09);
+      if(Math.random()<(step%2?0.35:0.7)){const deg=tr.scale[Math.floor(Math.random()*tr.scale.length)];musicNote(next,tr.root+12+deg,spb*1.5,tr.wave,tr.wave==='square'?0.018:0.05);}
+      MUSIC.beat++;next+=spb/2;}
+  },120);
+}
+function musicDb(mode,fn){return idbOpen().then(db=>new Promise(res=>{try{const tx=db.transaction('kv',mode);const q=fn(tx.objectStore('kv'));if(q){q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null);}else tx.oncomplete=()=>res(true);}catch(e){res(null);}})).catch(()=>null);}
+async function musicOwnPlay(){
+  const f=await musicDb('readonly',st=>st.get('song'));if(!f){toast('Pick a song file first (Settings, Music)');return;}
+  if(MUSIC.url)URL.revokeObjectURL(MUSIC.url);MUSIC.url=URL.createObjectURL(f.blob||f);
+  if(!MUSIC.el){MUSIC.el=new Audio();MUSIC.el.loop=true;}MUSIC.el.src=MUSIC.url;MUSIC.el.volume=0.6;MUSIC.el.play().catch(()=>{});
+}
+function musicSet(k){if(!MUSIC_TRACKS[k])return;S.music=k;save();musicPlay();renderMusic();}
+function musicFile(inp){const f=inp.files&&inp.files[0];if(!f)return;if(f.size>25e6){toast('That file is over 25 MB','d');return;}
+  musicDb('readwrite',st=>{st.put({blob:f,name:f.name},'song');}).then(()=>{S.musicName=f.name;musicSet('own');toast('Playing '+f.name,'z');});}
+function renderMusic(){const el=$('#musicBox');if(!el)return;const k=musicPick();
+  el.innerHTML=Object.entries(MUSIC_TRACKS).map(([id,t])=>`<button class="btn sm${k===id?' r':' ghost'}" style="margin:3px" onclick="musicSet('${id}')" title="${esc(t.d||'')}">${esc(t.n)}</button>`).join('')
+   +`<div class="help" style="margin-top:6px">${k==='own'?'Playing '+esc(S.musicName||'your song')+'. ':''}Your own song stays on this phone. <label class="btn xs ghost" style="cursor:pointer">Choose a song file<input type="file" accept="audio/*" hidden onchange="musicFile(this)"></label></div>`;}
+document.addEventListener('pointerdown',()=>{if(S&&musicPick()!=='off'&&!MUSIC.timer&&!(MUSIC.el&&!MUSIC.el.paused))musicPlay();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')musicStop();else if(S&&musicPick()!=='off')musicPlay();});
