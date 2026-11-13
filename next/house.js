@@ -1261,11 +1261,11 @@
       rot = -dir * .22 * k; parts.armF = { r: .9 * k }; parts.armB = { r: .7 * (1 - k) }; parts.head = { r: -.15 * k };
     }
     // dir: sprite faces left by default, flip when facing right
-    if (z.st !== 'sleep') drawShadow(z.x, z.y + 1, z.dead ? 26 : 17, z.dead ? .3 : .42);
+    if (z.st !== 'sleep') drawShadow(z.x, z.y + 1, (z.dead ? 26 : 17) * (z.scale || 1), z.dead ? .3 : .42);
     if (z.st === 'dead') { // corpse lies along the floor
       y = z.y + 6;
     }
-    const zs = z.kind === 'krampus' ? ZSCALE * 1.18 : ZSCALE, over = z.kind === 'krampus' ? santaHat : null;
+    const zs = z.kind === 'krampus' ? ZSCALE * 1.18 : ZSCALE * (z.scale || 1), over = z.kind === 'krampus' ? santaHat : z.over || null;   // z.scale / z.over: the weekly boss
     z._pose = [x, y + yo, zs, z.flip, { rot, sy, parts, alpha: 1, over }];
     ART.drawRig(ctx, 'zombie', x, y + yo, zs, z.flip, { rot, sy, parts, flash: z.flash, alpha, over });
   }
