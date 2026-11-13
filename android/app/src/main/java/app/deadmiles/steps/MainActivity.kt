@@ -1,6 +1,9 @@
 package app.deadmiles.steps
 
+import android.content.Context
 import android.content.Intent
+import android.os.PowerManager
+import android.provider.Settings
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
@@ -13,6 +16,7 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.StepsRecord
@@ -36,14 +40,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var handleBox: EditText
     private lateinit var tokenBox: EditText
-    private val permissions = setOf(HealthPermission.getReadPermission(StepsRecord::class))
+    private val stepsPerm = HealthPermission.getReadPermission(StepsRecord::class)
+    private val bgPerm = HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+    // Steps always; background reading too wherever this phone's Health Connect supports it
+    // (Android 15+). Without it the hourly job could only read while the app was open.
+    private var permissions = setOf(stepsPerm)
 
     private val requestPermissions =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
-            if (granted.containsAll(permissions)) {
-                setStatus("Step access allowed. Tap Save & start.")
-            } else {
-                setStatus("Step access was not allowed. The app cannot read steps without it.")
+            when {
+                granted.containsAll(permissions) -> setStatus("Step access allowed. Now step 4: let it run in the background.")
+                granted.contains(stepsPerm) -> setStatus("Steps are allowed, but NOT in the background, so it will only sync while this app is open. Tap Allow reading steps again and turn on \"Access data in the background\".")
+                else -> setStatus("Step access was not allowed. The app cannot read steps without it.")
             }
         }
 
@@ -81,7 +89,11 @@ class MainActivity : AppCompatActivity() {
         root.addView(label("3. Allow step access", bold = true))
         root.addView(button("Allow reading steps") { askPermission() })
 
-        root.addView(label("4. Start", bold = true))
+        root.addView(label("4. Let it run in the background", bold = true))
+        root.addView(label("So the hourly sync is not put to sleep. Choose Allow."))
+        root.addView(button("Don't put it to sleep") { askBattery() })
+
+        root.addView(label("5. Start", bold = true))
         root.addView(button("Save & start hourly sync") {
             prefs.handle = handleBox.text.toString().trim().lowercase()
             prefs.token = tokenBox.text.toString().trim()
@@ -124,10 +136,28 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun bgSupported(client: HealthConnectClient): Boolean = try {
+        client.features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND) ==
+            HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
+    } catch (e: Throwable) { false }
+
+    private fun askBattery() {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (pm.isIgnoringBatteryOptimizations(packageName)) { setStatus("Already allowed to run in the background."); return }
+        try {
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+        } catch (e: Exception) {
+            try { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } catch (e2: Exception) {
+                setStatus("Open Settings > Apps > Dead Miles Steps > Battery and choose Unrestricted.")
+            }
+        }
+    }
+
     private fun askPermission() {
         lifecycleScope.launch {
             try {
                 val client = HealthConnectClient.getOrCreate(this@MainActivity)
+                permissions = if (bgSupported(client)) setOf(stepsPerm, bgPerm) else setOf(stepsPerm)
                 val granted = client.permissionController.getGrantedPermissions()
                 if (granted.containsAll(permissions)) setStatus("Step access is already allowed.")
                 else requestPermissions.launch(permissions)
@@ -145,6 +175,20 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshStatus() {
         val prefs = Prefs(this)
+        lifecycleScope.launch {
+            try {
+                if (HealthConnectClient.getSdkStatus(this@MainActivity) != HealthConnectClient.SDK_AVAILABLE) return@launch
+                val client = HealthConnectClient.getOrCreate(this@MainActivity)
+                val granted = client.permissionController.getGrantedPermissions()
+                val warn = when {
+                    !granted.contains(stepsPerm) -> "Step access is not allowed yet (step 3)."
+                    bgSupported(client) && !granted.contains(bgPerm) -> "Background access is OFF, so steps only send while this app is open. Tap Allow reading steps and turn on \"Access data in the background\"."
+                    !(getSystemService(Context.POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName) -> "Tip: step 4 stops your phone putting the hourly sync to sleep."
+                    else -> ""
+                }
+                if (warn.isNotEmpty() && !status.text.contains(warn)) status.text = (status.text.toString().trim() + "\n\n" + warn).trim()
+            } catch (e: Exception) { }
+        }
         if (prefs.lastSync > 0) {
             val t = SimpleDateFormat("EEE h:mm a", Locale.getDefault()).format(Date(prefs.lastSync))
             setStatus("Last sync: $t · ${prefs.lastSteps} steps sent" + (if (prefs.lastError.isNotEmpty()) "\nLast problem: ${prefs.lastError}" else ""))
