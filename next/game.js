@@ -543,7 +543,7 @@ const NEXT_VERSION = '0.6';
     el.innerHTML = `<div class="kick sect">Workbench · ${s.known.length} recipe${s.known.length === 1 ? '' : 's'} known</div>` + s.known.map(k => {
       const r = D.RECIPES[k], ok = canCraft(r), out = r.out[0];
       return `<div class="recipe${ok ? '' : ' no'}"><div class="rout">${icon(out)}${r.out[1] > 1 ? `<em>x${r.out[1]}</em>` : ''}</div>
-        <div class="rinfo"><b>${r.n}</b><div class="rin">${Object.keys(r.in).map(m => { const have = countItem(m); return `<span class="${have >= r.in[m] ? 'ok' : 'miss'}">${icon(m)}${have}/${r.in[m]}</span>`; }).join('')}</div></div>
+        <div class="rinfo"><b>${r.n}</b><div class="rin">${Object.keys(r.in).map(m => { const have = countItem(m); return `<span class="${have >= r.in[m] ? 'ok' : 'miss'}">${icon(m)}${D.ITEMS[m] ? D.ITEMS[m].n : m} ${have}/${r.in[m]}</span>`; }).join('')}</div></div>
         <button class="mbtn sm${ok ? '' : ' ghost'}" data-craft="${k}"${ok ? '' : ' disabled'}>Craft</button></div>`;
     }).join('') + `<div class="empty">${unknown ? `${unknown} more blueprint${unknown > 1 ? 's' : ''} out there - Dot trades them, and some turn up in hidden stashes.` : 'You know every blueprint so far.'}<br>Materials come from the stash and the pack.</div>`;
     el.querySelectorAll('[data-craft]').forEach(b => b.onclick = () => craft(b.dataset.craft));
