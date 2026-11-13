@@ -304,6 +304,10 @@
     h += step(7, 'Run it once', '<p>Tap <b>Done</b>, then tap the Shortcut once to run it.</p>'
       + '<p>The first time, iPhone asks to read Health and to connect. Tap <b>Allow</b> (turn on <b>Steps</b>) and <b>Always Allow</b>.</p>'
       + '<p class="help">Nothing opens. That is normal: it sends your steps quietly.</p>');
+    h += '<div class="card"><h3>Wear an Oura ring (or another watch)?</h3><p>Let it count your steps too:</p>'
+      + '<p><b>1.</b> Oura app &rarr; your profile &rarr; <b>Data sharing</b> &rarr; <b>Apple Health</b> &rarr; turn on and allow <b>Steps</b>.</p>'
+      + '<p><b>2.</b> Health app &rarr; <b>Browse</b> &rarr; <b>Activity</b> &rarr; <b>Steps</b> &rarr; <b>Data Sources &amp; Access</b> &rarr; make sure <b>Oura</b> is on, tap <b>Edit</b> and drag Oura to the <b>top</b>.</p>'
+      + '<p class="help">Health then counts the ring&rsquo;s steps when your phone is not on you, without counting anything twice. Your Shortcut already reads the Health total, so nothing else changes.</p></div>';
     h += step(8, 'Test it', testBlock('iphone'));
     h += '<h3 style="margin:18px 4px 10px">Make it run by itself</h3>';
     h += step(9, 'Open the Automation tab', '<p>In Shortcuts, tap <b>Automation</b> at the bottom, then <b>+</b> (or <b>New Automation</b>). Pick <b>Time of Day</b>.</p>');
@@ -352,6 +356,10 @@
       + '<p class="help">Or: Settings &rarr; Apps &rarr; <b>Dead Miles Steps</b> &rarr; Battery &rarr; <b>Unrestricted</b>. Samsung: also check it is not in <b>Sleeping apps</b> / <b>Deep sleeping apps</b> (Settings &rarr; Battery &rarr; Background usage limits).</p>');
     h += step(8, 'Save and send', '<p>Tap <b>Save &amp; start hourly sync</b>, then <b>Send now</b>.</p>'
       + '<p class="help">From now on it sends your steps about every hour by itself. You never have to open it again. If the app shows a warning in its status line, it tells you exactly which switch is still off.</p>');
+    h += '<div class="card"><h3>Wear an Oura ring (or another watch)?</h3><p>Let it count your steps too:</p>'
+      + '<p><b>1.</b> Oura app &rarr; your profile &rarr; <b>Data sharing</b> &rarr; <b>Health Connect</b> &rarr; turn on and allow <b>Steps</b>.</p>'
+      + '<p><b>2.</b> Settings &rarr; <b>Health Connect</b> &rarr; <b>Data and access</b> &rarr; <b>Steps</b> &rarr; <b>App priority</b> &rarr; move <b>Oura</b> to the top.</p>'
+      + '<p class="help">The Dead Miles Steps app reads the Health Connect total, so the ring&rsquo;s steps come through without counting anything twice.</p></div>';
     h += step(9, 'Test it', testBlock('android'));
     return h;
   }
