@@ -57,7 +57,7 @@ const ART = (() => {
   }
 
   const rigs = {};
-  async function buildRig(key, res) {
+  async function buildRig(key, res, recolor, as) {
     const R = RIGS[key];
     const L = R.src.split('\n');
     const mid = L.findIndex(l => l.includes('</g></g><g><g class='));
@@ -71,6 +71,7 @@ const ART = (() => {
       const lines = p.lines === 'rest' ? colourLines.filter(i => !used.has(i) && i !== L.length - 1) : p.lines;
       let colour = lines.map(i => L[i]).join('\n');
       colour = colour.replace(/<\/g><\/g><\/g>\s*$/, '');
+      if (recolor) for (const a in recolor) colour = colour.split(a).join(recolor[a]);
       // cream sticker copy: same shapes, every non-none fill/stroke turned cream
       let outline = colour.replace(/(fill|stroke)="(?!none)[^"]*"/g, '$1="#f6e3bb"');
       // the last colour line may carry the closing tags of the whole group
@@ -84,7 +85,7 @@ const ART = (() => {
       out.parts[idx] = { name: p.name, pivot: p.pivot, o, c: toCanvas(ic, W, H), r: red };
     }));
     out.byName = {}; out.parts.forEach(p => out.byName[p.name] = p);
-    rigs[key] = out;
+    rigs[as || key] = out;
     return out;
   }
 
@@ -108,6 +109,7 @@ const ART = (() => {
           if (t.r) { ctx.translate(p.pivot[0], p.pivot[1]); ctx.rotate(t.r); ctx.translate(-p.pivot[0], -p.pivot[1]); }
         }
         if (alphaMul != null) ctx.globalAlpha *= alphaMul;
+        if (p.name === 'bat' && pose.weapon && pose.weapon !== 'bat') { if (layer === 'c' && WEAPON_ART[pose.weapon]) WEAPON_ART[pose.weapon](ctx); ctx.restore(); continue; }
         ctx.drawImage(p[layer], VB.x, VB.y, VB.w, VB.h);
         ctx.restore();
       }
@@ -116,6 +118,24 @@ const ART = (() => {
     if (pose.flash > 0) pass(pose.flashRed ? 'r' : 'o', pose.flash);
     ctx.restore();
   }
+
+  // other weapons drawn in rig space along the bat's line (hand ~ (23,-79), tip toward (55,-20))
+  const WEAPON_ART = {
+    fists: null,
+    knife(c) { c.save(); c.translate(23, -79); c.rotate(-.5); c.lineJoin = 'round';
+      c.fillStyle = '#3d2d61'; c.strokeStyle = P.INK; c.lineWidth = 3.2; c.beginPath(); c.rect(-4, -2, 8, 22); c.fill(); c.stroke();
+      c.fillStyle = '#d8dceb'; c.beginPath(); c.moveTo(-5, 20); c.lineTo(5, 20); c.lineTo(3, 50); c.lineTo(-4, 44); c.closePath(); c.fill(); c.stroke(); c.restore(); },
+    crowbar(c) { c.save(); c.translate(23, -79); c.rotate(-.5); c.lineCap = 'round'; c.lineJoin = 'round';
+      c.strokeStyle = P.INK; c.lineWidth = 11; c.beginPath(); c.moveTo(0, -14); c.lineTo(0, 62); c.quadraticCurveTo(0, 72, 10, 70); c.stroke();
+      c.strokeStyle = '#b53a2e'; c.lineWidth = 6; c.stroke(); c.restore(); },
+    axe(c) { c.save(); c.translate(23, -79); c.rotate(-.5); c.lineJoin = 'round';
+      c.fillStyle = '#b07a45'; c.strokeStyle = P.INK; c.lineWidth = 3.2; c.beginPath(); c.rect(-4, -10, 8, 74); c.fill(); c.stroke();
+      c.fillStyle = '#b9bdcc'; c.beginPath(); c.moveTo(-3, 48); c.lineTo(-30, 40); c.quadraticCurveTo(-36, 56, -30, 72); c.lineTo(-3, 64); c.closePath(); c.fill(); c.stroke(); c.restore(); },
+    bow(c) { c.save(); c.translate(26, -82); c.lineCap = 'round';
+      c.strokeStyle = P.INK; c.lineWidth = 9; c.beginPath(); c.moveTo(-6, -46); c.quadraticCurveTo(22, 0, -6, 46); c.stroke();
+      c.strokeStyle = '#b07a45'; c.lineWidth = 5; c.stroke();
+      c.strokeStyle = '#f6e3bb'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-6, -46); c.lineTo(-6, 46); c.stroke(); c.restore(); },
+  };
 
   // ---------- icons ----------
   const EXTRA_ICONS = {
@@ -143,6 +163,11 @@ const ART = (() => {
       <path d="M-8,-10 L0,-20 L8,-10 L0,-4 Z" fill="#9fe0e6" stroke="#11142f" stroke-width="2.4" stroke-linejoin="round"/>`,
   });
   Object.assign(EXTRA_ICONS, {
+    bat: `<g transform="rotate(40)"><path d="M-4,-30 Q0,-34 4,-30 L5,14 Q5,17 2,18 L-2,18 Q-5,17 -5,14 Z" fill="#e2b77e" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/><rect x="-3.5" y="18" width="7" height="12" rx="2" fill="#3d2d61" stroke="#11142f" stroke-width="2.4"/></g>`,
+    axe: `<g transform="rotate(35)"><rect x="-3.5" y="-30" width="7" height="60" rx="2" fill="#b07a45" stroke="#11142f" stroke-width="2.6"/><path d="M-2,-28 L-24,-34 Q-30,-20 -24,-6 L-2,-12 Z" fill="#b9bdcc" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/></g>`,
+    knife: `<g transform="rotate(40)"><rect x="-4" y="6" width="8" height="22" rx="2" fill="#3d2d61" stroke="#11142f" stroke-width="2.6"/><path d="M-5,6 L5,6 L3,-30 L-4,-22 Z" fill="#d8dceb" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/></g>`,
+    bow: `<g transform="rotate(20)"><path d="M-6,-30 Q22,0 -6,30" fill="none" stroke="#11142f" stroke-width="8" stroke-linecap="round"/><path d="M-6,-30 Q22,0 -6,30" fill="none" stroke="#b07a45" stroke-width="4.5" stroke-linecap="round"/><path d="M-6,-30 L-6,30" stroke="#f6e3bb" stroke-width="1.6"/></g>`,
+    arrow: `<g transform="rotate(-40)"><path d="M-26,0 L22,0" stroke="#11142f" stroke-width="6" stroke-linecap="round"/><path d="M-26,0 L22,0" stroke="#b07a45" stroke-width="3" stroke-linecap="round"/><path d="M22,-6 L32,0 L22,6 Z" fill="#b9bdcc" stroke="#11142f" stroke-width="2"/><path d="M-26,0 L-32,-7 M-26,0 L-32,7 M-20,0 L-26,-7 M-20,0 L-26,7" stroke="#f07b3c" stroke-width="3" stroke-linecap="round"/></g>`,
     lockpick: `<g transform="rotate(-30)"><rect x="-26" y="-3" width="40" height="6" rx="2" fill="#b9bdcc" stroke="#11142f" stroke-width="2.4"/><path d="M14,-3 L22,-3 L26,-9 L28,-7 L24,3 L14,3" fill="#b9bdcc" stroke="#11142f" stroke-width="2.4" stroke-linejoin="round"/><rect x="-30" y="-6" width="14" height="12" rx="3" fill="#5a4a86" stroke="#11142f" stroke-width="2.4"/></g>
       <g transform="translate(-4 14) rotate(-10)"><path d="M-20,0 L14,0 L14,8" fill="none" stroke="#11142f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M-20,0 L14,0 L14,8" fill="none" stroke="#9aa0b4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>`,
     crowbar: `<g transform="rotate(-40)"><path d="M-28,4 L18,4 Q28,4 28,-6 L28,-12" fill="none" stroke="#11142f" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M-28,4 L18,4 Q28,4 28,-6 L28,-12" fill="none" stroke="#b53a2e" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M-28,4 L-34,-2" stroke="#11142f" stroke-width="7" stroke-linecap="round"/><path d="M-28,4 L-34,-2" stroke="#9aa0b4" stroke-width="3" stroke-linecap="round"/></g>`,
@@ -189,6 +214,13 @@ const ART = (() => {
     h: { a: '#453453', b: '#3c2e4b', kind: 'planks' },
     o: { a: '#353452', b: '#2c2b46', kind: 'sidewalk' },
     a: { a: '#3a2c3c', b: '#2c2030', kind: 'boards' },
+    m: { a: '#4a5272', b: '#40486a', kind: 'smalltile' },
+    g: { a: '#3c3a4e', b: '#323044', kind: 'concrete' },
+    w: { a: '#4e3a50', b: '#443248', kind: 'planks' },
+    y: { a: '#6a5040', b: '#5c4436', kind: 'planks' },
+    x: { a: '#342a36', b: '#2a222c', kind: 'concrete' },
+    t: { a: '#4a4466', b: '#3e3a5a', kind: 'check' },
+    q: { a: '#3e5068', b: '#34465e', kind: 'check' },
   };
   function drawFloorTile(ctx, room, tx, ty, T) {
     const f = FLOOR[room]; if (!f) return;
@@ -236,6 +268,13 @@ const ART = (() => {
     h: { a: '#523f6e', b: '#463562', trim: '#2a1f4a', kind: 'wainscot' },
     o: { a: '#3d2d61', b: '#33264f', trim: '#1a1336', kind: 'brickout' },
     a: { a: '#4a3640', b: '#3a2a34', trim: '#22161e', kind: 'brick' },
+    m: { a: '#6a7a9a', b: '#5c6c8c', trim: '#3a4470', kind: 'tile' },
+    g: { a: '#4a4660', b: '#3e3a54', trim: '#262236', kind: 'brick' },
+    w: { a: '#5e4a6e', b: '#523f62', trim: '#3d2d61', kind: 'wainscot' },
+    y: { a: '#5a5478', b: '#4e486c', trim: '#2a2448', kind: 'brick' },
+    x: { a: '#40323c', b: '#342830', trim: '#1e161c', kind: 'brick' },
+    t: { a: '#6a6488', b: '#5c567c', trim: '#3d2d61', kind: 'wainscot' },
+    q: { a: '#5c7290', b: '#4e6482', trim: '#34466a', kind: 'tile' },
   };
   function drawWallFace(ctx, room, x, y, w, h, tx) {
     const f = WALLFACE[room] || WALLFACE.h;
@@ -643,6 +682,72 @@ const ART = (() => {
         line(ctx, g.x + g.w - 11, cy - 7, g.x + g.w - 11, cy + 9, '#b9bdcc', 3.4);
       }
       if (f.pried) { line(ctx, g.x + 6, g.fy0 + 8, g.x + 14, g.fy0 + 20, P.INK, 1.6); line(ctx, g.x + g.w - 8, g.fy1 - 10, g.x + g.w - 16, g.fy1 - 4, P.INK, 1.6); }
+    },
+    shopshelf(ctx, f, g) { // free-standing store gondola, goods on top shelves
+      box(ctx, g, '#9aa0b4', '#7d8398', 3);
+      const cols = [P.ORA, P.GRN, P.CRM, P.LIL2, '#e04a5a', P.ORAD];
+      for (let r = 0; r < 2; r++) { const yy = g.fy0 + 4 + r * (g.H / 2 - 2); line(ctx, g.x + 3, yy + g.H / 2 - 5, g.x + g.w - 3, yy + g.H / 2 - 5, P.INK, 2);
+        for (let xx = g.x + 6, i = r + (f.seed || 0); xx < g.x + g.w - 10; xx += 11, i++) if (!(f.searched && hash(i, r, 4) < .55)) blk(ctx, xx, yy + 2, 8, g.H / 2 - 9, cols[i % cols.length], 1, 1.4); }
+      for (let xx = g.x + 6, i = 0; xx < g.x + g.w - 10; xx += 12, i++) if (!(f.searched && i % 2)) blk(ctx, xx, g.ty0 + 4, 9, g.d - 8, cols[(i + 2) % cols.length], 2, 1.4);
+    },
+    register(ctx, f, g) {
+      box(ctx, g, P.CRMD, '#7a5048', 3);
+      blk(ctx, g.x + g.w - 30, g.ty0 - 12, 24, 20, '#4a5070', 3, 2.2); blk(ctx, g.x + g.w - 27, g.ty0 - 9, 18, 7, '#93a86c', 1, 1.2);
+      if (f.searched) blk(ctx, g.x + g.w - 32, g.fy0 + 4, 26, 10, '#140f26', 1, 1.6); else blk(ctx, g.x + g.w - 32, g.fy0 + 4, 26, 10, '#5a6080', 1, 1.6);
+      blk(ctx, g.x + 8, g.ty0 + 5, 14, 9, P.ORA, 2, 1.4);
+    },
+    cage(ctx, f, g) { // chain-link storage cage
+      box(ctx, g, '#4a4466', '#3a3454', 2);
+      ctx.save(); rr(ctx, g.x + 3, g.fy0 + 3, g.w - 6, g.H - 6, 2); ctx.clip();
+      ctx.fillStyle = f.searched ? '#140f26' : '#2a2440'; ctx.fillRect(g.x, g.fy0, g.w, g.H);
+      if (!f.searched) for (let i = 0; i < 4; i++) blk(ctx, g.x + 8 + i * (g.w - 16) / 4, g.fy0 + g.H * .45, (g.w - 16) / 4 - 4, g.H * .4, [P.CRM, '#e04a5a', P.CRM, P.GRN][i], 1, 1.2);
+      ctx.strokeStyle = 'rgba(185,189,204,.7)'; ctx.lineWidth = 1.2;
+      for (let k = -g.H; k < g.w + g.H; k += 7) { line(ctx, g.x + k, g.fy0, g.x + k + g.H, g.fy1, ctx.strokeStyle, 1.1); line(ctx, g.x + k + g.H, g.fy0, g.x + k, g.fy1, ctx.strokeStyle, 1.1); }
+      ctx.restore(); blk(ctx, g.x + 3, g.fy0 + 3, g.w - 6, g.H - 6, null, 2, 2.4);
+      if (!f.searched) { blk(ctx, g.x + g.w / 2 - 5, g.fy0 + g.H * .4, 10, 9, '#c9a85a', 2, 1.6); }
+    },
+    locker(ctx, f, g) {
+      const n = Math.max(1, Math.round(g.w / 22)), lw = g.w / n;
+      box(ctx, g, '#6e7690', '#5c6480', 2);
+      for (let i = 0; i < n; i++) { const x = g.x + i * lw;
+        if (f.searched && i === 0) { blk(ctx, x + 3, g.fy0 + 3, lw - 6, g.H - 6, '#140f26', 1, 1.6); }
+        else { blk(ctx, x + 3, g.fy0 + 3, lw - 6, g.H - 6, null, 1, 1.6); for (let k = 0; k < 3; k++) line(ctx, x + 7, g.fy0 + 8 + k * 4, x + lw - 7, g.fy0 + 8 + k * 4, P.INK, 1.2); dot(ctx, x + lw - 7, g.fy0 + g.H * .5, 2, P.INK); } }
+    },
+    filing(ctx, f, g) { box(ctx, g, '#7d8398', '#6e7690', 2); drawers(ctx, g.x + 3, g.fy0 + 3, g.w - 6, g.H - 5, 3, f.searched ? 1 : -1); },
+    schooldesk(ctx, f, g) {
+      blk(ctx, g.x + 8, g.fy0 - 2, 4, g.H, P.INK, 0, 0); blk(ctx, g.x + g.w - 12, g.fy0 - 2, 4, g.H, P.INK, 0, 0);
+      blk(ctx, g.x + 4, g.ty0 + 4, g.w - 8, g.d - 2, '#c9a87a', 2, 2.2); blk(ctx, g.x + 10, g.ty0 + 8, 12, 8, P.CRM, 1, 1.2);
+    },
+    workbench(ctx, f, g) {
+      box(ctx, g, '#9d6a56', P.WOODD, 2);
+      blk(ctx, g.x + 6, g.ty0 + 4, 18, 8, '#b9bdcc', 2, 1.4); dot(ctx, g.x + g.w - 16, g.ty0 + 9, 4, P.ORA);
+      for (let i = 0; i < 4; i++) line(ctx, g.x + 10 + i * 12, g.ty0 - 16, g.x + 10 + i * 12, g.ty0 - 4, '#9aa0b4', 2.4);
+      drawers(ctx, g.x + 4, g.fy0 + 3, g.w * .4, g.H - 5, 2, f.searched ? 0 : -1);
+    },
+    car(ctx, f, g) { // a wrecked hatchback in the bay
+      rr(ctx, g.x + 4, g.ty0 + 6, g.w - 8, g.fy1 - g.ty0 - 8, 16); ctx.fillStyle = '#7a3a3a'; ctx.fill(); ctx.lineWidth = 2.6; ctx.strokeStyle = P.INK; ctx.stroke();
+      blk(ctx, g.x + g.w * .22, g.ty0 + 14, g.w * .56, g.d * .55, '#2a3050', 10, 2.2);
+      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(g.x + g.w * .28, g.ty0 + 18, 10, g.d * .4);
+      for (const xx of [g.x + 10, g.x + g.w - 26]) { blk(ctx, xx, g.fy1 - 18, 16, 16, P.INK, 6, 0); dot(ctx, xx + 8, g.fy1 - 10, 3, '#9aa0b4'); }
+      blk(ctx, g.x + 8, g.fy0 + 2, g.w - 16, 10, '#5e2a2a', 3, 2);
+    },
+    washer(ctx, f, g) {
+      box(ctx, g, '#e8e2d4', '#d4cfc0', 4);
+      ctx.beginPath(); ctx.arc(g.x + g.w / 2, g.fy0 + g.H * .55, Math.min(g.w, g.H) * .32, 0, 6.28); ctx.fillStyle = f.searched ? '#140f26' : '#5a6a8e'; ctx.fill(); ctx.lineWidth = 2.6; ctx.strokeStyle = P.INK; ctx.stroke();
+      if (!f.searched) { ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.fillRect(g.x + g.w / 2 - 6, g.fy0 + g.H * .4, 4, 8); }
+      dot(ctx, g.x + 8, g.fy0 + 5, 2.4, P.INK); dot(ctx, g.x + 16, g.fy0 + 5, 2.4, P.ORA);
+    },
+    winerack(ctx, f, g) {
+      box(ctx, g, '#5e3a2a', '#4a2c20', 2);
+      for (let r = 0; r < 3; r++) for (let i = 0; i < Math.floor((g.w - 8) / 10); i++) { if (f.searched && (i + r) % 2) continue; const cx = g.x + 9 + i * 10, cy = g.fy0 + 8 + r * ((g.H - 12) / 3); dot(ctx, cx, cy, 4, P.INK); dot(ctx, cx, cy, 2.6, ['#7e1f2a', '#3a5a3a', '#7e1f2a'][r]); }
+    },
+    mat(ctx, f, g) { rr(ctx, g.x + 2, g.y + 4, g.w - 4, g.h - 8, 4); ctx.fillStyle = '#3f5a8a'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = P.INK; ctx.stroke(); line(ctx, g.x + g.w / 2, g.y + 6, g.x + g.w / 2, g.y + g.h - 6, '#5a76a8', 2); },
+    bench(ctx, f, g) { blk(ctx, g.x + 4, g.fy0 - 2, g.w - 8, 8, P.WOOD, 2, 2); blk(ctx, g.x + 8, g.fy0 + 6, 4, g.H - 6, P.INK, 0, 0); blk(ctx, g.x + g.w - 12, g.fy0 + 6, 4, g.H - 6, P.INK, 0, 0); },
+    boxes(ctx, f, g) { blk(ctx, g.x + 4, g.fy1 - 26, g.w * .55, 24, '#b98a5a', 2, 2.2); blk(ctx, g.x + g.w * .45, g.fy1 - 20, g.w * .5, 18, '#a07850', 2, 2.2); blk(ctx, g.x + 10, g.fy1 - 42, g.w * .4, 17, '#c9a06a', 2, 2.2); },
+    wallpanel(ctx, f, g) { // loose wall panel: invisible until pried (or a hairline crack with Keen eye)
+      const x = g.x + 8, w = g.w - 16, y = f.y + f.h - 50, h = 34;
+      if (f.opened) { blk(ctx, x, y, w, h, '#0c0816', 2, 2.2); line(ctx, x + 2, y + h, x + w - 4, y + h + 10, P.WOOD, 4); if (f.loot0 && f.loot0.length) blk(ctx, x + 6, y + h - 12, 14, 9, '#b9bdcc', 1, 1.2); }
+      else if (f.keen) { ctx.strokeStyle = 'rgba(10,8,24,.55)'; ctx.lineWidth = 1.2; ctx.strokeRect(x + .5, y + .5, w - 1, h - 1); }
     },
     shoerack(ctx, f, g) {
       box(ctx, g, P.WOOD, P.WOODD, 2);

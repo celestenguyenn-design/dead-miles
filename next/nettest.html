@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Dead Miles - net test</title>
+<style>
+body{margin:0;background:#11142f;color:#f6e3bb;font:15px/1.5 Inter,system-ui,sans-serif;padding:16px}
+button{min-height:48px;border:0;border-radius:14px;background:#f07b3c;color:#2a1308;font:800 16px Inter,system-ui,sans-serif;padding:0 18px}
+pre{background:#3d2d61;border-radius:14px;padding:12px;white-space:pre-wrap;font-size:12px;max-height:50vh;overflow:auto}
+</style></head><body>
+<h2>Online layer test</h2>
+<p>Loads only net.js and netpanel.js. Steps the server hands over appear below (this stands in for DM.addSteps).</p>
+<button id="open">Open online panel</button>
+<pre id="log"></pre>
+<script src="net.js"></script>
+<script src="netpanel.js"></script>
+<script>
+  const log = (...a) => { document.getElementById('log').textContent += a.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' ') + '\n'; };
+  window.TEST_STEPS = [];
+  NET.onSteps = (delta, src, info) => { TEST_STEPS.push({ delta, src, day: info.day }); log('onSteps', delta, src, info.day); };
+  document.getElementById('open').onclick = () => NET.openPanel();
+  NET.init().then(ok => { log('init ->', ok, NET.status, NET.handle ? '@' + NET.handle : ''); window.NET_READY = true; if (/[?&]panel/.test(location.search)) NET.openPanel(); });
+</script>
+</body></html>
