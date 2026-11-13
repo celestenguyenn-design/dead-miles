@@ -74,7 +74,7 @@
     s.textContent = `
 #sg{position:fixed;inset:0;z-index:8990;background:${C.ink};color:${C.crm};font-family:Inter,system-ui,-apple-system,sans-serif;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 #sg *{box-sizing:border-box}
-#sg .wrap{max-width:560px;margin:0 auto;padding:0 16px calc(32px + env(safe-area-inset-bottom))}
+#sg .wrap{overflow-wrap:anywhere;max-width:560px;margin:0 auto;padding:0 16px calc(32px + env(safe-area-inset-bottom))}
 #sg .top{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:10px;background:${C.ink};padding:calc(10px + env(safe-area-inset-top)) 0 10px;margin-bottom:6px;box-shadow:0 8px 12px -8px rgba(0,0,0,.5)}
 #sg .top h2{flex:1;margin:0;font-size:21px;font-weight:800;line-height:1.15}
 #sg .ib{width:46px;height:46px;flex:0 0 auto;border-radius:14px;border:0;background:${C.plum};color:${C.crm};font:800 24px Inter,system-ui,sans-serif;line-height:1}
@@ -96,7 +96,7 @@
 #sg .pick:after{content:'\\203A';margin-left:auto;font-size:30px;color:${C.ora};font-weight:800}
 #sg .step{display:flex;gap:12px;align-items:flex-start}
 #sg .num{flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:${C.ora};color:#2a1308;font-weight:800;font-size:17px;display:flex;align-items:center;justify-content:center;margin-top:1px}
-#sg .step>div{flex:1;min-width:0}
+#sg .step>div:not(.num){flex:1;min-width:0}
 #sg .box{background:${C.ink};border:2px solid ${C.lil};border-radius:12px;padding:10px 12px;margin:10px 0 0;font:600 13px/1.45 ui-monospace,Menlo,Consolas,monospace;color:${C.crm};word-break:break-all;-webkit-user-select:all;user-select:all}
 #sg .box.big{font-size:16px}
 #sg .lbl{font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${C.mute};margin-top:12px}
@@ -211,7 +211,7 @@
   }
   function testBlock(kind) {
     const T = UI.test[kind];
-    const runWord = kind === 'android' ? 'tapped <b>Send now</b> in the app' : 'ran the Shortcut';
+    const runWord = kind === 'android' ? 'tapped <b>Send now</b> in the app' : 'run the Shortcut';
     let out = '<p>After you have ' + runWord + ' once, tap Test. It asks the server what your phone sent.</p>'
       + btn('test:' + kind, T && T.busy ? 'Checking...' : 'Test it', '', T && T.busy ? ' disabled' : '');
     if (!T || T.busy) return out;
@@ -367,7 +367,7 @@
     h += '<div class="card"><h3>Right now</h3><div class="facts">'
       + '<span>Signed in</span><b>' + (NET.ok ? '<span class="ok">@' + esc(NET.handle) + '</span>' : '<span class="bad">No</span>') + '</b>';
     if (NET.ok) {
-      h += '<span>Last steps received</span><b>' + (UI.rows === null ? 'checking...' : newest ? fmt(newest.n) + '<br><span class="help">' + esc(when(newest.t)) + ' (' + ago(newest.t) + ')</span>' : '<span class="bad">none this week</span>') + '</b>'
+      h += '<span>Last steps received</span><b>' + (UI.rows === null ? 'checking...' : newest ? fmt(newest.n) + '<br><span class="help">' + esc(when(newest.t)) + '<br>' + ago(newest.t) + '</span>' : '<span class="bad">none this week</span>') + '</b>'
         + '<span>Updates today</span><b>' + (UI.rows === null ? '...' : tr.length) + '</b>'
         + '<span>In the game today</span><b>' + fmt(d.eff) + '</b>'
         + '<span>Where from</span><b>' + (d.ap || d.at ? 'phone ' + fmt(d.ap) + ' &middot; typed ' + fmt(d.at) : 'nothing yet') + '</b>';
@@ -467,7 +467,7 @@
     UI.hist.push(UI.screen); UI.screen = s; UI.msg = {}; UI.showTok = false;
     const root = document.getElementById('sg'); render(); if (root) root.scrollTop = 0;
     if (NET.ok && (s === 'iphone' || s === 'fix')) ensureKey();
-    if (NET.ok && s === 'fix' && (!UI.rows || Date.now() - UI.rowsAt > 60000)) refresh();
+    if (NET.ok && s === 'fix') refresh();
   }
   async function refresh() { UI.busy = true; render(); await NET.pullSteps(); await loadRows(); UI.busy = false; render(); }
 

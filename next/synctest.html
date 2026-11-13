@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Dead Miles - sync guide test</title>
+<style>
+body{margin:0;background:#11142f;color:#f6e3bb;font:15px/1.5 Inter,system-ui,sans-serif;padding:16px}
+button{min-height:48px;border:0;border-radius:14px;background:#f07b3c;color:#2a1308;font:800 16px Inter,system-ui,sans-serif;padding:0 18px;margin:4px 0}
+</style></head><body>
+<h2>Sync guide test</h2>
+<p>Loads only net.js, netpanel.js and syncguide.js. Add <code>?signed=1</code> for a fake signed-in player
+(RPCs must be mocked: the Playwright test routes supabase.co), <code>&amp;open=iphone</code> to open a screen.</p>
+<button id="g">Open sync guide</button> <button id="p">Open online panel</button>
+<script>
+  // Test identity. Only written when ?signed=1, so a real identity is never touched otherwise.
+  (function () {
+    const q = new URLSearchParams(location.search);
+    if (q.get('signed') === '1') localStorage.setItem('dm-next-id', JSON.stringify({ h: 'brooklyn', t: 'tok-0123456789abcdef0123456789abcdef', name: 'Brooklyn', src: 'next' }));
+    if (q.get('signed') === '0') localStorage.removeItem('dm-next-id');
+  })();
+</script>
+<script src="net.js"></script>
+<script src="netpanel.js"></script>
+<script src="syncguide.js"></script>
+<script>
+  NET.onSteps = () => true;
+  document.getElementById('g').onclick = () => SYNC.open();
+  document.getElementById('p').onclick = () => NET.openPanel();
+  NET.init().then(() => {
+    window.NET_READY = true;
+    const s = new URLSearchParams(location.search).get('open');
+    if (s === 'panel') NET.openPanel(); else if (s) SYNC.open(s);
+  });
+</script>
+</body></html>

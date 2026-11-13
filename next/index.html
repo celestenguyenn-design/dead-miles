@@ -308,7 +308,6 @@
   /* ---------- base (phase 4) ---------- */
   #basehud { position: absolute; left: 12px; top: calc(112px + var(--st)); display: none; flex-direction: column; align-items: flex-start; gap: 6px; }
   body.atbase #basehud { display: flex; }
-  body.event.atbase #basehud { top: calc(146px + var(--st)); }
   .bchips { display: flex; gap: 5px; margin-bottom: 2px; }
   .bchip { padding: 4px 8px; border-radius: 10px; background: rgba(17,20,47,.9); border: 2px solid var(--plum); line-height: 1.1; }
   .bchip i { display: block; font-style: normal; font-size: 7.5px; font-weight: 900; letter-spacing: .12em; color: var(--mute); }
@@ -322,6 +321,10 @@
   body.shift #bBuild, body.shift #bEdit, body.shift .bchips { display: none; }
   #shiftbar { position: absolute; left: 50%; top: calc(64px + var(--st)); transform: translateX(-50%); display: none; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 14px; background: rgba(17,20,47,.94); border: 2.5px solid var(--ora); box-shadow: 0 3px 0 var(--ink); pointer-events: none; }
   body.shift #shiftbar { display: flex; }
+  body.atbase #evchip { display: none !important; }
+  body.shift #shiftbar { left: 12px; transform: none; top: calc(112px + var(--st)); }
+  body.shift #basehud { top: calc(168px + var(--st)); }
+  .hhead .kick { white-space: nowrap; } .hlocal { font-size: 11px; font-weight: 800; color: var(--mute); margin-top: 1px; }
   #shiftbar b { font-size: 22px; font-weight: 900; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
   #shiftbar span { font-size: 9px; font-weight: 900; letter-spacing: .14em; color: var(--ora); }
   #shiftbar em { font-style: normal; font-size: 12px; font-weight: 900; color: var(--grn); }

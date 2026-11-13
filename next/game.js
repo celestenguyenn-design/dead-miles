@@ -650,7 +650,8 @@ const NEXT_VERSION = '0.4';
     const pk = code && party.data && party.data.horde && n && party.data.horde[n.week], pkills = pk ? Object.values(pk.shifts || {}).reduce((a, x) => a + (x.k || 0), 0) : 0;
     const res = Object.keys(SV.horde.resolved).sort().map(k => [k, SV.horde.resolved[k]]).filter(([, r]) => r && !r.skip && !r.seen).pop();
     return `<div class="basecard"><div class="bci"><b>Your base</b><span>Defence <em>${BS.defense()}</em> · <em>${Math.round(b.pool).toLocaleString('en-US')}</em> build steps</span>${gn ? `<span class="gnote">Garden: ${gn}</span>` : ''}</div><button class="mbtn" id="hBase">Go to base</button></div>
-      <div class="hordecard${open ? ' open' : ''}"><div class="hhead"><span class="kick">Horde night</span><span class="hwhen">Sundays 9 PM New York${n && new Date(n.at).getHours() !== 21 ? ` · ${esc(BS.when(n.at))} here` : ''}</span></div>
+      <div class="hordecard${open ? ' open' : ''}"><div class="hhead"><span class="kick">Horde night</span><span class="hwhen">Sun 9 PM New York</span></div>
+        ${n && new Date(n.at).getHours() !== 21 ? `<div class="hlocal">${esc(BS.when(n.at))} your time</div>` : ''}
         <div class="hcount" id="hCount">${n ? (open ? 'Watch shift open · hits in ' : 'in ') + BS.until(n.at) : ''}</div>
         <div class="hparty">${code ? `Party <b>${esc(code)}</b> · ${(party.members || []).length}/6${pk ? ` · ${pkills} kills so far` : ''}` : 'Solo horde · join a party to share one'}${mine ? ` · you: ${mine}/${HD.MAX_SHIFTS} shift${mine > 1 ? 's' : ''}` : ''}</div>
         <div class="hbtnrow">${open && mine < HD.MAX_SHIFTS ? '<button class="mbtn sm" id="hShift">Start watch shift</button>' : open ? '<span class="hdone">Shifts done this week</span>' : '<span class="hdone">Shifts open 24 h before</span>'}<button class="mbtn sm ghost" id="hParty">${code ? 'Party' : 'Join party'}</button></div>

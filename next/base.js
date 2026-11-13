@@ -18,13 +18,13 @@
   // steps + materials per tier; def = defence it adds at that tier
   const PIECES = B.PIECES = {
     walls: { n: 'Walls', d: 'A ring around the yard. Zombies have to break through.', tiers: [
-      { n: 'Wood fence', s: 3000, m: { wood: 8, nails: 16 }, def: 20, hp: 60 },
-      { n: 'Scrap wall', s: 6000, m: { scrap: 10, nails: 16, wood: 4 }, def: 40, hp: 110 },
-      { n: 'Reinforced wall', s: 12000, m: { scrap: 18, tape: 4, nails: 20 }, def: 65, hp: 170 }] },
+      { n: 'Wood fence', s: 3000, m: { wood: 8, nails: 16 }, def: 20, hp: 120 },
+      { n: 'Scrap wall', s: 6000, m: { scrap: 10, nails: 16, wood: 4 }, def: 40, hp: 220 },
+      { n: 'Reinforced wall', s: 12000, m: { scrap: 18, tape: 4, nails: 20 }, def: 65, hp: 340 }] },
     gate: { n: 'Gate', d: 'Closes the gap in the south wall.', need: ['walls', 1], tiers: [
-      { n: 'Wood gate', s: 1500, m: { wood: 4, nails: 8 }, def: 6, hp: 80 },
-      { n: 'Scrap gate', s: 3000, m: { scrap: 6, nails: 8 }, def: 12, hp: 140 },
-      { n: 'Steel gate', s: 6000, m: { scrap: 10, tape: 3 }, def: 20, hp: 220 }] },
+      { n: 'Wood gate', s: 1500, m: { wood: 4, nails: 8 }, def: 6, hp: 160 },
+      { n: 'Scrap gate', s: 3000, m: { scrap: 6, nails: 8 }, def: 12, hp: 280 },
+      { n: 'Steel gate', s: 6000, m: { scrap: 10, tape: 3 }, def: 20, hp: 420 }] },
     tower: { n: 'Watchtower', d: 'See them coming: on a watch shift, arrows point at zombies off screen.', tiers: [
       { n: 'Watchtower', s: 5000, m: { wood: 10, nails: 16, tape: 2 }, def: 10 }] },
     spikes: { n: 'Spike traps', d: 'Sharpened stakes outside the walls. Zombies that walk in get hurt.', tiers: [
@@ -158,7 +158,14 @@
   const GATE = [9, 10, 11];                                     // gap in the south fence
   const SPOTS = { chest: [6, 6, 1, 1], bench: [10, 6, 3, 1], barrel0: [3, 6, 1, 1], barrel1: [16, 6, 1, 1],
     beds0: [4, 15, 2, 1], beds1: [4, 18, 2, 1], beds2: [14, 15, 2, 1], beds3: [14, 18, 2, 1], tower: [15, 21, 2, 2], gen: [3, 22, 1, 1] };
-  function wallIds() { const o = []; for (let x = FX0; x <= FX1; x++) { o.push('w' + x + ',' + FY0); if (!GATE.includes(x)) o.push('w' + x + ',' + FY1); } for (let y = FY0 + 1; y < FY1; y++) { o.push('w' + FX0 + ',' + y); o.push('w' + FX1 + ',' + y); } return o; }
+  function wallIds() { // in order around the ring, so neighbours in the list are neighbours on the ground
+    const o = [];
+    for (let x = FX0; x <= FX1; x++) o.push('w' + x + ',' + FY0);
+    for (let y = FY0 + 1; y < FY1; y++) o.push('w' + FX1 + ',' + y);
+    for (let x = FX1; x >= FX0; x--) if (!GATE.includes(x)) o.push('w' + x + ',' + FY1);
+    for (let y = FY1 - 1; y > FY0; y--) o.push('w' + FX0 + ',' + y);
+    return o;
+  }
   function trapTiles(kind, tier) {
     const o = [], r = kind === 'spikes' ? 1 : 2; // spikes hug the wall, wire one row further out
     if (tier >= 1) for (let x = 5; x <= 15; x++) o.push([x, FY1 + r]);
@@ -351,12 +358,16 @@
     const ic = {};
     for (const k in D.DECOR) {
       try {
-        const d = D.DECOR[k], cv = document.createElement('canvas'); cv.width = cv.height = 96;
-        const c = cv.getContext('2d'), w = Math.min(3, d.w) * T, h = (d.floor ? d.h : 1) * T;
-        const f = { x: 0, y: 0, w, h, H: d.H, tx: 0, ty: 0, dk: k, art: 'bdecor', r: 0 };
-        const g = ART.geo(f), top = d.wall ? -60 : d.floor ? 0 : g.ty0 - 8, bot = d.wall ? h - 12 : h + 2, span = Math.max(w, bot - top);
-        const sc = 84 / span; c.translate(48 - w * sc / 2, 48 - (top + bot) / 2 * sc); c.scale(sc, sc);
-        if (d.floor) rugArt(c, k, 0, 0, w, h); else F.bdecor(c, f, g);
+        const d = D.DECOR[k], w = Math.min(3, d.w) * T, h = (d.floor ? d.h : 1) * T;
+        const big = document.createElement('canvas'); big.width = big.height = 260; const bc = big.getContext('2d'); bc.translate(130 - w / 2, 150 - h);
+        const f = { x: 0, y: 0, w, h, H: d.H, tx: 0, ty: 0, dk: k, art: 'bdecor', r: 0 }, g = ART.geo(f);
+        if (d.floor) rugArt(bc, k, 0, 0, w, h); else F.bdecor(bc, f, g);
+        const px = bc.getImageData(0, 0, 260, 260).data; let x0 = 260, y0 = 260, x1 = 0, y1 = 0;   // crop to what was drawn
+        for (let y = 0; y < 260; y++) for (let x = 0; x < 260; x++) if (px[(y * 260 + x) * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        if (x1 <= x0) continue;
+        const cv = document.createElement('canvas'); cv.width = cv.height = 96; const c = cv.getContext('2d');
+        const span = Math.max(x1 - x0, y1 - y0) + 4, sc = Math.min(2.2, 84 / span);
+        c.translate(48, 48); c.scale(sc, sc); c.drawImage(big, -(x0 + x1) / 2, -(y0 + y1) / 2);
         ic[k] = cv.toDataURL();
       } catch (e) { /* the icon falls back to nothing */ }
     }
@@ -607,7 +618,7 @@
       if (Math.hypot(p.x - z.x, p.y - z.y) < 1.1 * T && p.st !== 'down' && Math.abs(p.y - z.y) < 30) { z.st = 'chase'; z.stT = 0; return; }
       z.hitT = (z.hitT || 0) - dt;
       if (z.hitT <= 0) {
-        z.hitT = 1.05; f.hp -= 10 * (z.dmgMul || 1); f._key = null; SFX.play('thunk');
+        z.hitT = 1.1; f.hp -= 8 * (z.dmgMul || 1); f._key = null; SFX.play('thunk');
         for (let i = 0; i < 4; i++) g.parts.push({ x: f.x + f.w / 2 + (Math.random() - .5) * 20, y: f.y + f.h, z: 18 + Math.random() * 20, vx: (Math.random() - .5) * 80, vy: (Math.random() - .5) * 30, vz: 40 + Math.random() * 60, g: 400, life: .6, max: .6, col: f.tier === 1 ? '#a0704f' : '#9aa0b4', size: 3 });
         g.shake = Math.max(g.shake, 1.5);
         if (f.hp <= 0) { f.broken = true; f.solid = 0; f._key = null; House().refresh(); SFX.play('break'); toast(f.piece === 'gate' ? 'They broke the gate!' : 'A wall section gave way!', 1.8); z.st = 'chase'; z.stT = 0; }
