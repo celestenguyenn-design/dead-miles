@@ -12,7 +12,7 @@ const ART = (() => {
   // The wob filter region is relative to each element's bbox by default; give it a fixed
   // user-space region so separately rendered parts keep identical wobble and are not clipped.
   const DEFS = S.defs.replace(/<filter id="wob"[^>]*>/, '<filter id="wob" filterUnits="userSpaceOnUse" x="-140" y="-290" width="320" height="340">');
-  const VB = { x: -82, y: -228, w: 172, h: 236 };
+  const VB = { x: -82, y: -266, w: 172, h: 274 };   // tall enough for bunny ears and the pilgrim hat
 
   // ---------- character rigs ----------
   // Line ranges refer to the colour half of the generated SVG; the cream outline half has the
@@ -160,8 +160,9 @@ const ART = (() => {
     pants: [['#2f3a72', 'Denim'], ['#2a2838', 'Black'], ['#a08a5a', 'Khaki'], ['#5c6a3a', 'Olive'], ['#8a3a3a', 'Red'], ['#b9bdcc', 'Grey']],
   };
   LOOK.def = { body: 'f', skin: 0, hair: 0, hairC: 0, hood: true, coat: 0, pants: 0 };
-  LOOK.norm = l => typeof l === 'number' ? Object.assign({}, LOOK.def, { coat: l }) : Object.assign({}, LOOK.def, l || {});
-  LOOK.random = () => { const r = a => Math.floor(Math.random() * a); return { body: r(2) ? 'm' : 'f', skin: r(6), hair: r(6), hairC: r(8), hood: Math.random() < .6, coat: r(LOOK.coats.length), pants: r(LOOK.pants.length) }; };
+  // cos: worn cosmetics by slot ({hat, face, neck, back, outfit} -> key in COS or null); always a fresh copy
+  LOOK.norm = l => { const o = typeof l === 'number' ? Object.assign({}, LOOK.def, { coat: l }) : Object.assign({}, LOOK.def, l || {}); const c = {}; for (const k in (o.cos || {})) if (o.cos[k] && COS[o.cos[k]]) c[k] = o.cos[k]; o.cos = c; return o; };
+  LOOK.random = () => { const r = a => Math.floor(Math.random() * a); return { body: r(2) ? 'm' : 'f', skin: r(6), hair: r(6), hairC: r(8), hood: Math.random() < .6, coat: r(LOOK.coats.length), pants: r(LOOK.pants.length), cos: {} }; };
   const SP = (d, fill, sw = 4.4) => `<path d="${d}" fill="${fill}" stroke="${P.INK}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round" />`;
   const SD = (d, fill, extra = '') => `<path d="${d}" fill="${fill}" ${extra}/>`;
   const SL = (d, col, w) => `<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" />`;
@@ -184,9 +185,10 @@ const ART = (() => {
   LOOK.patch = function (lk) {
     lk = LOOK.norm(lk);
     const hc = LOOK.hairs[lk.hairC] || LOOK.hairs[0], sk = LOOK.skins[lk.skin] || LOOK.skins[0], m = lk.body === 'm', st = lk.hair;
+    const hat = COS[lk.cos.hat], hood = lk.hood && !hat;   // hats sit on the hair: the hood is pushed down while one is worn
     return L => {
       // head group lines (colour half): 91 hood, 92 hood shade, 93 hood stitches, 94 face, 95 fringe, 96 strands, 101 brows, 102 lower lid lines, 103 blush
-      if (lk.hood) {
+      if (hood) {
         let extra = '';
         if (st === 1) extra = SP('M-6,-130 Q-12,-118 -8,-104 L-2,-106 Q-4,-118 0,-128 Z', hc, 3.2);          // long: a lock out of the hood
         if (st === 4) extra = SP('M-10,-128 Q-16,-122 -12,-114 Q-6,-112 -4,-120 Z', hc, 3.2);
@@ -215,17 +217,147 @@ const ART = (() => {
         L[101] = L[101] + SL('M8.8,-143.6 l2.8,-2.4 M24.2,-143.6 l2.6,-2.4', P.INK, 1.8);   // lashes
         L[103] = `<ellipse cx="25.5" cy="-130" rx="3.4" ry="2.2" fill="${sk[1]}" opacity=".5"/>`;
       }
+      COSPATCH(L, lk);
     };
   };
   LOOK.recolor = function (lk) {
     lk = LOOK.norm(lk);
-    const c = LOOK.coats[lk.coat] || LOOK.coats[0], sk = LOOK.skins[lk.skin] || LOOK.skins[0], pa = LOOK.pants[lk.pants] || LOOK.pants[0];
+    const of = COS[lk.cos.outfit], c = of ? of.col : LOOK.coats[lk.coat] || LOOK.coats[0], sk = LOOK.skins[lk.skin] || LOOK.skins[0], pa = LOOK.pants[lk.pants] || LOOK.pants[0];
     const map = {};
     if (c[0] !== '#f07b3c') { map['#f07b3c'] = c[0]; map['#c95f2c'] = c[1]; }
     if (sk[0] !== '#f8dfc2') map['#f8dfc2'] = sk[0];
     if (pa[0] !== '#2f3a72') map['#2f3a72'] = pa[0];
     return Object.keys(map).length ? map : null;
   };
+
+  // ---------- cosmetics (phase 5): earned, worn on the survivor sprite ----------
+  // hat / face / neck fragments are in HEAD coordinates (the head group: face ellipse 8,-142 r20/21, facing right);
+  // back / outfit fragments are in BODY coordinates (pack x -50..-14, y -120..-58; coat x -30..27, y -124..-46).
+  // Colours must never be exactly a recoloured base colour (#f07b3c, #c95f2c, #f8dfc2, #2f3a72).
+  const CI = P.INK, CRM2 = '#f6e3bc';
+  const circ = (cx, cy, r, fill, sw = 2.6, extra = '') => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${CI}" stroke-width="${sw}" ${extra}/>`;
+  const beanie = (main, cuff) => SP('M-19,-152 Q-22,-186 6,-187 Q33,-186 32,-154 Z', main, 3.6) +
+    SP('M-21,-158 Q6,-166 33,-158 L33,-149 Q6,-157 -21,-148 Z', cuff, 3.2) +
+    SL('M-14,-158 l0,8 M-6,-160 l0,8 M2,-161 l0,8 M10,-161 l0,8 M18,-160 l0,8 M26,-158 l0,8', 'rgba(17,20,47,.35)', 1.4);
+  const heart = (cx, cy, fill) => SP(`M${cx},${cy + 6} L${cx - 7},${cy - 1} Q${cx - 10},${cy - 6} ${cx - 5},${cy - 8} Q${cx - 2},${cy - 9} ${cx},${cy - 5} Q${cx + 2},${cy - 9} ${cx + 5},${cy - 8} Q${cx + 10},${cy - 6} ${cx + 7},${cy - 1} Z`, fill, 2.4);
+  const scarf = (main, stripe, tailTip) => SP('M-20,-124 Q4,-112 28,-124 Q31,-116 27,-110 Q4,-100 -19,-112 Q-23,-118 -20,-124 Z', main, 3.2) +
+    SL('M-17,-117 Q4,-106 25,-117', stripe, 2.4) +
+    SP('M-12,-112 L-15,-92 L-5,-91 L-4,-108 Z', main, 3) + SL('M-14.4,-101 L-5.4,-100.5', stripe, 2.2) +
+    SL('M-14,-91 l-1,4 M-10,-91 l0,4.4 M-6,-91 l1,4', tailTip || main, 1.8);
+  const COS = {
+    // ---- hats
+    beanie: { slot: 'hat', svg: () => beanie('#e0b43d', '#b48a29') + circ(4, -189, 7, CRM2, 3) + SL('M18,-176 l4,3 M21,-178 l-1,5', CI, 1.2) },
+    cap: { slot: 'hat', svg: () => SP('M-18,-150 Q-20,-182 6,-183 Q30,-182 31,-156 Q6,-158 -18,-150 Z', '#c94a4b', 3.6) +
+      SL('M6,-183 Q9,-168 7,-156', 'rgba(17,20,47,.35)', 1.4) + SP('M21,-159 Q46,-163 52,-153 Q40,-147 21,-151 Z', '#9e3435', 3) +
+      circ(6, -183, 3, '#9e3435', 2) + circ(17, -170, 4.4, CRM2, 1.6) },
+    bucket: { slot: 'hat', svg: () => SP('M-28,-156 Q6,-170 40,-156 Q44,-147 36,-145 Q6,-155 -22,-145 Q-32,-148 -28,-156 Z', '#b0a26a', 3.2) +
+      SL('M-22,-151 Q6,-160 34,-151', 'rgba(17,20,47,.3)', 1.2) +
+      SP('M-14,-158 Q-14,-184 6,-185 Q26,-184 26,-158 Q6,-162 -14,-158 Z', '#b0a26a', 3.4) +
+      SP('M-14,-164 Q6,-169 26,-164 L26,-158 Q6,-162 -14,-158 Z', '#7a6e42', 2.4) + SL('M-6,-180 l3,4 M12,-182 l-2,5', 'rgba(17,20,47,.35)', 1.2) },
+    beret: { slot: 'hat', svg: () => SP('M3,-179 L4,-187 L8,-186 L8,-179 Z', '#6a1f39', 2.4) +
+      SP('M-22,-160 Q-24,-176 4,-180 Q34,-180 37,-166 Q37,-156 20,-155 Q0,-152 -22,-160 Z', '#8a2e4b', 3.6) +
+      SL('M-19,-158 Q2,-153 26,-157', '#6a1f39', 3) + SL('M10,-176 Q22,-174 28,-168', 'rgba(246,227,187,.3)', 2) },
+    hardhat: { slot: 'hat', svg: () => SP('M-20,-154 Q-21,-186 6,-188 Q33,-186 32,-154 Z', '#f0c23d', 3.6) +
+      SP('M1,-187 Q3,-170 3,-156 L10,-156 Q10,-172 9,-187 Z', '#c89a29', 2.2) +
+      SP('M-24,-156 Q6,-161 42,-155 Q43,-149 32,-149 Q6,-153 -24,-150 Z', '#c89a29', 3) +
+      `<rect x="15" y="-178" width="10" height="6" rx="1.5" fill="#b53a2f" stroke="${CI}" stroke-width="1.4" transform="rotate(8 20 -175)"/>` + SL('M-12,-176 l5,2 M22,-166 l4,-1', 'rgba(17,20,47,.4)', 1.3) },
+    frog: { slot: 'hat', svg: () => SP('M-20,-150 Q-22,-184 6,-186 Q33,-184 32,-152 Q6,-158 -20,-150 Z', '#7cb85b', 3.6) +
+      circ(-6, -185, 8.5, '#7cb85b', 3.2) + circ(18, -187, 8.5, '#7cb85b', 3.2) + circ(-5, -186, 5, CRM2, 1.6) + circ(19, -188, 5, CRM2, 1.6) +
+      `<circle cx="-3.6" cy="-186" r="2.6" fill="${CI}"/><circle cx="20.4" cy="-188" r="2.6" fill="${CI}"/>` +
+      SL('M-4,-165 Q8,-158 22,-165', '#4a7a36', 2.2) + `<circle cx="-10" cy="-163" r="2.8" fill="#f07aa8" opacity=".7"/><circle cx="27" cy="-164" r="2.8" fill="#f07aa8" opacity=".7"/>` },
+    bunny: { slot: 'hat', svg: () => SP('M-8,-178 Q-22,-214 -9,-219 Q2,-215 2,-180 Z', '#f6e8ee', 3.2) + SD('M-6,-184 Q-15,-207 -8,-212 Q-2,-208 -2,-186 Z', '#f4a6c5') +
+      SP('M10,-182 Q15,-217 31,-213 Q36,-205 20,-180 Z', '#f6e8ee', 3.2) + SD('M13,-186 Q18,-208 28,-208 Q30,-203 18,-186 Z', '#f4a6c5') +
+      beanie('#f6e8ee', '#f4a6c5') + SL('M24,-178 l3,3', 'rgba(17,20,47,.35)', 1.2) },
+    pilgrim: { slot: 'hat', svg: () => SP('M-28,-156 Q6,-168 40,-156 Q40,-148 6,-146 Q-28,-148 -28,-156 Z', '#2a2440', 3.2) +
+      SP('M-14,-157 L-10,-198 Q6,-202 22,-198 L26,-157 Q6,-153 -14,-157 Z', '#2a2440', 3.4) +
+      SP('M-13,-170 Q6,-166 25,-170 L25.5,-161 Q6,-157 -13.5,-161 Z', '#5a4a87', 2.4) +
+      `<rect x="1" y="-171" width="11" height="10" rx="1" fill="none" stroke="#e0b94a" stroke-width="3"/>` + SL('M-6,-194 L-9,-172', 'rgba(246,227,187,.22)', 2) },
+    // ---- face
+    round: { slot: 'face', svg: () => SL('M-2.8,-140 L-12,-143', CI, 2.2) + circ(4.6, -139, 7.4, 'rgba(246,227,187,.22)', 2.6) + circ(21, -139, 7.4, 'rgba(246,227,187,.22)', 2.6) +
+      `<circle cx="4.6" cy="-139" r="6" fill="none" stroke="#b07a46" stroke-width="1.2"/><circle cx="21" cy="-139" r="6" fill="none" stroke="#b07a46" stroke-width="1.2"/>` + SL('M12,-140 Q12.8,-143 13.6,-140', CI, 2.2) },
+    aviators: { slot: 'face', svg: () => SL('M-3,-143 L-12,-145', '#e0b94a', 2) + SP('M-3,-145 Q4,-148 11,-145 Q12,-134 5,-131 Q-3,-132 -3,-145 Z', '#2a2f5e', 2.2) +
+      SP('M14.5,-145 Q21,-148 28.5,-145 Q29,-134 22,-131 Q14,-132 14.5,-145 Z', '#2a2f5e', 2.2) + SL('M11,-145.5 Q12.8,-148 14.5,-145.5', '#e0b94a', 1.8) +
+      SL('M0,-142 l4,-1.2 M17.6,-142 l4,-1.2', 'rgba(255,255,255,.65)', 1.4) },
+    hearts: { slot: 'face', svg: () => SL('M-2,-141 L-12,-144', CI, 2) + heart(4.6, -139, '#f07aa9') + heart(21, -139, '#f07aa9') + SL('M11.4,-141 Q12.8,-143 14.2,-141', CI, 2) +
+      SL('M0,-143 l2,-1.4 M16.4,-143 l2,-1.4', 'rgba(255,255,255,.7)', 1.4) },
+    bandana: { slot: 'face', svg: () => SP('M-10,-132 L-19,-127 L-16,-120 L-9,-125 Z', '#9e3435', 2.4) + SP('M-10,-134 Q9,-128 30,-136 Q31,-124 22,-116 Q12,-110 2,-114 Q-8,-118 -10,-128 Z', '#c94a4b', 3) +
+      [[2, -125], [12, -121], [21, -127], [9, -130], [-4, -126], [16, -115]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.5" fill="${CRM2}"/>`).join('') },
+    gasmask: { slot: 'face', svg: () => SL('M-6,-147 L-17,-151 M-8,-127 L-17,-127', '#2a2838', 3.4) +
+      SP('M-6,-150 Q8,-158 30,-150 Q34,-136 30,-122 Q20,-112 8,-114 Q-6,-118 -8,-132 Z', '#4a4657', 3.2) +
+      circ(5, -140, 6.6, '#9fe0e6', 2.6) + circ(21, -140, 6.6, '#9fe0e6', 2.6) + SL('M2,-143 l3,-2 M18,-143 l3,-2', 'rgba(255,255,255,.8)', 1.4) +
+      circ(17, -121, 7.4, '#7c9a4d', 2.8) + circ(17, -121, 3.6, 'none', 1.6) + SL('M13,-121 h8', CI, 1.2) },
+    // ---- neck (head coordinates, drawn under the chin)
+    scarf: { slot: 'neck', svg: () => scarf('#3fa7a1', CRM2) },
+    harvest: { slot: 'neck', svg: () => scarf('#e2863a', '#8a4a2b', '#b53a2f') + SP('M-10,-98 l3,-4 l2,3 l3,-2 l-1,4 l3,1 l-4,2 l1,3 l-4,-1 Z', '#b53a2f', 1.2) },
+    tags: { slot: 'neck', svg: () => SL('M-17,-121 Q-6,-108 6,-110 Q16,-111 24,-120', '#c9cedf', 1.6) + SL('M-10,-112 L-10,-104', '#c9cedf', 1.2) +
+      `<rect x="-14.5" y="-105" width="8" height="11" rx="2.5" fill="#c9cedf" stroke="${CI}" stroke-width="1.6" transform="rotate(10 -10 -100)"/>` +
+      `<rect x="-11" y="-104" width="8" height="11" rx="2.5" fill="#aab0c4" stroke="${CI}" stroke-width="1.6" transform="rotate(-12 -7 -99)"/>` },
+    pearls: { slot: 'neck', svg: () => { let o = ''; for (let i = 0; i <= 10; i++) { const t = i / 10, x = (1 - t) * (1 - t) * -17 + 2 * (1 - t) * t * 4 + t * t * 25, y = (1 - t) * (1 - t) * -120 + 2 * (1 - t) * t * -96 + t * t * -119; o += circ(x.toFixed(1), y.toFixed(1), 2.7, '#f4efe6', 1.2); }
+      return o + SP('M4,-106 l4,5 l-4,6 l-4,-6 Z', '#f07aa9', 1.6); } },
+    // ---- back (body coordinates)
+    patched: { slot: 'back', pack: ['#8a6a53', '#6e523f'], svg: () => `<rect x="-47" y="-117" width="11" height="9" rx="1.5" fill="#e8863b" stroke="${CI}" stroke-width="1.6" transform="rotate(-6 -41 -112)"/>` +
+      SL('M-46,-116 l9,-1 M-45.6,-109 l9,-1', 'rgba(17,20,47,.5)', .8) + `<rect x="-32" y="-82" width="12" height="10" rx="1.5" fill="#3fa7a1" stroke="${CI}" stroke-width="1.6" transform="rotate(8 -26 -77)"/>` +
+      SL('M-30,-80 l2,2 M-26,-80 l2,2 M-22,-79 l2,2', CRM2, 1) },
+    camo: { slot: 'back', pack: ['#6e7d4d', '#55623b'], svg: () => SD('M-48,-114 q8,-6 14,-1 q2,7 -6,9 q-8,1 -8,-8 Z M-28,-96 q7,-3 11,3 q-2,7 -9,5 q-6,-2 -2,-8 Z M-46,-78 q6,-4 10,1 q1,6 -5,6 q-6,0 -5,-7 Z', '#4b5635') +
+      SD('M-34,-110 q4,-2 7,1 q-1,4 -5,4 q-3,-1 -2,-5 Z M-44,-92 q4,-3 7,0 q0,4 -4,4 q-4,-1 -3,-4 Z M-24,-70 q4,-2 6,1 q-1,4 -4,3 q-3,-1 -2,-4 Z', '#a3935f') },
+    teddy: { slot: 'back', svg: () => SL('M-46,-113 Q-54,-108 -55,-100', CI, 1.4) + circ(-60.5, -99, 3.2, '#b07a46', 2) + circ(-49.5, -99, 3.2, '#b07a46', 2) +
+      SP('M-55,-88 m-6,8 a6,7 0 1 0 12,0 a6,7 0 1 0 -12,0 Z', '#b07a46', 2.4) + circ(-55, -93, 6.8, '#b07a46', 2.4) +
+      `<ellipse cx="-53" cy="-90.5" rx="3.2" ry="2.2" fill="${CRM2}"/><circle cx="-57.5" cy="-94.5" r="1.1" fill="${CI}"/><circle cx="-52" cy="-94.5" r="1.1" fill="${CI}"/>` +
+      `<rect x="-58" y="-83" width="6" height="2.6" rx="1" fill="${CRM2}" stroke="${CI}" stroke-width=".8" transform="rotate(-25 -55 -82)"/>` },
+    lights: { slot: 'back', svg: () => { const pts = [[-49, -110], [-40, -104], [-31, -111], [-21, -105], [-47, -86], [-38, -80], [-28, -86], [-19, -80]], cols = ['#ffe27a', '#f07aa9', '#7ee0d8', '#ffe27a', '#f07aa9', '#7ee0d8', '#ffe27a', '#f07aa9'];
+      return SL('M-51,-108 Q-45,-100 -40,-104 Q-35,-110 -31,-111 Q-26,-102 -21,-105 Q-16,-106 -14,-100', '#2a2838', 1.2) + SL('M-50,-84 Q-44,-78 -38,-80 Q-33,-88 -28,-86 Q-23,-77 -19,-80 Q-15,-82 -14,-78', '#2a2838', 1.2) +
+        pts.map(([x, y], i) => `<circle cx="${x}" cy="${y + 2.6}" r="5.6" fill="${cols[i]}" opacity=".28"/>` + circ(x, y + 2.6, 2.6, cols[i], 1.2)).join(''); } },
+    // ---- outfits (jacket styles; col = [main, shade] replaces the jacket colour while worn)
+    denim: { slot: 'outfit', col: ['#5a7ab9', '#3e5a95', 'Denim'], svg: () => SL('M-25,-104 Q-2,-97 20,-104', CRM2, 1.4, ) .replace('/>', 'stroke-dasharray="3 2.4"/>') +
+      `<rect x="-22" y="-100" width="11" height="8" rx="1.5" fill="#3e5a95" stroke="${CI}" stroke-width="1.6"/>` + SL('M-21,-96 h9', CRM2, 1).replace('/>', 'stroke-dasharray="2 1.6"/>') +
+      SP('M-30,-56 Q-2,-50 27,-56 L27,-49 Q-2,-44 -30,-50 Z', '#3e5a95', 2.4), arm: SL('M17,-83 L26,-87', CRM2, 1.2).replace('/>', 'stroke-dasharray="2.4 2"/>') },
+    raincoat: { slot: 'outfit', col: ['#f2c84b', '#c99c2b', 'Raincoat'], svg: () => [-100, -86, -72].map(y => `<rect x="-2" y="${y}" width="9" height="3.6" rx="1.6" fill="#7a5049" stroke="${CI}" stroke-width="1.2"/>`).join('') +
+      SP('M-29.5,-63 Q-2,-56 27,-63 L27.3,-57 Q-2,-50 -29.8,-57 Z', '#d8dcec', 1.8), arm: SP('M18,-86 L27,-90 L28,-86 L19,-82 Z', '#d8dcec', 1.4) },
+    varsity: { slot: 'outfit', col: ['#2a3669', '#1d2651', 'Varsity'], sleeve: ['#efe2c0', '#d9caa4'], svg: () => SP('M-30,-56 Q-2,-50 27,-56 L27,-49 Q-2,-44 -30,-50 Z', '#e8863b', 2.2) +
+      SL('M-30,-52.6 Q-2,-46.6 27,-52.6', CRM2, 1.6) + circ(-14, -92, 7.6, CRM2, 2.2) + SP('M-17,-97 L-17,-87 Q-10,-87 -10,-92 Q-10,-97 -17,-97 Z', '#e8863b', 1.8),
+      arm: SP('M16,-82 L26,-87 L27.5,-83.5 L17.5,-79 Z', '#e8863b', 1.4) },
+    puffer: { slot: 'outfit', col: ['#b39ae1', '#8a72bd', 'Puffer'], svg: () => SL('M-27,-108 Q-2,-101 20,-108 M-28.5,-94 Q-2,-87 22,-94 M-29.5,-80 Q-2,-73 24,-80 M-30,-66 Q-2,-59 26,-66', '#8a72bd', 2.4) +
+      SL('M-26,-104 Q-2,-97 20,-104', 'rgba(255,255,255,.25)', 1.4), arm: SL('M9,-108 L4,-101 M15,-103 L9,-95 M20,-96 L14,-89 M24,-89 L19,-84', '#8a72bd', 2.2) },
+    leather: { slot: 'outfit', col: ['#3a3645', '#26222f', 'Biker'], svg: () => SP('M-9,-118 L-15,-99 L-4,-104 Z', '#4a4657', 2) + SP('M10,-118 L16,-101 L6,-104 Z', '#4a4657', 2) +
+      SL('M-11,-108 L3,-56', '#c9cedf', 2) + SP('M-30,-58 Q-2,-53 27,-58 L27,-52 Q-2,-47 -30,-52 Z', '#26222f', 1.8) + `<rect x="-6" y="-58" width="8" height="6" rx="1" fill="none" stroke="#c9cedf" stroke-width="1.6"/>` +
+      [[-22, -116], [-18, -118], [-14, -119]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.3" fill="#c9cedf"/>`).join(''), arm: SL('M18,-84 L26,-88', '#c9cedf', 1.8) },
+  };
+  // drop the worn cosmetics into the baked survivor lines (called at the end of LOOK.patch)
+  function COSPATCH(L, lk) {
+    const c = lk.cos || {}, get = s => COS[c[s]];
+    const face = get('face'), hat = get('hat'), neck = get('neck'), back = get('back'), out = get('outfit');
+    if (neck) L[93] = (L[93] || '') + neck.svg();
+    if (face) L[108] = face.svg();
+    if (hat) L[109] = hat.svg();
+    if (back) {
+      if (back.pack) { L[63] = L[63].replace('#5a4a86', back.pack[0]); L[64] = L[64].replace('#4a3c70', back.pack[1]); L[65] = L[65].replace('#4a3c70', back.pack[1]); }
+      L[69] = L[69] + back.svg();
+    }
+    if (out) {
+      L[85] = L[85] + out.svg();
+      if (out.sleeve) { L[117] = L[117].replace('#f07b3c', out.sleeve[0]); L[62] = L[62].replace('#c95f2c', out.sleeve[1]); }
+      if (out.arm) L[117] = L[117] + out.arm;
+    }
+  }
+  // wardrobe icons: the item on a hint of the body, plus a flat silhouette for locked ones
+  const COS_ICON = {
+    hat: { t: 'scale(.62) translate(-8 164)', base: `<ellipse cx="8" cy="-142" rx="20" ry="21" fill="#f8dfc2" stroke="${CI}" stroke-width="3.4"/><ellipse cx="5" cy="-139" rx="3" ry="4" fill="${CI}"/><ellipse cx="20" cy="-139" rx="3" ry="4" fill="${CI}"/>` },
+    face: { t: 'scale(1.18) translate(-10 134)', base: `<ellipse cx="8" cy="-142" rx="20" ry="21" fill="#f8dfc2" stroke="${CI}" stroke-width="3"/><ellipse cx="5" cy="-139" rx="3" ry="4" fill="${CI}"/><ellipse cx="20" cy="-139" rx="3" ry="4" fill="${CI}"/>` },
+    neck: { t: 'scale(1.12) translate(-4 108)', base: `<ellipse cx="8" cy="-142" rx="20" ry="21" fill="#f8dfc2" stroke="${CI}" stroke-width="3"/>` },
+    back: { t: 'scale(.92) translate(36 89)', base: p => SP('M-43,-120 Q-50,-118 -50,-106 L-50,-68 Q-50,-58 -40,-58 L-16,-58 L-14,-120 Z', p ? p[0] : '#5a4a86', 3.4) + SP('M-50,-96 L-34,-96 L-34,-74 Q-42,-72 -50,-74 Z', p ? p[1] : '#4a3c70', 3) },
+    outfit: { t: 'scale(.74) translate(2 86)', base: o => SP('M-18,-120 Q-27,-90 -30,-50 Q-2,-44 27,-50 Q21,-90 15,-120 Q-2,-127 -18,-120 Z', o.col[0], 3.6) +
+      SD('M-18,-120 Q-27,-90 -30,-50 Q-18,-47 -8,-46.5 Q-14,-80 -8,-120 Q-14,-122 -18,-120 Z', o.col[1]) + SL('M4,-112 L5,-47', CI, 1.3) },
+  };
+  function cosIconSVG(k, sil) {
+    const o = COS[k], I = COS_ICON[o.slot];
+    let base = typeof I.base === 'function' ? I.base(o.slot === 'back' ? o.pack : o) : I.base, item = o.svg();
+    if (o.slot === 'outfit') item += SP('M6,-114 Q22,-106 27,-84 L17,-80 Q12,-96 1,-104 Z', o.sleeve ? o.sleeve[0] : o.col[0], 3.6) + (o.arm || '') + SP('M-20,-124 Q-2,-116 17,-125 L18,-113 Q-2,-105 -20,-113 Z', '#f6e3bb', 3.4);
+    let body = base + item;
+    if (sil) body = body.replace(/fill="(?!none)[^"]*"/g, 'fill="#2c2350"').replace(/stroke="(?!none)[^"]*"/g, 'stroke="#5a4a86"').replace(/opacity="[^"]*"/g, '');
+    return `<g transform="${I.t}">${body}</g>`;
+  }
+  LOOK.COS = COS;
+  LOOK.cosIcons = function () { for (const k in COS) { iconURL['cos_' + k] = svgURL(cosIconSVG(k), '-36 -36 72 72', 96, 96); iconURL['cosS_' + k] = svgURL(cosIconSVG(k, true), '-36 -36 72 72', 96, 96); } };
 
   // ---------- icons ----------
   const EXTRA_ICONS = {
@@ -283,6 +415,7 @@ const ART = (() => {
   function buildIcons() {
     const all = Object.assign({}, S.icons, EXTRA_ICONS);
     for (const k in all) iconURL[k] = svgURL(all[k], '-36 -36 72 72', 96, 96);
+    LOOK.cosIcons();
   }
 
   // ---------- drawing helpers ----------

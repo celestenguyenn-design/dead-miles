@@ -114,6 +114,46 @@ window.DM = window.DM || {};
   };
   D.BASIC = ['bandage', 'lockpick'];
   for (const k in D.RECIPES) if (!D.BASIC.includes(k)) D.ITEMS['bp_' + k] = { n: 'Blueprint: ' + D.RECIPES[k].n.replace(/ \(.*\)/, ''), i: 'blueprint', use: 'Learn', bp: k, rare: 1 };
+  // ---------------------------------------------------------------- cosmetics (phase 5): earned, never in the pack
+  // Looting one unlocks it straight into the Wardrobe (game.js unlockCos). src says where it comes from (the hint on a locked one):
+  // loot = any house, corpse = zombies, police / mansion = those buildings, horde = horde-night crates, quest = Dot's quest rewards,
+  // trader = Dot's shop from trader level lv, event = Thanksgiving. Art: ART.LOOK.COS. Item key: 'cos_' + key.
+  D.COS_SLOTS = [['hat', 'Hat'], ['face', 'Face'], ['neck', 'Neck'], ['back', 'Back'], ['outfit', 'Outfit']];
+  D.RARITY = { c: { n: 'Common', w: 60, caps: 3, price: 30 }, r: { n: 'Rare', w: 28, caps: 6, price: 55 }, e: { n: 'Epic', w: 10, caps: 12, price: 95 }, l: { n: 'Legendary', w: 3, caps: 25, price: 160 } };
+  D.COS = {
+    beanie: { n: 'Knit beanie', slot: 'hat', r: 'c', src: 'loot' }, cap: { n: 'Baseball cap', slot: 'hat', r: 'c', src: 'loot' }, bucket: { n: 'Bucket hat', slot: 'hat', r: 'c', src: 'loot' },
+    hardhat: { n: 'Hard hat', slot: 'hat', r: 'r', src: 'loot' }, beret: { n: 'Beret', slot: 'hat', r: 'r', src: 'mansion' },
+    frog: { n: 'Frog hat', slot: 'hat', r: 'e', src: 'trader', lv: 2 }, bunny: { n: 'Bunny-ear beanie', slot: 'hat', r: 'e', src: 'trader', lv: 3 },
+    pilgrim: { n: 'Pilgrim hat', slot: 'hat', r: 'l', src: 'event' },
+    round: { n: 'Round glasses', slot: 'face', r: 'c', src: 'loot' }, bandana: { n: 'Bandana', slot: 'face', r: 'c', src: 'corpse' },
+    aviators: { n: 'Aviators', slot: 'face', r: 'r', src: 'police' }, hearts: { n: 'Heart shades', slot: 'face', r: 'r', src: 'quest' },
+    gasmask: { n: 'Gas mask', slot: 'face', r: 'e', src: 'police' },
+    scarf: { n: 'Knit scarf', slot: 'neck', r: 'c', src: 'loot' }, tags: { n: 'Dog tags', slot: 'neck', r: 'r', src: 'corpse' },
+    pearls: { n: 'Pearl necklace', slot: 'neck', r: 'e', src: 'mansion' }, harvest: { n: 'Harvest scarf', slot: 'neck', r: 'e', src: 'event' },
+    patched: { n: 'Patched pack', slot: 'back', r: 'c', src: 'loot' }, camo: { n: 'Camo pack', slot: 'back', r: 'r', src: 'horde' },
+    teddy: { n: 'Teddy charm', slot: 'back', r: 'e', src: 'quest' }, lights: { n: 'Fairy-light pack', slot: 'back', r: 'l', src: 'trader', lv: 5 },
+    denim: { n: 'Denim jacket', slot: 'outfit', r: 'c', src: 'loot' }, raincoat: { n: 'Raincoat', slot: 'outfit', r: 'c', src: 'loot' },
+    varsity: { n: 'Varsity jacket', slot: 'outfit', r: 'r', src: 'loot' }, puffer: { n: 'Puffer jacket', slot: 'outfit', r: 'e', src: 'trader', lv: 4 },
+    leather: { n: 'Biker jacket', slot: 'outfit', r: 'l', src: 'police' },
+  };
+  D.cosHint = k => { const c = D.COS[k]; return { loot: 'Found in houses', corpse: 'Found on zombies', police: 'Police stations', mansion: 'Mansions', horde: 'Horde-night crates', quest: "Dot's quest rewards", trader: 'Trader level ' + c.lv, event: c.slot === 'hat' ? 'Thanksgiving: the zombie turkey' : 'Thanksgiving event' }[c.src]; };
+  for (const k in D.COS) D.ITEMS['cos_' + k] = { n: D.COS[k].n, i: 'cos_' + k, cos: k, rare: D.COS[k].r !== 'c' ? 1 : 0, tag: D.RARITY[D.COS[k].r].n.toLowerCase() + ' cosmetic' };
+  D.ITEMS.hat.cos = 'pilgrim';   // the old pack item (0.4) is the same pilgrim hat: picking one up unlocks it
+  D.cosOwned = () => ({});       // game.js points this at the save's wardrobe, so rolls prefer cosmetics you do not have yet
+  // pick a cosmetic from the pools ('loot' is always in): rarer = rarer, unowned first
+  D.pickCos = function (pools, rnd = Math.random) {
+    const own = D.cosOwned() || {}, ks = Object.keys(D.COS).filter(k => D.COS[k].src === 'loot' || pools.includes(D.COS[k].src));
+    const rs = Object.keys(D.RARITY).filter(r => ks.some(k => D.COS[k].r === r)), boost = pools.length ? 1.8 : 1;   // special places lean rarer
+    let v = rnd() * rs.reduce((a, r) => a + D.RARITY[r].w * (r === 'c' ? 1 : boost), 0), r = rs[0];
+    for (const x of rs) { v -= D.RARITY[x].w * (x === 'c' ? 1 : boost); if (v <= 0) { r = x; break; } }
+    let pick = ks.filter(k => D.COS[k].r === r);
+    const fresh = pick.filter(k => !own[k]); if (fresh.length) pick = fresh;
+    // a pool's own items come up more often than the general house loot
+    const w = pick.map(k => D.COS[k].src === 'loot' ? 1 : 2.5), tot = w.reduce((a, b) => a + b, 0);
+    let u = rnd() * tot; for (let i = 0; i < pick.length; i++) { u -= w[i]; if (u <= 0) return 'cos_' + pick[i]; }
+    return 'cos_' + pick[pick.length - 1];
+  };
+  D.COS_POOL = { 'cos_*': [], 'cosZ_*': ['corpse'], 'cosP_*': ['police'], 'cosM_*': ['mansion'], 'cosH_*': ['horde'] };
   // what the trader pays (caps each); she sells for about 4x
   D.VALUE = { beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
     lockpick: 3, cranberry: 3, stuffing: 3, pie: 4, turkey: 20, hat: 0, pole: 2, watch: 25, jewelry: 20, wood: 1, nails: .25, spikedbat: 20, machete: 22, prybar: 14, packplus: 15, backpack: 40, shoes: 10, lockset: 18, note: 0, parcel: 0 };
@@ -205,7 +245,11 @@ window.DM = window.DM || {};
   // phase 4: decor and seeds turn up now and then (decor more often in mansions and apartments - see game.js loot())
   for (const [t, w] of [['dresser', .3], ['wardrobe', .25], ['hutch', .5], ['side', .3], ['books', .4], ['storage', .35], ['desk', .2], ['tv', .25], ['cellar', .4], ['washer', .3]]) D.LOOT[t][1]['decor_*'] = w;
   for (const [t, w] of [['pantry', .5], ['cabinet', .3], ['storage', .6], ['garage', .4], ['shelves', .4], ['store', .4], ['cellar', .6], ['trash', .3], ['workbench', .3]]) D.LOOT[t][1]['seed_*'] = w;
-  D.LOOT.hordecrate = [[3, 4], { 'decor_*': 1, 'seed_*': 1.2, ammo: 2, meds: 2, bandage: 2, scrap: 2, nails: 2, wood: 2, tape: 1, battery: 1, 'bp_*': .5 }];
+  D.LOOT.hordecrate = [[3, 4], { 'decor_*': 1, 'seed_*': 1.2, ammo: 2, meds: 2, bandage: 2, scrap: 2, nails: 2, wood: 2, tape: 1, battery: 1, 'bp_*': .5, 'cosH_*': .35 }];
+  // phase 5: cosmetics are rare finds - clothes-ish furniture, zombies a little more often, police lockers better (mansions: see game.js loot())
+  for (const [t, w] of [['wardrobe', .1], ['dresser', .08], ['coat', .09], ['hutch', .06], ['washer', .07], ['night', .04], ['gym', .05]]) D.LOOT[t][1]['cos_*'] = w;
+  D.LOOT.corpse[1]['cosZ_*'] = .3;
+  for (const [t, w] of [['locker', .22], ['evidence', .25], ['armory', .15]]) D.LOOT[t][1]['cosP_*'] = w;
   if (D.EVENT) {
     Object.assign(D.LOOT.fridge[1], { cranberry: 2, pie: 2 }); Object.assign(D.LOOT.pantry[1], { stuffing: 3, cranberry: 2 }); Object.assign(D.LOOT.cabinet[1], { stuffing: 2, cranberry: 1 });
     Object.assign(D.LOOT.store[1], { cranberry: 2, stuffing: 2 }); Object.assign(D.LOOT.storage[1], { stuffing: 1, pie: 1 });
@@ -220,6 +264,7 @@ window.DM = window.DM || {};
     for (let i = 0; i < out.length; i++) if (out[i] === 'bp_*') { const b = Object.keys(D.ITEMS).filter(x => x.startsWith('bp_')); out[i] = b[Math.floor(rnd() * b.length)]; }
       else if (out[i] === 'decor_*') { const b = Object.keys(D.DECOR); out[i] = b[Math.floor(rnd() * b.length)]; }
       else if (out[i] === 'seed_*') { const b = Object.keys(D.ITEMS).filter(x => D.ITEMS[x].seed); out[i] = b[Math.floor(rnd() * b.length)]; }
+      else if (D.COS_POOL[out[i]]) out[i] = D.pickCos(D.COS_POOL[out[i]], rnd);
     return out;
   };
 
