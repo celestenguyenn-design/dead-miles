@@ -57,6 +57,7 @@ const NEXT_VERSION = '0.8';
     v.tips = v.tips || {};                  // phase 5: first-time tips already shown
     if (v.survivor) migrateCos(v.survivor);
     if (v.survivor) migrateQuiver(v.survivor);
+    if (v.survivor) DM.Food.norm(v.survivor);   // 0.8: hunger + thirst (older saves start at 80/80, draining from now)
     DM.Crew.norm(v);                        // phase 5b: crew + strays (SV.crew, SV.pets)
     DM.Boss.norm(v);                        // phase 5b: the weekly boss (SV.boss)
     return v;
@@ -95,7 +96,7 @@ const NEXT_VERSION = '0.8';
     const J = D.JOBS[job];
     let xp = 0; try { const v = JSON.parse(localStorage.getItem('dm-next-skills') || '{}'); if (v.scav) xp = +v.scav.xp || 0; } catch (e) { /* none */ }
     const s = { name: name || 'Survivor', look, job, hp: 0, xp, pack: [], stash: [], hands: null, quiver: { n: 0 }, packBonus: 0, known: D.BASIC.concat(job === 'hunter' ? ['arrow'] : []), wardrobe: { own: {}, seen: {} } };
-    s.hp = maxHp(s);
+    s.hp = maxHp(s); DM.Food.norm(s, true);
     for (const [k, n] of J.kit) {
       if (k === J.hands) { s.hands = { k, d: D.WEAPONS[D.ITEMS[k].w].dur }; continue; }
       if (k === 'arrow') { s.quiver = { n: Math.min(D.QUIVER, n) }; continue; }
@@ -193,7 +194,8 @@ const NEXT_VERSION = '0.8';
     if (SV.day.key === t && !force) return;
     const days = Math.max(1, dayNum(t) - dayNum(SV.day.key));
     const s = SV.survivor;
-    if (s) s.hp = Math.min(maxHp(s), s.hp + 25 * days); // rest heals a little each day
+    if (s && s.food) s.hp = DM.Food.tick(s, s.hp);   // catch hunger/thirst up to now first
+    if (s && !DM.Food.hungry(s)) s.hp = Math.min(maxHp(s), s.hp + 25 * days); // rest heals a little each day (not on an empty stomach)
     SV.prevDay = days === 1 ? SV.day : null;
     SV.day = { key: t, phone: 0, typed: 0, walk: 0, scouted: 0 };
     // unlooted houses last 3 days; finished ones are cleared from the list; quest houses stay while the quest is open
@@ -520,6 +522,7 @@ const NEXT_VERSION = '0.8';
     weapon: ['You found a weapon', 'Equip it in Pack & stash at home, or tap the Swap button (bottom right) during a run to fight with it right away.'],
     cosmetic: ['Cosmetics are earned', 'They unlock straight into your Wardrobe (home screen, next to Edit look). Tap any you own to wear it - hats, glasses, scarves, packs and jackets.'],
     base: ['Your base', 'Build steps come from walking. Tap BUILD for walls, traps and garden beds, DECORATE to place furniture you found. The stash chest is here too.'],
+    food: ['Hungry or thirsty', 'Your Hunger and Thirst bars drain slowly, even with the app closed. Below 30 you tire faster and search slower. Tap the bars to eat or drink - beans, water, soda, garden food, or a rain barrel at the base.'],
     lock: ['Locked', 'Lockpicks are silent but can snap - aim, then hold TURN and let go if it binds. A crowbar always works, but it is loud and may smash something.'],
   };
   let tipQ = [], tipOn = false;
@@ -580,7 +583,7 @@ const NEXT_VERSION = '0.8';
     const it = D.ITEMS[k]; if (!it) return '';
     if (it.w) { const W = D.WEAPONS[it.w]; return W.ranged ? `Ranged weapon · ${W.dmg} damage · lasts ${W.dur} shots · needs arrows` : `Melee weapon · ${W.dmg} damage · reach ${W.reach} · lasts ${W.dur} hits · ${W.noise >= 4 ? 'loud' : W.noise >= 3 ? 'a bit loud' : 'quiet'}`; }
     if (it.slots) return `Fit it to your pack: +${it.slots} pack slots for good`;
-    if (it.hp || it.sta) return [it.hp ? `heals ${it.hp} HP` : '', it.sta ? `+${it.sta} stamina` : ''].filter(Boolean).join(' · ').replace(/^./, c => c.toUpperCase());
+    if (it.hp || it.sta || it.hu || it.th) return [DM.Food.label(k), it.hp ? `heals ${it.hp} HP` : '', it.sta ? `+${it.sta} stamina` : ''].filter(Boolean).join(' · ').replace(/^./, c => c.toUpperCase());
     return { lockpick: 'Opens locks silently with the lockpick mini-game. Snaps if you force it.', arrow: 'Ammo for the hunting bow. You can pick most of them back up.', shoes: 'Wear them: your footsteps make 30% less noise.',
       lockset: 'Keep it in your kit: locks feel easier (wider sweet spot, picks last longer).', prybar: 'A quiet way to pry things open; also a weapon.' }[k] || '';
   }
@@ -900,6 +903,7 @@ const NEXT_VERSION = '0.8';
   function renderHome() {
     if (!SV || !SV.survivor || DM.scene) return;
     rollDay();
+    foodTick();
     const s = SV.survivor, d = SV.day, J = D.JOBS[s.job], Lv = D.scavLvl(s.xp);
     const eff = effective(d), nxt = nextHouseAt(d), w = worth(eff);
     $('#menu').className = '';
@@ -913,6 +917,7 @@ const NEXT_VERSION = '0.8';
           <div class="sname">${esc(s.name)}</div>
           <div class="sjob">${J.n} · <span>${J.stats.join(' · ')}</span></div>
           <div class="mbar hp"><i style="width:${s.hp / maxHp(s) * 100}%"></i><span>HP ${Math.ceil(s.hp)}/${maxHp(s)}</span></div>
+          ${DM.Food.barsHTML(s)}${needStat(s)}
           <div class="sline">Scavenging Lv ${Lv}<div class="mbar xp"><i style="width:${Lv >= 10 ? 100 : (s.xp - D.XPCUM(Lv)) / (D.XPCUM(Lv + 1) - D.XPCUM(Lv)) * 100}%"></i></div></div>
           <div class="shands">${hands}</div>
         </div>
@@ -949,13 +954,56 @@ const NEXT_VERSION = '0.8';
     };
     if ($('#mSyncG')) $('#mSyncG').onclick = () => { SFX.play('ui'); try { SYNC.open($('#mSyncG').dataset.m || undefined); } catch (e) { toast('Sync guide failed to open', 1.6); } };
     $('#mLook').onclick = () => { SFX.play('ui'); editLook(); };
+    $('#mNeeds').onclick = () => { SFX.play('ui'); openFood(); };
     $('#mWard').onclick = () => { SFX.play('ui'); editLook('wardrobe'); };
     let vt = 0, vtT = 0; $('#mver').onclick = () => { const n = performance.now(); if (n - vtT > 1200) vt = 0; vtT = n; if (++vt >= 5) { vt = 0; if (DM_DEV_OK) openDev(); } };
     $('#mset').onclick = openSettings;
     drawPortrait($('#mPort'), s.hands && s.hands.k, .78);
     if (curTab === 'houses') renderHouses(); else if (curTab === 'bench') renderBench(); else renderStash();
     updateSync();
-    if (cosQueue.length) setTimeout(showCosPop, 400); else tip('home');
+    if (cosQueue.length) setTimeout(showCosPop, 400); else { tip('home'); if (s.food.h < DM.Food.LOW || s.food.t < DM.Food.LOW) tip('food'); }
+  }
+  // ---- 0.8: hunger + thirst (food.js). Real time drains them, so catch up whenever the home screen shows.
+  const FD = DM.Food;
+  function foodTick() { const s = SV && SV.survivor; if (!s || !s.food) return; const h0 = s.hp; s.hp = FD.tick(s, s.hp); if (s.hp !== h0) Game.save(); }
+  const needStat = s => { const st = FD.status(s); return st.length ? `<div class="nstat">${st.map(([c, t]) => `<span class="${c}">${t}</span>`).join('')}</div>` : ''; };
+  // the bars on the home card follow the clock while the app stays open
+  setInterval(() => {
+    if (!SV || !SV.survivor || DM.scene || !$('#mNeeds')) return;
+    foodTick(); const f = SV.survivor.food;
+    $('#mNeeds').outerHTML = FD.barsHTML(SV.survivor); $('#mNeeds').onclick = () => { SFX.play('ui'); openFood(); };
+    const hp = $('.scard .mbar.hp'); if (hp) { hp.querySelector('i').style.width = SV.survivor.hp / maxHp(SV.survivor) * 100 + '%'; hp.querySelector('span').textContent = `HP ${Math.ceil(SV.survivor.hp)}/${maxHp(SV.survivor)}`; }
+    if (f.h < FD.LOW || f.t < FD.LOW) tip('food');
+  }, 60e3);
+  // eat & drink from home: everything in the pack and the stash, with what it does to the bars
+  function openFood() {
+    const s = SV.survivor; foodTick();
+    const rows = [];
+    for (const from of ['pack', 'stash']) s[from].forEach((e, i) => { if (FD.isFood(e.k)) rows.push({ e, i, from }); });
+    rows.sort((a, b) => (D.ITEMS[b.e.k].hu || 0) + (D.ITEMS[b.e.k].th || 0) - (D.ITEMS[a.e.k].hu || 0) - (D.ITEMS[a.e.k].th || 0));
+    const b = SV.base, w = b && b.built && b.built.barrel ? DM.Base.barrelCharges() : 0;
+    sheetOpen(`<div class="kick">Food &amp; water</div><h3>Eat &amp; drink</h3>
+      <div class="fdbars">${FD.barsHTML(s).replace('id="mNeeds"', '')}</div>
+      <ul class="fdfx">${FD.effects(s).map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+      <div class="fdlist">${rows.length ? rows.map((r, j) => { const it = D.ITEMS[r.e.k]; return `<div class="fdrow">${icon(r.e.k)}<div>${esc(it.n)}${r.e.n > 1 ? ' x' + r.e.n : ''}<em>${FD.label(r.e.k)}${it.hp ? ` · +${it.hp} HP` : ''}${it.sta ? ` · +${it.sta} stamina` : ''} · ${r.from}</em></div><button class="mbtn sm" data-fd="${j}">${it.use}</button></div>`; }).join('')
+        : '<div class="empty">No food or drinks in your pack or stash. Kitchens, pantries, fridges and stores have them; Dot sells beans and water; the garden grows food.</div>'}</div>
+      ${w ? `<p class="mp" style="margin:4px 0 0">Your rain barrels hold ${w} charge${w === 1 ? '' : 's'} of water: drink from one at the base (+50 thirst).</p>` : ''}
+      <div class="btnrow"><button class="mbtn sm ghost" id="fdClose">Close</button></div>`);
+    $('#msheet').querySelectorAll('[data-fd]').forEach(btn => btn.onclick = () => {
+      const r = rows[+btn.dataset.fd], e = r.e, it = D.ITEMS[e.k];
+      SFX.play('pick'); const msg = eatEntry(s, r.from, r.i);
+      toast(`${FD.verb(e.k)} ${it.n.toLowerCase()} · ${msg}`, 1.8); openFood(); renderHome();
+    });
+    $('#fdClose').onclick = () => { sheetClose(); renderHome(); };
+  }
+  Game.openFood = openFood;
+  function eatEntry(s, from, i) { // one bite from the pack or stash: hunger/thirst, plus the smaller HP heal
+    const e = s[from][i], it = D.ITEMS[e.k];
+    const fed = FD.eat(s, e.k);
+    if (it.hp) s.hp = Math.min(maxHp(s), s.hp + it.hp);
+    e.n--; if (!e.n) s[from].splice(i, 1);
+    Game.save();
+    return [fed, it.hp ? `+${it.hp} HP` : ''].filter(Boolean).join(' · ');
   }
   function renderHouses() {
     const list = [];
@@ -1149,7 +1197,7 @@ const NEXT_VERSION = '0.8';
         done('Repaired');
       }]);
     }
-    if (it.use && it.use !== 'Read' && (it.hp || it.sta) && !it.slots) btns.push([it.use, () => { s.hp = Math.min(maxHp(s), s.hp + (it.hp || 0)); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(`${it.n}: +${it.hp || 0} HP`); }]);
+    if (it.use && it.use !== 'Read' && (it.hp || it.sta || FD.isFood(e.k)) && !it.slots) btns.push([it.use, () => { if (FD.isFood(e.k)) { const m = eatEntry(s, sel.from, sel.i); done(`${FD.verb(e.k)} ${it.n.toLowerCase()} · ${m}`); return; } s.hp = Math.min(maxHp(s), s.hp + (it.hp || 0)); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(`${it.n}: +${it.hp || 0} HP`); }]);
     if (it.slots || it.bp || e.k === 'shoes' || e.k === 'lockset') btns.push([it.use, () => { const msg = Game.applyUse(e.k); if (!msg) return; e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(msg); }]);
     if (e.k === 'note') btns.push(['Read', () => toast('The note is too faded to make sense of here.', 2)]);
     if (it.gift) btns.push(['Open', () => {
@@ -1202,6 +1250,7 @@ const NEXT_VERSION = '0.8';
     ['Locks & secrets', 'Locked doors, safes and cages hold the best loot. Lockpicks are silent but snap; a crowbar always works but is loud. After you search most of a house, hidden spots can open: a loose floorboard under a rug, a sliding bookshelf, an attic hatch (needs a hook pole), a cracked wall panel. Torn notes give hints.'],
     ['Weapons & equipping', 'The weapon in your hand is what you fight with. At home: Pack & stash > tap a weapon > Equip. In a house: tap the Swap button (bottom right) to pick any weapon in your pack. Weapons wear out - repair them with scrap. Zombies hear noise; you can run (push the stick far) and dodge.'],
     ['Cosmetics & wardrobe', 'Cosmetics are earned: rare finds in houses and on zombies, better in mansions and police stations, plus Dot\'s shop and jobs, horde-night crates and events. They unlock straight into your Wardrobe and never use pack space. Wardrobe (home screen) > tap one to wear it. Spares are sold to Dot automatically.'],
+    ['Food & water', 'Two bars under your HP: Hunger (drumstick) and Thirst (droplet). They drain with real time, even while the app is closed - about one meal and two drinks a day - and a little faster during runs (sprinting and fighting most). Tap the bars, or a food in Pack & stash, to eat or drink: beans and pie fill Hunger, water and soda fill Thirst, cranberry sauce and tomatoes a bit of both, coffee gives stamina. Garden crops are food, and a rain barrel at the base gives a drink (+50 thirst). Below 30: Hungry means slower stamina and no overnight healing; Thirsty means slower searches and max stamina 80. At 0 you lose 1 HP an hour, but never below 10 from hunger alone. Above 80 on both: +10% scavenging XP. Your crew eats from the stash separately.'],
     ['Base & farming', 'Your base is built with steps (the same steps also scout houses). Build walls, a gate, traps and garden beds; decorate with furniture you find. Plant seeds, water them with steps each day, and harvest real food. The stash chest lives here.'],
     ['Horde night', 'Every Sunday 9 PM New York time a horde hits. In the 24 hours before, do a watch shift (a 2-3 minute defence) - every kill thins the horde for your whole party. Strong bases hold and pay out a crate; weak ones lose something you repair with steps. Skip the shift and you get nothing.'],
     ['Seasonal events', 'Holidays switch on by themselves: Thanksgiving (the week around it) and Christmas (Dec 18 - Jan 2). Events bring holiday loot, a mini-boss in about 1 in 3 houses, a chain of event jobs from Dot, and once-a-year cosmetics. Thanksgiving also has the Black Friday horde: a bigger Sunday horde with better crates.'],
@@ -1231,7 +1280,8 @@ const NEXT_VERSION = '0.8';
       <button class="mbtn sm" data-d="pool">+10,000 build steps</button><button class="mbtn sm" data-d="seeds">+seeds &amp; decor</button>
       <button class="mbtn sm" data-d="gday">Garden: +1 day</button><button class="mbtn sm" data-d="hwin">Horde: ${DM.Horde.devOffset ? 'real clock' : 'shift window'}</button>
       <button class="mbtn sm" data-d="hres">Horde: resolve now</button><button class="mbtn sm" data-d="cos">+cosmetic</button><button class="mbtn sm" data-d="wpn">+machete (stash)</button><button class="mbtn sm" data-d="crew">+crew member</button><button class="mbtn sm" data-d="pet">+stray</button>
-      <button class="mbtn sm" data-d="hide">Next house: survivor + stray</button><button class="mbtn sm" data-d="boss">Boss: steps + fights</button><button class="mbtn sm" data-d="bhurt">Boss: -4,000 HP</button><button class="mbtn sm ghost" data-d="reset">Reset save</button></div>
+      <button class="mbtn sm" data-d="hide">Next house: survivor + stray</button><button class="mbtn sm" data-d="boss">Boss: steps + fights</button><button class="mbtn sm" data-d="bhurt">Boss: -4,000 HP</button>
+      <button class="mbtn sm" data-d="f10">Hunger+thirst 10</button><button class="mbtn sm" data-d="f100">Hunger+thirst 100</button><button class="mbtn sm" data-d="f12">+12 hours (drain)</button><button class="mbtn sm ghost" data-d="reset">Reset save</button></div>
       <div class="kick sect">Event (reloads) · now: ${EVA ? esc(EVA.ev.name) + (EVA.forced ? ' (forced)' : '') : 'none'}</div>
       <div class="chips devev">${['auto', ...EVS.ORDER, 'none'].map(v => `<button class="chip${EVS.dev.choice() === v ? ' on' : ''}" data-ev="${v}">${v === 'auto' ? 'Auto (calendar)' : v === 'none' ? 'None' : esc(EVS.get(v).name)}</button>`).join('')}</div>
       <div class="btnrow"><button class="mbtn sm ghost" id="mClose">Close</button></div>`);
@@ -1260,6 +1310,8 @@ const NEXT_VERSION = '0.8';
       if (k === 'hide') { DM.Crew.forceNpc = DM.Crew.forceStray = !DM.Crew.forceNpc; toast(DM.Crew.forceNpc ? 'Every house: a survivor + a stray' : 'Back to normal odds', 1.6); }
       if (k === 'boss') { DM.Boss.dev.steps(); DM.Boss.dev.fights(); renderHome(); }
       if (k === 'bhurt') { DM.Boss.dev.hurt(4000); renderHome(); }
+      if (k === 'f10' || k === 'f100') { foodTick(); const f = SV.survivor.food; f.h = f.t = k === 'f10' ? 10 : 100; Game.save(); renderHome(); toast('Hunger + thirst ' + f.h, 1.2); }
+      if (k === 'f12') { SV.survivor.food.at -= 12 * 36e5; foodTick(); Game.save(); renderHome(); const f = SV.survivor.food; toast(`12 hours later: hunger ${Math.round(f.h)}, thirst ${Math.round(f.t)}`, 1.8); }
       if (k === 'gift') { for (const [m, n] of [['gift', 3], ['turkey', 1], ['pie', 3], ['cranberry', 3], ['stuffing', 3]]) addTo(SV.survivor.stash, STASH_SLOTS, m, n); Game.save(); renderHome(); }
       if (k === 'reset') { if (b.dataset.sure) { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } SV = migrate(fresh()); DM.S = null; sheetClose(); boot2(); return; } b.dataset.sure = 1; b.textContent = 'Tap again to wipe'; return; }
       openDev();
