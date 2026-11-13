@@ -784,7 +784,7 @@ const NEXT_VERSION = '0.6';
     const a = EVA, up = !a && EVS.upcoming();
     if (!a && !up) return '';
     const e = (a || up).ev, acc = e.accent, n = a ? EVS.daysLeft() : up.days;
-    const when = a ? (n <= 1 ? 'last day!' : `${n} days left`) : n <= 1 ? 'starts tomorrow' : `starts in ${n} days`;
+    const when = a ? (a.forced ? 'forced for testing' : n <= 1 ? 'last day!' : `${n} days left`) : n <= 1 ? 'starts tomorrow' : `starts in ${n} days`;
     const bits = a ? [e.boss && `${e.boss.name}s on the loose`, e.quests && "Dot's event jobs", hordeLine(a)].filter(Boolean) : ['Limited cosmetics', e.boss && e.boss.name];
     return `<button class="evban${a ? '' : ' soon'}" id="evBan" style="--evc:${acc.c};--evc2:${acc.c2};--evbg:${acc.bg}"><span class="evg">${EVS.glyph((a || up).id)}</span>
       <span class="evt"><b>${esc(e.name)} event</b><em>${when}</em><small>${bits.filter(Boolean).map(esc).join(' · ')}</small></span><span class="evgo">›</span></button>`;
@@ -1057,7 +1057,7 @@ const NEXT_VERSION = '0.6';
   function openSettings() {
     const MC = DM.Music ? DM.Music.cfg() : null;
     sheetOpen(`<div class="kick">Settings</div><button class="mbtn" id="mHow">How to play</button>
-      ${MC ? `<h3>Sound</h3><div class="btnrow tipsrow"><span>Music <small>· eerie, speeds up with danger</small></span><button class="mbtn sm${MC.music ? '' : ' ghost'}" id="mMus">${MC.music ? 'On' : 'Off'}</button></div>
+      ${MC ? `<h3 class="sndh">Sound</h3><div class="btnrow tipsrow"><span>Music <small>· eerie, speeds up with danger</small></span><button class="mbtn sm${MC.music ? '' : ' ghost'}" id="mMus">${MC.music ? 'On' : 'Off'}</button></div>
       <label class="volrow"><span>Music volume</span><input type="range" id="mMvol" min="0" max="100" value="${Math.round(MC.mvol * 100)}"${MC.music ? '' : ' disabled'}></label>
       <label class="volrow"><span>Sound effects</span><input type="range" id="mSfx" min="0" max="100" value="${Math.round(MC.sfx * 100)}"></label>` : ''}
       <div class="btnrow tipsrow"><span>First-time tips</span><button class="mbtn sm ghost" id="mTips">${SV.tips.off ? 'Turn on' : 'Turn off'}</button></div><h3>Save</h3>

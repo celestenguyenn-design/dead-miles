@@ -325,9 +325,8 @@ const ART = (() => {
     lights: { slot: 'back', svg: () => { const pts = [[-49, -110], [-40, -104], [-31, -111], [-21, -105], [-47, -86], [-38, -80], [-28, -86], [-19, -80]], cols = ['#ffe27a', '#f07aa9', '#7ee0d8', '#ffe27a', '#f07aa9', '#7ee0d8', '#ffe27a', '#f07aa9'];
       return SL('M-51,-108 Q-45,-100 -40,-104 Q-35,-110 -31,-111 Q-26,-102 -21,-105 Q-16,-106 -14,-100', '#2a2838', 1.2) + SL('M-50,-84 Q-44,-78 -38,-80 Q-33,-88 -28,-86 Q-23,-77 -19,-80 Q-15,-82 -14,-78', '#2a2838', 1.2) +
         pts.map(([x, y], i) => `<circle cx="${x}" cy="${y + 2.6}" r="5.6" fill="${cols[i]}" opacity=".28"/>` + circ(x, y + 2.6, 2.6, cols[i], 1.2)).join(''); } },
-    candycane: { slot: 'back', svg: () => SL('M-40,-56 L-30,-132 Q-28,-146 -16,-146 Q-6,-145 -7,-134', CI, 10) + SL('M-40,-56 L-30,-132 Q-28,-146 -16,-146 Q-6,-145 -7,-134', '#f4efe6', 6) +
-      SL('M-40,-56 L-30,-132 Q-28,-146 -16,-146 Q-6,-145 -7,-134', '#d9483a', 6).replace('/>', 'stroke-dasharray="5 6"/>') +
-      SL('M-46,-102 L-22,-96', '#6e3f26', 3.2) + SL('M-35,-140 Q-30,-146 -24,-147', 'rgba(255,255,255,.65)', 1.6) },
+    candycane: { slot: 'back', iconT: 'scale(.6) translate(46 104)', svg: () => SL('M-34,-60 L-49,-150 Q-51,-166 -63,-164 Q-73,-162 -71,-150', CI, 10) + SL('M-34,-60 L-49,-150 Q-51,-166 -63,-164 Q-73,-162 -71,-150', '#f4efe6', 6) +
+      SL('M-34,-60 L-49,-150 Q-51,-166 -63,-164 Q-73,-162 -71,-150', '#d9483a', 6).replace('/>', 'stroke-dasharray="5 6"/>') + SL('M-52,-104 L-30,-108', '#6e3f26', 3.2) + SL('M-52,-152 Q-54,-160 -60,-161', 'rgba(255,255,255,.7)', 1.6) },
     // ---- outfits (jacket styles; col = [main, shade] replaces the jacket colour while worn)
     denim: { slot: 'outfit', col: ['#5a7ab9', '#3e5a95', 'Denim'], svg: () => SL('M-25,-104 Q-2,-97 20,-104', CRM2, 1.4, ) .replace('/>', 'stroke-dasharray="3 2.4"/>') +
       `<rect x="-22" y="-100" width="11" height="8" rx="1.5" fill="#3e5a95" stroke="${CI}" stroke-width="1.6"/>` + SL('M-21,-96 h9', CRM2, 1).replace('/>', 'stroke-dasharray="2 1.6"/>') +
@@ -375,7 +374,7 @@ const ART = (() => {
     if (o.slot === 'outfit') item += SP('M6,-114 Q22,-106 27,-84 L17,-80 Q12,-96 1,-104 Z', o.sleeve ? o.sleeve[0] : o.col[0], 3.6) + (o.arm || '') + SP('M-20,-124 Q-2,-116 17,-125 L18,-113 Q-2,-105 -20,-113 Z', '#f6e3bb', 3.4);
     let body = base + item;
     if (sil) body = body.replace(/fill="(?!none)[^"]*"/g, 'fill="#2c2350"').replace(/stroke="(?!none)[^"]*"/g, 'stroke="#5a4a86"').replace(/opacity="[^"]*"/g, '');
-    return `<g transform="${I.t}">${body}</g>`;
+    return `<g transform="${o.iconT || I.t}">${body}</g>`;
   }
   LOOK.COS = COS;
   LOOK.cosIcons = function () { for (const k in COS) { iconURL['cos_' + k] = svgURL(cosIconSVG(k), '-36 -36 72 72', 96, 96); iconURL['cosS_' + k] = svgURL(cosIconSVG(k, true), '-36 -36 72 72', 96, 96); } };

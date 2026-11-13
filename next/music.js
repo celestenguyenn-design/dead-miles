@@ -18,6 +18,7 @@ window.DM = window.DM || {};
   try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); if (v && typeof v === 'object') cfg = Object.assign(cfg, v); } catch (e) { /* blocked */ }
   const clamp01 = v => Math.max(0, Math.min(1, +v || 0));
   M.cfg = () => Object.assign({}, cfg);
+  M.stats = () => ({ beat, next, running, t: SFX.ac ? SFX.ac.currentTime : 0 });   // tests
   M.set = function (k, v) {
     cfg[k] = k === 'music' ? (v ? 1 : 0) : clamp01(v);
     try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) { /* blocked */ }
