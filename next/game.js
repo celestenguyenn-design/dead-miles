@@ -555,14 +555,14 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
         <div class="steps"><b>${Math.round(d.phone + d.walk + d.typed).toLocaleString('en-US')}</b><span>steps today</span></div>
         <div class="stepinfo">${d.typed ? `${d.typed.toLocaleString('en-US')} typed (half value) · ` : ''}${Math.round(w).toLocaleString('en-US')} worth<br>
           <b>${d.scouted}</b> house${d.scouted === 1 ? '' : 's'} scouted${nxt ? ` · next at ${nxt.toLocaleString('en-US')}` : ' · that\'s the max today'}</div>
-        <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="My total today" maxlength="6"><button id="mLog" class="mbtn sm">Log</button></div>
+        <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="My total today" maxlength="8"><button id="mLog" class="mbtn sm">Log</button></div>
         <div id="msync" class="msync"></div>
       </div>
       <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Pack &amp; stash</button><button data-t="bench">Workbench</button></div>
       <div id="mpane"></div>`;
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { SFX.play('ui'); tab(b.dataset.t); }; });
     $('#mLog').onclick = () => {
-      const v = parseInt($('#mSteps').value, 10); if (!(v > 0)) { toast('Type your step total for today', 1.6); return; }
+      const v = parseInt(String($('#mSteps').value).replace(/[^0-9]/g, ''), 10); /* "8,500" or "8 500" is 8500, not 8 */ if (!(v > 0)) { toast('Type your step total for today', 1.6); return; }
       // typed steps go through the step ledger so a phone catching up later never counts the same steps twice
       if (window.NET) { const before = SV.day.typed; const g = NET.typeSteps(v, 'total'); if (!g && SV.day.typed === before) toast(NET.onSteps ? 'Already counted that many today' : 'Saved - it will count in a moment', 2); else if (g < v - (NET.stepsDay().ap || 0)) toast('Typed steps above your phone count are capped at 4,000 a day', 2.4); return; }
       const used = DM.addSteps(v, 'typed'); if (used < v) toast(`Typed steps are capped at 4,000 a day (${used.toLocaleString('en-US')} counted)`, 2.6);
