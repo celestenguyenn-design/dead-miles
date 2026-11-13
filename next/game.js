@@ -478,7 +478,7 @@
     document.querySelectorAll('.job').forEach(b => b.onclick = () => { cre.job = b.dataset.j; SFX.play('ui'); renderCreate(); });
     $('#cGo').onclick = async () => {
       SV.survivor = createSurvivor(cre.name.trim(), cre.look, cre.job);
-      DM.S = SV.survivor; Game.save();
+      DM.S = SV.survivor; Game.save(); publish();
       await E.buildSurvivor(cre.look);
       renderHome();
     };
