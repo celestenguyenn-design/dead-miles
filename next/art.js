@@ -142,6 +142,16 @@ const ART = (() => {
     ring: `<ellipse cx="0" cy="6" rx="18" ry="14" fill="none" stroke="#11142f" stroke-width="9"/><ellipse cx="0" cy="6" rx="18" ry="14" fill="none" stroke="#e0b94a" stroke-width="5"/>
       <path d="M-8,-10 L0,-20 L8,-10 L0,-4 Z" fill="#9fe0e6" stroke="#11142f" stroke-width="2.4" stroke-linejoin="round"/>`,
   });
+  Object.assign(EXTRA_ICONS, {
+    lockpick: `<g transform="rotate(-30)"><rect x="-26" y="-3" width="40" height="6" rx="2" fill="#b9bdcc" stroke="#11142f" stroke-width="2.4"/><path d="M14,-3 L22,-3 L26,-9 L28,-7 L24,3 L14,3" fill="#b9bdcc" stroke="#11142f" stroke-width="2.4" stroke-linejoin="round"/><rect x="-30" y="-6" width="14" height="12" rx="3" fill="#5a4a86" stroke="#11142f" stroke-width="2.4"/></g>
+      <g transform="translate(-4 14) rotate(-10)"><path d="M-20,0 L14,0 L14,8" fill="none" stroke="#11142f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M-20,0 L14,0 L14,8" fill="none" stroke="#9aa0b4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>`,
+    crowbar: `<g transform="rotate(-40)"><path d="M-28,4 L18,4 Q28,4 28,-6 L28,-12" fill="none" stroke="#11142f" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M-28,4 L18,4 Q28,4 28,-6 L28,-12" fill="none" stroke="#b53a2e" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M-28,4 L-34,-2" stroke="#11142f" stroke-width="7" stroke-linecap="round"/><path d="M-28,4 L-34,-2" stroke="#9aa0b4" stroke-width="3" stroke-linecap="round"/></g>`,
+    cranberry: `<rect x="-15" y="-20" width="30" height="40" rx="4" fill="#b9bdcc" stroke="#11142f" stroke-width="2.6"/><rect x="-15" y="-10" width="30" height="20" fill="#9e2b3a" stroke="#11142f" stroke-width="2"/><circle cx="-4" cy="0" r="3.4" fill="#e04a5a"/><circle cx="4" cy="2" r="3" fill="#e04a5a"/><circle cx="1" cy="-4" r="2.6" fill="#e04a5a"/>`,
+    stuffing: `<g transform="rotate(6)"><path d="M-18,-22 L18,-22 L20,24 L-20,24 Z" fill="#e8a24a" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/><rect x="-14" y="-10" width="28" height="16" rx="3" fill="#f6e3bb" stroke="#11142f" stroke-width="1.8"/><circle cx="-6" cy="-2" r="2.4" fill="#93a86c"/><circle cx="2" cy="-1" r="2.4" fill="#c95f2c"/><circle cx="8" cy="-3" r="2" fill="#93a86c"/></g>`,
+    pie: `<path d="M-26,4 Q0,-26 26,4 L22,12 L-22,12 Z" fill="#e0a050" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/><path d="M-20,2 Q0,-18 20,2 Z" fill="#d9772e"/><path d="M-12,-6 Q-6,-10 0,-8 M4,-8 Q10,-8 12,-4" stroke="#f6e3bb" stroke-width="2.2" stroke-linecap="round" fill="none"/><path d="M-22,12 L22,12 L20,18 L-20,18 Z" fill="#b9bdcc" stroke="#11142f" stroke-width="2.2" stroke-linejoin="round"/>`,
+    turkey: `<ellipse cx="0" cy="14" rx="28" ry="8" fill="#e8e2d4" stroke="#11142f" stroke-width="2.4"/><path d="M-22,8 Q-24,-16 0,-18 Q24,-16 22,8 Z" fill="#c9782e" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/><path d="M-12,-10 Q-4,-14 4,-12" stroke="#f0b06a" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M18,-6 L28,-14 M-18,-6 L-28,-14" stroke="#11142f" stroke-width="5" stroke-linecap="round"/><circle cx="28" cy="-15" r="4" fill="#f6e3bb" stroke="#11142f" stroke-width="2"/><circle cx="-28" cy="-15" r="4" fill="#f6e3bb" stroke="#11142f" stroke-width="2"/>`,
+    hat: `<ellipse cx="0" cy="14" rx="30" ry="9" fill="#2a2440" stroke="#11142f" stroke-width="2.6"/><path d="M-16,12 L-12,-22 L12,-22 L16,12 Z" fill="#2a2440" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/><rect x="-15" y="2" width="30" height="8" fill="#5a4a86" stroke="#11142f" stroke-width="1.8"/><rect x="-6" y="0" width="12" height="12" rx="1" fill="none" stroke="#e0b94a" stroke-width="3"/>`,
+  });
   const iconURL = {};
   function buildIcons() {
     const all = Object.assign({}, S.icons, EXTRA_ICONS);
@@ -617,6 +627,22 @@ const ART = (() => {
       blk(ctx, cx - 7, top + 12, 14, 9, '#ffe2a8', 2, 2);
       const gl = ctx.createRadialGradient(cx, top + 18, 2, cx, top + 18, 40); gl.addColorStop(0, 'rgba(255,226,168,.35)'); gl.addColorStop(1, 'rgba(255,226,168,0)');
       ctx.fillStyle = gl; ctx.fillRect(cx - 40, top - 22, 80, 80);
+    },
+    safe(ctx, f, g) {
+      box(ctx, g, '#4a5070', '#3a4060', 4);
+      shade(ctx, g.x + 2, g.fy0 + 1, 6, g.H - 3, .25);
+      if (f.searched) {
+        blk(ctx, g.x + 5, g.fy0 + 5, g.w - 10, g.H - 9, '#140f26', 2, 2);
+        line(ctx, g.x + 7, g.fy0 + g.H * .5, g.x + g.w - 7, g.fy0 + g.H * .5, '#6e7690', 2);
+        ctx.beginPath(); ctx.moveTo(g.x + g.w - 2, g.fy0 + 2); ctx.lineTo(g.x + g.w + 10, g.fy0 + 8); ctx.lineTo(g.x + g.w + 10, g.fy1 + 3); ctx.lineTo(g.x + g.w - 2, g.fy1 - 2); ctx.closePath();
+        ctx.fillStyle = '#4a5070'; ctx.fill(); ctx.lineWidth = 2.2; ctx.strokeStyle = P.INK; ctx.stroke();
+      } else {
+        blk(ctx, g.x + 5, g.fy0 + 5, g.w - 10, g.H - 9, null, 2, 1.8);
+        const cx = g.x + g.w * .45, cy = g.fy0 + g.H * .45;
+        dot(ctx, cx, cy, 8, P.INK); dot(ctx, cx, cy, 6, '#b9bdcc'); line(ctx, cx, cy, cx + 4, cy - 3, P.INK, 1.8);
+        line(ctx, g.x + g.w - 11, cy - 7, g.x + g.w - 11, cy + 9, '#b9bdcc', 3.4);
+      }
+      if (f.pried) { line(ctx, g.x + 6, g.fy0 + 8, g.x + 14, g.fy0 + 20, P.INK, 1.6); line(ctx, g.x + g.w - 8, g.fy1 - 10, g.x + g.w - 16, g.fy1 - 4, P.INK, 1.6); }
     },
     shoerack(ctx, f, g) {
       box(ctx, g, P.WOOD, P.WOODD, 2);

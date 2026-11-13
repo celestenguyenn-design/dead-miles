@@ -63,12 +63,19 @@
     tape: { n: 'Duct tape', i: 'tape' },
     book: { n: 'Paperback', i: 'book' },
     note: { n: 'Torn note', i: 'note', use: 'Read' },
+    lockpick: { n: 'Lockpick', i: 'lockpick' },
+    crowbar: { n: 'Crowbar', i: 'crowbar' },
+    cranberry: { n: 'Cranberry sauce', i: 'cranberry', use: 'Eat', hp: 8 },
+    stuffing: { n: 'Stuffing mix', i: 'stuffing', use: 'Eat', hp: 7 },
+    pie: { n: 'Pumpkin pie', i: 'pie', use: 'Eat', hp: 12 },
+    turkey: { n: 'Whole turkey', i: 'turkey', use: 'Eat', hp: 50, rare: 1 },
+    hat: { n: 'Pilgrim hat', i: 'hat', rare: 1, tag: 'event cosmetic' },
     pole: { n: 'Hook pole', i: 'hook' },
     watch: { n: 'Pocket watch', i: 'watch', rare: 1 },
     jewelry: { n: 'Gold ring', i: 'ring', rare: 1 },
   };
   // how many fit in one pack slot (anything not listed does not stack)
-  const STACK = { water: 3, beans: 3, snack: 3, drink: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
+  const STACK = { lockpick: 5, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
   const stackMax = k => STACK[k] || 1;
   // merge rolled item keys into container stacks; ammo comes in loose handfuls of 4-12
   function toStacks(keys) {
@@ -80,6 +87,11 @@
     }
     return out;
   }
+  // Thanksgiving event: in the prototype an early preview from Nov 10 (the real game: around Nov 19 - Dec 2); ?event=thanksgiving or #thanksgiving forces it
+  const EVENT = (() => { const d = new Date(), m = d.getMonth(), dd = d.getDate(); return /[?&]event=thanksgiving\b/.test(location.search) || location.hash === '#thanksgiving' || (m === 10 && dd >= 10) || (m === 11 && dd <= 2); })();
+  // locks: sweet-spot width in degrees per difficulty. A future Thief job can raise LOCK_EASE to widen them.
+  const LOCK_EASE = 1;
+  const LOCKS = { easy: { w: 22, xp: 4, name: 'Easy' }, medium: { w: 14, xp: 6, name: 'Medium' }, hard: { w: 8, xp: 12, name: 'Hard' } };
   const LOOT = {
     fridge: [[2, 3], { drink: 3, water: 3, beans: 1, snack: 2 }],
     cabinet: [[1, 3], { beans: 3, snack: 2, water: 1 }],
@@ -101,9 +113,13 @@
     coat: [[1, 2], { cloth: 3, snack: 1, key: 1 }],
     hall: [[1, 1], { key: 2, battery: 1 }],
     corpse: [[0, 1], { scrap: 1, ammo: 1, snack: 1, bandage: 1 }],
+    safe: [[3, 4], { ammo: 5, meds: 1, watch: 1, jewelry: 1 }, ['ammo', 'ammo', 'jewelry']],
     cache: [[3, 4], { watch: 2, jewelry: 3, ammo: 3, meds: 2 }, ['jewelry', 'watch']],
     attic: [[3, 4], { watch: 2, jewelry: 2, ammo: 3, meds: 2, battery: 1 }, ['watch']],
   };
+  if (EVENT) {
+    Object.assign(LOOT.fridge[1], { cranberry: 2, pie: 2 }); Object.assign(LOOT.pantry[1], { stuffing: 3, cranberry: 2 }); Object.assign(LOOT.cabinet[1], { stuffing: 2, cranberry: 1 });
+  }
   function rollLoot(key) {
     const [[a, b], tab, guaranteed] = LOOT[key];
     const out = guaranteed ? guaranteed.slice() : [];
@@ -157,7 +173,7 @@
     { art: 'tub', at: [11, 10, 2, 2], H: 24, solid: 1 },
     // utility closet
     { art: 'shelves', name: 'Utility shelves', at: [14, 10, 2, 1], H: 58, time: 2.4, noise: 4, loot: 'shelves' },
-    { art: 'toolbox', name: 'Toolbox', at: [17, 10, 1, 1], H: 20, time: 1.8, noise: 3.5, loot: 'toolbox' },
+    { art: 'toolbox', name: 'Toolbox', at: [17, 10, 1, 1], H: 20, time: 1.8, noise: 3.5, loot: 'toolbox', lock: 'medium' },
     { art: 'heater', at: [14, 13, 1, 1], H: 54, solid: 1 },
     // hidden room
     { art: 'supply', at: [2, 10, 2, 1], H: 56 },
@@ -169,7 +185,8 @@
     { id: 'secretShelf', art: 'bookshelf', name: 'Bookshelf', at: [3, 15, 2, 1], H: 62, secret: 1, seed: 2 },
     { art: 'bed', at: [6, 15, 2, 3], H: 18 },
     { art: 'nightstand', name: 'Nightstand', at: [8, 15, 1, 1], H: 24, time: 1.5, noise: 2, loot: 'night' },
-    { art: 'wardrobe', name: 'Wardrobe', at: [12, 15, 2, 1], H: 64, time: 2.8, noise: 5, loot: 'wardrobe' },
+    { art: 'wardrobe', name: 'Bedroom closet', at: [12, 15, 2, 1], H: 64, time: 2.8, noise: 5, loot: 'wardrobe', lock: 'easy' },
+    { art: 'safe', name: 'Gun safe', at: [2, 19, 1, 1], H: 46, time: 2.2, noise: 2, loot: 'safe', lock: 'hard' },
     { art: 'dresser', name: 'Dresser', at: [14, 15, 3, 1], H: 34, time: 2.4, noise: 3.5, loot: 'dresser' },
     { art: 'desk', name: 'Desk', at: [15, 19, 2, 1], H: 30, time: 2, noise: 2.5, loot: 'desk' },
     { art: 'chair', at: [15, 18, 1, 1], H: 16, solid: 0 },
@@ -229,20 +246,23 @@
       f.tx = d.at[0]; f.ty = d.at[1]; f.tw = d.at[2]; f.th = d.at[3];
       f.x = f.tx * T; f.y = f.ty * T; f.w = f.tw * T; f.h = f.th * T;
       if (f.solid == null) f.solid = 1;
-      f.lootable = !!d.loot; f.searched = false; f.items = d.items ? 1 : null; f.loot0 = null; f.slide = 0;
+      f.lootable = !!d.loot; f.searched = false; f.locked = d.lock || null; f.items = d.items ? 1 : null; f.loot0 = null; f.slide = 0;
       f.room = roomAt(f.tx, f.wall ? f.ty + 1 : f.ty);
       f._key = null; f._c = null;
       G.furn.push(f);
     }
     // ~20% of containers turn out empty - never the fridge, the hidden stash, or the bin by the stoop
-    const elig = G.furn.filter(f => f.lootable && f.art !== 'fridge' && f.art !== 'crate' && f.name !== 'Garbage bin' && f.name !== 'Dresser' && f.name !== 'Toolbox');
+    const elig = G.furn.filter(f => f.lootable && f.art !== 'fridge' && f.art !== 'crate' && f.name !== 'Garbage bin' && f.name !== 'Dresser' && f.name !== 'Toolbox' && f.name !== 'Utility shelves' && !f.lock);
     for (let i = elig.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [elig[i], elig[j]] = [elig[j], elig[i]]; }
     elig.slice(0, Math.round(elig.length * .2)).forEach(f => f.empty = true);
     for (const f of G.furn) if (f.lootable) f.pre = f.empty ? [] : rollLoot(f.loot); // rolled up front so Keen eye can sense rares
     G.furn.find(f => f.name === 'Dresser').pre.push('note');   // the clue for the floor cache
     G.furn.find(f => f.name === 'Toolbox').pre.push('pole');   // opens the attic hatch
+    G.furn.find(f => f.name === 'Utility shelves').pre.push('crowbar');
+    G.pack.push({ k: 'lockpick', n: 2 });
     G.zs.push(mkZombie(6.4 * T, 21.62 * T, 'sleep', 'l'));
     G.zs.push(mkZombie(8.6 * T, 12.7 * T, 'idle', 'b'));
+    if (EVENT) { const tk = mkZombie(8 * T, 28.95 * T, 'idle', 'o'); Object.assign(tk, { kind: 'turkey', hp: 170, maxHp: 170, hw: 10, hh: 7 }); G.zs.push(tk); }
     buildWalls(); buildSolid();
     G.p.flip = false;
     hideCards(); closeSheet(true);
@@ -432,6 +452,7 @@
           o.connect(f); f.connect(g); g.connect(this.master); o.start(t); l.start(t); o.stop(t + 1.05); l.stop(t + 1.05); break;
         }
         case 'alert': this.tone('triangle', 520, 300, .18, .06); break;
+        case 'gobble': for (let i = 0; i < 5; i++) this.tone('sawtooth', 420 - i * 30 + Math.random() * 60, 260, .07, .035, i * .065); break;
       }
     },
   };
@@ -445,7 +466,9 @@
     SFX.init();
     if (e.repeat && !MOVEKEYS.includes(e.code) && e.code !== 'ShiftLeft') return;
     keys.add(e.code);
+    if (LP.on) { if (e.code === 'Escape' || e.code === 'KeyQ') closeLock(); if (e.code === 'Space') e.preventDefault(); return; }
     if (G.sheet) {
+      if (G.sheet.kind === 'lock') { if (e.code === 'KeyE' || e.code === 'Digit1') { e.preventDefault(); $('#shActs button').click(); return; } if (e.code === 'Digit2' || e.code === 'KeyR') { $('#shActs button.ghost').click(); return; } }
       if (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); if (G.sheet.kind === 'loot') takeAll(); else closeSheet(); return; }
       if (e.code === 'Escape' || e.code === 'KeyQ' || e.code === 'Tab' || e.code === 'KeyI') { e.preventDefault(); closeSheet(); return; }
       if (MOVEKEYS.includes(e.code)) closeSheet();
@@ -566,8 +589,10 @@
 
   // ---------------------------------------------------------------- interaction
   // secrets stay invisible until most of the house has been searched; no announcement when that happens
-  function gateOpen() { const L = G.furn.filter(f => f.lootable && !f.secretLoot); return L.filter(f => f.searched).length >= Math.ceil(L.length * .75); }
+  function gateOpen() { const L = G.furn.filter(f => f.lootable && !f.secretLoot && !f.lock); return L.filter(f => f.searched).length >= Math.ceil(L.length * .75); }
   const hasItem = k => G.pack.some(e => e.k === k);
+  const packCount = k => G.pack.reduce((a, e) => a + (e.k === k ? e.n : 0), 0);
+  function usePack(k) { const i = G.pack.findIndex(e => e.k === k); if (i < 0) return; if (!--G.pack[i].n) G.pack.splice(i, 1); }
   const RUG = { x: 14.2 * T, y: 3.2 * T, w: 4.6 * T, h: 3.4 * T }, BOARD = { x: 18.05 * T, y: 5.8 * T, w: 26, h: 10 };
   const HATCH = { x: 20.5 * T, y: 15.6 * T }, HOLE = { x: 26.5 * T, y: 15.2 * T };
   function secretActs(out) {
@@ -605,16 +630,17 @@
       if (!f.lootable) continue;
       if (f.id === 'sofa' && G.zs.some(z => z.st === 'sleep' || z.st === 'rise')) continue; // someone is sleeping on it
       let act = null;
-      if (!f.searched) act = 'Search';
+      if (f.locked) act = 'Locked';
+      else if (!f.searched) act = 'Search';
       else if (f.loot0 && f.loot0.length) act = 'Open';
-      if (act) out.push({ obj: f, act, rect: f.wall ? { x: f.x + 4, y: f.y + 20, w: f.w - 8, h: f.h - 20 } : furnRect(f), name: f.name, noise: f.noise });
+      if (act) out.push({ obj: f, act, lock: f.locked, rect: f.wall ? { x: f.x + 4, y: f.y + 20, w: f.w - 8, h: f.h - 20 } : furnRect(f), name: f.name, noise: f.noise });
     }
     for (const d of G.drops) out.push({ obj: d, act: 'Pick up', rect: { x: d.x - 12, y: d.y - 8, w: 24, h: 14 }, name: ITEMS[d.k].n + (d.n > 1 ? ' x' + d.n : ''), drop: true });
     secretActs(out);
     for (const z of G.zs) {
       if (!z.dead || z.rot === 0) continue;
       let act = !z.searched ? 'Search' : (z.loot0 && z.loot0.length ? 'Open' : null);
-      if (act) out.push({ obj: z, act, rect: { x: z.x + (z.fallDir || 1) * 34 - 38, y: z.y - 14, w: 76, h: 26 }, name: 'Zombie', noise: 1.5, corpse: true });
+      if (act) out.push({ obj: z, act, rect: z.kind === 'turkey' ? { x: z.x - 24, y: z.y - 14, w: 48, h: 26 } : { x: z.x + (z.fallDir || 1) * 34 - 38, y: z.y - 14, w: 76, h: 26 }, name: z.kind === 'turkey' ? 'Zombie turkey' : 'Zombie', noise: 1.5, corpse: true });
     }
     return out;
   }
@@ -636,6 +662,7 @@
     p.fx = dx / d; p.fy = dy / d; if (Math.abs(dx) > 3) p.flip = dx < 0;
     if (it.act === 'Open') { openLoot(o, it); return; }
     if (it.drop) { pickUp(o); return; }
+    if (it.act === 'Locked') { openLockChoice(it); return; }
     const dur = it.dur || (it.act === 'Push' ? 1.7 : (it.corpse ? 1.4 : o.time) * searchMul());
     p.st = 'search'; p.stT = 0; p.search = { it, t: 0, dur, nextNoise: .25, nextFx: 0 };
     if (it.act === 'Search' && (o.art === 'fridge' || o.art === 'wardrobe' || o.art === 'coat' || o.art === 'pantry')) SFX.play('open');
@@ -649,9 +676,10 @@
       return;
     }
     o.searched = true; G.stats.searched++;
-    const keys = it.corpse ? rollLoot('corpse') : o.pre.slice();
+    const keys = it.corpse ? (o.kind === 'turkey' ? ['turkey', 'hat'] : rollLoot('corpse')) : o.pre.slice();
     if (keys.length && Math.random() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot); if (more.length) keys.push(more[0]); }
     o.loot0 = toStacks(keys);
+    if (it.pry && o.loot0.length && Math.random() < .25) { const i = Math.floor(Math.random() * o.loot0.length), sm = o.loot0[i]; sm.n--; if (!sm.n) o.loot0.splice(i, 1); toast('Smashed: ' + ITEMS[sm.k].n.toLowerCase(), 1.8); }
     // xp: bigger containers teach more, the hidden stash a lot
     gainXP(it.corpse ? 2 : 2 + (o.time >= 2.2 ? 1 : 0) + (o.rare ? 6 : 0), G.p.x, G.p.y);
     o._key = null;
@@ -731,6 +759,7 @@
       else if (G.p.st === 'free') { G.p.auto.t += dt; const ai = autoInput(); if (ai) inp = ai; }
     }
     if (G.tapMark) { G.tapMark.t += dt; if (G.tapMark.t > .7) G.tapMark = null; }
+    updateLock(dt);
     updatePlayer(dt, inp);
     for (const z of G.zs) updateZombie(z, dt);
     separate();
@@ -747,7 +776,8 @@
     p.staDelay -= dt;
     if (p.staDelay <= 0 && !(inp.run && inp.m > 0)) p.sta = Math.min(100, p.sta + 20 * dt);
 
-    if (p.st === 'free') {
+    if (LP.on) { p.vx *= .8; p.vy *= .8; inp = { x: 0, y: 0, m: 0, run: false }; }
+    if (p.st === 'free' && !LP.on) {
       if (btn.dodge && p.sta >= 25) { startDodge(inp); }
       else if ((btn.atkPressed || btn.atk) && p.sta >= 4) startSwing();
       else if (btn.use) { const it = findTarget(); if (it) startSearch(it); }
@@ -818,7 +848,7 @@
       $('#room').textContent = ROOMNAME[room].toUpperCase();
     }
     // leave via front door
-    if (G.entered && p.y > 29.35 * T && !G.over) showSummary();
+    if (G.entered && p.y > 29.35 * T && Math.abs(p.x - 20.5 * T) < 2.6 * T && !G.over) showSummary(); // step off the stoop to leave
   }
 
   function startDodge(inp) {
@@ -860,7 +890,7 @@
     }
   }
   function hitZombie(z, fa) {
-    const sneak = z.st === 'sleep' || z.st === 'idle';
+    const sneak = (z.st === 'sleep' || z.st === 'idle') && z.kind !== 'turkey';
     const dmg = Math.round((sneak ? 50 : 34) + Math.random() * 4);
     z.hp -= dmg; z.flash = 1; z.hurtDir = Math.cos(fa) >= 0 ? 1 : -1;
     z.kbx = Math.cos(fa) * 5.5 * T; z.kby = Math.sin(fa) * 5.5 * T * .8;
@@ -873,12 +903,13 @@
       return;
     }
     if (z.st === 'sleep') { z.st = 'rise'; z.stT = .25; z.alertT = 1; SFX.play('groan'); }
-    else if (z.st !== 'rise') { z.st = 'hurt'; z.stT = 0; z.lunge = null; }
+    else if (z.kind === 'turkey' && (z.st === 'windup' || z.st === 'lunge')) { z.kbx *= .3; z.kby *= .3; } // it does not flinch mid-peck
+    else if (z.st !== 'rise') { z.st = 'hurt'; z.stT = z.kind === 'turkey' ? .17 : 0; z.lunge = null; }
   }
   function hurtPlayer(dmg, dx, dy, z) {
     const p = G.p;
     if (p.inv > 0 || p.st === 'down') return;
-    cancelSearch(); p.auto = null; if (G.sheet) closeSheet();
+    cancelSearch(); p.auto = null; if (G.sheet) closeSheet(); if (LP.on) closeLock('You flinched - the pick slipped out');
     p.hp = Math.max(0, p.hp - dmg); p.inv = .7; p.flash = .55;
     p.kbx = dx * 6 * T; p.kby = dy * 6 * T * .8;
     p.st = 'hurt'; p.stT = 0;
@@ -929,7 +960,7 @@
         z.wanderT -= dt;
         if (z.wanderT <= 0) { z.wanderT = 2.5 + Math.random() * 3; z.wtx = z.x + (Math.random() - .5) * 2.2 * T; z.wty = z.y + (Math.random() - .5) * 1.4 * T; }
         if (z.wtx != null) { const dx = z.wtx - z.x, dy = z.wty - z.y, d = Math.hypot(dx, dy); if (d > 4) { spd = .45 * T; vx = dx / d; vy = dy / d; face(vx); } }
-        if (z.groanT -= dt, z.groanT <= 0) { z.groanT = 6 + Math.random() * 8; if (Math.hypot(dxp, dyp) < 9 * T) SFX.play('groan'); }
+        if (z.groanT -= dt, z.groanT <= 0) { z.groanT = 6 + Math.random() * 8; if (Math.hypot(dxp, dyp) < 9 * T) SFX.play(z.kind === 'turkey' ? 'gobble' : 'groan'); }
         look();
         break;
       }
@@ -958,11 +989,11 @@
         break;
       case 'chase': {
         if (p.st === 'down') { z.st = 'idle'; break; }
-        z.groanT -= dt; if (z.groanT <= 0) { z.groanT = 3 + Math.random() * 4; SFX.play('groan'); }
+        z.groanT -= dt; if (z.groanT <= 0) { z.groanT = 3 + Math.random() * 4; SFX.play(z.kind === 'turkey' ? 'gobble' : 'groan'); }
         const see = losClear(z.x, z.y - 30, p.x, p.y - 30);
         if (see) { z.lastSeen = { x: p.x, y: p.y }; z.lostT = 0; } else z.lostT += dt;
         if (z.lostT > 5) { z.st = 'investigate'; z.target = z.lastSeen; z.path = null; z.stT = 0; break; }
-        if (dp < 1.2 * T && see && z.cd <= 0) { z.st = 'windup'; z.stT = 0; face(dxp); SFX.play('alert'); break; }
+        if (dp < (z.kind === 'turkey' ? 1 : 1.2) * T && see && z.cd <= 0) { z.st = 'windup'; z.stT = 0; face(dxp); SFX.play(z.kind === 'turkey' ? 'gobble' : 'alert'); break; }
         let tgt;
         if (see && dp < 3.2 * T) tgt = { x: p.x, y: p.y };
         else { const st = nextStep(z, playerField()); tgt = st.same ? { x: p.x, y: p.y } : st; }
@@ -970,24 +1001,28 @@
         spd = (1.85 + .25 * Math.sin(G.t * 2 + z.id * 9)) * T;
         if (dp < .75 * T) spd = 0;
         vx = dx / dd; vy = dy / dd; face(dxp);
+        if (z.kind === 'turkey') { // fast and erratic: darting zig-zags
+          spd = (2.9 + 1.2 * Math.sin(G.t * 7 + z.id * 5)) * T; if (dp < .6 * T) spd = 0;
+          const zig = Math.sin(G.t * 9 + z.id * 3) * .9; const nx = vx - vy * zig, ny = vy + vx * zig, nn = Math.hypot(nx, ny) || 1; vx = nx / nn; vy = ny / nn;
+        }
         break;
       }
       case 'windup':
         face(dxp);
         if (z.stT < .5) { const d = dp || 1; vx = -dxp / d; vy = -dyp / d; spd = .25 * T; }
-        if (z.stT >= .62) { const d = dp || 1; z.lunge = { x: dxp / d, y: dyp / d, hit: false }; z.st = 'lunge'; z.stT = 0; SFX.play('whoosh'); }
+        if (z.stT >= (z.kind === 'turkey' ? .48 : .62)) { const d = dp || 1; z.lunge = { x: dxp / d, y: dyp / d, hit: false }; z.st = 'lunge'; z.stT = 0; SFX.play('whoosh'); }
         break;
       case 'lunge': {
         const L = z.lunge; spd = 4.8 * T * Math.max(0, 1 - z.stT / .24); vx = L.x; vy = L.y;
         if (!L.hit && p.inv <= 0 && p.st !== 'down') {
           const d = Math.hypot(p.x - z.x, (p.y - z.y) * 1.2);
-          if (d < .85 * T) { L.hit = true; hurtPlayer(16 + Math.round(Math.random() * 6), L.x, L.y, z); }
+          if (d < (z.kind === 'turkey' ? .75 : .85) * T) { L.hit = true; hurtPlayer(z.kind === 'turkey' ? 9 + Math.round(Math.random() * 4) : 16 + Math.round(Math.random() * 6), L.x, L.y, z); }
         }
         if (z.stT >= .26) { z.st = 'recover'; z.stT = 0; }
         break;
       }
       case 'recover':
-        if (z.stT > .75) { z.st = 'chase'; z.stT = 0; z.cd = .35; }
+        if (z.stT > (z.kind === 'turkey' ? .45 : .75)) { z.st = 'chase'; z.stT = 0; z.cd = z.kind === 'turkey' ? .15 : .35; }
         break;
       case 'hurt':
         if (z.stT > .32) { z.st = 'chase'; z.stT = 0; z.cd = .25; z.lostT = 0; }
@@ -1262,6 +1297,7 @@
     if (G.redFlash > 0) { ctx.fillStyle = `rgba(181,58,46,${G.redFlash * .32})`; ctx.fillRect(0, 0, W, H); }
     if (p.hp < 35 && p.st !== 'down') { ctx.fillStyle = `rgba(181,58,46,${.08 + .06 * Math.sin(G.t * 5)})`; ctx.fillRect(0, 0, W, H); }
     drawBanners();
+    drawLock();
   }
 
   function drawWall(w) {
@@ -1377,7 +1413,51 @@
     ART.drawRig(ctx, 'survivor', p.x, p.y + yo, PSCALE, p.flip, { rot, sx, sy, parts, flash: p.flash, flashRed: true, alpha });
   }
 
+  function drawTurkey(z) {
+    const dir = z.flip ? 1 : -1, t = G.t + z.id * 10;
+    const sp = Math.min(1, Math.hypot(z.vx, z.vy) / (2.5 * T)), s = Math.sin(z.ph * 3);
+    let rot = Math.sin(t * 6) * .05, lean = 0, peck = 0;
+    if (z.st === 'windup') { lean = -.35 * Math.min(1, z.stT / .3); }
+    if (z.st === 'lunge') peck = 1;
+    if (z.st === 'hurt') rot = z.hurtDir * .3 * Math.max(0, 1 - z.stT / .32);
+    if (z.dead) rot = z.rot;
+    drawShadow(z.x, z.y + 1, z.dead ? 26 : 20, .42);
+    ctx.save(); ctx.translate(z.x, z.y - Math.abs(Math.cos(z.ph * 3)) * 3 * sp); ctx.rotate(rot); ctx.scale(dir * 1.35, 1.35);
+    const INK = P.INK; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    // tail fan with missing feathers and bare quills
+    for (let i = 0; i < 9; i++) {
+      const a = -Math.PI / 2 - 1.1 + i * .275 - .4, missing = (i === 2 || i === 6);
+      ctx.save(); ctx.translate(-10, -28); ctx.rotate(a + Math.sin(t * 3 + i) * .04);
+      if (missing) { ART.line(ctx, 0, 0, 28, 0, INK, 3); ART.line(ctx, 0, 0, 28, 0, '#d8c9a8', 1.4); }
+      else { ctx.beginPath(); ctx.ellipse(20, 0, 17, 6.5, 0, 0, 6.28); ctx.fillStyle = ['#7a4a30', '#a8602e', '#5e3a2a'][i % 3]; ctx.fill(); ctx.lineWidth = 2.2; ctx.strokeStyle = INK; ctx.stroke(); ART.dot(ctx, 31, 0, 2.6, i % 2 ? '#c9a85a' : '#5a4a86'); }
+      ctx.restore();
+    }
+    // legs
+    for (const k of [-1, 1]) { const sw = s * 6 * sp * k; ART.line(ctx, -2 + k * 5, -14, -2 + k * 5 + sw, 0, INK, 5); ART.line(ctx, -2 + k * 5, -14, -2 + k * 5 + sw, 0, '#d9772e', 2.6); ART.line(ctx, -6 + k * 5 + sw, 0, 4 + k * 5 + sw, 0, INK, 3); }
+    ctx.rotate(lean);
+    // body
+    ctx.beginPath(); ctx.ellipse(0, -26, 19, 15, -.1, 0, 6.28); ctx.fillStyle = '#6e4a3a'; ctx.fill(); ctx.lineWidth = 2.6; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(-6, -30, 9, 6, -.3, 0, 6.28); ctx.fillStyle = '#8a5e44'; ctx.fill();
+    // exposed ribs
+    ctx.save(); ctx.beginPath(); ctx.ellipse(5, -22, 9, 7.5, .2, 0, 6.28); ctx.fillStyle = '#c96a6a'; ctx.fill(); ctx.lineWidth = 1.8; ctx.stroke(); ctx.clip();
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(-2, -22, 5 + i * 3.2, -.9, .9); ctx.strokeStyle = '#f6e3bb'; ctx.lineWidth = 1.8; ctx.stroke(); }
+    ctx.restore();
+    // neck + head (pecks forward on the lunge)
+    const hx = 15 + peck * 9, hy = -44 + peck * 10;
+    ctx.beginPath(); ctx.moveTo(10, -34); ctx.quadraticCurveTo(15, -40, hx - 2, hy + 4); ctx.lineWidth = 8; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 5; ctx.strokeStyle = '#a3a882'; ctx.stroke();
+    ART.dot(ctx, hx, hy, 8.5, INK); ART.dot(ctx, hx, hy, 6.8, '#a3a882');
+    ART.dot(ctx, hx - 3, hy + 3, 2, '#7e1f2a');
+    ctx.beginPath(); ctx.moveTo(hx + 5, hy - 2); ctx.lineTo(hx + 13, hy + 1); ctx.lineTo(hx + 5, hy + 4); ctx.closePath(); ctx.fillStyle = '#e0a020'; ctx.fill(); ctx.lineWidth = 1.8; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(hx + 6, hy + 3); ctx.quadraticCurveTo(hx + 9, hy + 13 + Math.sin(t * 5) * 2, hx + 4, hy + 15); ctx.quadraticCurveTo(hx + 1, hy + 9, hx + 4, hy + 4); ctx.fillStyle = '#b53a2e'; ctx.fill(); ctx.lineWidth = 1.6; ctx.stroke();
+    if (!z.dead) { // glowing eye
+      const gl = ctx.createRadialGradient(hx + 2, hy - 2, 0, hx + 2, hy - 2, 9); gl.addColorStop(0, 'rgba(214,255,120,.85)'); gl.addColorStop(1, 'rgba(214,255,120,0)');
+      ctx.fillStyle = gl; ctx.fillRect(hx - 8, hy - 12, 20, 20); ART.dot(ctx, hx + 2, hy - 2, 2.6, '#eaff9a'); ART.dot(ctx, hx + 2.4, hy - 2, 1, INK);
+    } else { ART.line(ctx, hx, hy - 4, hx + 4, hy, INK, 1.6); ART.line(ctx, hx + 4, hy - 4, hx, hy, INK, 1.6); }
+    if (z.flash > 0) { ctx.globalAlpha = z.flash * .8; ctx.beginPath(); ctx.ellipse(0, -26, 19, 15, -.1, 0, 6.28); ctx.fillStyle = '#ffffff'; ctx.fill(); ART.dot(ctx, hx, hy, 7, '#ffffff'); ctx.globalAlpha = 1; }
+    ctx.restore();
+  }
   function drawZombie(z) {
+    if (z.kind === 'turkey') { drawTurkey(z); return; }
     const dir = z.flip ? 1 : -1; // facing direction (+1 = right)
     const parts = {}; let rot = 0, yo = 0, alpha = z.alpha, sy = 1;
     const sp = Math.min(1, Math.hypot(z.vx, z.vy) / (1.85 * T));
@@ -1543,18 +1623,22 @@
       const rm = it.corpse || it.drop ? null : o.room; if (rm && G.fog[rm] > .6) continue;
       let mx, my;
       if (it.drop) { mx = o.x; my = o.y - 40; }
-      else if (it.corpse) { mx = o.x + (o.fallDir || 1) * 34; my = o.y - 34; }
+      else if (it.corpse) { mx = o.x + (o.kind === 'turkey' ? 0 : (o.fallDir || 1) * 34); my = o.y - 34; }
       else { const g = ART.geo(o); mx = o.x + o.w / 2 + (o.slide || 0) * T; my = (o.wall ? o.y + o.h - 62 : g.ty0) - 14; }
       const isT = tgt && tgt.obj === o;
       const bob = isT ? Math.sin(G.t * 6) * 2 : 0;
       const a = isT ? 1 : clamp(1.4 - d / (2.4 * T), .25, .85);
       ctx.globalAlpha = a;
       const rad = isT ? 11 : 8;
-      ctx.fillStyle = isT ? P.ORA : (it.act === 'Open' ? P.CRMD : P.PLUM);
+      ctx.fillStyle = isT ? P.ORA : (it.act === 'Open' ? P.CRMD : it.act === 'Locked' ? '#6e3240' : P.PLUM);
       ctx.beginPath(); ctx.arc(mx, my + bob, rad, 0, 6.28); ctx.fill(); ctx.lineWidth = 2.4; ctx.strokeStyle = isT ? P.INK : P.CRM; ctx.stroke();
       ctx.beginPath(); ctx.moveTo(mx - 4, my + rad - 1 + bob); ctx.lineTo(mx, my + rad + 5 + bob); ctx.lineTo(mx + 4, my + rad - 1 + bob); ctx.fillStyle = isT ? P.ORA : (it.act === 'Open' ? P.CRMD : P.PLUM); ctx.fill();
       ctx.strokeStyle = isT ? P.INK : P.CRM; ctx.lineWidth = 2;
       if (it.act === 'Search') { ctx.beginPath(); ctx.arc(mx - 1.2, my - 1.2 + bob, rad * .38, 0, 6.28); ctx.stroke(); ART.line(ctx, mx + rad * .2, my + rad * .2 + bob, mx + rad * .5, my + rad * .5 + bob, ctx.strokeStyle, 2.4); }
+      else if (it.act === 'Locked') { // padlock
+        const c = isT ? P.INK : P.CRM; ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(mx, my - 2 + bob, rad * .3, Math.PI, 0); ctx.stroke();
+        ctx.fillStyle = c; ctx.fillRect(mx - rad * .45, my - 2 + bob, rad * .9, rad * .62);
+      }
       else if (it.act === 'Push') { ctx.fillStyle = isT ? P.INK : P.CRM; ctx.font = '900 12px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.fillText('?', mx, my + 4 + bob); }
       else { ART.dot(ctx, mx, my + bob, 3, P.INK); }
       ctx.globalAlpha = 1;
@@ -1566,7 +1650,7 @@
       ctx.lineWidth = 4.5; ctx.strokeStyle = P.LILD; ctx.beginPath(); ctx.arc(x, y, 13, 0, 6.28); ctx.stroke();
       ctx.strokeStyle = P.ORA; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(x, y, 13, -Math.PI / 2, -Math.PI / 2 + k * 6.283); ctx.stroke(); ctx.lineCap = 'butt';
       ctx.fillStyle = P.CRM; ctx.font = '800 9px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.fillText(Math.floor(k * 100) + '%', x, y + 3.5);
-      const lbl = (s.it.act === 'Push' ? 'pushing' : 'searching') + ' · ' + s.it.name.toLowerCase();
+      const lbl = ({ Push: 'pushing', Pry: 'prying', Move: 'moving', 'Pull down': 'pulling', Climb: 'climbing' }[s.it.act] || 'searching') + ' · ' + s.it.name.toLowerCase();
       ctx.font = '800 10px system-ui,sans-serif'; const tw = ctx.measureText(lbl).width + 14;
       ctx.fillStyle = 'rgba(17,20,47,.85)'; ART.rr(ctx, x - tw / 2, y - 37, tw, 16, 8); ctx.fill();
       ctx.fillStyle = P.CRM; ctx.fillText(lbl, x, y - 25.5);
@@ -1579,7 +1663,7 @@
         ctx.globalAlpha = 1;
       }
       if (z.alertT > 0 || z.st === 'windup') {
-        const x = z.x, y = z.y - 92 - (z.st === 'windup' ? 4 : 0);
+        const x = z.x, y = z.y - (z.kind === 'turkey' ? 84 : 92) - (z.st === 'windup' ? 4 : 0);
         const red = z.st === 'windup';
         const sc = red ? 1 + Math.sin(G.t * 30) * .08 : 1;
         ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);
@@ -1588,10 +1672,10 @@
         ctx.restore();
         if (red) { ctx.globalAlpha = .25 + .2 * Math.sin(G.t * 30); ctx.fillStyle = P.RED; ctx.beginPath(); ctx.ellipse(z.x + Math.sign(G.p.x - z.x) * 22, z.y, 34, 14, 0, 0, 6.28); ctx.fill(); ctx.globalAlpha = 1; }
       }
-      if (!z.dead && z.hp < 100) {
-        const w = 40, x = z.x - w / 2, y = z.y - 84;
+      if (!z.dead && z.hp < (z.maxHp || 100)) {
+        const w = 40, x = z.x - w / 2, y = z.y - (z.kind === 'turkey' ? 76 : 84);
         ART.rr(ctx, x - 2, y - 2, w + 4, 9, 4); ctx.fillStyle = P.INK; ctx.fill();
-        ART.rr(ctx, x, y, w * Math.max(0, z.hp) / 100, 5, 2.5); ctx.fillStyle = P.GRN; ctx.fill();
+        ART.rr(ctx, x, y, w * Math.max(0, z.hp) / (z.maxHp || 100), 5, 2.5); ctx.fillStyle = P.GRN; ctx.fill();
       }
     }
     // damage numbers
@@ -1621,7 +1705,7 @@
   function hud() {
     const p = G.p;
     hpFill.style.width = p.hp + '%'; stFill.style.width = p.sta + '%';
-    const hudKey = [Math.round(p.hp), G.pack.length, G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5), SK.xp].join('|');
+    const hudKey = [Math.round(p.hp), G.pack.length, packCount('lockpick'), G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5), SK.xp].join('|');
     if (hudKey !== lastHud) {
       lastHud = hudKey;
       hpVal.textContent = Math.ceil(p.hp);
@@ -1637,7 +1721,8 @@
       if (t && p.st !== 'down') {
         useBtn.classList.add('on'); useLbl.classList.add('on');
         const loud = !t.corpse && t.act === 'Search' && t.noise >= 4;
-        useLbl.innerHTML = `${t.act} <b>${t.name}</b>${loud ? '<em>loud</em>' : ''}`;
+        if (t.act === 'Locked') { const n = packCount('lockpick'), cb = hasItem('crowbar'); useLbl.innerHTML = `Locked <b>${t.name}</b>` + (n || cb ? `<em class="opt">${[n ? `pick ${n}` : '', cb ? 'pry' : ''].filter(Boolean).join(' / ')}</em>` : ''); }
+        else useLbl.innerHTML = `${t.act} <b>${t.name}</b>${loud ? '<em>loud</em>' : ''}`;
       } else { useBtn.classList.remove('on'); useLbl.classList.remove('on'); }
     }
     $('#hp').classList.toggle('low', p.hp < 35);
@@ -1673,7 +1758,7 @@
   function itemCard(e, onTap, extra = '', cls = '') {
     const it = ITEMS[e.k], el = document.createElement('button');
     el.className = 'slot' + (it.rare ? ' rare' : '') + cls;
-    el.innerHTML = `<img alt="" src="${ART.iconURL[it.i]}"><span>${it.n}</span>${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${extra}`;
+    el.innerHTML = `<img alt="" src="${ART.iconURL[it.i]}"><span>${it.n}</span>${it.tag ? `<small class="tag">${it.tag}</small>` : ''}${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${extra}`;
     el.addEventListener('click', ev => { ev.stopPropagation(); onTap(el); });
     return el;
   }
@@ -1681,7 +1766,7 @@
     const rm = it.corpse ? 'Zombie' : ROOMNAME[o.room] || '';
     G.sheet = { kind: 'loot', o, it };
     $('#shKick').textContent = (it.corpse ? 'Corpse' : rm) + ' · searched';
-    $('#shTitle').textContent = it.corpse ? 'Zombie remains' : o.name;
+    $('#shTitle').textContent = it.corpse ? (o.kind === 'turkey' ? 'Zombie turkey' : 'Zombie remains') : o.name;
     renderLoot();
     sheet.classList.add('on');
   }
@@ -1757,6 +1842,130 @@
   }
   $('#shTake').addEventListener('click', e => { e.stopPropagation(); takeAll(); });
   $('#shClose').addEventListener('click', e => { e.stopPropagation(); closeSheet(); });
+
+  // ---- locks: choose pick or pry (two buttons in the sheet)
+  function openLockChoice(it) {
+    const o = it.obj, L = LOCKS[o.locked], n = packCount('lockpick'), cb = hasItem('crowbar');
+    if (!n && !cb) { toast('Locked. You need lockpicks or a crowbar.', 1.8); SFX.play('alert'); return; }
+    G.sheet = { kind: 'lock', it };
+    $('#shKick').textContent = `${ROOMNAME[o.room]} · ${L.name.toLowerCase()} lock`;
+    $('#shTitle').textContent = o.name;
+    $('#shGrid').innerHTML = `<div class="empty lockinfo">Locked. Picking is silent but takes a steady hand.<br>Prying always works - loud, and things inside can break.</div>`;
+    $('#shTake').style.display = 'none'; $('#shCap').textContent = '';
+    const acts = $('#shActs'); acts.innerHTML = '';
+    const bp = document.createElement('button'); bp.textContent = n ? `Pick (${n} pick${n > 1 ? 's' : ''})` : 'No picks'; bp.disabled = !n;
+    bp.onclick = ev => { ev.stopPropagation(); closeSheet(); openLock(o); };
+    const bc = document.createElement('button'); bc.className = 'ghost'; bc.textContent = cb ? 'Pry (crowbar)' : 'No crowbar'; bc.disabled = !cb;
+    bc.onclick = ev => { ev.stopPropagation(); closeSheet(); startPry(it); };
+    acts.append(bp, bc);
+    sheet.classList.add('on');
+  }
+  function startPry(it) {
+    const p = G.p, o = it.obj;
+    p.st = 'search'; p.stT = 0;
+    p.search = { it: { obj: o, act: 'Pry', name: o.name, rect: it.rect, noise: 7.5, pry: true, done: () => { o.locked = null; o.pried = true; o._key = null; SFX.play('kill'); G.shake = 8; emitNoise(o.x + o.w / 2, o.y + o.h, 9); finishPry(it); } }, t: 0, dur: 2.6 + (o.time > 2.5 ? 1 : .4), nextNoise: .2, nextFx: 0 };
+    SFX.play('scrape');
+  }
+  function finishPry(it) { // pried open: the normal search happens straight away (with a chance to smash something)
+    const p = G.p; p.search = { it: { obj: it.obj, act: 'Search', name: it.obj.name, rect: it.rect, noise: it.obj.noise, pry: true }, t: 0, dur: .01 }; finishSearch();
+  }
+
+  // ---- lockpick mini-game (game keeps running behind it)
+  const LP = { on: false };
+  const lpEl = $('#lockpick'), lpCv = $('#lpCv'), lpc = lpCv.getContext('2d');
+  function openLock(o) {
+    const L = LOCKS[o.locked];
+    if (o.sweet == null) o.sweet = 15 + Math.random() * 150; // stays the same for this lock, even after a snapped pick
+    Object.assign(LP, { on: true, o, L, w: L.w * LOCK_EASE, ang: 90, turn: 0, strain: 0, hold: false, click: 0, shake: 0, msg: '', snapT: 0, open: 0 });
+    $('#lpTitle').textContent = o.name; $('#lpKick').textContent = L.name + ' lock';
+    lpEl.classList.add('on'); G.p.st = 'free';
+    const p = G.p, dx = o.x + o.w / 2 - p.x; if (Math.abs(dx) > 3) p.flip = dx < 0;
+  }
+  function closeLock(msg) { LP.on = false; LP.hold = false; lpEl.classList.remove('on'); if (msg) toast(msg, 1.6); }
+  function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* not supported */ } }
+  function updateLock(dt) {
+    if (!LP.on) return;
+    if (LP.open) { LP.open += dt; LP.turn = Math.min(1, LP.turn + dt * 4); if (LP.open > .55) { const o = LP.o; closeLock(); o.locked = null; o._key = null; gainXP(LP.L.xp, G.p.x, G.p.y); startSearch({ obj: o, act: 'Search', name: o.name, rect: furnRect(o), noise: o.noise }); } return; }
+    if (keys.has('KeyA') || keys.has('ArrowLeft')) LP.ang = clamp(LP.ang - 70 * dt, 0, 180);
+    if (keys.has('KeyD') || keys.has('ArrowRight')) LP.ang = clamp(LP.ang + 70 * dt, 0, 180);
+    const hold = LP.hold || keys.has('Space') || keys.has('KeyW') || keys.has('ArrowUp');
+    const dist = Math.abs(LP.ang - LP.o.sweet), half = LP.w / 2;
+    // how far the cylinder can turn before it binds: full inside the sweet spot, falling off over ~50 degrees
+    const maxTurn = dist <= half ? 1 : clamp(1 - (dist - half) / 50, 0, .92);
+    LP.close = clamp(1 - dist / 60, 0, 1);
+    if (hold) {
+      LP.turn = Math.min(maxTurn, LP.turn + dt * 1.5);
+      if (LP.turn >= maxTurn - .001 && maxTurn < 1) { // bound: strain the pick
+        LP.strain += dt; LP.shake = 1;
+        if (Math.random() < dt * 8) buzz(12);
+        if (LP.strain >= 1.2) snapPick();
+      } else LP.shake = 0;
+      LP.click -= dt;
+      if (LP.click <= 0 && LP.turn < maxTurn) { LP.click = .2 - .14 * LP.close; if (SFX.ac) SFX.tone('square', 900 + 1300 * LP.close, 700 + 900 * LP.close, .025, .025); if (LP.close > .7) buzz(6); }
+      if (LP.turn >= 1) { LP.open = .001; SFX.play('kill'); SFX.tone('triangle', 220, 110, .2, .12); buzz([20, 30, 40]); }
+    } else { LP.turn = Math.max(0, LP.turn - dt * 3); LP.shake = 0; LP.strain = Math.max(0, LP.strain - dt * .35); }
+    if (LP.snapT > 0) LP.snapT -= dt;
+  }
+  function snapPick() {
+    usePack('lockpick'); LP.strain = 0; LP.turn = 0; LP.snapT = .5; LP.hold = false;
+    if (SFX.ac) { SFX.tone('square', 2400, 600, .06, .08); SFX.noise(.08, 'highpass', 3000, 1500, .1, 1); }
+    buzz(60);
+    const n = packCount('lockpick');
+    if (!n) closeLock('Last pick snapped');
+    else LP.msg = `Snap! ${n} pick${n > 1 ? 's' : ''} left`;
+  }
+  function drawLock() {
+    if (!LP.on) return;
+    const dpr = DEV.dpr, W = lpCv.clientWidth, H = lpCv.clientHeight;
+    if (lpCv.width !== Math.round(W * dpr)) { lpCv.width = Math.round(W * dpr); lpCv.height = Math.round(H * dpr); }
+    const c = lpc; c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+    const cx = W / 2, cy = H * .6, R = Math.min(W, H) * .36;
+    const sh = LP.shake ? (Math.random() - .5) * 3 : 0;
+    // housing
+    c.fillStyle = '#2a2440'; c.beginPath(); c.arc(cx, cy, R + 18, 0, 6.29); c.fill(); c.lineWidth = 4; c.strokeStyle = P.INK; c.stroke();
+    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28 + .3; ART.dot(c, cx + Math.cos(a) * (R + 9), cy + Math.sin(a) * (R + 9), 3, '#4a4466'); }
+    // cylinder turns with tension
+    const rot = LP.turn * Math.PI / 2;
+    c.save(); c.translate(cx + sh, cy); c.rotate(rot);
+    c.fillStyle = '#c9a85a'; c.beginPath(); c.arc(0, 0, R, 0, 6.29); c.fill(); c.lineWidth = 3.5; c.strokeStyle = P.INK; c.stroke();
+    c.fillStyle = '#e0c47a'; c.beginPath(); c.arc(0, 0, R * .78, 0, 6.29); c.fill();
+    // keyway
+    c.fillStyle = P.INK; c.beginPath(); c.moveTo(-6, -R * .55); c.lineTo(6, -R * .55); c.lineTo(4, R * .2); c.lineTo(10, R * .35); c.lineTo(-10, R * .35); c.lineTo(-4, R * .2); c.closePath(); c.fill();
+    c.restore();
+    // tension wrench at the bottom of the keyway, moving with the cylinder
+    c.save(); c.translate(cx + sh, cy); c.rotate(rot); c.strokeStyle = P.INK; c.lineWidth = 9; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(0, R * .3); c.lineTo(0, R * .62); c.lineTo(R * .9, R * .62); c.stroke();
+    c.strokeStyle = '#9aa0b4'; c.lineWidth = 4.5; c.stroke(); c.restore();
+    // the pick, from the keyway out at the chosen angle (0 = left, 180 = right, over the top)
+    const a = Math.PI + LP.ang / 180 * Math.PI, jit = LP.shake ? (Math.random() - .5) * .05 : 0, bend = Math.min(1, LP.strain / 1.2);
+    c.save(); c.translate(cx + sh, cy); c.rotate(a + jit);
+    c.lineCap = 'round';
+    c.strokeStyle = P.INK; c.lineWidth = 8; c.beginPath(); c.moveTo(4, 0); c.quadraticCurveTo(R * .7, -bend * 12, R * 1.3, -bend * 4); c.stroke();
+    c.strokeStyle = LP.snapT > 0 ? '#ff5a48' : bend > .55 ? '#f0b090' : '#d8dceb'; c.lineWidth = 4; c.stroke();
+    c.fillStyle = P.LIL; c.strokeStyle = P.INK; c.lineWidth = 3; ART.rr(c, R * 1.2, -9, R * .42, 18, 6); c.fill(); c.stroke();
+    c.restore();
+    // tension meter
+    const mw = W * .62, mx = cx - mw / 2, my = H * .1;
+    c.fillStyle = 'rgba(17,20,47,.9)'; ART.rr(c, mx - 3, my - 3, mw + 6, 16, 8); c.fill();
+    const tcol = bend > .66 ? '#ff5a48' : bend > .33 ? P.ORA : P.GRN;
+    c.fillStyle = tcol; ART.rr(c, mx, my, Math.max(6, mw * bend), 10, 5); c.fill();
+    c.textAlign = 'center';
+    if (LP.open) { c.fillStyle = P.GRN; c.font = '900 15px system-ui,sans-serif'; c.fillText('CLUNK - IT OPENS', cx, my + 30); }
+    else if (LP.msg) { c.fillStyle = '#ff8a7a'; c.font = '900 13px system-ui,sans-serif'; c.fillText(LP.msg.toUpperCase(), cx, my + 30); }
+    else { c.fillStyle = P.MUTE; c.font = '900 10px system-ui,sans-serif'; c.fillText('PICK STRAIN', cx, my + 28); }
+    $('#lpPicks').textContent = `${packCount('lockpick')} pick${packCount('lockpick') === 1 ? '' : 's'}`;
+  }
+  // input: drag horizontally anywhere on the lock to aim, hold TURN to apply tension
+  let lpDrag = null;
+  lpCv.addEventListener('pointerdown', e => { SFX.init(); lpDrag = { x: e.clientX, a: LP.ang, id: e.pointerId }; lpCv.setPointerCapture(e.pointerId); e.preventDefault(); });
+  lpCv.addEventListener('pointermove', e => { if (!lpDrag || e.pointerId !== lpDrag.id || LP.hold) return; LP.ang = clamp(lpDrag.a + (e.clientX - lpDrag.x) * .55, 0, 180); });
+  const lpUp = e => { if (lpDrag && e.pointerId === lpDrag.id) lpDrag = null; };
+  lpCv.addEventListener('pointerup', lpUp); lpCv.addEventListener('pointercancel', lpUp);
+  const turnB = $('#lpTurn');
+  turnB.addEventListener('pointerdown', e => { SFX.init(); e.preventDefault(); LP.hold = true; turnB.classList.add('down'); LP.msg = ''; });
+  const tUp = () => { LP.hold = false; turnB.classList.remove('down'); };
+  turnB.addEventListener('pointerup', tUp); turnB.addEventListener('pointercancel', tUp); turnB.addEventListener('pointerleave', tUp);
+  $('#lpClose').addEventListener('click', e => { e.stopPropagation(); closeLock(); });
 
   // ---- level up popup
   let lvlTimer = 0;
@@ -1836,7 +2045,7 @@
 
   // debug / test hooks
   const DM = window.DM = {
-    get G() { return G; }, gateOpen, fps: 0, ms: 0, SK, scavLvl, XPCUM, openPack, dropItem,
+    get G() { return G; }, gateOpen, LP, EVENT, fps: 0, ms: 0, SK, scavLvl, XPCUM, openPack, dropItem,
     tp(tx, ty) { G.p.x = tx * T; G.p.y = ty * T; G.p.vx = G.p.vy = 0; G.cam.x = G.p.x; G.cam.y = G.p.y - 34; },
     face(x, y) { G.p.fx = x; G.p.fy = y; if (x) G.p.flip = x < 0; },
     target() { const t = findTarget(); return t ? { act: t.act, name: t.name } : null; },
@@ -1855,6 +2064,7 @@
     DEV.fs = Math.min(2, DEV.dpr * DEV.zoom); buildStatic();
     G.cam.x = G.p.x; G.cam.y = G.p.y - 120;
     addEventListener('resize', resize);
+    if (EVENT) document.body.classList.add('event');
     $('#loading').remove();
     DM.ready = true;
     requestAnimationFrame(t => { last = t; frame(t); });
