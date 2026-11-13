@@ -130,16 +130,17 @@
     wallCells = []; doorLeaves = []; wallRects = new Array(MW * MH).fill(null).map(() => []);
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
       if (isVoid(x, y)) { wallRects[y * MW + x].push({ x: x * T, y: y * T, w: T, h: T }); continue; }
+      const shut = keyShut(x, y);
       const horizDoor = isDoor(x, y) && isWall(x - 1, y) && isWall(x + 1, y);
       if (horizDoor) {
         wallCells.push({ x, y, lintel: true, key: (y + 1) * T, cut: 1 });
-        if (ch(x, y) !== '=') { // open door leaf, hinged on the west jamb, swung into the room below (front door: into the hall)
+        if (ch(x, y) !== '=' && !shut) { // open door leaf, hinged on the west jamb, swung into the room below (front door: into the hall)
           const dir = (x + ',' + y) === L.frontDoor ? -1 : 1, g0 = (y + 1) * T - WT / 2, g1 = g0 + dir * T * .72;
           doorLeaves.push({ x0: x * T + 2, x1: x * T + 8, y0: Math.min(g0, g1), y1: Math.max(g0, g1), key: Math.max(g0, g1), vert: true });
         }
         continue;
       }
-      if (isDoor(x, y) && isWall(x, y - 1) && isWall(x, y + 1)) { // vertical doorway: leaf swung into the hall (east)
+      if (isDoor(x, y) && !shut && isWall(x, y - 1) && isWall(x, y + 1)) { // vertical doorway: leaf swung into the hall (east)
         const gy = y * T + 4;
         doorLeaves.push({ x0: (x + 1) * T - 4, x1: (x + 1) * T - 4 + T * .7, y0: gy, y1: gy, key: gy + 1, vert: false });
       }
@@ -164,6 +165,7 @@
     }
     faceCache.clear(); fogMap = null;
   }
+  const keyShut = (x, y) => G.furn.some(f => f.keyDoor && (f.swing || 0) < 1 && f.tx === x && f.ty === y);
   let solidCell = new Uint8Array(MW * MH);
   function buildSolid() {
     solidCell = new Uint8Array(MW * MH);
@@ -290,7 +292,8 @@
   function dmgNum(x, y, v, col) { G.nums.push({ x, y, v, t: 0, col }); }
   // ---------------------------------------------------------------- interaction
   // secrets stay invisible until most of the house has been searched; no announcement when that happens
-  function gateOpen() { const C = G.furn.filter(f => f.lootable && !f.secretLoot && !f.lock); return C.filter(f => f.searched).length >= Math.ceil(C.length * gatePct()); }
+  const gateSet = () => G.furn.filter(f => f.lootable && !f.secretLoot && !f.lock && !f.car && !f.keyRoom);   // 0.8: brass-key spots never count
+  function gateOpen() { const C = gateSet(); return C.filter(f => f.searched).length >= Math.ceil(C.length * gatePct()); }
   const hasItem = k => G.pack.some(e => e.k === k) || (S().hands && S().hands.k === k);
   const hasPry = () => hasItem('crowbar') || hasItem('prybar');
   const packCount = k => G.pack.reduce((a, e) => a + (e.k === k ? e.n : 0), 0);
@@ -324,6 +327,22 @@
       }
     }
   }
+  // Standing exactly on a secret before the house is searched enough: a quiet nudge, once in a while.
+  // It only fires where the note's clue points, so the secret is still earned.
+  function secretHint() {
+    if (gateOpen()) return;
+    const p = G.p, now = performance.now();
+    for (const s of G.sec) {
+      if (s.found || (s.st || 0) > 0 || (s.hintAt && now - s.hintAt < 25000)) continue;
+      let here = false, msg = '';
+      if (s.type === 'rug') { const R = rugRect(s); here = p.x > R.x - 6 && p.x < R.x + R.w + 6 && p.y > R.y - 6 && p.y < R.y + R.h + 6; msg = 'The floor creaks here... look around the rest of the house first.'; }
+      else if (s.type === 'shelf') { const sh = G.furn[s.furn]; here = sh && !sh.slideState && p.x > sh.x + 4 && p.x < sh.x + sh.w - 4 && p.y - (sh.y + sh.h) < 24 && p.y > sh.y + sh.h - 4; msg = 'This shelf feels wrong... look around the rest of the house first.'; }
+      else if (s.type === 'attic') { here = Math.hypot(p.x - px(s.hatch.x), p.y - px(s.hatch.y)) < .75 * T; msg = 'There is a hatch up there... look around the rest of the house first.'; }
+      else if (s.type === 'panel') { const f = G.furn[s.furn]; here = f && !f.opened && Math.abs(p.x - (f.x + f.w / 2)) < f.w / 2 && p.y - (f.y + f.h) < 30 && p.y > f.y + f.h - 4; msg = 'This wall sounds hollow... look around the rest of the house first.'; }
+      if (here) { s.hintAt = now; toast(msg, 3); return; }
+    }
+  }
+  function searchedCount() { const C = gateSet(); return [C.filter(f => f.searched).length, C.length]; }
   function foundSecret(s) { if (!s.found) { s.found = true; gainXP(8, G.p.x, G.p.y); if (DM.Game && DM.Game.onSecret) DM.Game.onSecret(); } }
   function moveRug(s) { s.st = 1; SFX.play('whoosh'); const R = rugRect(s); puff(R.x + R.w * .8, R.y + R.h * .7, 2, 8, 'rgba(234,210,164,.5)', 50, .7, 3); }
   function pryBoard(s) {
@@ -350,7 +369,9 @@
   function interactables() {
     const out = [];
     for (const f of G.furn) {
+      if (f.keyDoor) { if (f.keyLock) out.push({ obj: f, act: hasKeyNow() ? 'Unlock' : 'KeyLocked', rect: furnRect(f), name: 'door', keyLock: 1 }); continue; }   // 0.8: key-locked room
       if (!f.lootable) continue;
+      if (f.keyLock) { out.push({ obj: f, act: hasKeyNow() ? 'Unlock' : 'KeyLocked', rect: furnRect(f), name: 'car', keyLock: 1 }); continue; }   // 0.8: locked car
       if (f.bedOf && (f.bedOf.st === 'sleep' || f.bedOf.st === 'rise')) continue; // someone is sleeping on it
       let act = null;
       if (f.locked) act = 'Locked';
@@ -374,7 +395,10 @@
     for (const it of interactables()) {
       const d = rectDist(p.x, p.y, it.rect);
       if (d > 36) continue;
-      const score = d + rectDist(fx, fy, it.rect) * .5;
+      // A secret action (Move rug, Pry floorboard, Push bookshelf...) only exists while she is standing
+      // in its spot, so it must win over the furniture beside it - a desk with a leftover item kept
+      // showing "Open Desk" and hid the rug.
+      const score = d + rectDist(fx, fy, it.rect) * .5 - (it.secret ? 1000 : 0);
       if (score < bd) { bd = score; best = it; }
     }
     return best;
@@ -387,6 +411,8 @@
     if (it.act === 'Open') { openLoot(o, it); return; }
     if (it.drop) { pickUp(o); return; }
     if (it.act === 'Locked') { openLockChoice(it); return; }
+    if (it.act === 'KeyLocked') { toast(it.name === 'car' ? 'Locked - needs a brass key in your pack' : 'Key-locked door - needs a brass key in your pack', 2); SFX.play('alert'); return; }
+    if (it.act === 'Unlock') { useKey(it); return; }
     const dur = it.dur || (it.act === 'Push' ? 1.7 : (it.corpse ? 1.4 : o.time) * searchMul());
     p.st = 'search'; p.stT = 0; p.search = { it, t: 0, dur, nextNoise: .25, nextFx: 0 };
     if (it.act === 'Search' && (o.art === 'fridge' || o.art === 'wardrobe' || o.art === 'coat' || o.art === 'pantry')) SFX.play('open');
@@ -403,11 +429,31 @@
     const keys = it.corpse ? (EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse')) : o.pre.slice();
     if (keys.length && Math.random() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot); if (more.length) keys.push(more[0]); }
     o.loot0 = toStacks(keys);
+    // A torn note remembers the house it came from, so reading it somewhere else is not misleading.
+    for (const e of o.loot0) if (e.k === 'note') e.d = { addr: L.address, text: L.note || '' };
     if (it.pry && o.loot0.length && Math.random() < .25) { const i = Math.floor(Math.random() * o.loot0.length), sm = o.loot0[i]; sm.n--; if (!sm.n) o.loot0.splice(i, 1); toast('Smashed: ' + ITEMS[sm.k].n.toLowerCase(), 1.8); }
     // xp: bigger containers teach more, the hidden stash a lot
     gainXP(it.corpse ? 2 : 2 + (o.time >= 2.2 ? 1 : 0) + (o.rare ? 6 : 0), G.p.x, G.p.y);
     o._key = null;
     openLoot(o, it);
+  }
+  // ---- 0.8: brass keys open locked cars and key-locked rooms (nothing else does). The key is used up.
+  const hasKeyNow = () => G.pack.some(e => e.k === 'key');
+  function useKey(it) {
+    const o = it.obj, i = G.pack.findIndex(e => e.k === 'key'); if (i < 0) return;
+    const e = G.pack[i]; e.n--; if (!e.n) G.pack.splice(i, 1);
+    lastHud = ''; SFX.play('unlock'); DM.Game && DM.Game.save();
+    if (o.keyDoor) {
+      o.keyLock = null; o.solid = 0; o.swing = .001; o._key = null; buildSolid();
+      setTimeout(() => SFX.play('creak'), 260);
+      emitNoise(o.x + o.w / 2, o.y + o.h, 2.5);
+      toast('Click. The brass key turns - the door swings open', 2.2); gainXP(4, G.p.x, G.p.y);
+    } else {
+      for (const f of G.furn) if (f.car && f.keyLock) { f.keyLock = null; f._key = null; }
+      setTimeout(() => SFX.play('creak'), 220);
+      emitNoise(o.x + o.w / 2, o.y + o.h, 3);
+      toast('Unlocked the car - glove box and trunk are open to search', 2.2); gainXP(3, G.p.x, G.p.y);
+    }
   }
   function cancelSearch() { const p = G.p; if (p.st === 'search') { p.st = 'free'; p.search = null; } }
 
@@ -809,6 +855,7 @@
       G.fog[k] = lerp(G.fog[k], target, 1 - Math.exp(-(target < G.fog[k] ? 5 : 2) * dt));
     }
     G.noiseLvl = Math.max(0, G.noiseLvl - dt * .28);
+    for (const f of G.furn) if (f.keyDoor && f.swing && f.swing < 1) { f.swing = Math.min(1, f.swing + dt * 2.4); f._key = null; if (f.swing >= 1) { buildWalls(); buildSolid(); } }
     // particles
     for (const q of G.parts) {
       q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= Math.exp(-2.2 * dt); q.vy *= Math.exp(-2.2 * dt);
@@ -964,7 +1011,7 @@
     }
   }
   function furnCanvas(f) {
-    const key = (f.searched ? 1 : 0) + ':' + (f.slide || 0).toFixed(2);
+    const key = (f.searched ? 1 : 0) + ':' + (f.slide || 0).toFixed(2) + (f.keyLock ? ':k' : '') + (f.swing ? ':' + f.swing.toFixed(2) : '');
     if (f._key === key && f._c) return f._c;
     const fs = DEV.fs, g = ART.geo(f);
     const bx = f.x - 16, by = g.ty0 - 40, bw = f.w + 32, bh = f.y + f.h + 8 - by;
@@ -1507,11 +1554,15 @@
       const n = Math.round(G.noiseLvl * 5);
       noiseBars.forEach((b, i) => b.classList.toggle('on', i < n));
       $('#noise').classList.toggle('hot', n >= 4);
+      { const [a, b] = searchedCount(), el = $('#srch'); if (el) el.textContent = b ? `searched ${a}/${b}` : ''; }
+      if (p.st !== 'down') secretHint();
       const t = G.target;
       if (t && p.st !== 'down') {
         useBtn.classList.add('on'); useLbl.classList.add('on');
         const loud = !t.corpse && t.act === 'Search' && t.noise >= 4;
         if (t.act === 'Locked') { const n = packCount('lockpick'), cb = hasPry(); useLbl.innerHTML = `Locked <b>${t.name}</b>` + (n || cb ? `<em class="opt">${[n ? `pick ${n}` : '', cb ? 'pry' : ''].filter(Boolean).join(' / ')}</em>` : ''); }
+        else if (t.act === 'KeyLocked') useLbl.innerHTML = `Locked <b>${t.name}</b><em class="opt">needs a brass key</em>`;
+        else if (t.act === 'Unlock') useLbl.innerHTML = `Unlock <b>${t.name}</b><em class="opt">uses a brass key</em>`;
         else useLbl.innerHTML = `${t.act} <b>${t.name}</b>${loud ? '<em>loud</em>' : ''}`;
       } else { useBtn.classList.remove('on'); useLbl.classList.remove('on'); }
     }
@@ -1657,7 +1708,11 @@
       const msg = DM.Game.applyUse(e.k); if (!msg) return;
       e.n--; if (!e.n) G.pack.splice(i, 1); lastHud = ''; SFX.play('pick'); toast(msg, 1.8); openPack(); return;
     }
-    if (e.k === 'note') { $('#shActs').innerHTML = `<div class="note">${L.note || '"...the rest is torn away."'}</div>`; SFX.play('pick'); return; }
+    if (e.k === 'note') {
+      const nd = e.d && typeof e.d === 'object' ? e.d : { addr: L.address, text: L.note };   // old notes: assume this house
+      const here = nd.addr === L.address;
+      $('#shActs').innerHTML = `<div class="note">${nd.text || '"...the rest is torn away."'}<br><small>Found at <b>${nd.addr || 'a house'}</b>${here ? ' - this house.' : ' - not this house. The clue is about that place.'}</small></div>`;
+      SFX.play('pick'); return; }
     if (it.hp) p.hp = Math.min(maxHp(), p.hp + it.hp);
     const fed = F.isFood(e.k) ? F.eat(S(), e.k) : '';
     if (it.sta) p.sta = Math.min(F.staMax(), p.sta + it.sta);

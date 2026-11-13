@@ -1024,6 +1024,7 @@ const NEXT_VERSION = '0.8';
       const tags = [h.nLocks ? `${h.nLocks} lock${h.nLocks > 1 ? 's' : ''}` : 'no locks', `${h.nZombies} zombie${h.nZombies === 1 ? '' : 's'}`];
       const bs = !done && !far ? EVS.bossFor(layoutOf(h)) : null;   // event mini-boss: scouts spot it from the street
       if (bs) tags.push(`<b class="evtag">${esc(bs.name.toLowerCase())} · ${bs.where}</b>`);
+      if (!done && !far && h.type !== 'tutorial') { const HL = layoutOf(h); if (HL.car) tags.push('parked car'); if (HL.keyRoom) tags.push('key-locked room'); }   // 0.8: brass-key spots
       return `<div class="hcard${done ? ' done' : ''}${h.type === 'tutorial' ? ' tut' : ''}${q ? ' quest' : ''}">
         ${typeIcon(h.type)}
         <div class="hinfo"><div class="hname">${T.n} <em>${T.size}</em>${h.type === 'tutorial' ? ' <em class="first">first house</em>' : ''}${q ? ` <em class="first">quest: ${D.QUESTS[q.type].n.toLowerCase()}</em>` : ''}</div>
@@ -1199,7 +1200,7 @@ const NEXT_VERSION = '0.8';
     }
     if (it.use && it.use !== 'Read' && (it.hp || it.sta || FD.isFood(e.k)) && !it.slots) btns.push([it.use, () => { if (FD.isFood(e.k)) { const m = eatEntry(s, sel.from, sel.i); done(`${FD.verb(e.k)} ${it.n.toLowerCase()} · ${m}`); return; } s.hp = Math.min(maxHp(s), s.hp + (it.hp || 0)); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(`${it.n}: +${it.hp || 0} HP`); }]);
     if (it.slots || it.bp || e.k === 'shoes' || e.k === 'lockset') btns.push([it.use, () => { const msg = Game.applyUse(e.k); if (!msg) return; e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(msg); }]);
-    if (e.k === 'note') btns.push(['Read', () => toast('The note is too faded to make sense of here.', 2)]);
+    if (e.k === 'note') btns.push(['Read', () => { const nd = e.d && typeof e.d === 'object' ? e.d : null; toast(nd && nd.text ? nd.text + '  (found at ' + nd.addr + ')' : 'The note is too faded to make sense of here.', nd ? 5 : 2); }]);
     if (it.gift) btns.push(['Open', () => {
       e.n--; if (!e.n) s[sel.from].splice(sel.i, 1);
       const stacks = D.toStacks(D.rollLoot('giftbox')), lost = [];

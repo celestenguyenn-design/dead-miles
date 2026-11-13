@@ -307,18 +307,21 @@
     }
     if (secTypes.includes('rug')) {
       const tables = furn.filter(f => (f.table || f.art === 'coffee' || f.desk) && !f.pocket);
+      const rdist = reach();   // the loose board must be a floor cell she can actually stand on
       for (const t of shuffle(tables)) {
         const r = roomOfCh[t.room];
         const rx0 = Math.max(r.x0, t.at[0] - 1), ry0 = Math.max(r.y0, t.at[1] - 1), rx1 = Math.min(r.x1, t.at[0] + t.at[2]), ry1 = Math.min(r.y1, t.at[1] + t.at[3]);
-        const cells = [];
+        const cells = [], good = [];
         for (let y = ry0; y <= ry1; y++) for (let x = rx0; x <= rx1; x++) if (!occ[y][x] && (y === t.at[1] + t.at[3] || x === t.at[0] + t.at[2])) cells.push([x, y]);
         if (!cells.length) continue;
-        const [bx, by] = pick(cells); occ[by][bx] = 3;
+        // 0.8: prefer a board cell she can stand on (also left of the table). Same single roll as before, so seeds keep their houses.
+        for (let y = ry0; y <= ry1; y++) for (let x = rx0; x <= rx1; x++) if (!occ[y][x] && rdist[y * MW + x] >= 0 && (y === t.at[1] + t.at[3] || x === t.at[0] + t.at[2] || x === t.at[0] - 1)) good.push([x, y]);
+        const v = rnd(), orig = cells[Math.floor(v * cells.length)], use = good.length ? good : cells, [bx, by] = use[Math.floor(v * use.length)]; occ[orig[1]][orig[0]] = 3;   // reserve the old cell: the rest of the house rolls exactly as before
         const holders = conts().filter(f => f.room !== t.room && !f.lockable);
         if (!holders.length) continue;
         const holder = pick(holders); (holder.extra = holder.extra || []).push('note'); holder.noEmpty = 1;
         L.note = t.table && ['kitchen', 'dining', 'breakroom'].includes(r.t) ? NOTES.supper : t.art === 'coffee' ? NOTES.tv : t.desk ? NOTES.desk : NOTES.any;
-        secOut.push({ type: 'rug', rug: { x: rx0 + .15, y: ry0 + .2, w: rx1 - rx0 + .7, h: ry1 - ry0 + .6 }, board: { x: bx, y: by }, room: t.room });
+        secOut.push({ type: 'rug', rug: { x: rx0 + .15, y: ry0 + .2, w: rx1 - rx0 + .7, h: ry1 - ry0 + .6 }, board: { x: bx, y: by }, orig: { x: orig[0], y: orig[1] }, room: t.room });
         break;
       }
     }
@@ -399,6 +402,8 @@
     for (const r of rooms) { if (r.hidden || r.isolated) continue; let any = false; for (let y = r.y0; y <= r.y1 && !any; y++) for (let x = r.x0; x <= r.x1; x++) if (fd[y * MW + x] >= 0) { any = true; break; } if (!any) return null; }
     for (const f of furn) if ((f.loot || f.mustReach) && !f.pocket && !accessible(f, fd)) return null;
 
+    // 0.8: if anything later landed on the preferred board cell (or it cannot be stood on), fall back to the old cell
+    for (const sc of secOut) if (sc.type === 'rug' && sc.orig) { const b = sc.board; if (occ[b.y][b.x] === 1 || fd[b.y * MW + b.x] < 0) sc.board = sc.orig; delete sc.orig; }
     // ---- output
     for (const r of rooms) { const def = ROOMS[r.t]; L.rooms[r.ch] = r.hidden ? { name: 'Hidden room', style: 's', hidden: true } : r.isolated ? { name: 'Attic', style: 'a', isolated: true } : { name: def ? def.n : 'Room', style: def ? def.st : 'h', kind: r.t }; }
     L.rooms.o = { name: front ? 'Sidewalk' : 'Stoop', style: 'o' };
@@ -420,7 +425,7 @@
     function keyExtras() {
       const kr = D.mulberry32((seed ^ 0x4b1d5eed) >>> 0);
       const kshuf = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(kr() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-      const pRoom = { mansion: .5, police: .5, school: .3 }[type] || .2, pCar = .25;
+      const pRoom = { mansion: .5, police: .5, school: .3 }[type] || .2, pCar = .34;
       const wantRoom = kr() < pRoom, wantCar = kr() < pCar;
       if (wantRoom) lockedRoom();
       if (wantCar) parkedCar();

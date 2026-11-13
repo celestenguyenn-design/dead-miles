@@ -475,6 +475,15 @@ const ART = (() => {
     if (lw) { ctx.lineWidth = lw; ctx.strokeStyle = P.INK; ctx.stroke(); }
   }
   function line(ctx, x1, y1, x2, y2, col, lw) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.stroke(); }
+  // brass padlock with a keyhole: marks a lock only a brass key opens (0.8)
+  function keyLockMark(ctx, x, y, big) {
+    const k = big ? 1.15 : 1;
+    ctx.save(); ctx.translate(x, y); ctx.scale(k, k);
+    ctx.beginPath(); ctx.arc(0, -6, 5.5, Math.PI, 0); ctx.lineWidth = 5.5; ctx.strokeStyle = '#11142f'; ctx.stroke(); ctx.lineWidth = 2.6; ctx.strokeStyle = '#b9bdcc'; ctx.stroke();
+    rr(ctx, -8, -6, 16, 13, 3); ctx.fillStyle = '#e0b94a'; ctx.fill(); ctx.lineWidth = 2.2; ctx.strokeStyle = '#11142f'; ctx.stroke();
+    ctx.fillStyle = '#11142f'; ctx.beginPath(); ctx.arc(0, -1.5, 2.2, 0, 6.29); ctx.fill(); ctx.fillRect(-1, -1.5, 2, 5.5);
+    ctx.restore();
+  }
   function dot(ctx, x, y, r, col) { ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fillStyle = col; ctx.fill(); }
 
   // deterministic hash for tile variation
@@ -1017,6 +1026,61 @@ const ART = (() => {
       ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(g.x + g.w * .28, g.ty0 + 18, 10, g.d * .4);
       for (const xx of [g.x + 10, g.x + g.w - 26]) { blk(ctx, xx, g.fy1 - 18, 16, 16, P.INK, 6, 0); dot(ctx, xx + 8, g.fy1 - 10, 3, '#9aa0b4'); }
       blk(ctx, g.x + 8, g.fy0 + 2, g.w - 16, 10, '#5e2a2a', 3, 2);
+    },
+    // 0.8: a parked car on the street (gen.js keyExtras). Drawn as one car split over two furniture halves
+    // (glove box at the front, trunk at the back); each half clips to its own footprint.
+    pcar(ctx, f, g) {
+      const C = f.car || { half: 0, col: 0, flip: 0 }, cols = [['#5f8fa8', '#7eaec4', '#46708a'], ['#c95f2c', '#e07a46', '#9e4520'], ['#7c9a4c', '#9ab86a', '#5c7836'], ['#9e3434', '#bc4c4c', '#7a2626'], ['#d8c9a0', '#ece0bc', '#b0a27a']][C.col % 5];
+      const W = g.w * 2, X0 = (C.half ^ C.flip) ? g.x - g.w : g.x, ty = g.ty0, fy0 = g.fy0, fy1 = g.fy1;
+      ctx.save(); ctx.beginPath(); ctx.rect(g.x, ty - 60, g.w, fy1 - ty + 70); ctx.clip();
+      if (C.flip) { ctx.translate(X0 * 2 + W, 0); ctx.scale(-1, 1); }   // front faces right
+      // shadow, wheels (the back one flat)
+      ctx.fillStyle = 'rgba(5,4,16,.4)'; ctx.beginPath(); ctx.ellipse(X0 + W / 2, fy1 - 3, W * .48, 7, 0, 0, 6.29); ctx.fill();
+      dot(ctx, X0 + 34, fy1 - 11, 12, P.INK); dot(ctx, X0 + 34, fy1 - 11, 4.5, '#9aa0b4');
+      ctx.beginPath(); ctx.ellipse(X0 + W - 36, fy1 - 8, 14, 8.5, 0, 0, 6.29); ctx.fillStyle = P.INK; ctx.fill(); dot(ctx, X0 + W - 36, fy1 - 10, 4, '#7a7f94');
+      // body: side (front face) + bonnet/roof/boot (top face)
+      rr(ctx, X0 + 3, ty + 4, W - 6, fy1 - 13 - ty, 13); ctx.fillStyle = cols[0]; ctx.fill();
+      rr(ctx, X0 + 3, ty + 4, W - 6, g.d + 2, 12); ctx.fillStyle = cols[1]; ctx.fill();
+      line(ctx, X0 + 6, fy0 + 2, X0 + W - 6, fy0 + 2, cols[2], 2.4);
+      blk(ctx, X0 + 2, fy1 - 22, W - 4, 7, '#3a3f58', 3, 2);   // bumper strip / sill
+      rr(ctx, X0 + 3, ty + 4, W - 6, fy1 - 13 - ty, 13); ctx.lineWidth = 2.6; ctx.strokeStyle = P.INK; ctx.stroke();
+      // cabin: roof and glass
+      const cx0 = X0 + W * .27, cw = W * .46;
+      rr(ctx, cx0, ty - 20, cw, 30, 9); ctx.fillStyle = '#2a3050'; ctx.fill(); ctx.lineWidth = 2.4; ctx.strokeStyle = P.INK; ctx.stroke();
+      blk(ctx, cx0 + 10, ty - 22, cw - 20, 13, cols[2], 6, 2.2);
+      ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(cx0 + cw - 22, ty - 6, 8, 12);
+      line(ctx, cx0 + cw * .5, ty - 9, cx0 + cw * .5, ty + 9, P.INK, 2);
+      // cracked windshield (front end of the glass)
+      ctx.strokeStyle = 'rgba(214,240,251,.75)'; ctx.lineWidth = 1.3; ctx.beginPath();
+      ctx.moveTo(cx0 + 12, ty - 2); ctx.lineTo(cx0 + 4, ty - 8); ctx.moveTo(cx0 + 12, ty - 2); ctx.lineTo(cx0 + 22, ty - 7); ctx.moveTo(cx0 + 12, ty - 2); ctx.lineTo(cx0 + 9, ty + 7); ctx.moveTo(cx0 + 12, ty - 2); ctx.lineTo(cx0 + 20, ty + 4); ctx.stroke();
+      // doors, handles, lights, rust
+      line(ctx, X0 + W * .5, fy0 + 4, X0 + W * .5, fy1 - 22, cols[2], 2);
+      line(ctx, X0 + W * .3, fy0 + 4, X0 + W * .3, fy1 - 22, cols[2], 2);
+      blk(ctx, X0 + W * .38, fy0 + 8, 10, 4, P.INK, 1, 0); blk(ctx, X0 + W * .58, fy0 + 8, 10, 4, P.INK, 1, 0);
+      dot(ctx, X0 + 10, fy0 + 8, 4.5, P.INK); dot(ctx, X0 + 10, fy0 + 8, 3, '#3a3f58');   // the broken headlight
+      blk(ctx, X0 + W - 13, fy0 + 4, 7, 9, '#d9483a', 2, 1.8);
+      ctx.fillStyle = 'rgba(122,64,40,.55)'; ctx.beginPath(); ctx.ellipse(X0 + W * .72, fy0 + 15, 9, 5, .3, 0, 6.29); ctx.ellipse(X0 + W * .16, ty + 12, 6, 3.5, -.2, 0, 6.29); ctx.fill();
+      // opened: trunk lid up / passenger door ajar
+      if (f.searched && C.half === 1) { blk(ctx, X0 + W - 52, ty - 16, 44, 20, cols[2], 5, 2.2); blk(ctx, X0 + W - 48, ty + 6, 36, 10, '#140f26', 3, 1.6); }
+      if (f.searched && C.half === 0) blk(ctx, X0 + W * .3 + 2, fy0 + 4, W * .2 - 4, fy1 - fy0 - 28, '#140f26', 2, 1.6);
+      ctx.restore();
+      if (f.keyLock) keyLockMark(ctx, g.x + g.w / 2, fy0 + 9);
+    },
+    // 0.8: the shut door of a key-locked room; swings open (f.swing 0..1) once a brass key turns
+    keydoor(ctx, f, g) {
+      const sw = f.swing || 0, T = f.w, x = g.x, fy1 = g.fy1;
+      if (sw >= 1) return;
+      if (!f.vert) { // in an east-west wall: a door you see face on
+        const w = (T - 8) * (1 - sw), y0 = fy1 - 56, h = 56 - 7;
+        blk(ctx, x + 4, y0, w, h, '#8a5a36', 3, 2.6);
+        if (w > 16) { blk(ctx, x + 9, y0 + 6, w - 10, h * .36, '#7a4c2c', 2, 1.6); blk(ctx, x + 9, y0 + h * .5, w - 10, h * .38, '#7a4c2c', 2, 1.6); dot(ctx, x + w - 3, y0 + h * .48, 3, '#e0b94a'); }
+        if (!sw) keyLockMark(ctx, x + T / 2, y0 + h * .45, 1);
+      } else { // in a north-south wall: the door's edge, with the sign hanging over it
+        const cx = x + T / 2, L = (T - 4) * (1 - sw), top = g.fy1 - 2 - L;
+        blk(ctx, cx - 7, top - 50, 14, L, '#a06a40', 3, 2.4);          // top edge
+        blk(ctx, cx - 7, top - 50 + L - 2, 14, 50, '#7a4c2c', 2, 2.4);  // south end
+        if (!sw) keyLockMark(ctx, cx, top - 62, 1);
+      }
     },
     washer(ctx, f, g) {
       box(ctx, g, '#e8e2d4', '#d4cfc0', 4);
