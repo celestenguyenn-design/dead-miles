@@ -257,6 +257,42 @@
   .job .kit { grid-column: 2; grid-row: 1 / span 2; display: grid; grid-template-columns: repeat(2, 28px); gap: 2px; align-content: center; }
   .job .kit i { position: relative; } .job .kit img { width: 28px; height: 28px; } .job .kit em { position: absolute; right: -2px; bottom: -2px; font-style: normal; font-size: 9px; font-weight: 900; color: var(--ora); }
   .job.on { border-color: var(--ora); box-shadow: 0 3px 0 var(--ora); background: #2a1f4a; } .job.on span { color: var(--crm); }
+  #qchip { display: none; max-width: 150px; padding: 5px 8px; border-radius: 10px; background: rgba(17,20,47,.9); border: 2px solid var(--ora); font-size: 10px; font-weight: 800; line-height: 1.35; color: var(--crm); text-align: right; }
+  #qchip.on { display: block; } #qchip b { color: var(--ora); } #qchip i { display: block; height: 3px; }
+  .msync { margin-top: 8px; font-size: 11px; font-weight: 800; color: var(--mute); }
+  .msync.online { color: var(--grn); } .msync.offline::before, .msync.signed-out::before, .msync.local::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--mute); margin-right: 6px; }
+  .msync.online::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--grn); margin-right: 6px; }
+  .pick { display: block; width: 100%; text-align: left; margin: 8px 0; padding: 12px 14px; border-radius: 16px; background: var(--plum); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); color: var(--crm); }
+  .pick b { display: block; font-size: 17px; font-weight: 900; color: var(--ora); } .pick span { font-size: 12px; font-weight: 700; color: var(--crm); }
+  .picons img { width: 22px; height: 22px; vertical-align: -6px; margin: 0 2px 0 6px; }
+  .hcard.trader { box-shadow: 0 4px 0 var(--grn); border-color: var(--ink); background: #1f2a2a; }
+  .hcard.quest { box-shadow: 0 4px 0 var(--ora); }
+  .hcard .hot { color: var(--ora); }
+  .hdays img, .tplace img, .qrew img, .caps img, .shoprow button img, .shoprow span img { width: 16px; height: 16px; vertical-align: -3px; }
+  .dotmini { overflow: hidden; display: grid; place-items: end center; } .dotmini svg { width: 58px; height: 68px; margin-bottom: -6px; }
+  .logo.small { flex: 1; font-size: 15px; text-align: center; }
+  .caps { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 12px; background: var(--ink); border: 2px solid var(--plum); font-size: 15px; font-weight: 900; }
+  .caps img { width: 22px; height: 22px; }
+  .tcard { display: flex; gap: 10px; padding: 12px 12px 12px 6px; border-radius: 20px; background: #1c1538; border: 3px solid var(--ink); box-shadow: 0 5px 0 var(--grn); }
+  .dotsvg { width: 110px; height: 128px; flex: none; }
+  .tinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .tname { font-size: 24px; font-weight: 900; line-height: 1; } .tplace { font-size: 11px; font-weight: 800; color: var(--mute); }
+  .tsay { margin: 4px 0; padding: 8px 10px; border-radius: 12px 12px 12px 2px; background: var(--crm); color: var(--ink); font-size: 13px; font-weight: 700; font-style: italic; line-height: 1.35; }
+  .tlvl { font-size: 11px; font-weight: 900; color: var(--grn); }
+  .qcard { position: relative; padding: 12px; margin-bottom: 8px; border-radius: 16px; background: #1c1538; border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--plum); }
+  .qcard.ready { box-shadow: 0 3px 0 var(--ora); border-color: var(--ora); }
+  .qhead { display: flex; align-items: center; gap: 8px; } .qhead b { font-size: 16px; font-weight: 900; } .qhead em { font-style: normal; font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 6px; background: var(--plum); }
+  .qprog { margin-left: auto; font-size: 12px; font-weight: 900; color: var(--ora); }
+  .qtext { margin: 5px 0; font-size: 13px; font-weight: 700; color: var(--crm); line-height: 1.35; } .qrew { font-size: 11px; font-weight: 800; color: var(--mute); margin-bottom: 8px; }
+  .shoprow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 6px; border-radius: 14px; background: #1c1538; border: 2.5px solid var(--ink); box-shadow: 0 3px 0 var(--plum); }
+  .shoprow > img { width: 38px; height: 38px; } .shoprow > div { flex: 1; min-width: 0; } .shoprow b { display: block; font-size: 14px; font-weight: 900; } .shoprow span { font-size: 11px; font-weight: 700; color: var(--mute); }
+  .shoprow.gone { opacity: .45; } .shoprow .mbtn { display: flex; align-items: center; gap: 4px; }
+  .recipe { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 6px; border-radius: 14px; background: #1c1538; border: 2.5px solid var(--ink); box-shadow: 0 3px 0 var(--plum); }
+  .recipe.no { opacity: .7; } .rout { position: relative; } .rout img { width: 44px; height: 44px; } .rout em { position: absolute; right: -4px; bottom: -2px; font-style: normal; font-size: 11px; font-weight: 900; color: var(--ora); }
+  .rinfo { flex: 1; min-width: 0; } .rinfo b { font-size: 13px; font-weight: 900; }
+  .rin { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 3px; } .rin span { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 900; } .rin img { width: 20px; height: 20px; }
+  .rin .ok { color: var(--grn); } .rin .miss { color: #ff8a7a; }
+  .mbtn:disabled { opacity: .5; }
   #loading { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 900; letter-spacing: .2em; color: var(--mute); font-size: 12px; }
   @keyframes pulse { to { filter: brightness(1.35); } }
   @keyframes pop { from { transform: scale(.6); opacity: 0; } }
@@ -281,6 +317,7 @@
       </div>
       <div id="skill"><span>SCAVENGING <b>Lv <i id="skLv">1</i></b></span><div class="xp"><i id="skXp"></i></div></div>
       <canvas id="mini" width="144" height="180"></canvas>
+      <div id="qchip"></div>
     </div>
   </div>
   <div id="toast"></div>
@@ -312,8 +349,10 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="../s2art.js"></script>
+<script src="s2art.js"></script>
 <script src="art.js"></script>
+<script src="net.js"></script>
+<script src="netpanel.js"></script>
 <script src="data.js"></script>
 <script src="engine.js"></script>
 <script src="gen.js"></script>
