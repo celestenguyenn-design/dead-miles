@@ -651,7 +651,7 @@ const NEXT_VERSION = '0.5';
       const x = canvas.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, canvas.width, canvas.height);
       x.fillStyle = 'rgba(8,6,22,.4)'; x.beginPath(); x.ellipse(canvas.width / 2, canvas.height * .9, canvas.width * .28, canvas.width * .07, 0, 0, 6.3); x.fill();
       const k = t / 1000, wk = getWeapon(); const w = wk && D.ITEMS[wk] ? D.ITEMS[wk].w : 'fists';
-      ART.drawRig(x, 'survivor', canvas.width / 2 - 4, canvas.height * .9, canvas.height / 260 * .98, false,
+      ART.drawRig(x, 'survivor', canvas.width / 2 - 4, canvas.height * .9, canvas.height / 282 * .98, false,
         { sy: 1 + Math.sin(k * 2.4) * .014, rot: Math.sin(k * .9) * .015, parts: { arm: { r: Math.sin(k * 1.3) * .05 }, bat: { r: Math.sin(k * 1.3) * .05 }, legB: { r: Math.sin(k * .7) * .02 } }, weapon: w });
       idleRAF = requestAnimationFrame(loop);
     };

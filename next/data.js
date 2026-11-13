@@ -248,7 +248,7 @@ window.DM = window.DM || {};
   D.LOOT.hordecrate = [[3, 4], { 'decor_*': 1, 'seed_*': 1.2, ammo: 2, meds: 2, bandage: 2, scrap: 2, nails: 2, wood: 2, tape: 1, battery: 1, 'bp_*': .5, 'cosH_*': .35 }];
   // phase 5: cosmetics are rare finds - clothes-ish furniture, zombies a little more often, police lockers better (mansions: see game.js loot())
   for (const [t, w] of [['wardrobe', .1], ['dresser', .08], ['coat', .09], ['hutch', .06], ['washer', .07], ['night', .04], ['gym', .05]]) D.LOOT[t][1]['cos_*'] = w;
-  D.LOOT.corpse[1]['cosZ_*'] = .3;
+  D.LOOT.corpse[1]['cosZ_*'] = 1;   // ~4.5% per body vs ~2.5-3.7% per wardrobe or dresser
   for (const [t, w] of [['locker', .22], ['evidence', .25], ['armory', .15]]) D.LOOT[t][1]['cosP_*'] = w;
   if (D.EVENT) {
     Object.assign(D.LOOT.fridge[1], { cranberry: 2, pie: 2 }); Object.assign(D.LOOT.pantry[1], { stuffing: 3, cranberry: 2 }); Object.assign(D.LOOT.cabinet[1], { stuffing: 2, cranberry: 1 });
