@@ -77,15 +77,25 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   faster and finds more; later this becomes skill points.
 - Pack is 12 slots. Items stack with LIMITS (ammo 30, bandages/meds 5,
   food/water/snacks/drinks 3, scrap 10...); weapons/tools don't stack.
-- Dropping an item destroys it. No coming back for it ("think about what you
-  should actually loot").
+- Dropped items stay on the floor for the rest of that run (you can pick them
+  back up); once you leave the house, anything left behind is gone.
 - A bit fewer lootable things per house; some containers are empty.
+
+## Hidden compartments (decided)
+- 7DTD-style secrets, NOT noticeable. Only searchable after ~75% of the house
+  has been looted (no announcement). No visible clue unless the Keen eye perk.
+- Top-down stand-ins for 7DTD parkour: small discovery chains - a torn note
+  with a vague hint, a rug hiding a loose floorboard, a sliding bookshelf, an
+  attic hatch that needs a hook pole found elsewhere. 1-2 per house, mixed up
+  by the generator so they can't be memorised. Summary shows "Secrets found N of M".
 
 ## Steps -> houses (decided)
 - ALL daily steps count (no dedicated walks needed). Houses scouted per day
   follow the taper: ~3 at 3k, ~6 at 7k, ~9 at 15k, cap 10 at ~25k.
 - More steps in a day = slightly better odds at bigger buildings, but luck
   still matters. Extra houses beyond what you can loot go to crew auto-search.
+- She CHOOSES which scouted houses to loot from the day's list (type, size,
+  danger shown, e.g. a police station); the rest can go to crew auto-search.
 - Consistency (horde shifts, watering, streak) matters as much as volume.
 
 ## Build order
