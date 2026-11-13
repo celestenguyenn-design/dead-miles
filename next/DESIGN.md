@@ -34,7 +34,7 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Music: the Eerie generated track that speeds up with danger (s2.js MUSIC).
 - Pacing: steps taper through the day (7k full, then 50%, then 15%); typed
   steps half value, max 4k/day. Loot is stingy; good gear from raids/boss.
-- Social: shared party camp (Supabase camps table, camp_get/camp_add), weekly
+- Social: (shared camp dropped - personal bases instead), weekly
   group boss over the whole week, gifts = supplies only, 1/day, 5 received/week.
 - Oura: morning check-in (sleep, readiness) sets the day; workouts = training.
 - Systems coming back from the old game: home base, crew of survivors, pet
@@ -53,22 +53,24 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   hidden rooms) so walk-only friends are not left behind.
 - Loot runs short: about 3-5 minutes per house.
 
-## Shared party base, farming, party horde night (decided)
-- The shared camp IS the party's home base. Everyone lives there despite the
-  distance. Everyone's steps build it (walls, gate, watchtower, traps,
-  workbench, rain barrels, garden beds); each player also has a personal locker.
+## Bases, farming, party horde night (decided)
+- EVERYONE HAS THEIR OWN BASE (owner changed her mind on a shared base: "I want
+  to be able to decorate it"). Build it with steps (walls, gate, watchtower,
+  traps, workbench, rain barrels, garden beds) and DECORATE it: furniture,
+  posters, rugs, lights - decorations are earned cosmetics, many found while
+  looting. Friends can visit your base. No shared camp.
 - Farming: plant seeds found while looting. Watering costs steps (a few hundred
-  per plant per day) and ANY party member can water. Plants grow over real days;
-  unwatered plants wilt. Grown food is the reliable food supply.
-- Party horde night: announced days ahead with one deadline for everyone.
-  "Showing up" = a watch shift any time in the 24 h before: a 2-3 minute
-  real-time defense at the base (same joystick combat). Each shift thins the
-  horde; walls/traps/tower add defense. At the deadline it resolves: hold =
-  loot for everyone who did a shift; fall short = something breaks (a wall
-  section, the garden, the generator, an item from the shared stash) and the
-  party walks to repair it. Skippers get nothing but can help repair. Two
-  people online together can share a shift as a bonus, never required.
-  Horde size grows slowly; tuned so a party of two is not crushed.
+  per plant per day). Plants grow over real days; unwatered plants wilt. Grown
+  food is the reliable food supply. Visiting friends can water your plants.
+- Party horde night (kept): one horde for the whole party, announced days ahead,
+  one deadline for everyone. "Showing up" = a watch shift any time in the 24 h
+  before: a 2-3 minute real-time defense (same joystick combat), at your own
+  base or a friend's. Every shift thins the WHOLE horde. At the deadline each
+  member's base is checked against what is left: strong bases hold (loot for
+  everyone who did a shift), weak ones lose something (a wall section, the
+  garden, the generator, a stash item) and get repaired with steps. Skippers get
+  nothing. Two people online together can share a shift as a bonus, never
+  required. Horde size grows slowly; a party of two must not be crushed.
 
 ## Build order
 1. Prototype one house: joystick, rooms with lootable furniture, timed search,
@@ -76,6 +78,6 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 2. House generator (many layouts by building type), scouting from steps.
 3. Character, gear, inventory, cosmetics/dress-up on the top-down sprite.
 4. Accounts + step sync + friends using the existing backend.
-5. Camp, weekly boss, gifts, Oura check-in.
+5. Weekly boss, gifts, Oura check-in, party horde night.
 6. Base, crew, strays, real-world map.
 7. Replace the old game (a deliberate switch the owner approves).
