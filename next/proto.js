@@ -61,31 +61,36 @@
     tape: { n: 'Duct tape', i: 'tape' },
     book: { n: 'Paperback', i: 'book' },
   };
+  // how many fit in one pack slot (anything not listed does not stack)
+  const STACK = { water: 3, beans: 3, snack: 3, drink: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
+  const stackMax = k => STACK[k] || 1;
+  // merge rolled item keys into container stacks; ammo comes in loose handfuls of 4-12
+  function toStacks(keys) {
+    const out = [];
+    for (const k of keys) {
+      const n = k === 'ammo' ? 4 + Math.floor(Math.random() * 9) : 1;
+      const e = out.find(e => e.k === k && STACK[k]);
+      if (e) e.n += n; else out.push({ k, n });
+    }
+    return out;
+  }
   const LOOT = {
     fridge: [[2, 3], { drink: 3, water: 3, beans: 1, snack: 2 }],
     cabinet: [[1, 3], { beans: 3, snack: 2, water: 1 }],
-    oven: [[0, 1], { beans: 1, scrap: 1 }],
-    sink: [[1, 2], { tape: 2, cloth: 2, scrap: 1 }],
     kdrawers: [[1, 2], { knife: 3, scrap: 1, battery: 2, tape: 1 }],
     pantry: [[2, 4], { beans: 4, snack: 3, water: 2 }],
     trash: [[0, 2], { scrap: 3, snack: 1 }],
-    hutch: [[1, 2], { battery: 1, cloth: 1, key: 1, scrap: 1 }],
     island: [[1, 2], { knife: 1, scrap: 2, tape: 1, battery: 1 }],
-    toilet: [[0, 1], { water: 1, scrap: 2, meds: 1 }],
     vanity: [[1, 2], { cloth: 2, bandage: 2, meds: 1 }],
     medcab: [[2, 3], { meds: 3, bandage: 3 }],
     shelves: [[2, 3], { cloth: 2, tape: 2, battery: 2, scrap: 2 }],
     toolbox: [[2, 3], { wrench: 3, scrap: 3, tape: 2 }],
-    supply: [[2, 3], { beans: 3, water: 3 }],
     crate: [[4, 5], { ammo: 5, meds: 3, bandage: 2, battery: 1, key: 1 }, ['ammo', 'meds']],
     books: [[1, 1], { book: 4, key: 1 }],
-    bed: [[0, 1], { ammo: 1, snack: 2, bandage: 1 }],
     night: [[1, 2], { meds: 2, battery: 2, key: 1, book: 1 }],
     wardrobe: [[1, 3], { cloth: 4, battery: 1 }],
     dresser: [[1, 3], { cloth: 3, battery: 1, ammo: 1, bandage: 1 }],
     desk: [[1, 2], { scrap: 2, battery: 2, key: 1, tape: 1, book: 1 }],
-    sofa: [[0, 1], { snack: 2, battery: 1, ammo: 1 }],
-    side: [[1, 1], { battery: 2, key: 1 }],
     tv: [[1, 2], { battery: 2, scrap: 2 }],
     coat: [[1, 2], { cloth: 3, snack: 1, key: 1 }],
     hall: [[1, 1], { key: 2, battery: 1 }],
@@ -101,25 +106,43 @@
     return out;
   }
 
+  // ---------------------------------------------------------------- scavenging skill (persists between runs)
+  const SKEY = 'dm-next-skills';
+  const XPCUM = L => L <= 1 ? 0 : Math.round(14 * Math.pow(L - 1, 1.75) + (L > 5 ? 30 * (L - 5) * (L - 5) : 0)); // xp needed to reach level L
+  const PERKS = { 3: ['Quiet hands', 'Searches make 25% less noise'], 6: ['Keen eye', 'Hidden clues glow, rare loot sparkles'], 9: ['Pack rat', '+2 pack slots'] };
+  const SK = { xp: 0 };
+  try { const v = JSON.parse(localStorage.getItem(SKEY) || '{}'); if (v.scav && v.scav.xp >= 0) SK.xp = +v.scav.xp; } catch (e) { /* storage blocked */ }
+  function saveSkills() { try { localStorage.setItem(SKEY, JSON.stringify({ scav: { xp: SK.xp } })); } catch (e) { /* ignore */ } }
+  function scavLvl() { let L = 1; while (L < 10 && SK.xp >= XPCUM(L + 1)) L++; return L; }
+  const searchMul = () => 1.5 * (1 - .06 * (scavLvl() - 1));   // slow at first, faster with skill
+  const extraChance = () => .04 * (scavLvl() - 1);
+  const packSlots = () => scavLvl() >= 9 ? 14 : 12;
+  function gainXP(n, x, y) {
+    const before = scavLvl(); SK.xp += n; saveSkills();
+    G.nums.push({ x: x + 16, y: y - 112, v: '+' + n + ' xp', t: 0, col: P.GRN, small: 1 });
+    const after = scavLvl();
+    if (after > before) levelUp(after);
+  }
+
   // ---------------------------------------------------------------- furniture
   // at: [tx,ty,tw,th]; H: visual height; time: search secs; noise: radius in tiles
   const FDEF = [
     // kitchen
     { art: 'fridge', name: 'Fridge', at: [2, 2, 1, 1], H: 62, time: 2.4, noise: 5.5, loot: 'fridge' },
     { art: 'counter', name: 'Cabinets', at: [3, 2, 2, 1], H: 32, time: 1.8, noise: 2.5, loot: 'cabinet' },
-    { art: 'stove', name: 'Oven', at: [5, 2, 1, 1], H: 32, time: 1.6, noise: 3, loot: 'oven' },
-    { art: 'sink', name: 'Sink cabinet', at: [6, 2, 2, 1], H: 32, time: 1.8, noise: 2.5, loot: 'sink' },
+    { art: 'stove', at: [5, 2, 1, 1], H: 32 },
+    { art: 'sink', at: [6, 2, 2, 1], H: 32 },
     { art: 'drawers', name: 'Kitchen drawers', at: [8, 2, 1, 1], H: 32, time: 1.6, noise: 3.5, loot: 'kdrawers' },
     { art: 'pantry', name: 'Pantry', at: [10, 2, 2, 1], H: 62, time: 2.6, noise: 4.5, loot: 'pantry' },
-    { art: 'trash', name: 'Trash can', at: [13, 2, 1, 1], H: 26, time: 1.4, noise: 3, loot: 'trash' },
-    { art: 'hutch', name: 'China hutch', at: [19, 2, 2, 1], H: 62, time: 2.2, noise: 4, loot: 'hutch' },
+    { art: 'trash', at: [13, 2, 1, 1], H: 26 },
+    { art: 'hutch', at: [19, 2, 2, 1], H: 62 },
     { art: 'island', name: 'Island drawers', at: [4, 5, 3, 1], H: 32, time: 1.8, noise: 3, loot: 'island' },
     { art: 'table', at: [15, 4, 3, 2], H: 24, solid: 1, cloth: 1, items: 1 },
     { art: 'chair', at: [14, 4, 1, 1], H: 16, solid: 0 },
     { art: 'chair', at: [18, 4, 1, 1], H: 16, solid: 0 },
     { art: 'chair', at: [16, 3, 1, 1], H: 16, solid: 0 },
     // bathroom
-    { art: 'toilet', name: 'Toilet tank', at: [7, 10, 1, 1], H: 24, time: 1.4, noise: 2.5, loot: 'toilet' },
+    { art: 'toilet', at: [7, 10, 1, 1], H: 24 },
     { art: 'vanity', name: 'Vanity', at: [8, 10, 2, 1], H: 30, time: 1.6, noise: 2.5, loot: 'vanity' },
     { art: 'medcab', name: 'Medicine cabinet', at: [10, 9, 1, 1], H: 0, time: 1.5, noise: 2, loot: 'medcab', wall: 1, solid: 0 },
     { art: 'tub', at: [11, 10, 2, 2], H: 24, solid: 1 },
@@ -128,24 +151,24 @@
     { art: 'toolbox', name: 'Toolbox', at: [17, 10, 1, 1], H: 20, time: 1.8, noise: 3.5, loot: 'toolbox' },
     { art: 'heater', at: [14, 13, 1, 1], H: 54, solid: 1 },
     // hidden room
-    { art: 'supply', name: 'Supply shelf', at: [2, 10, 2, 1], H: 56, time: 2, noise: 3, loot: 'supply' },
+    { art: 'supply', at: [2, 10, 2, 1], H: 56 },
     { art: 'crate', name: 'Hidden crate', at: [4, 10, 2, 1], H: 30, time: 3, noise: 4, loot: 'crate', rare: 1 },
     { art: 'cot', at: [5, 11, 1, 2], H: 12, solid: 1 },
     // bedroom
     { id: 'secretShelf', art: 'bookshelf', name: 'Bookshelf', at: [3, 15, 2, 1], H: 62, time: 2, noise: 2.5, loot: 'books', secret: 1, seed: 2 },
-    { art: 'bed', name: 'Bed', at: [6, 15, 2, 3], H: 18, time: 2, noise: 2, loot: 'bed' },
+    { art: 'bed', at: [6, 15, 2, 3], H: 18 },
     { art: 'nightstand', name: 'Nightstand', at: [8, 15, 1, 1], H: 24, time: 1.5, noise: 2, loot: 'night' },
     { art: 'wardrobe', name: 'Wardrobe', at: [12, 15, 2, 1], H: 64, time: 2.8, noise: 5, loot: 'wardrobe' },
     { art: 'dresser', name: 'Dresser', at: [14, 15, 3, 1], H: 34, time: 2.4, noise: 3.5, loot: 'dresser' },
     { art: 'desk', name: 'Desk', at: [15, 19, 2, 1], H: 30, time: 2, noise: 2.5, loot: 'desk' },
     { art: 'chair', at: [15, 18, 1, 1], H: 16, solid: 0 },
     // living room
-    { id: 'sofa', art: 'sofa', name: 'Sofa cushions', at: [4, 21, 3, 1], H: 26, time: 1.8, noise: 2, loot: 'sofa' },
-    { art: 'sidetable', name: 'Side table', at: [7, 21, 1, 1], H: 24, time: 1.4, noise: 2, loot: 'side' },
+    { id: 'sofa', art: 'sofa', at: [4, 21, 3, 1], H: 26 },
+    { art: 'sidetable', at: [7, 21, 1, 1], H: 24 },
     { art: 'coffee', at: [4, 23, 3, 1], H: 16, solid: 1 },
     { art: 'tvstand', name: 'TV stand', at: [4, 26, 3, 1], H: 26, time: 1.8, noise: 2.5, loot: 'tv' },
     { art: 'armchair', at: [9, 22, 1, 1], H: 22, solid: 1 },
-    { art: 'bookshelf', name: 'Bookshelf', at: [13, 21, 2, 1], H: 62, time: 2, noise: 2.5, loot: 'books', seed: 5 },
+    { art: 'bookshelf', at: [13, 21, 2, 1], H: 62, seed: 5 },
     { art: 'plant', at: [16, 21, 1, 1], H: 20, solid: 1 },
     // hallway
     { art: 'coat', name: 'Coat closet', at: [21, 10, 1, 1], H: 64, time: 2.4, noise: 4.5, loot: 'coat' },
@@ -181,7 +204,7 @@
         hp: 100, sta: 100, staDelay: 0, st: 'free', stT: 0, inv: 0, ph: 0, stepAcc: 0, kbx: 0, kby: 0,
         swingQ: false, search: null, flash: 0, swingHit: false, downRot: 0,
       },
-      zs: [], furn: [], pack: [], parts: [], rings: [], nums: [], decals: [], banners: [],
+      zs: [], furn: [], pack: [], drops: [], parts: [], rings: [], nums: [], decals: [], banners: [],
       fog: {}, visited: {}, room: 'o', noiseLvl: 0, cam: { x: 20.5 * T, y: 26 * T }, z3: false,
       stats: { searched: 0, kills: 0, start: performance.now() }, entered: false, lastNoise: null, field: null, fieldT: 0, fieldCell: -1,
       secretHint: 0, sheet: null,
@@ -200,6 +223,11 @@
       f._key = null; f._c = null;
       G.furn.push(f);
     }
+    // ~20% of containers turn out empty - never the fridge, the hidden stash, or the bin by the stoop
+    const elig = G.furn.filter(f => f.lootable && f.art !== 'fridge' && f.art !== 'crate' && f.name !== 'Garbage bin');
+    for (let i = elig.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [elig[i], elig[j]] = [elig[j], elig[i]]; }
+    elig.slice(0, Math.round(elig.length * .2)).forEach(f => f.empty = true);
+    for (const f of G.furn) if (f.lootable) f.pre = f.empty ? [] : rollLoot(f.loot); // rolled up front so Keen eye can sense rares
     G.zs.push(mkZombie(6.4 * T, 21.62 * T, 'sleep', 'l'));
     G.zs.push(mkZombie(8.6 * T, 12.7 * T, 'idle', 'b'));
     buildWalls(); buildSolid();
@@ -535,6 +563,7 @@
       else if (f.loot0 && f.loot0.length) act = 'Open';
       if (act) out.push({ obj: f, act, rect: f.wall ? { x: f.x + 4, y: f.y + 20, w: f.w - 8, h: f.h - 20 } : furnRect(f), name: f.name, noise: f.noise });
     }
+    for (const d of G.drops) out.push({ obj: d, act: 'Pick up', rect: { x: d.x - 12, y: d.y - 8, w: 24, h: 14 }, name: ITEMS[d.k].n + (d.n > 1 ? ' x' + d.n : ''), drop: true });
     for (const z of G.zs) {
       if (!z.dead || z.rot === 0) continue;
       let act = !z.searched ? 'Search' : (z.loot0 && z.loot0.length ? 'Open' : null);
@@ -559,7 +588,8 @@
     const dx = cx - p.x, dy = cy - p.y, d = Math.hypot(dx, dy) || 1;
     p.fx = dx / d; p.fy = dy / d; if (Math.abs(dx) > 3) p.flip = dx < 0;
     if (it.act === 'Open') { openLoot(o, it); return; }
-    const dur = it.act === 'Push' ? 1.7 : it.corpse ? 1.4 : o.time;
+    if (it.drop) { pickUp(o); return; }
+    const dur = it.act === 'Push' ? 1.7 : (it.corpse ? 1.4 : o.time) * searchMul();
     p.st = 'search'; p.stT = 0; p.search = { it, t: 0, dur, nextNoise: .25, nextFx: 0 };
     if (it.act === 'Search' && (o.art === 'fridge' || o.art === 'wardrobe' || o.art === 'coat' || o.art === 'pantry')) SFX.play('open');
   }
@@ -571,7 +601,11 @@
       return;
     }
     o.searched = true; G.stats.searched++;
-    o.loot0 = rollLoot(it.corpse ? 'corpse' : o.loot);
+    const keys = it.corpse ? rollLoot('corpse') : o.pre.slice();
+    if (keys.length && Math.random() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot); if (more.length) keys.push(more[0]); }
+    o.loot0 = toStacks(keys);
+    // xp: bigger containers teach more, the hidden stash a lot
+    gainXP(it.corpse ? 2 : 2 + (o.time >= 2.2 ? 1 : 0) + (o.rare ? 6 : 0), G.p.x, G.p.y);
     o._key = null;
     if (o.secret && !G.secretOpen) { toast('A cold draught leaks from behind the shelf...', 3); }
     openLoot(o, it);
@@ -587,6 +621,7 @@
     for (const it of interactables()) {
       const o = it.obj; let bx;
       if (it.corpse) bx = { x: it.rect.x, y: it.rect.y - 34, w: it.rect.w, h: it.rect.h + 40 };
+      else if (it.drop) bx = { x: o.x - 16, y: o.y - 30, w: 32, h: 38 };
       else if (o.wall) bx = { x: o.x + 4, y: o.y + o.h - 60, w: o.w - 8, h: 60 };
       else { const g = ART.geo(o); bx = { x: o.x + (o.slide || 0) * T, y: g.ty0 - 8, w: o.w, h: g.fy1 - g.ty0 + 8 }; }
       if (rm(it) && G.fog[rm(it)] > .6) continue;
@@ -609,10 +644,11 @@
       G.tapMark = { x: wx, y: wy, t: 0 };
     }
   }
-  function rm(it) { return it.corpse ? null : it.obj.room; }
+  function rm(it) { return it.corpse || it.drop ? null : it.obj.room; }
   function goalCellFor(it) {
     const o = it.obj;
     if (it.corpse) return cellOf({ x: it.rect.x + it.rect.w / 2, y: o.y });
+    if (it.drop) return cellOf(o);
     const tx = o.tx + Math.round(o.slide || 0), cx = tx + Math.floor((o.tw - 1) / 2), cy = o.ty + Math.floor((o.th - 1) / 2);
     const cand = [[cx, o.ty + o.th], [cx + (o.tw > 1 ? 1 : 0), o.ty + o.th], [cx, o.ty - 1], [tx - 1, cy], [tx + o.tw, cy]];
     for (const [x, y] of cand) if (x >= 0 && y >= 0 && x < MW && y < MH && !solidCell[y * MW + x]) return [x, y];
@@ -687,7 +723,7 @@
       const s = p.search; s.t += dt;
       const o = s.it.obj, r = s.it.rect;
       s.nextNoise -= dt; s.nextFx -= dt;
-      if (s.nextNoise <= 0) { s.nextNoise = .75; emitNoise(r.x + r.w / 2, r.y + r.h / 2, s.it.act === 'Push' ? 5 : s.it.noise); }
+      if (s.nextNoise <= 0) { s.nextNoise = .75; emitNoise(r.x + r.w / 2, r.y + r.h / 2, s.it.act === 'Push' ? 5 : s.it.noise * (scavLvl() >= 3 ? .75 : 1)); }
       if (s.nextFx <= 0) {
         s.nextFx = .16; SFX.play(s.it.act === 'Push' ? 'whoosh' : 'rummage');
         const fx0 = r.x + r.w / 2 + (Math.random() - .5) * r.w * .6, fy0 = r.y + r.h;
@@ -964,8 +1000,9 @@
     if (!G.secretOpen && G.visited.r && Math.hypot(G.p.x - 3.5 * T, G.p.y - 15 * T) < 6 * T) {
       G.secretHint -= dt;
       if (G.secretHint <= 0) {
-        G.secretHint = .28;
-        G.parts.push({ x: 3 * T + 4 + Math.random() * 6, y: 15.9 * T, z: 4 + Math.random() * 40, vx: 8 + Math.random() * 14, vy: 4 + Math.random() * 8, vz: (Math.random() - .3) * 8, g: 0, life: 2.2, max: 2.2, col: 'rgba(220,226,255,.55)', size: 1.6 + Math.random() * 1.2, mote: 1 });
+        const keen = scavLvl() >= 6;
+        G.secretHint = keen ? .12 : .28;
+        G.parts.push({ x: 3 * T + 4 + Math.random() * 6, y: 15.9 * T, z: 4 + Math.random() * 40, vx: 8 + Math.random() * 14, vy: 4 + Math.random() * 8, vz: (Math.random() - .3) * 8, g: 0, life: 2.2, max: 2.2, col: keen ? 'rgba(255,214,140,.95)' : 'rgba(220,226,255,.55)', size: (keen ? 2.4 : 1.6) + Math.random() * 1.2, mote: 1 });
       }
     }
     // the third zombie wanders in from the street
@@ -1143,12 +1180,14 @@
     for (const w of wallCells) { if (w.key < vy0 || w.key - WH - T > vy1 || (w.x + 1) * T < vx0 || w.x * T > vx1) continue; list.push({ k: w.key, w }); }
     for (const d of doorLeaves) list.push({ k: d.key, d });
     for (const f of G.furn) { const k = f.wall ? f.y + f.h + .5 : f.y + f.h; if (k + 10 < vy0 || f.y - 120 > vy1) continue; list.push({ k, f }); }
+    for (const d of G.drops) list.push({ k: d.y - 2, dr: d });
     for (const z of G.zs) list.push({ k: z.st === 'sleep' || z.st === 'rise' && z.stT < .5 ? 22 * T + 1 : z.dead ? z.y - 14 : z.y, z });
     list.push({ k: p.y, pl: 1 });
     list.sort((a, b) => a.k - b.k);
     for (const it of list) {
       if (it.w) drawWall(it.w);
       else if (it.d) drawDoor(it.d);
+      else if (it.dr) drawDrop(it.dr);
       else if (it.f) { const f = it.f, cvs = furnCanvas(f); if (f.lootable && f.searched && !(f.loot0 && f.loot0.length) && !(f.secret && !G.secretOpen)) ctx.globalAlpha = .82; ctx.drawImage(cvs, f._b.x + (f.slide || 0) * T, f._b.y, f._b.w, f._b.h); ctx.globalAlpha = 1; if (f.art === 'crate' && !f.searched) ART.candle(ctx, f.x + f.w - 12, ART.geo(f).ty0 + 12, G.t); }
       else if (it.z) drawZombie(it.z);
       else drawPlayer();
@@ -1206,6 +1245,14 @@
     ctx.globalAlpha = 1;
   }
 
+  const iconImg = {};
+  function drawDrop(d) {
+    const im = iconImg[ITEMS[d.k].i] || (iconImg[ITEMS[d.k].i] = Object.assign(new Image(), { src: ART.iconURL[ITEMS[d.k].i] }));
+    drawShadow(d.x, d.y + 1, 11, .45);
+    const bob = Math.sin(G.t * 3 + d.x) * 1.5;
+    if (im.complete) ctx.drawImage(im, d.x - 15, d.y - 26 + bob, 30, 30);
+    if (d.n > 1) { ctx.font = '900 10px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = P.INK; ctx.strokeText('x' + d.n, d.x + 12, d.y + 2); ctx.fillStyle = P.CRM; ctx.fillText('x' + d.n, d.x + 12, d.y + 2); }
+  }
   const DOORH = 50;
   function drawDoor(d) {
     if (d.vert) { // leaf seen edge-on running north-south: a tall thin strip
@@ -1401,15 +1448,25 @@
       }
       ctx.restore(); ctx.globalAlpha = 1;
     }
+    // Keen eye: rare loot sparkles
+    if (scavLvl() >= 6) for (const f of G.furn) {
+      if (!f.lootable || f.searched || !f.pre || !f.pre.some(k => ITEMS[k].rare) || G.fog[f.room] > .6) continue;
+      const g = ART.geo(f), sx = f.x + f.w * .78 + (f.slide || 0) * T, sy = (f.wall ? f.y + f.h - 50 : g.ty0 + 8), tw = (Math.sin(G.t * 5 + f.fid) + 1) / 2;
+      ctx.save(); ctx.translate(sx, sy); ctx.rotate(G.t * .8); ctx.globalAlpha = .5 + tw * .5; ctx.fillStyle = '#ffe2a8';
+      const gl = ctx.createRadialGradient(0, 0, 1, 0, 0, 16); gl.addColorStop(0, 'rgba(255,226,168,.5)'); gl.addColorStop(1, 'rgba(255,226,168,0)'); ctx.fillStyle = gl; ctx.fillRect(-16, -16, 32, 32); ctx.fillStyle = '#fff1cf';
+      const r1 = 5 + tw * 6; ctx.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, rr = i % 2 ? 1.6 : r1; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } ctx.fill(); ctx.restore();
+    }
+    ctx.globalAlpha = 1;
     // loot markers
     const tgt = (p.st === 'free' || p.st === 'swing') ? findTarget() : null;
     G.target = tgt;
     for (const it of interactables()) {
       const o = it.obj, d = rectDist(p.x, p.y, it.rect);
       if (d > 3 * T) continue;
-      const rm = it.corpse ? null : o.room; if (rm && G.fog[rm] > .6) continue;
+      const rm = it.corpse || it.drop ? null : o.room; if (rm && G.fog[rm] > .6) continue;
       let mx, my;
-      if (it.corpse) { mx = o.x + (o.fallDir || 1) * 34; my = o.y - 34; }
+      if (it.drop) { mx = o.x; my = o.y - 40; }
+      else if (it.corpse) { mx = o.x + (o.fallDir || 1) * 34; my = o.y - 34; }
       else { const g = ART.geo(o); mx = o.x + o.w / 2 + (o.slide || 0) * T; my = (o.wall ? o.y + o.h - 62 : g.ty0) - 14; }
       const isT = tgt && tgt.obj === o;
       const bob = isT ? Math.sin(G.t * 6) * 2 : 0;
@@ -1463,7 +1520,7 @@
     // damage numbers
     for (const n of G.nums) {
       const k = n.t / .9; ctx.globalAlpha = 1 - k * k;
-      ctx.font = `900 ${16 + (1 - k) * 4}px system-ui,sans-serif`; ctx.textAlign = 'center';
+      ctx.font = n.small ? '900 12px system-ui,sans-serif' : `900 ${16 + (1 - k) * 4}px system-ui,sans-serif`; ctx.textAlign = 'center';
       ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeStyle = P.INK; ctx.strokeText(n.v, n.x, n.y - k * 26); ctx.fillStyle = n.col; ctx.fillText(n.v, n.x, n.y - k * 26);
     }
     ctx.globalAlpha = 1;
@@ -1487,12 +1544,15 @@
   function hud() {
     const p = G.p;
     hpFill.style.width = p.hp + '%'; stFill.style.width = p.sta + '%';
-    const hudKey = [Math.round(p.hp), G.pack.length, G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5)].join('|');
+    const hudKey = [Math.round(p.hp), G.pack.length, G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5), SK.xp].join('|');
     if (hudKey !== lastHud) {
       lastHud = hudKey;
       hpVal.textContent = Math.ceil(p.hp);
-      packEl.textContent = G.pack.length + '/12';
-      $('#pack').classList.toggle('full', G.pack.length >= 12);
+      packEl.textContent = G.pack.length + '/' + packSlots();
+      $('#pack').classList.toggle('full', G.pack.length >= packSlots());
+      const L = scavLvl();
+      $('#skLv').textContent = L;
+      $('#skXp').style.width = (L >= 10 ? 100 : (SK.xp - XPCUM(L)) / (XPCUM(L + 1) - XPCUM(L)) * 100) + '%';
       const n = Math.round(G.noiseLvl * 5);
       noiseBars.forEach((b, i) => b.classList.toggle('on', i < n));
       $('#noise').classList.toggle('hot', n >= 4);
@@ -1521,11 +1581,23 @@
 
   // ---------------------------------------------------------------- sheets & cards
   const sheet = $('#sheet');
-  function itemCard(k, onTap, extra = '') {
-    const it = ITEMS[k], el = document.createElement('button');
-    el.className = 'slot' + (it.rare ? ' rare' : '');
-    el.innerHTML = `<img alt="" src="${ART.iconURL[it.i]}"><span>${it.n}</span>${extra}`;
-    el.addEventListener('click', e => { e.stopPropagation(); onTap(el); });
+  // ---- pack with stacks: G.pack = [{k, n}], each entry one slot
+  function roomFor(k) { // how many of k the pack can still take
+    let room = 0; const m = stackMax(k);
+    for (const e of G.pack) if (e.k === k) room += m - e.n;
+    return room + (packSlots() - G.pack.length) * m;
+  }
+  function addToPack(k, n) { // tops up existing stacks first, then new slots; returns how many fit
+    const m = stackMax(k); let left = n;
+    for (const e of G.pack) if (e.k === k && e.n < m && left) { const t = Math.min(left, m - e.n); e.n += t; left -= t; }
+    while (left && G.pack.length < packSlots()) { const t = Math.min(left, m); G.pack.push({ k, n: t }); left -= t; }
+    return n - left;
+  }
+  function itemCard(e, onTap, extra = '', cls = '') {
+    const it = ITEMS[e.k], el = document.createElement('button');
+    el.className = 'slot' + (it.rare ? ' rare' : '') + cls;
+    el.innerHTML = `<img alt="" src="${ART.iconURL[it.i]}"><span>${it.n}</span>${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${extra}`;
+    el.addEventListener('click', ev => { ev.stopPropagation(); onTap(el); });
     return el;
   }
   function openLoot(o, it) {
@@ -1536,61 +1608,99 @@
     renderLoot();
     sheet.classList.add('on');
   }
-  function renderLoot() {
+  function renderLoot(note) {
     const s = G.sheet, o = s.o, grid = $('#shGrid'); grid.innerHTML = '';
+    $('#shActs').innerHTML = '';
     const items = o.loot0 || [];
-    if (!items.length) { grid.innerHTML = `<div class="empty">${s.it.corpse ? 'Nothing useful on it.' : 'Nothing useful left.'}</div>`; }
-    items.forEach((k, i) => grid.appendChild(itemCard(k, el => takeItem(i, el))));
-    $('#shCap').textContent = `Pack ${G.pack.length}/12`;
-    $('#shTake').style.display = items.length ? '' : 'none';
-    $('#shTake').textContent = items.length > 1 ? `Take all ${items.length}` : 'Take it';
+    if (!items.length) grid.innerHTML = `<div class="empty">${s.it.corpse ? 'Nothing useful on it.' : 'Nothing useful.'}</div>`;
+    items.forEach((e, i) => { const fits = roomFor(e.k) > 0; grid.appendChild(itemCard(e, () => takeItem(i), fits ? '' : '<em class="nofit">won\'t fit</em>', fits ? '' : ' full')); });
+    $('#shCap').textContent = note || `Pack ${G.pack.length}/${packSlots()}`;
+    const can = items.some(e => roomFor(e.k) > 0);
+    $('#shTake').style.display = can ? '' : 'none';
+    $('#shTake').textContent = items.length > 1 ? 'Take all' : 'Take it';
   }
-  function takeItem(i, el) {
-    const o = G.sheet.o;
-    if (G.pack.length >= 12) { toast('Your pack is full', 1.4); $('#shCap').classList.add('shake'); setTimeout(() => $('#shCap').classList.remove('shake'), 400); return false; }
-    const k = o.loot0.splice(i, 1)[0]; G.pack.push(k); SFX.play('pick');
-    if (k === 'ammo' || k === 'key') toast(ITEMS[k].n + '!', 1.2);
-    renderLoot(); o._key = null;
-    return true;
+  function takeItem(i) {
+    const o = G.sheet.o, e = o.loot0[i];
+    const got = addToPack(e.k, e.n);
+    if (!got) { toast(`No room for ${ITEMS[e.k].n.toLowerCase()}`, 1.4); $('#shCap').classList.add('shake'); setTimeout(() => $('#shCap').classList.remove('shake'), 400); return; }
+    e.n -= got; if (!e.n) o.loot0.splice(i, 1);
+    SFX.play('pick');
+    if (e.k === 'ammo' || e.k === 'key') toast(ITEMS[e.k].n + (got > 1 ? ' x' + got : '') + '!', 1.2);
+    renderLoot(e.n ? `Only ${got} fit - ${e.n} left here` : null); o._key = null;
   }
   function takeAll() {
-    const o = G.sheet && G.sheet.o; if (!o) return;
-    while (o.loot0.length && G.pack.length < 12) { G.pack.push(o.loot0.shift()); }
-    SFX.play('pick');
-    if (o.loot0.length) { toast('Your pack is full', 1.4); renderLoot(); } else closeSheet();
+    const o = G.sheet && G.sheet.o; if (!o || G.sheet.kind !== 'loot') return;
+    let took = 0;
+    for (const e of o.loot0) { const got = addToPack(e.k, e.n); e.n -= got; took += got; }
+    o.loot0 = o.loot0.filter(e => e.n > 0);
+    if (took) SFX.play('pick');
+    if (o.loot0.length) { const left = o.loot0.reduce((a, e) => a + e.n, 0); toast(`Pack full - left ${left} item${left > 1 ? 's' : ''} here`, 1.8); renderLoot(); } else closeSheet();
   }
   function closeSheet(silent) { sheet.classList.remove('on'); if (G) G.sheet = null; }
-  function openPack() {
+  function pickUp(d) {
+    const got = addToPack(d.k, d.n);
+    if (!got) { toast('Your pack is full', 1.3); return; }
+    d.n -= got; if (!d.n) G.drops.splice(G.drops.indexOf(d), 1);
+    SFX.play('pick'); toast(`Picked up ${ITEMS[d.k].n.toLowerCase()}${got > 1 ? ' x' + got : ''}`, 1.1);
+  }
+  function openPack(sel = -1) {
     if (G.over) return;
     G.sheet = { kind: 'pack' };
-    $('#shKick').textContent = 'Your pack · ' + G.pack.length + '/12';
+    $('#shKick').textContent = 'Your pack · ' + G.pack.length + '/' + packSlots();
     $('#shTitle').textContent = 'Backpack';
-    const grid = $('#shGrid'); grid.innerHTML = '';
+    const grid = $('#shGrid'); grid.innerHTML = ''; $('#shActs').innerHTML = '';
     if (!G.pack.length) grid.innerHTML = '<div class="empty">Empty. Go find something.</div>';
-    G.pack.forEach((k, i) => {
-      const it = ITEMS[k];
-      grid.appendChild(itemCard(k, () => {
-        if (!it.use) { toast(it.n + ': saved for camp', 1.3); return; }
-        const p = G.p;
-        if (it.hp) p.hp = Math.min(100, p.hp + it.hp);
-        if (it.sta) p.sta = Math.min(100, p.sta + it.sta);
-        G.pack.splice(i, 1); SFX.play('pick'); toast(`${it.use === 'Use' ? 'Used' : it.use === 'Take' ? 'Took' : it.use === 'Eat' ? 'Ate' : 'Drank'} ${it.n.toLowerCase()}`, 1.3);
-        openPack();
-      }, it.use ? `<em>${it.use}</em>` : ''));
-    });
-    $('#shCap').textContent = 'Tap food or meds to use';
+    G.pack.forEach((e, i) => grid.appendChild(itemCard(e, () => openPack(i === sel ? -1 : i), '', i === sel ? ' sel' : '')));
+    $('#shCap').textContent = sel < 0 ? 'Tap an item to use or drop it' : '';
     $('#shTake').style.display = 'none';
+    if (sel >= 0) {
+      const e = G.pack[sel], it = ITEMS[e.k], acts = $('#shActs');
+      acts.innerHTML = `<span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}</span>`;
+      if (it.use) { const b = document.createElement('button'); b.textContent = it.use; b.onclick = ev => { ev.stopPropagation(); useItem(sel); }; acts.appendChild(b); }
+      const d = document.createElement('button'); d.className = 'ghost'; d.textContent = 'Drop'; d.onclick = ev => { ev.stopPropagation(); dropItem(sel); }; acts.appendChild(d);
+    }
     sheet.classList.add('on');
+  }
+  function useItem(i) {
+    const e = G.pack[i], it = ITEMS[e.k], p = G.p;
+    if (it.hp) p.hp = Math.min(100, p.hp + it.hp);
+    if (it.sta) p.sta = Math.min(100, p.sta + it.sta);
+    e.n--; if (!e.n) G.pack.splice(i, 1);
+    SFX.play('pick'); toast(`${it.use === 'Use' ? 'Used' : it.use === 'Take' ? 'Took' : it.use === 'Eat' ? 'Ate' : 'Drank'} ${it.n.toLowerCase()}`, 1.3);
+    openPack(e.n ? i : -1);
+  }
+  function dropItem(i) {
+    const e = G.pack.splice(i, 1)[0], p = G.p;
+    // land at her feet, nudged so several drops do not sit exactly on top of each other
+    const a = G.drops.length * 2.1;
+    G.drops.push({ k: e.k, n: e.n, x: p.x + Math.cos(a) * 14, y: p.y + 6 + Math.sin(a) * 6 });
+    SFX.play('open'); toast(`Dropped ${ITEMS[e.k].n.toLowerCase()}${e.n > 1 ? ' x' + e.n : ''}`, 1.2);
+    openPack();
   }
   $('#shTake').addEventListener('click', e => { e.stopPropagation(); takeAll(); });
   $('#shClose').addEventListener('click', e => { e.stopPropagation(); closeSheet(); });
 
+  // ---- level up popup
+  let lvlTimer = 0;
+  function levelUp(L) {
+    const perk = PERKS[L];
+    $('#lvlBody').innerHTML = `<div class="kick">Scavenging</div><div class="lv">Level ${L}</div>
+      <div class="lvsub">Searches 6% faster · +4% extra-loot chance</div>
+      ${perk ? `<div class="perk"><b>Perk unlocked: ${perk[0]}</b>${perk[1]}</div>` : ''}`;
+    const el = $('#lvlup'); el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+    clearTimeout(lvlTimer); lvlTimer = setTimeout(() => el.classList.remove('on'), perk ? 3600 : 2600);
+    if (SFX.ac) [523, 659, 784, 1046].forEach((f, i) => SFX.tone('triangle', f, f * 1.01, .25, .07, i * .09));
+    puff(G.p.x, G.p.y, 30, 18, '#ffe2a8', 140, .9, 3);
+  }
+
   function hideCards() { $('#card').classList.remove('on'); }
   function packSummaryHTML(list) {
     if (!list.length) return '<div class="empty">Nothing.</div>';
-    const counts = {}; list.forEach(k => counts[k] = (counts[k] || 0) + 1);
+    const counts = {}; list.forEach(e => counts[e.k] = (counts[e.k] || 0) + e.n);
     return Object.keys(counts).map(k => `<div class="sum-item${ITEMS[k].rare ? ' rare' : ''}"><img alt="" src="${ART.iconURL[ITEMS[k].i]}"><span>${ITEMS[k].n}</span>${counts[k] > 1 ? `<b>x${counts[k]}</b>` : ''}</div>`).join('');
   }
+  const skillLine = () => { const L = scavLvl(); return `<div class="skline">Scavenging Lv ${L}${L < 10 ? ` · ${SK.xp - XPCUM(L)}/${XPCUM(L + 1) - XPCUM(L)} xp` : ' · max'} <button class="reset" id="cReset">reset skills</button></div>`; };
+  function bindReset() { $('#cReset').onclick = () => { SK.xp = 0; saveSkills(); lastHud = ''; $('#cReset').closest('.skline').outerHTML = skillLine(); bindReset(); toast('Skills reset', 1.2); }; }
   function showSummary() {
     G.over = true; G.paused = true; closeSheet(true);
     const rooms = Object.keys(ROOMNAME).filter(k => k !== 'o'), seen = rooms.filter(k => G.visited[k]).length;
@@ -1602,8 +1712,9 @@
       <div class="stats"><div><b>${seen}/${rooms.length}</b>rooms</div><div><b>${G.stats.searched}/${total}</b>searched</div><div><b>${G.stats.kills}</b>zombies</div><div><b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b>time</div></div>
       ${G.visited.s ? '<div class="found">You found the hidden room</div>' : '<div class="found dim">Something in this house stayed hidden...</div>'}
       <div class="sum">${packSummaryHTML(G.pack)}</div>
+      ${skillLine()}
       <div class="btnrow"><button id="cBack" class="ghost">Go back in</button><button id="cNew">New run</button></div>`;
-    $('#card').classList.add('on');
+    $('#card').classList.add('on'); bindReset();
     $('#cBack').onclick = () => { hideCards(); G.over = false; G.paused = false; G.p.y = 28.4 * T; G.p.vy = 0; };
     $('#cNew').onclick = () => newGame();
   }
@@ -1615,9 +1726,10 @@
       <h2>You barely got out</h2>
       <p>She dragged herself back out onto the stoop. Half the pack spilled on the way.</p>
       <div class="sum">${packSummaryHTML(G.pack)}</div>
-      ${lost.length ? `<div class="lost">Lost: ${lost.map(k => ITEMS[k].n).join(', ')}</div>` : ''}
+      ${lost.length ? `<div class="lost">Lost: ${lost.map(e => ITEMS[e.k].n + (e.n > 1 ? ' x' + e.n : '')).join(', ')}</div>` : ''}
+      ${skillLine()}
       <div class="btnrow"><button id="cNew">Restart</button></div>`;
-    $('#card').classList.add('on');
+    $('#card').classList.add('on'); bindReset();
     $('#cNew').onclick = () => newGame();
   }
 
@@ -1644,7 +1756,7 @@
 
   // debug / test hooks
   const DM = window.DM = {
-    get G() { return G; }, fps: 0, ms: 0,
+    get G() { return G; }, fps: 0, ms: 0, SK, scavLvl, XPCUM, openPack, dropItem,
     tp(tx, ty) { G.p.x = tx * T; G.p.y = ty * T; G.p.vx = G.p.vy = 0; G.cam.x = G.p.x; G.cam.y = G.p.y - 34; },
     face(x, y) { G.p.fx = x; G.p.fy = y; if (x) G.p.flip = x < 0; },
     target() { const t = findTarget(); return t ? { act: t.act, name: t.name } : null; },
