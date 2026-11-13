@@ -496,7 +496,10 @@
     let spd = 0, running = false;
     // stamina
     p.staDelay -= dt;
-    if (p.staDelay <= 0 && !(inp.run && inp.m > 0)) p.sta = Math.min(100, p.sta + 20 * dt);
+    // Refill whenever she is not ACTUALLY sprinting. Before, holding the joystick far out with no
+    // stamina left blocked the refill too, so she was stuck winded until she let go of the stick.
+    if (p.staDelay <= 0 && !p.running) p.sta = Math.min(100, p.sta + (inp.m > .1 ? 13 : 20) * dt);
+    if (p.sta <= 1) p.winded = true; else if (p.sta >= 30) p.winded = false;
 
     if (LP.on) { p.vx *= .8; p.vy *= .8; inp = { x: 0, y: 0, m: 0, run: false }; }
     if (p.st === 'free' && !LP.on) {
@@ -511,7 +514,7 @@
     }
 
     if (p.st === 'free' || p.st === 'swing') {
-      running = inp.run && inp.m > .5 && p.sta > 1 && p.st === 'free';
+      running = inp.run && inp.m > .5 && p.sta > 1 && !p.winded && p.st === 'free';
       spd = (running ? 4.5 : 2.75) * T * inp.m * (p.st === 'swing' ? .35 : 1);
       if (running) { p.sta = Math.max(0, p.sta - 24 * dt); p.staDelay = .7; }
       const tvx = inp.x * spd, tvy = inp.y * spd;
