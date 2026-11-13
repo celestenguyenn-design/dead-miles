@@ -569,7 +569,7 @@
   function gateOpen() { const L = G.furn.filter(f => f.lootable && !f.secretLoot); return L.filter(f => f.searched).length >= Math.ceil(L.length * .75); }
   const hasItem = k => G.pack.some(e => e.k === k);
   const RUG = { x: 14.2 * T, y: 3.2 * T, w: 4.6 * T, h: 3.4 * T }, BOARD = { x: 18.05 * T, y: 5.8 * T, w: 26, h: 10 };
-  const HATCH = { x: 20.5 * T, y: 15.4 * T }, HOLE = { x: 26.5 * T, y: 15.2 * T };
+  const HATCH = { x: 20.5 * T, y: 15.6 * T }, HOLE = { x: 26.5 * T, y: 15.2 * T };
   function secretActs(out) {
     const p = G.p, gate = gateOpen();
     const sh = G.furn.find(f => f.id === 'secretShelf');
@@ -1022,7 +1022,7 @@
   function updateWorld(dt) {
     // fog
     for (const k in G.fog) {
-      const target = k === G.room ? 0 : k === 'a' ? .99 : G.room === 'a' ? .97 : k === 'o' ? .12 : G.visited[k] ? .45 : k === 's' ? .99 : .97;
+      const target = k === G.room ? 0 : k === 'a' ? .99 : G.room === 'a' ? 1 : k === 'o' ? .12 : G.visited[k] ? .45 : k === 's' ? .99 : .97;
       G.fog[k] = lerp(G.fog[k], target, 1 - Math.exp(-(target < G.fog[k] ? 5 : 2) * dt));
     }
     G.noiseLvl = Math.max(0, G.noiseLvl - dt * .28);
@@ -1088,6 +1088,7 @@
       let rm = roomAt(x, y);
       if (!rm && isWall(x, y)) rm = roomAt(x, y - 1) || roomAt(x - 1, y) || roomAt(x + 1, y) || roomAt(x, y + 1);
       if (ch(x, y) === 'X') rm = 'r';
+      if (x >= 24 && isVoid(x, y + 1)) rm = null; // attic: nothing below its south wall
       if (rm) ART.drawFloorTile(c, rm, x, y, T);
     }
     // street + curb
@@ -1228,7 +1229,7 @@
     for (const w of wallCells) { if (w.key < vy0 || w.key - WH - T > vy1 || (w.x + 1) * T < vx0 || w.x * T > vx1) continue; list.push({ k: w.key, w }); }
     for (const d of doorLeaves) list.push({ k: d.key, d });
     for (const d of G.drops) list.push({ k: d.y - 2, dr: d });
-    if (G.attic.st === 1) list.push({ k: HATCH.y + 6, lad: 1 });
+    if (G.attic.st === 1) list.push({ k: HATCH.y - 14, lad: 1 });
     for (const f of G.furn) { const k = f.wall ? f.y + f.h + .5 : f.y + f.h; if (k + 10 < vy0 || f.y - 120 > vy1) continue; list.push({ k, f }); }
     for (const z of G.zs) list.push({ k: z.st === 'sleep' || z.st === 'rise' && z.stT < .5 ? 22 * T + 1 : z.dead ? z.y - 14 : z.y, z });
     list.push({ k: p.y, pl: 1 });
@@ -1237,7 +1238,7 @@
       if (it.w) drawWall(it.w);
       else if (it.d) drawDoor(it.d);
       else if (it.dr) drawDrop(it.dr);
-      else if (it.lad) drawLadder(false, HATCH.x, HATCH.y + 6);
+      else if (it.lad) drawLadder(false, HATCH.x + 2, HATCH.y - 14);
       else if (it.f) { const f = it.f, cvs = furnCanvas(f); if (f.lootable && f.searched && !(f.loot0 && f.loot0.length) && !(f.secret && !G.secretOpen)) ctx.globalAlpha = .82; ctx.drawImage(cvs, f._b.x + (f.slide || 0) * T, f._b.y, f._b.w, f._b.h); ctx.globalAlpha = 1; if (f.art === 'crate' && !f.searched) ART.candle(ctx, f.x + f.w - 12, ART.geo(f).ty0 + 12, G.t); }
       else if (it.z) drawZombie(it.z);
       else drawPlayer();

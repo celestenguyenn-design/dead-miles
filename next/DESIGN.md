@@ -98,13 +98,29 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   danger shown, e.g. a police station); the rest can go to crew auto-search.
 - Consistency (horde shifts, watering, streak) matters as much as volume.
 
-## Jobs (decided)
-- Pick a job ("what you did before") at character creation, like old Dead
-  Miles backgrounds: perk + small starter kit. Old: Farmer (garden), Engineer
-  (cheaper base builds), Chef (food heals more), Firefighter (HP, fire axe),
-  Carpenter (walls/traps), Mechanic (repairs), Gamer (XP, weaker). New, loot
-  themed (proposed): Locksmith (quiet locks/safes, spots secrets sooner), Nurse
-  (more meds, better healing), Cop (guns, police-station loot).
+## Jobs (decided - combat/survival roles, owner's call)
+- Hunter (archer): bows, quiet ranged kills, recoverable arrows; best sneaker.
+- Scavenger: faster searches, more loot, spots secrets sooner.
+- Thief: lockpicking expert (wider sweet spots, picks break less), quieter.
+- Brawler: melee damage + toughness; best on horde night.
+- Mechanic: cheaper walls/traps/repairs, quieter prying.
+- Medic dropped as a job ("not useful in this scenario"); healing becomes an
+  optional skill anyone can level.
+
+## Locks (decided)
+- Locked doors, gun safes, pharmacy cages, toolboxes, attic trunks guard the
+  best loot. Some houses are only worth it with a crowbar.
+- Lockpick = a real mini-game (rotate to find the sweet spot, strain snaps the
+  pick), silent, consumes picks; harder locks = smaller sweet spot.
+- Crowbar = always works, loud, can smash something inside.
+- Picks/crowbars are loot, trader stock, or crafted from blueprints.
+
+## Events (decided)
+- Seasonal events with limited loot, a mini-boss, a trader event quest and
+  once-a-year cosmetics. First: Thanksgiving (around Nov 26): cranberry sauce,
+  stuffing, pumpkin pie, whole turkey, a zombie turkey mini-boss, pilgrim hat,
+  maybe a "Black Friday horde". Later: Christmas, Halloween, summer heatwave.
+- Players are experienced survival gamers: depth over hand-holding.
 
 ## Trader + quests (decided, 7 Days to Die style)
 - A trader is a permanent entry on the house list (never uses a scouted slot),
