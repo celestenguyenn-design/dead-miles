@@ -263,7 +263,7 @@
   }
   function alertZombie(z, x, y, seen) {
     if (z.st === 'sleep') { z.st = 'rise'; z.stT = 0; z.alertT = 1; SFX.play('groan'); z.target = { x, y }; return; }
-    if (seen) { if (z.st !== 'chase') { z.alertT = .9; SFX.play('groan'); SFX.play('alert'); } z.st = 'chase'; z.stT = 0; z.lostT = 0; return; }
+    if (seen) { if (z.st !== 'chase') { z.alertT = .9; SFX.play('groan'); SFX.play('alert'); if (opts.onAlert) opts.onAlert(z); } z.st = 'chase'; z.stT = 0; z.lostT = 0; return; }
     if (z.st !== 'investigate') { z.alertT = .7; if (Math.random() < .6) SFX.play('groan'); }
     z.st = 'investigate'; z.target = { x, y }; z.path = null; z.stT = 0;
   }
@@ -550,7 +550,7 @@
     const stepLen = running ? T * .72 : T * .58;
     if (p.stepAcc > stepLen) {
       p.stepAcc = 0; SFX.play(running ? 'run' : 'step');
-      const qn = (job() === 'thief' ? .6 : job() === 'hunter' ? .8 : 1) * (S().shoes ? .7 : 1); if (running) emitNoise(p.x, p.y, 3 * qn, false); else emitNoise(p.x, p.y, 1.1 * qn, false);
+      const qn = (job() === 'thief' ? .6 : job() === 'hunter' ? .8 : 1) * (S().shoes ? .7 : 1) * (opts.quiet ? opts.quiet() : 1); if (running) emitNoise(p.x, p.y, 3 * qn, false); else emitNoise(p.x, p.y, 1.1 * qn, false);
       if (running) puff(p.x, p.y, 2, 2, 'rgba(157,144,191,.6)', 30, .4, 3);
     }
     if (moved < .05 && p.st === 'free') p.ph = lerp(p.ph, Math.round(p.ph / Math.PI) * Math.PI, .2);
@@ -670,6 +670,7 @@
     return losClear(z.x, z.y - 30, p.x, p.y - 30);
   }
   function updateZombie(z, dt) {
+    if (opts.zupdate && opts.zupdate(z, dt)) return;   // the weekly boss (boss.js) runs its own brain
     z.stT += dt; z.flash = Math.max(0, z.flash - dt * 6); z.alertT = Math.max(0, z.alertT - dt); z.cd = Math.max(0, z.cd - dt);
     const p = G.p;
     const [zx, zy] = cellOf(z); z.roomNow = roomAt(zx, zy);
@@ -1002,6 +1003,7 @@
     for (const s of G.sec) if (s.type === 'attic' && s.st === 1) list.push({ k: s.hatch.y * T - 14, lad: s });
     for (const f of G.furn) { const k = f.wall ? f.y + f.h + .5 : f.y + f.h; if (k + 10 < vy0 || f.y - 120 > vy1) continue; list.push({ k, f }); }
     for (const z of G.zs) list.push({ k: z.sleep && (z.st === 'sleep' || z.st === 'rise' && z.stT < .5) ? z.sleep.key * T + 1 : z.dead ? z.y - 14 : z.y, z });
+    if (opts.sprites) for (const s of opts.sprites(G)) list.push({ k: s.k, sp: s });   // pets, crew, hidden survivors (crew.js)
     list.push({ k: p.y, pl: 1 });
     list.sort((a, b) => a.k - b.k);
     for (const it of list) {
@@ -1010,6 +1012,7 @@
       else if (it.dr) drawDrop(it.dr);
       else if (it.lad) drawLadder(false, it.lad.hatch.x * T + 2, it.lad.hatch.y * T - 14);
       else if (it.f) { const f = it.f, cvs = furnCanvas(f); if (f.lootable && f.searched && !(f.loot0 && f.loot0.length) && !(f.secret && !G.secretOpen)) ctx.globalAlpha = .82; ctx.drawImage(cvs, f._b.x + (f.slide || 0) * T, f._b.y, f._b.w, f._b.h); ctx.globalAlpha = 1; if (f.art === 'crate' && !f.searched) ART.candle(ctx, f.x + f.w - 12, ART.geo(f).ty0 + 12, G.t); }
+      else if (it.sp) it.sp.draw(ctx);
       else if (it.z) drawZombie(it.z);
       else drawPlayer();
     }
@@ -1956,6 +1959,16 @@
     spawn(x, y, props) { const z = mkZombie(x, y, 'investigate', null); Object.assign(z, props || {}); G.zs.push(z); return z; },
     hurtZombie(z, dmg, fa = 0, soft) { const kb = [z.kbx, z.kby]; hitZombie(z, fa, dmg, true); if (soft && !z.dead) { z.kbx = kb[0]; z.kby = kb[1]; if (z.st === 'hurt') z.st = 'chase'; } },
     solidAt: (tx, ty) => !!solidCell[ty * MW + tx],
+    // phase 5b (crew.js, boss.js): move an entity with collision, path toward the player, line of sight, noise, hurting her
+    move: (e, dx, dy) => moveEnt(e, dx, dy),
+    stepToPlayer: e => nextStep(e, playerField()),
+    los: (x0, y0, x1, y1) => losClear(x0, y0, x1, y1),
+    noise: (x, y, r, show) => emitNoise(x, y, r, show),
+    hurtPlayer: (dmg, dx, dy, z) => hurtPlayer(dmg, dx, dy, z),
+    banner: (t, sub) => banner(t, sub), puff: (...a) => puff(...a),
+    roomAt: e => { const [x, y] = cellOf(e); return roomAt(x, y); },
+    fogOf: r => (G && r != null && G.fog[r] != null ? G.fog[r] : 0),
+    pause: on => { if (G) G.paused = !!on; },
     exit(kind) { if (G && !G.over || kind) finishRun(kind || 'leave'); },
     get opts() { return opts; },
   };

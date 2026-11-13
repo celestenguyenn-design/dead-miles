@@ -141,8 +141,12 @@ window.DM = window.DM || {};
     denim: { n: 'Denim jacket', slot: 'outfit', r: 'c', src: 'loot' }, raincoat: { n: 'Raincoat', slot: 'outfit', r: 'c', src: 'loot' },
     varsity: { n: 'Varsity jacket', slot: 'outfit', r: 'r', src: 'loot' }, puffer: { n: 'Puffer jacket', slot: 'outfit', r: 'e', src: 'trader', lv: 4 },
     leather: { n: 'Biker jacket', slot: 'outfit', r: 'l', src: 'police' },
+    // weekly group boss (boss.js): a chance when the boss your party fought goes down
+    wardencap: { n: "Warden's cap", slot: 'hat', r: 'e', src: 'boss' }, ashcrown: { n: 'Ash crown', slot: 'hat', r: 'l', src: 'boss' },
+    stetho: { n: 'Stethoscope', slot: 'neck', r: 'e', src: 'boss' }, apron: { n: "Butcher's apron", slot: 'outfit', r: 'e', src: 'boss' },
   };
-  D.cosHint = k => { const c = D.COS[k]; return { loot: 'Found in houses', corpse: 'Found on zombies', police: 'Police stations', mansion: 'Mansions', horde: 'Horde-night crates', quest: "Dot's quest rewards", trader: 'Trader level ' + c.lv, event: D.EVHINT[k] || 'Seasonal event' }[c.src]; };
+  D.cosHint = k => { const c = D.COS[k]; return { loot: 'Found in houses', corpse: 'Found on zombies', police: 'Police stations', mansion: 'Mansions', horde: 'Horde-night crates', quest: "Dot's quest rewards", trader: 'Trader level ' + c.lv, event: D.EVHINT[k] || 'Seasonal event', boss: D.BOSSHINT[k] || 'Weekly boss' }[c.src]; };
+  D.BOSSHINT = { apron: 'Weekly boss: the Butcher of Bed-Stuy', ashcrown: 'Weekly boss: Mother Ash', wardencap: 'Weekly boss: the Bridge Warden', stetho: 'Weekly boss: the Night Nurse' };
   // where each event cosmetic comes from (the wardrobe also tags them "Thanksgiving 2026" etc.)
   D.EVHINT = { pilgrim: 'Thanksgiving: the zombie turkey', feathers: 'Thanksgiving: zombie turkeys', pietin: "Thanksgiving: Dot's dinner job", harvest: "Thanksgiving: Dot's jobs",
     santa: 'Christmas: the Krampus walker', candycane: "Christmas: Dot's gift job" };
