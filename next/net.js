@@ -17,7 +17,10 @@
     hasPin: false, pin: '', stepKey: '', idSource: '',
     lastPull: 0, lastPost: 0, steps: { today: 0, yesterday: 0, src: 'none', posts: [] },
     conflict: null, party: null, boardRows: [],
-    cfg: { timeout: 12000, saveDelay: 4000, publishDelay: 15000, pollMs: 5 * 60000, typedCap: 4000 },
+    cfg: { timeout: 12000, saveDelay: 4000, publishDelay: 15000, pollMs: 5 * 60000, typedCap: 4000,
+      // Players whose phone cannot sync and who type their steps instead. The owner's call:
+      // their typed totals count exactly like phone steps. Handles, lower case.
+      trustedTyped: ['isa'] },
     onConflict: null,   // ({local, remote}) => 'local' | 'remote' | Promise of either
     onChange: null      // () => void, any status change (panel uses it)
   };
@@ -337,6 +340,12 @@
     const d = dayStr(); const r = dayRec(d);
     const totalNow = target(r).eff;
     const claim = mode === 'add' ? totalNow + n : n;
+    if (NET.handle && NET.cfg.trustedTyped.includes(String(NET.handle).toLowerCase())) {
+      if (claim > r.phone) r.phone = claim;
+      saveLedger();
+      const g = applyDay(d, 'phone'); NET.steps.today = target(r).eff; NET.steps.phone = r.phone; changed();
+      return g;
+    }
     if (claim > r.typed) r.typed = claim;
     saveLedger();
     const g = applyDay(d); NET.steps.today = target(r).eff; NET.steps.typed = r.at; changed();
