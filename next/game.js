@@ -1,3 +1,6 @@
+/* The test panel hands out free steps, caps and materials, so it never opens on the
+   real site where friends play - only on local test copies and the claude.ai preview. */
+var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -32,7 +35,7 @@
   function migrate(v) {
     v.trader = v.trader || { caps: 0, completed: 0, day: '', offers: [], active: [], stock: [], seq: 0 };
     v.walked = v.walked || 0;
-    if (v.survivor) { const s = v.survivor; if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); s.packBonus = s.packBonus || 0; }
+    if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); s.packBonus = s.packBonus || 0; }
     return v;
   }
   Game.save = function () {
@@ -454,36 +457,72 @@
   let curTab = 'houses';
   function tab(t) { curTab = t; document.querySelectorAll('#mtabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); renderHome(); }
 
-  // ---- character creation
-  let cre = { name: '', look: 0, job: 'scavenger' };
+  // ---- character creation / edit look
+  let cre = { name: '', look: ART.LOOK.norm(null), job: 'scavenger' }, creEdit = false, idleRAF = 0;
+  const LK = ART.LOOK;
+  function lookRows(lk) {
+    const sw = (key, list, colOf, labelOf) => `<div class="swatches">${list.map((v, i) => `<button class="sw${lk[key] === i ? ' on' : ''}" data-k="${key}" data-v="${i}" style="background:${colOf(v)}" aria-label="${labelOf(v, i)}"></button>`).join('')}</div>`;
+    return `
+      <div class="lrow"><div class="kick">Body</div><div class="chips">${[['f', 'Female'], ['m', 'Male']].map(([v, n]) => `<button class="chip${lk.body === v ? ' on' : ''}" data-k="body" data-v="${v}">${n}</button>`).join('')}</div></div>
+      <div class="lrow"><div class="kick">Skin</div>${sw('skin', LK.skins, v => v[0], (v, i) => 'Skin ' + (i + 1))}</div>
+      <div class="lrow"><div class="kick">Hair</div><div class="chips">${LK.styles.map((n, i) => `<button class="chip${lk.hair === i ? ' on' : ''}" data-k="hair" data-v="${i}">${n}</button>`).join('')}</div></div>
+      <div class="lrow"><div class="kick">Hair colour</div>${sw('hairC', LK.hairs, v => v, (v, i) => LK.hairNames[i])}</div>
+      <div class="lrow"><div class="kick">Hood</div><div class="chips"><button class="chip${lk.hood ? ' on' : ''}" data-k="hood" data-v="1">Up</button><button class="chip${!lk.hood ? ' on' : ''}" data-k="hood" data-v="0">Down</button></div></div>
+      <div class="lrow"><div class="kick">Jacket</div>${sw('coat', LK.coats, v => v[0], v => v[2])}</div>
+      <div class="lrow"><div class="kick">Pants</div>${sw('pants', LK.pants, v => v[0], v => v[1])}</div>`;
+  }
+  function bindLook(lk, rerender) {
+    document.querySelectorAll('[data-k]').forEach(b => b.onclick = async () => {
+      const k = b.dataset.k, v = b.dataset.v;
+      lk[k] = k === 'body' ? v : k === 'hood' ? v === '1' : +v;
+      SFX.play('ui'); await E.buildSurvivor(lk); rerender();
+    });
+  }
+  function startIdle(canvas, getWeapon) { // gentle idle: breathing + a slow sway
+    cancelAnimationFrame(idleRAF);
+    const loop = t => {
+      if (!document.body.contains(canvas)) return;
+      const x = canvas.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, canvas.width, canvas.height);
+      x.fillStyle = 'rgba(8,6,22,.4)'; x.beginPath(); x.ellipse(canvas.width / 2, canvas.height * .9, canvas.width * .28, canvas.width * .07, 0, 0, 6.3); x.fill();
+      const k = t / 1000, wk = getWeapon(); const w = wk && D.ITEMS[wk] ? D.ITEMS[wk].w : 'fists';
+      ART.drawRig(x, 'survivor', canvas.width / 2 - 4, canvas.height * .9, canvas.height / 260 * .98, false,
+        { sy: 1 + Math.sin(k * 2.4) * .014, rot: Math.sin(k * .9) * .015, parts: { arm: { r: Math.sin(k * 1.3) * .05 }, bat: { r: Math.sin(k * 1.3) * .05 }, legB: { r: Math.sin(k * .7) * .02 } }, weapon: w });
+      idleRAF = requestAnimationFrame(loop);
+    };
+    idleRAF = requestAnimationFrame(loop);
+  }
   function renderCreate() {
     $('#menu').className = 'create';
+    const lk = cre.look;
     $('#mbody').innerHTML = `
-      <div class="mhead"><div class="logo">DEAD MILES</div><div class="kick">a new survivor</div></div>
+      <div class="mhead"><div class="logo">DEAD MILES</div><div class="kick">${creEdit ? 'edit your look' : 'a new survivor'}</div></div>
       <div class="ccard">
-        <div class="cprev"><canvas id="cPort" width="200" height="240"></canvas></div>
-        <div class="cform">
-          <label class="kick" for="cName">Name</label>
-          <input id="cName" maxlength="16" placeholder="Your name" value="${esc(cre.name)}" autocomplete="off">
-          <div class="kick">Hood</div>
-          <div class="swatches">${D.LOOKS.map((l, i) => `<button class="sw${i === cre.look ? ' on' : ''}" data-i="${i}" style="background:${l.c[0]}" aria-label="${l.n}"></button>`).join('')}</div>
+        <div class="cprev"><canvas id="cPort" width="260" height="320"></canvas><button class="mbtn sm ghost" id="cRand">Randomise</button></div>
+        <div class="cform">${creEdit ? '' : `<label class="kick" for="cName">Name</label>
+          <input id="cName" maxlength="16" placeholder="Your name" value="${esc(cre.name)}" autocomplete="off">`}
+          ${lookRows(lk)}
         </div>
       </div>
-      <div class="kick sect">Job</div>
+      ${creEdit ? '<button class="mbtn big" id="cSave">Save look</button><button class="mbtn big ghost" id="cCancel">Cancel</button>' : `<div class="kick sect">Job</div>
       <div class="jobs">${Object.keys(D.JOBS).map(k => { const J = D.JOBS[k]; return `<button class="job${k === cre.job ? ' on' : ''}" data-j="${k}">
         <b>${J.n}</b><span>${J.perk}</span><div class="kit">${J.kit.map(([it, n]) => `<i>${icon(it)}${n > 1 ? `<em>${n}</em>` : ''}</i>`).join('')}</div></button>`; }).join('')}</div>
-      <button class="mbtn big" id="cGo">Start walking</button>`;
-    $('#cName').oninput = e => cre.name = e.target.value;
-    document.querySelectorAll('.sw').forEach(b => b.onclick = async () => { cre.look = +b.dataset.i; await E.buildSurvivor(cre.look); renderCreate(); });
+      <button class="mbtn big" id="cGo">Start walking</button>`}`;
+    if ($('#cName')) $('#cName').oninput = e => cre.name = e.target.value;
+    bindLook(lk, renderCreate);
+    $('#cRand').onclick = async () => { cre.look = LK.random(); SFX.play('ui'); await E.buildSurvivor(cre.look); renderCreate(); };
     document.querySelectorAll('.job').forEach(b => b.onclick = () => { cre.job = b.dataset.j; SFX.play('ui'); renderCreate(); });
-    $('#cGo').onclick = async () => {
-      SV.survivor = createSurvivor(cre.name.trim(), cre.look, cre.job);
+    if (creEdit) {
+      $('#cSave').onclick = () => { SV.survivor.look = Object.assign({}, cre.look); Game.save(); publish(); creEdit = false; renderHome(); toast('Looking good', 1.2); };
+      $('#cCancel').onclick = async () => { creEdit = false; await E.buildSurvivor(SV.survivor.look); renderHome(); };
+    } else $('#cGo').onclick = async () => {
+      SV.survivor = createSurvivor(cre.name.trim(), Object.assign({}, cre.look), cre.job);
       DM.S = SV.survivor; Game.save(); publish();
       await E.buildSurvivor(cre.look);
       renderHome();
     };
-    drawPortrait($('#cPort'), cre.job ? D.JOBS[cre.job].hands : 'bat', 1.0);
+    startIdle($('#cPort'), () => creEdit ? (SV.survivor.hands && SV.survivor.hands.k) : D.JOBS[cre.job].hands);
   }
+  function editLook() { creEdit = true; cre.look = LK.norm(SV.survivor.look); renderCreate(); $('#menu').scrollTo(0, 0); }
   function drawPortrait(c, weapon, sc = .7) {
     const dpr = c.width / c.clientWidth || 2, x = c.getContext('2d');
     x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.width, c.height);
@@ -503,7 +542,7 @@
     $('#mbody').innerHTML = `
       <div class="mtop"><div class="logo">DEAD MILES</div><button id="mver" class="ver">${VERSION}</button><button id="mnet" class="gear" aria-label="Account and friends"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.8 19.5c.6-3.6 3.2-5.6 6.2-5.6s5.6 2 6.2 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16.5 13.6c2.6.1 4.4 1.8 4.9 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><button id="mset" class="gear" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 4.6.1-1.1-.1-1.1 2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.9-1.1L15.8 3h-4l-.4 2.6a8 8 0 0 0-1.9 1.1l-2.4-1-2 3.4 2 1.6-.1 1.1.1 1.1-2 1.6 2 3.4 2.4-1c.6.5 1.2.8 1.9 1.1l.4 2.6h4l.4-2.6a8 8 0 0 0 1.9-1.1l2.4 1 2-3.4z" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></button></div>
       <div class="scard">
-        <canvas id="mPort" width="150" height="190"></canvas>
+        <div class="portwrap"><canvas id="mPort" width="150" height="190"></canvas><button class="editlook" id="mLook">Edit look</button></div>
         <div class="sinfo">
           <div class="sname">${esc(s.name)}</div>
           <div class="sjob">${J.n} · <span>${J.stats.join(' · ')}</span></div>
@@ -529,7 +568,8 @@
       const used = DM.addSteps(v, 'typed'); if (used < v) toast(`Typed steps are capped at 4,000 a day (${used.toLocaleString('en-US')} counted)`, 2.6);
     };
     $('#mnet').onclick = openAccount;
-    let vt = 0, vtT = 0; $('#mver').onclick = () => { const n = performance.now(); if (n - vtT > 1200) vt = 0; vtT = n; if (++vt >= 5) { vt = 0; openDev(); } };
+    $('#mLook').onclick = () => { SFX.play('ui'); editLook(); };
+    let vt = 0, vtT = 0; $('#mver').onclick = () => { const n = performance.now(); if (n - vtT > 1200) vt = 0; vtT = n; if (++vt >= 5) { vt = 0; if (DM_DEV_OK) openDev(); } };
     $('#mset').onclick = openSettings;
     drawPortrait($('#mPort'), s.hands && s.hands.k, .78);
     if (curTab === 'houses') renderHouses(); else if (curTab === 'bench') renderBench(); else renderStash();
@@ -635,7 +675,10 @@
     };
     $('#mClose').onclick = sheetClose;
   }
+  // The test panel hands out free steps, caps and materials, so it never opens on the
+  // real site where friends play - only on local test copies and the claude.ai preview.
   function openDev() {
+    if (!DM_DEV_OK) return;
     sheetOpen(`<div class="kick">Developer</div><h3>Test panel</h3>
       <div class="devgrid"><button class="mbtn sm" data-d="s1">+1,000 steps</button><button class="mbtn sm" data-d="s5">+5,000 steps</button>
       <button class="mbtn sm" data-d="day">New day</button><button class="mbtn sm" data-d="heal">Full heal</button>
@@ -660,7 +703,7 @@
   // ---------------------------------------------------------------- boot
   function boot2() {
     rollDay();
-    if (!SV.survivor) { cre = { name: '', look: 0, job: 'scavenger' }; E.buildSurvivor(0).then(renderCreate); return; }
+    if (!SV.survivor) { cre = { name: '', look: ART.LOOK.random(), job: 'scavenger' }; creEdit = false; E.buildSurvivor(cre.look).then(renderCreate); return; }
     DM.S = SV.survivor;
     E.buildSurvivor(SV.survivor.look).then(renderHome);
   }

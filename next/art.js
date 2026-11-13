@@ -57,9 +57,10 @@ const ART = (() => {
   }
 
   const rigs = {};
-  async function buildRig(key, res, recolor, as) {
+  async function buildRig(key, res, recolor, as, patch) {
     const R = RIGS[key];
     const L = R.src.split('\n');
+    if (patch) patch(L);
     const mid = L.findIndex(l => l.includes('</g></g><g><g class='));
     const colourLines = rng(mid + 1, L.length - 1).filter(i => !/^\s*<\/g><\/g><\/g>\s*$/.test(L[i]));
     const used = new Set(R.skip);
@@ -144,6 +145,86 @@ const ART = (() => {
       c.strokeStyle = P.INK; c.lineWidth = 9; c.beginPath(); c.moveTo(-6, -46); c.quadraticCurveTo(22, 0, -6, 46); c.stroke();
       c.strokeStyle = '#b07a45'; c.lineWidth = 5; c.stroke();
       c.strokeStyle = '#f6e3bb'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-6, -46); c.lineTo(-6, 46); c.stroke(); c.restore(); },
+  };
+
+  // ---------- survivor appearance: body, skin, hair (style + colour), hood up/down, coat, pants ----------
+  // Works by patching individual lines of the baked survivor SVG (colour half; mid line 61),
+  // so the parts rig (legs / body / arm+bat) keeps working for every look.
+  const LOOK = {
+    skins: [['#f8dfc2', '#f08a6a'], ['#efc9a0', '#ea8a6a'], ['#d9a477', '#d97a5a'], ['#b97d52', '#c06650'], ['#8a5a3c', '#a8504a'], ['#5e3b27', '#8a4040']],
+    hairs: ['#221d2e', '#5a3a28', '#e8c46a', '#c9602c', '#f07aa8', '#b39ae0', '#3fa7a0', '#ecebf2'],
+    hairNames: ['Black', 'Brown', 'Blonde', 'Ginger', 'Pink', 'Lilac', 'Teal', 'White'],
+    styles: ['Bob', 'Long', 'Twin buns', 'Crop', 'Curls', 'Buzz'],
+    coats: [['#f07b3c', '#c95f2c', 'Ember'], ['#3fa7a0', '#2c7c77', 'Teal'], ['#9a62b8', '#744690', 'Plum'], ['#7c9a4c', '#5c7836', 'Moss'], ['#c94a4a', '#9e3434', 'Brick'], ['#e0b43c', '#b48a28', 'Mustard'],
+      ['#e8609a', '#b8457a', 'Pink'], ['#f4a6c4', '#d9809f', 'Blush'], ['#6aa8e0', '#4a84b8', 'Sky'], ['#3a4a8a', '#2a3668', 'Navy'], ['#3a3848', '#26242f', 'Black']],
+    pants: [['#2f3a72', 'Denim'], ['#2a2838', 'Black'], ['#a08a5a', 'Khaki'], ['#5c6a3a', 'Olive'], ['#8a3a3a', 'Red'], ['#b9bdcc', 'Grey']],
+  };
+  LOOK.def = { body: 'f', skin: 0, hair: 0, hairC: 0, hood: true, coat: 0, pants: 0 };
+  LOOK.norm = l => typeof l === 'number' ? Object.assign({}, LOOK.def, { coat: l }) : Object.assign({}, LOOK.def, l || {});
+  LOOK.random = () => { const r = a => Math.floor(Math.random() * a); return { body: r(2) ? 'm' : 'f', skin: r(6), hair: r(6), hairC: r(8), hood: Math.random() < .6, coat: r(LOOK.coats.length), pants: r(LOOK.pants.length) }; };
+  const SP = (d, fill, sw = 4.4) => `<path d="${d}" fill="${fill}" stroke="${P.INK}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round" />`;
+  const SD = (d, fill, extra = '') => `<path d="${d}" fill="${fill}" ${extra}/>`;
+  const SL = (d, col, w) => `<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" />`;
+  const HAIR_BACK = { // hood down: drawn behind the face (head coords; face ellipse 8,-142 r20/21, facing right)
+    0: 'M-20,-144 Q-21,-171 6,-171 Q26,-169 29,-152 L20,-152 Q6,-150 -6,-140 L-4,-122 Q-14,-117 -20,-124 Z',
+    1: 'M-20,-144 Q-21,-171 6,-171 Q26,-169 29,-152 L20,-152 Q6,-150 -6,-140 L-2,-112 Q-6,-102 -16,-102 Q-24,-110 -22,-124 Z',
+    2: 'M-18,-143 Q-19,-168 6,-169 Q25,-168 28,-153 L20,-152 Q6,-150 -6,-140 L-6,-128 Q-16,-126 -18,-143 Z',
+    3: 'M-17,-143 Q-17,-167 6,-168 Q24,-167 28,-154 L20,-153 Q6,-152 -6,-140 L-8,-132 Q-17,-132 -17,-143 Z',
+    4: 'M-24,-140 Q-28,-148 -22,-156 Q-26,-166 -16,-170 Q-12,-180 0,-176 Q8,-182 16,-176 Q26,-178 28,-168 Q34,-160 28,-152 L20,-152 Q6,-150 -6,-140 L-6,-126 Q-12,-118 -20,-124 Q-28,-130 -24,-140 Z',
+    5: 'M-15,-143 Q-15,-164 6,-165 Q22,-164 27,-155 L18,-154 Q6,-152 -6,-140 L-8,-134 Q-15,-134 -15,-143 Z',
+  };
+  const FRINGE = { // drawn over the forehead
+    0: 'M-12,-148 Q-8,-171 14,-167 Q29,-163 30,-147 Q26,-152 22,-148 Q20,-156 13,-150 Q9,-158 2,-149 Q-4,-156 -12,-148 Z',
+    1: 'M-12,-148 Q-8,-171 14,-167 Q29,-163 30,-147 Q26,-150 22,-147 Q18,-157 10,-151 Q4,-157 -2,-150 Q-6,-154 -12,-148 Z',
+    2: 'M-12,-148 Q-8,-171 14,-167 Q29,-163 30,-147 Q24,-154 18,-152 Q12,-158 4,-152 Q-4,-156 -12,-148 Z',
+    3: 'M-12,-150 Q-8,-170 12,-168 Q28,-166 30,-152 Q22,-160 10,-158 Q2,-158 -12,-150 Z',
+    4: 'M-13,-148 Q-14,-158 -6,-160 Q-4,-170 6,-168 Q12,-174 20,-168 Q30,-168 30,-156 Q34,-150 30,-146 Q26,-152 22,-150 Q20,-156 13,-152 Q8,-158 2,-152 Q-4,-156 -8,-150 Q-11,-146 -13,-148 Z',
+    5: 'M-12,-152 Q-6,-166 10,-166 Q26,-166 29,-154 Q18,-160 8,-160 Q-2,-160 -12,-152 Z',
+  };
+  LOOK.patch = function (lk) {
+    lk = LOOK.norm(lk);
+    const hc = LOOK.hairs[lk.hairC] || LOOK.hairs[0], sk = LOOK.skins[lk.skin] || LOOK.skins[0], m = lk.body === 'm', st = lk.hair;
+    return L => {
+      // head group lines (colour half): 91 hood, 92 hood shade, 93 hood stitches, 94 face, 95 fringe, 96 strands, 101 brows, 102 lower lid lines, 103 blush
+      if (lk.hood) {
+        let extra = '';
+        if (st === 1) extra = SP('M-6,-130 Q-12,-118 -8,-104 L-2,-106 Q-4,-118 0,-128 Z', hc, 3.2);          // long: a lock out of the hood
+        if (st === 4) extra = SP('M-10,-128 Q-16,-122 -12,-114 Q-6,-112 -4,-120 Z', hc, 3.2);
+        L[95] = SP(FRINGE[st], hc) + extra;
+        L[96] = st === 5 || st === 3 ? '' : SL(st === 4 ? 'M-11,-150 Q-16,-144 -12,-138 M29,-150 Q33,-144 30,-138' : 'M-11,-150 Q-17,-144 -14,-136 M29,-150 Q34,-143 30,-136 M10,-163 Q15,-156 11,-149', hc, 2.2);
+      } else {
+        let back = SP(HAIR_BACK[st], hc);
+        if (st === 2) back = SP('M-12,-168 a8,8 0 1 0 0.1,0 Z', hc) + SP('M8,-174 a8,8 0 1 0 0.1,0 Z', hc) + back;
+        const shade = st === 5 ? '' : SD(st === 1 ? 'M-20,-130 Q-24,-112 -16,-104 L-8,-104 Q-14,-118 -12,-132 Z' : 'M-18,-140 Q-20,-150 -12,-158 Q-14,-146 -12,-136 Z', 'rgba(17,20,47,.22)');
+        const hoodDown = SP('M-22,-124 Q-28,-110 -16,-106 Q2,-103 18,-108 Q22,-114 16,-118 Q-2,-112 -22,-124 Z', '#f07b3c');   // bunched hood at the neck
+        const ear = `<ellipse cx="-9" cy="-138" rx="5" ry="6.4" fill="${sk[0]}" stroke="${P.INK}" stroke-width="3.2"/>`;
+        L[91] = back + shade + hoodDown + ear;
+        L[92] = ''; L[93] = '';
+        L[95] = SP(FRINGE[st], hc);
+        L[96] = st === 4 ? SL('M-4,-176 q4,-4 8,0 M14,-176 q4,-4 8,0 M-20,-160 q-2,-5 2,-8', 'rgba(17,20,47,.35)', 1.6) : st === 1 || st === 0 ? SL('M-11,-150 Q-17,-144 -14,-136 M10,-163 Q15,-156 11,-149', 'rgba(17,20,47,.3)', 1.6) : '';
+      }
+      if (m) {
+        L[94] = SP('M-12,-146 Q-12,-163 8,-163 Q28,-163 28,-147 Q28,-130 20,-124 Q10,-119 -1,-123 Q-12,-128 -12,-146 Z', sk[0]);     // squarer jaw
+        L[101] = SL('M-.4,-150.6 Q5,-151.6 10,-150.4', P.INK, 2.6) + SL('M15.4,-150.4 Q20.4,-151.8 25.4,-150.8', P.INK, 2.6);       // heavier brows
+        L[102] = '';
+        L[103] = `<ellipse cx="25.5" cy="-130" rx="3" ry="1.8" fill="${sk[1]}" opacity=".25"/>`;
+        // broader shoulders
+        L[79] = L[79].replace('M-18,-120 Q-27,-90 -30,-50', 'M-22,-121 Q-29,-90 -31,-50').replace('Q21,-90 15,-120 Q-2,-127 -18,-120 Z', 'Q23,-90 19,-121 Q-2,-129 -22,-121 Z');
+        L[80] = L[80].replace('M-18,-120 Q-27,-90 -30,-50', 'M-22,-121 Q-29,-90 -31,-50').replace('Q-14,-122 -18,-120 Z', 'Q-14,-123 -22,-121 Z');
+      } else {
+        L[101] = L[101] + SL('M8.8,-143.6 l2.8,-2.4 M24.2,-143.6 l2.6,-2.4', P.INK, 1.8);   // lashes
+        L[103] = `<ellipse cx="25.5" cy="-130" rx="3.4" ry="2.2" fill="${sk[1]}" opacity=".5"/>`;
+      }
+    };
+  };
+  LOOK.recolor = function (lk) {
+    lk = LOOK.norm(lk);
+    const c = LOOK.coats[lk.coat] || LOOK.coats[0], sk = LOOK.skins[lk.skin] || LOOK.skins[0], pa = LOOK.pants[lk.pants] || LOOK.pants[0];
+    const map = {};
+    if (c[0] !== '#f07b3c') { map['#f07b3c'] = c[0]; map['#c95f2c'] = c[1]; }
+    if (sk[0] !== '#f8dfc2') map['#f8dfc2'] = sk[0];
+    if (pa[0] !== '#2f3a72') map['#2f3a72'] = pa[0];
+    return Object.keys(map).length ? map : null;
   };
 
   // ---------- icons ----------
@@ -783,5 +864,5 @@ const ART = (() => {
     ctx.beginPath(); ctx.ellipse(x, y - 14, 2.6 * fl, 5 * fl, 0, 0, 6.28); ctx.fillStyle = '#ffd27a'; ctx.fill();
   }
 
-  return { P, rigs, buildRig, drawRig, buildIcons, iconURL, rr, blk, line, dot, hash, drawFloorTile, drawWallFace, FURN, geo, candle, VB };
+  return { P, LOOK, rigs, buildRig, drawRig, buildIcons, iconURL, rr, blk, line, dot, hash, drawFloorTile, drawWallFace, FURN, geo, candle, VB };
 })();
