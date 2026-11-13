@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.71';
+const VERSION='8.0';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -377,7 +377,7 @@ const BASE_PERK={house:'Cozy: +1 HP recovered every morning',pharmacy:'Clinic co
 
 /* ================= state ================= */
 let S=null;
-function fresh(){return {v:3,created:Date.now(),name:'',onboarded:false,muster:null,caches:{},keeps:{},keepsTotal:0,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},infect:null,diff:'normal',mapSkin:'bloom',checkin:{date:'',n:0},ladder:{date:'',hit:[]},
+function fresh(){return {v:3,era:SEASON,s2Kit:true,created:Date.now(),name:'',onboarded:false,muster:null,caches:{},keeps:{},keepsTotal:0,av:ART.randomAv(),cosmetics:[],cls:'',sp:0,skills:{},sfx:true,flares:{date:'',used:0},flare:null,callsHidden:[],raidSeats:{},parts:0,gifts:{date:'',spent:0},infect:null,diff:'normal',mapSkin:'bloom',checkin:{date:'',n:0},ladder:{date:'',hit:[]},
   steps:{total:0,today:0,date:todayStr(),lastSync:0,lastSyncDate:''},
   walk:{toNext:0,dist:500,district:0,houses:0,progress:0,banked:0},
   loc:null,pack:[],run:0,hp:100,lvl:1,xp:0,kills:0,keys:0,
@@ -455,7 +455,7 @@ function migrateGear(){
   }
   if(changed)save();
 }
-function ensureState(){if(!S)return;try{migrateGear();}catch(e){}try{migrateHandsFeet();}catch(e){}S.bossPity=S.bossPity||0;S.dust=S.dust||0;S.scrolls=S.scrolls||0;S.pins=S.pins||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
+function ensureState(){if(!S)return;if(S.onboarded)try{season2Kit();}catch(e){}try{migrateGear();}catch(e){}try{migrateHandsFeet();}catch(e){}S.bossPity=S.bossPity||0;S.dust=S.dust||0;S.scrolls=S.scrolls||0;S.pins=S.pins||0;S.bossKills=S.bossKills||0;S.petXp=S.petXp||0;S.petName=S.petName||'';if(S.pet&&!S.petName&&typeof PET_NAMES!=='undefined')S.petName=PET_NAMES[S.pet][Math.abs(hash(String(S.created||0)))%PET_NAMES[S.pet].length];
   if(!S.pets)S.pets=[];if(S.pet&&!S.pets.length){S.pets.push({id:uid(),kind:S.pet,coat:S.pet==='dog'?'mutt':'tabby',name:S.petName,xp:S.petXp||0,found:Date.now()});S.petActive=S.pets[0].id;}if(S.pet&&!S.petCoat){const ap=S.pets.find(p=>p.id===S.petActive)||S.pets[0];S.petCoat=ap?ap.coat:(S.pet==='dog'?'mutt':'tabby');}S.petGifts=S.petGifts||[];S.roomsSearched=S.roomsSearched||0;S.deals=S.deals||{};S.streakBest=S.streakBest||0;S.today=S.today||{date:'',kills:0,places:0};if(S.hydro===undefined)S.hydro=100;if(S.hydroStep===undefined)S.hydroStep=0;crewBackfill();for(const c of (S.crew||[])){if(c.hp===undefined)c.hp=crewMax(c);if(c.hp>crewMax(c))c.hp=crewMax(c);}S.bossFightDate=S.bossFightDate||'';if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};if(S.steps.week===undefined){S.steps.week=S.steps.today||0;S.steps.weekId=weekId();}if(!S.hidden)S.hidden=[];if(S.rival===undefined)S.rival='';S.bossFightsToday=S.bossFightsToday||0;if(!S.streak)S.streak={days:0,last:''};
   if(!S.flares)S.flares={date:'',used:0};if(S.flare===undefined)S.flare=null;if(!S.callsHidden)S.callsHidden=[];if(!S.raidSeats)S.raidSeats={};if(!S.gifts)S.gifts={date:'',spent:0};if(S.infect===undefined)S.infect=null;if(S.infect&&!S.infect.stage)S.infect.stage=1;if(S.diff&&S.diff!=='normal'){log('Difficulty settings are gone: everyone plays the same county now. You were on '+(DIFF[S.diff]?DIFF[S.diff].n:S.diff)+'.');}S.diff='normal';if(!S.mapSkin)S.mapSkin='bloom';if(S.parts===undefined)S.parts=0;if(!S.stock.medkit)S.stock.medkit={};if(S.eq&&S.eq.hands===undefined)S.eq.hands=null;if(S.eq&&S.eq.feet===undefined)S.eq.feet=null;
   // free any slot a downed crew member is still sitting in (they never gave it
@@ -607,7 +607,7 @@ function restoreSnapshot(i){
   const arr=snapshots();const s=arr[i];if(!s)return;
   if(!confirm('Go back to the save from '+ago(s.t)+'? ('+(s.s.name||'Survivor')+', level '+s.lvl+', '+fmt(s.steps)+' steps.) The current one is kept as a restore point.'))return;
   snapshot('before going back');
-  const keep=S.online;S=Object.assign(fresh(),s.s);S.online=(keep&&keep.ok)?keep:(s.s.online||keep);S.combat=false;ensureState();
+  const keep=S.online;S=Object.assign(fresh(),seasonize(s.s));S.online=(keep&&keep.ok)?keep:(s.s.online||keep);S.combat=false;ensureState();
   log('Went back to the save from '+ago(s.t)+'.');save();render();toast('Earlier save restored','z');pushPlayer();
 }
 
@@ -635,7 +635,7 @@ async function restoreCloudSnap(id){
     const cs=cloudSaveOf(st);
     if(!cs||!cs.onboarded){toast('That restore point has no character in it.','d');return;}
     snapshot('before a server restore');
-    const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),cs);S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();
+    const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),seasonize(cs));S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();
     log('Restored the server save from '+ago(new Date((r&&r.at)||Date.now()).getTime())+'.');
     save();render();toast('Save restored','z');pushPlayer();
   }catch(e){toast(e.message,'d');}
@@ -830,7 +830,7 @@ function bestMed(){
   return 'bandage';
 }
 function medsAll(){return MED_ORDER.map(id=>({id,pack:packMeds(id),stock:medsHeld(id)})).filter(x=>x.pack||x.stock);}
-const maxHp=()=>Math.max(30,Math.round(hydroHpMult()*(1-infectPenalty())*(100+(S.lvl-1)*10+sk('tough')*10+sk('thickskin')*8+sk('survivalist')*5+(bg('firefighter')?10:0)-(bg('gamer')?10:0))));
+const maxHp=()=>Math.max(30,Math.round(hydroHpMult()*(1-infectPenalty())*(100+s2HpBonus()+(S.lvl-1)*10+sk('tough')*10+sk('thickskin')*8+sk('survivalist')*5+(bg('firefighter')?10:0)-(bg('gamer')?10:0))));
 const eqItem=(slot)=>S.eq[slot]?S.gear.find(g=>g.uid===S.eq[slot]):null;
 const ARMOR_SLOTS=['armor','head','hands','feet'];
 const dr=()=>ARMOR_SLOTS.reduce((a,k)=>a+((eqItem(k)&&eqItem(k).dr)||0),0);
@@ -870,7 +870,7 @@ const fistLvlBonus=()=>Math.round(((S.lvl||1)-1)*FIST_LVL_SHARE);
 const baseDmg=()=>[3,6];
 // What fists ACTUALLY land, level included - so the button can stop lying.
 const fistDmg=()=>{const b=baseDmg(),x=fistLvlBonus();return [b[0]+x,b[1]+x];};
-function addXp(n){if(setPerk('xp'))n=Math.round(n*(1+setPerk('xp')));if(roleLvl('teacher'))n=Math.round(n*(1+(5+roleLvl('teacher')*3)/100));if(S.pet==='cat')n=Math.round(n*petXpMult());if(bg('gamer'))n=Math.round(n*(1.25+sk('metaknowledge')*0.05));S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
+function addXp(n){n=Math.round(n*s2XpMult()*(campDone('radio')?1.05:1));if(setPerk('xp'))n=Math.round(n*(1+setPerk('xp')));if(roleLvl('teacher'))n=Math.round(n*(1+(5+roleLvl('teacher')*3)/100));if(S.pet==='cat')n=Math.round(n*petXpMult());if(bg('gamer'))n=Math.round(n*(1.25+sk('metaknowledge')*0.05));S.xp+=n;while(S.xp>=S.lvl*40){S.xp-=S.lvl*40;S.lvl++;S.sp++;S.hp=maxHp();log('Level '+S.lvl+'. Max HP '+maxHp()+'. +1 skill point.');toast('Level '+S.lvl+' · +1 skill point','a');SFX.play('levelup');}}
 const activeCrew=()=>S.active.map(id=>S.crew.find(c=>c.id===id)).filter(c=>c&&(c.hp===undefined||c.hp>0)&&!c.out&&c.rest!==todayStr());
 const CREW_CAP=8;
 function crewNeed(c){return c.lvl*(c.trait==='quick'?4:6);}
@@ -1278,7 +1278,7 @@ function skillPaid(id){const p=S.skillPaid&&S.skillPaid[id];return (p===undefine
 function partYield(g){const y=PART_YIELD[g.r||'common'];return (y||1)+sk('stripdown');}
 function skillList(){return (SKILLS[S.cls]||[]).concat(SKILLS[S.bg]||[]).concat(SKILLS.general);}
 const bg=(id)=>S&&S.bg===id;
-function dmgBonus(){let d=sk('heavyhands')*2+sk('axeman')*2+sk('sharpknife')-(bg('gamer')?1:0);
+function dmgBonus(){let d=s2DmgBonus()+sk('heavyhands')*2+sk('axeman')*2+sk('sharpknife')-(bg('gamer')?1:0);
   if(setPerk('vsHuman')&&C){const t=C.enemies[C.target];if(t&&t.human)d+=Math.max(1,Math.round((t.max||20)*setPerk('vsHuman')*0.5));}if(sk('rampage')&&C)d+=sk('rampage')*2*C.enemies.filter(e=>e.dead).length;if(sk('bloodied')&&S.hp<maxHp()/2)d+=3*sk('bloodied');return d;}
 function learn(id){const def=skillList().find(s=>s.id===id);if(!def||sk(id)>=def.max)return;if(def.req&&S.lvl<def.req){toast(def.n+' unlocks at level '+def.req);return;}
   const cost=skillCost(id);if(S.sp<cost){toast('Rank '+cost+' of '+def.n+' costs '+cost+' points - you have '+S.sp,'d');return;}
@@ -1365,7 +1365,7 @@ function districtAt(i){
     far:true};
 }
 const district=()=>districtAt(Math.max(0,S.walk.district|0));
-function countySteps(){return Math.max(0,(S.steps.total||0)-(S.countyStart||0));}
+function countySteps(){if(S.era===SEASON)return Math.max(0,(S.steps.eff||0)-(S.countyEff||0));return Math.max(0,(S.steps.total||0)-(S.countyStart||0));}
 function county(){return S.county||0;}
 function unlockedDistrict(){
   let d=0;
@@ -1438,7 +1438,7 @@ function dayReveal(delta,before,newsBefore){if(!(delta>=100))return;const P=plot
     +(grew.length?'<div class="section-label" style="margin-top:8px">Grew</div><ul class="journal" style="margin:4px 0">'+grew.map(g=>'<li><span>'+g+'</span></li>').join('')+'</ul>':(P.some(pl=>pl.seed)?'<p class="help">The plot grew a little. Not a whole stage yet.</p>':''))
     +(lines.length?'<div class="section-label" style="margin-top:8px">On the road</div><ul class="journal" style="margin:4px 0">'+lines.map(m=>'<li><span>'+esc(m)+'</span></li>').join('')+'</ul>':'')
     +'<div class="stack" style="margin-top:10px">'+(ripe?'<button class="btn r" onclick="harvestAll();closeSheet();render()">🧺 Harvest '+ripe+' ripe plot'+(ripe>1?'s':'')+'</button>':'')+(empty&&S.base?'<button class="btn" onclick="closeSheet();plantSheet('+P.findIndex(pl=>!pl.seed)+')">🌱 Plant something for tomorrow<small>'+empty+' empty plot'+(empty>1?'s':'')+'</small></button>':'')+'<button class="btn ghost" onclick="closeSheet()">Back to the road</button></div>');}
-function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05-setPerk('dist')-(roleLvl('pathfinder')?(3+roleLvl('pathfinder')*2)/100:0)-(veteran('pathfinder')?0.1:0)));if(wxKind()==='snow')dist=Math.round(dist*1.1);if(S.walk.nextMul){dist=Math.round(dist*S.walk.nextMul);S.walk.nextMul=0;}if(S.walk.scouted>0){dist=Math.round(dist*0.7);S.walk.scouted--;}dist=vehicleDist(dist);S.walk.dist=Math.max(60,dist);S.walk.progress=0;S.walk.toNext=S.walk.dist;}
+function newDistance(){const d=district();let dist=rint(d.dist[0],d.dist[1]);dist=Math.round(dist*(1-sk('pathfinder')*0.06-sk('speedrunner')*0.05-setPerk('dist')-(roleLvl('pathfinder')?(3+roleLvl('pathfinder')*2)/100:0)-(veteran('pathfinder')?0.1:0)));if(wxKind()==='snow')dist=Math.round(dist*1.1);if(S.walk.nextMul){dist=Math.round(dist*S.walk.nextMul);S.walk.nextMul=0;}if(S.walk.scouted>0){dist=Math.round(dist*0.7);S.walk.scouted--;}dist=vehicleDist(dist);if(scoutOn())dist=Math.round(dist*S2_DIST);S.walk.dist=Math.max(60,dist);S.walk.progress=0;S.walk.toNext=S.walk.dist;}
 function bossName(){if(eventNow()==='halloween')return 'The Gourd King';return BOSS_NAMES[hash(weekId()+'boss')%BOSS_NAMES.length];}
 
 /* ================= rooms with something about them (v7.57) =================
@@ -1508,7 +1508,12 @@ const SEALS=[
   {id:'cellar', n:'Bolted storm cellar',   d:'Steel doors, four bolts, all of them on your side. Whoever locked this was keeping something IN.'},
 ];
 function sealOf(id){return SEALS.find(x=>x.id===id)||SEALS[0];}
-function rarW(it){const r=RAR[it.r||'common'].w;return r>=3?1+sk('eagleeye')*0.15+sk('rng')*0.1+setPerk('rare'):1;}
+/* SEASON 2 - THE SLOW GRIND. "It was giving so many high tier items that it just
+   was progressing so fast. I want some type of slow grind, almost never ending."
+   Every loot table runs through rarW, so this one damper thins rare-and-up across
+   rooms and chests at once. Raids and the weekly boss are where the good stuff lives. */
+const S2_RAR={common:1,uncommon:0.8,rare:0.45,epic:0.22,legendary:0.12};
+function rarW(it){const k=it.r||'common';const r=RAR[k].w;return (r>=3?1+sk('eagleeye')*0.15+sk('rng')*0.1+setPerk('rare'):1)*(S2_RAR[k]||1);}
 /* ================= DISTANCE TIERS (v7.19) =================
    Her friend: "it doesn't really feel like a walking game - he's always standing
    in place looting a million houses." He was right, and the cause was concrete:
@@ -1536,7 +1541,7 @@ function rollRoom(r,loc){
   // Distance buys RARITY, not just bigger numbers - a pile of more canned beans
   // is not a reason to walk a mile. Only rare-and-up are re-weighted.
   // v7.63: gear in rooms at half weight. "We have unlimited weapons - I never feel like I need my legendaries."
-  const list=table(r.cats,r.shelf,r.gear*ft.mult*0.5).map(x=>({...x,w:x.w*rarW(x)*((RAR[x.r||'common'].w>=3)?ft.rar:1)}));
+  const list=table(r.cats,r.shelf,r.gear*ft.mult*0.3).map(x=>({...x,w:x.w*rarW(x)*((RAR[x.r||'common'].w>=3)?ft.rar:1)}));
   const n=rint(1,3);const out=[];
   for(let i=0;i<n;i++){const it=wpick(list,'w');if(it.gear)out.push({id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r});else out.push({id:it.id,n:it.n,e:it.e,pts:Math.round(it.pts*lm),cat:it.cat,qty:it.qty,r:it.r});}
   if(Math.random()<0.07*ft.mult)out.push({id:'chest',...ITEMS.chest});
@@ -1645,7 +1650,7 @@ function dropLegendQuiet(){const id=pick(LEGEND_IDS);S.gear.push({uid:uid(),id,.
 const STREAK_LOOP=10;
 function streakLoopReward(d){
   if(d<=30||d%STREAK_LOOP)return null;
-  return (d%50===0)
+  return (d%100===0)
     ? {d,n:'a LEGENDARY - '+d+' days straight',give:()=>{dropLegendQuiet();S.keys+=2;}}
     : {d,n:'2 keys and 150 season points',give:()=>{S.keys+=2;seasonAdd(150);}};
 }
@@ -1734,6 +1739,7 @@ function giftDay(){const d=S.gifts||(S.gifts={date:'',spent:0});if(d.date!==S.st
 function giftCost(g){return GIFT_COST[g&&g.r||'common']||1;}
 function giftLeft(){return Math.max(0,GIFT_BUDGET-giftDay().spent);}
 function giftBlocked(g){
+  if(scoutOn())return 'Season 2: only supplies can be sent, one gift a day. Use "Send supplies" on the County tab.';
   const c=giftCost(g);
   // Her call: a legendary stays with whoever earned it. There are nine of them,
   // they only come from chests, bosses and the season track, and handing one over
@@ -1772,6 +1778,7 @@ async function takeGifts(){
   if(!rows||!rows.length)return;
   const got=[];
   for(const row of rows){
+    if(scoutOn()){const r=receiveSupply(row);if(r)got.push({n:r.n,from:r.from||'someone',note:r.note||'',r:'common'});continue;}
     const it=row.item;if(!it||!it.id)continue;
     const g=Object.assign({},it,{uid:uid()});delete g.broken;
     S.gear.push(g);got.push({n:g.n||'something',from:row.from||'someone',note:row.note||'',r:g.r||'common'});
@@ -2630,7 +2637,10 @@ function addSteps(n,src){
   if(src!=='carry'&&infect()){S.infectStep=(S.infectStep||0)+n;
     while(S.infectStep>=INFECT_PER_STEPS){S.infectStep-=INFECT_PER_STEPS;S.hp=Math.max(1,S.hp-1-infectStage());}}
   if(src!=='carry')try{expedSteps(n);plotSteps(n);}catch(e){}
-  if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(Math.max(3,Math.round(6*thirstMult())));}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip'||src==='clipboard'||src==='shortcut')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;S.wallet=(S.wallet||0)+n;workSteps(n);checkLadder();if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
+  if(src!=='carry'){S.hydroStep=(S.hydroStep||0)+n;while(S.hydroStep>=HYDRO_STEPS){S.hydroStep-=HYDRO_STEPS;loseHydro(Math.max(3,Math.round(6*thirstMult())));}S.steps.total+=n;S.steps.today+=n;if(S.steps.weekId!==weekId()){S.steps.weekId=weekId();S.steps.week=0;}S.steps.week=(S.steps.week||0)+n;if(!S.steps.src)S.steps.src={phone:0,typed:0,walk:0};const bk=(src==='phone'||src==='clip'||src==='clipboard'||src==='shortcut')?'phone':(src==='sync'||src==='demo')?'typed':'walk';S.steps.src[bk]=(S.steps.src[bk]||0)+n;
+    // SEASON 2: from here on n is what the steps are WORTH (tapers through the day; typed counts half)
+    if(scoutOn()){n=effSteps(n,src==='sync');campFeed(n);if(n<=0){checkMilestones();save();render();return;}}
+    S.wallet=(S.wallet||0)+n;workSteps(n);checkLadder();if(S.pet)S.petXp=(S.petXp||0)+Math.round(n*(S.base&&S.base.rooms.kennel?1.25:1));ctEvent('steps',n);checkMilestones();}
   if(src!=='carry'&&S.steps.today>=S.goal&&S.streak.last!==S.steps.date){const y=new Date();y.setDate(y.getDate()-1);S.streak.days=(S.streak.last===todayStr(y))?S.streak.days+1:1;S.streak.last=S.steps.date;S.stock.food+=2;S.stock.water+=2;addXp(15);log('Daily target hit. Streak '+S.streak.days+'. +2 food, +2 water, +15 XP.');toast('Target hit. Streak '+S.streak.days,'a');streakReward();}
   // v7.50: steps that arrive in the first minutes after an hour or more away are AWAY STEPS.
   // The road plays out - the crew clears and searches the place she was standing at, and every
@@ -2640,7 +2650,7 @@ function addSteps(n,src){
     if(S.loc&&!S.combat){const carry=S.walk.banked||0;S.walk.banked=0;if(awayResolvePlace())n+=carry;else S.walk.banked=carry;}}
   if(S.loc||S.combat){S.walk.banked=(S.walk.banked||0)+n;if(src!=='carry'&&src!=='live')toast('+'+fmt(n)+' steps saved for after this stop','z');save();render();return;}
   let left=n,hops=0;
-  while(left>0){if(left>=S.walk.toNext){left-=S.walk.toNext;S.walk.progress=S.walk.dist;S.walk.toNext=0;arrive();if(away&&hops++<60&&awayResolvePlace())continue;break;}else{S.walk.toNext-=left;S.walk.progress=S.walk.dist-S.walk.toNext;left=0;}}
+  while(left>0){if(left>=S.walk.toNext){left-=S.walk.toNext;S.walk.progress=S.walk.dist;S.walk.toNext=0;arrive();if(!S.loc&&hops++<400)continue;if(away&&hops++<60&&awayResolvePlace())continue;break;}else{S.walk.toNext-=left;S.walk.progress=S.walk.dist-S.walk.toNext;left=0;}}
   if(left>0)S.walk.banked=(S.walk.banked||0)+left;
   if(away){try{awayAmbush(n);}catch(e){}clearTimeout(AWAY_T);AWAY_T=setTimeout(()=>{const rp=S.awayRep;if(rp&&(rp.places||rp.lines.length))rp.done=true;render();},1500);}
   else if(!S.loc&&!S.combat&&S.flags.roadCheck<1&&Math.random()<Math.min(0.5,n/300*0.07*dealMod('road'))){S.flags.roadCheck++;if(Math.random()<sk('shadow')*0.12){log('Something moved in the treeline. You went around it.');save();render();return;}save();render();setTimeout(()=>startCombat(worldCrowd([worldEnemy(Math.random()<0.7?'walker':'runner')]),'road'),400);return;}
@@ -2792,6 +2802,15 @@ function renderQuest(){const el=$('#questCard');if(!el)return;const q=questAvail
   el.innerHTML='<h2>📻 Marisol: '+esc(q.n)+'</h2><p>'+esc(q.brief)+'</p>'+(going?'<p class="help">The next place you reach is '+esc(q.loc.n)+'. Keep walking.</p>':'<button class="btn r wide" onclick="questGo(\''+q.id+'\')">'+q.e+' Go: '+esc(q.loc.n)+'<small>your next stop, however far that is</small></button>');}
 function arrive(){
   S.loc=(S.walk.forceLoc==='quest'&&S.quest)?questLoc():makeLoc(S.walk.forceLoc||undefined);S.walk.forceLoc=null;S.walk.houses++;
+  // SEASON 2: "I want a game where I can walk, but I'm not stopping." The place goes on the
+  // scouted list and the road keeps going. Quests still stop you - they are a story beat.
+  if(scoutOn()&&!S.loc.quest){const loc=S.loc;S.loc=null;
+    if(!loc.stronghold&&S.walk.houses>2&&Math.random()<0.12)loc.rival=pick(RIVALS).id;
+    const full=scoutList().length>=scoutMax();scoutAdd(loc);
+    if(!full){log('Scouted '+loc.n+' ('+district().n+').');}
+    const maxD=unlockedDistrict();if(S.walk.houses%5===0&&S.walk.district<maxD){S.walk.district++;log('You crossed into '+district().n+'.');toast('New district: '+district().n,'a');}
+    if(!awayMode()&&Math.random()<0.12)rollEvent();
+    newDistance();return;}
   if(!S.loc.stronghold&&!S.loc.quest&&typeof awayMode==='function'&&!awayMode()&&Math.random()<0.22)rollEvent();
   if(!S.loc.stronghold&&S.walk.houses>2&&Math.random()<0.12){S.loc.rival=pick(RIVALS).id;}
   log('Reached '+S.loc.n+' ('+district().n+').');toast('Reached '+S.loc.e+' '+S.loc.n,'a');SFX.play('arrive');
@@ -3001,7 +3020,7 @@ function counterStrike(){
   // It is a real swing, so it wears the weapon like one. Free, it was simply the best button.
   if(w&&!C.countered){C.countered=true;w.dur--;breakWeapon(w);}   // one point for the round, however many she answers
 }
-function hurt(n,src){let d=Math.max(1,Math.round((n-dr())*(1-drSoak())));
+function hurt(n,src){let d=Math.max(1,Math.round((n-dr())*(1-drSoak())*s2Guard()));
   // Vigil caps the OPENING hit of a fight. It does nothing for the rest of the
   // fight, so it is protection against being ambushed, not a damage sponge.
   {const a=eqItem('armor');
@@ -3233,7 +3252,7 @@ function act(kind){
     if(e.human){if(Math.random()<0.25){const g=pick(['pipe','bat','jacket','helmet','crowbar']);S.gear.push({uid:uid(),id:g,...GEAR[g]});clog('It dropped a '+GEAR[g].n+'.','sys');}
       if(Math.random()<0.5){S.pack.push({id:'ammo',...ITEMS.ammo,uid:uid(),qty:3,n:'Rounds (x3)'});clog('You take 3 rounds off the body.','sys');}
       if(e.boss){S.keys++;S.pack.push({id:'skull',...ITEMS.skull,uid:uid()});clog('The boss mask, and a key from the belt.','sys');
-        if(e.wanted&&!e.fled){S.bossKilled=weekId();S.pack.push({id:'wanted',...ITEMS.wanted,uid:uid()});clog('Bounty claimed: '+e.n+'. The poster comes off the wall.','good');ctEvent('bounty',1);if(Math.random()<0.3)dropLegend('The boss was carrying something.');}}}
+        if(e.wanted&&!e.fled){S.bossKilled=weekId();S.pack.push({id:'wanted',...ITEMS.wanted,uid:uid()});clog('Bounty claimed: '+e.n+'. The poster comes off the wall.','good');ctEvent('bounty',1);if(Math.random()<0.1)dropLegend('The boss was carrying something.');}}}
     else if(Math.random()<0.06){S.pack.push({id:'dogtag',...ITEMS.dogtag,uid:uid()});clog('A dog tag around its neck. Trophy.','sys');}}}
   };reap();
   // Hold the fight this timer belongs to: if a new one somehow started in the
@@ -3735,7 +3754,7 @@ function sealAfter(won){
   }
   const scrap=35+rint(0,25);S.stock.scrap+=scrap;S.keys+=2;addXp(90+S.lvl*6);
   medsGive('kit',1);
-  if(Math.random()<0.35)dropLegendQuiet(),got.push('a LEGENDARY');
+  if(Math.random()<0.12)dropLegendQuiet(),got.push('a LEGENDARY');
   S.sealsOpened=(S.sealsOpened||0)+1;
   log('You cleared the '+cur.n.toLowerCase()+'. +'+scrap+' scrap, 2 keys, a trauma kit'+(got.length?', '+got.join(', '):'')+'.');
   toast('Sealed room cleared','l');SFX.play('legend');
@@ -3766,7 +3785,7 @@ function chestLoot(){
   const list=table(['food','water','meds','scrap','ammo'],1.5,1.5).filter(x=>x.r!=='common').map(x=>({...x,w:x.w*rarW(x)}));const got=[];
   for(let i=0;i<3;i++){const it=wpick(list,'w');const item=it.gear?{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}:{id:it.id,n:it.n,e:it.e,pts:Math.round(it.pts*lootMult()),cat:it.cat,qty:it.qty,r:it.r};if(takeItem(item,null))got.push(item);}
   if(Math.random()<0.25){const cs=rollCosmetic();if(takeItem(cs,null))got.push(cs);}
-  if(Math.random()<0.08){dropLegend('Under the false bottom:');got.push({e:'✨',n:'a legendary',r:'legendary'});}
+  if(Math.random()<0.03){dropLegend('Under the false bottom:');got.push({e:'✨',n:'a legendary',r:'legendary'});}
   ctEvent('chests',1);log('Opened a chest: '+got.map(g=>g.n).join(', ')+'.');
   openSheet(`<h2>Chest opened</h2><div class="big">🧳</div><div class="loot" style="justify-content:center">${got.map(g=>`<div class="item r-${g.r||'common'}"><span class="e">${g.e}</span>${esc(g.n)}</div>`).join('')}</div><button class="btn a wide" style="margin-top:12px" onclick="closeSheet()">Nice</button>`);
   save();render();
@@ -3774,6 +3793,7 @@ function chestLoot(){
 function leaveLoc(){
   if(!S.loc)return;const loc=S.loc;
   if(loc.geo){if(loc.cleared)S.run++;streetState().looted[loc.geo]=Date.now();S.loc=null;log(loc.cleared?'Left '+loc.n+', cleared.':'Left '+loc.n+'. It is picked over for a day.');save();render();if(typeof updateMarkers==='function')updateMarkers();return;}
+  if(loc.scoutedVisit){if(loc.cleared)S.run++;S.loc=null;log('Done with '+loc.n+'.');const carry=S.walk.banked||0;S.walk.banked=0;save();render();if(carry>0)addSteps(carry,'carry');return;}
   if(loc.cleared)S.run++;S.loc=null;
   log('Left '+loc.n+'. Run x'+(1+S.run*0.1).toFixed(1)+'.');
   const maxD=unlockedDistrict();
@@ -4044,7 +4064,7 @@ const LOCKSMITH=[
   {id:'chest',n:'Open a chest for you',e:'🧳',k:3,d:'Three rare-or-better things, straight into your pack.',go:()=>chestLoot()},
   {id:'parts',n:'A box of weapon parts',e:'⚙️',k:6,d:'+12 parts for upgrades.',go:()=>{S.parts=(S.parts||0)+12;}},
   {id:'meds',n:'A medic\'s bag',e:'🧰',k:8,d:'A trauma kit, 2 antibiotics and an adrenaline shot into the stash.',go:()=>{medsGive('kit',1);medsGive('abx',2);medsGive('adrena',1);}},
-  {id:'legend',n:'Something from under the seat',e:'✨',k:40,weekly:true,d:'A legendary. Guaranteed. One a week.',go:()=>{S.lockLegendWeek=weekId();dropLegend('Marlow reaches under the seat.');}},
+  {id:'legend',n:'Something from under the seat',e:'✨',k:60,weekly:true,d:'A legendary. Guaranteed. One a week.',go:()=>{S.lockLegendWeek=weekId();dropLegend('Marlow reaches under the seat.');}},
   {id:'quiet',n:'A quiet week',e:'🤫',k:20,d:'Marlow has a word with the Tolls. No raids on your base for 7 days.',go:()=>{S.flags.noRaidUntil=Date.now()+7*86400000;}},
 ];
 function locksmith(id){const l=LOCKSMITH.find(x=>x.id===id);if(!l||!S.base)return;if(l.weekly&&S.lockLegendWeek===weekId()){toast('Marlow has nothing else under the seat this week','d');return;}if(l.id==='quiet'&&S.flags.noRaidUntil>Date.now()){toast('It is already quiet. Buy again when it runs out.','d');return;}if(S.keys<l.k){toast('Needs '+l.k+' keys','d');return;}
@@ -4869,9 +4889,9 @@ async function goOnline(handle,token){
     if(token&&token.trim()){try{let b=null;try{b=await rpc('get_my_state',{p_handle:handle,p_token:o.token});}catch(e){}   // key-checked (v7.43 SQL); before that SQL runs it throws
       if(!b)b=await rpc('get_base',{p_handle:handle});const cs=cloudSaveOf(b);
       if(cs&&cs.onboarded){const cloudAt=cs.savedAt||0;const localAt=S.savedAt||0;const localNewer=S.onboarded&&(localAt>cloudAt+60000||(S.steps&&S.steps.total)>((cs.steps&&cs.steps.total)||0));
-        if(!S.onboarded){const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),cs);S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();log('Brought your character back from the server.');save();closeSheet();render();toast('Welcome back, '+(S.name||handle),'z');identWrite(handle,o.token);pushPlayer();return;}
+        if(!S.onboarded){const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),seasonize(cs));S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();log('Brought your character back from the server.');save();closeSheet();render();toast('Welcome back, '+(S.name||handle),'z');identWrite(handle,o.token);pushPlayer();return;}
         openSheet(`<h2>Found your save</h2><div class="big">${ART.avatarSVG(cs.av||S.av,70)}</div><p><b style="color:var(--bone)">${esc(cs.name||handle)}</b>, level ${cs.lvl||1}, ${fmt((cs.steps&&cs.steps.total)||0)} lifetime steps${cs.base?', base at '+esc(cs.base.n):''}.<br><span class="help">Cloud copy saved ${cloudAt?ago(cloudAt):'at an unknown time'}${S.onboarded?' · this phone saved '+(localAt?ago(localAt):'at an unknown time'):''}.</span></p>${localNewer?'<p style="color:#ff8a92"><b>Careful:</b> what is on this phone looks NEWER than the cloud copy. Restoring would roll you back. Keep this one unless you know the cloud copy is the right one.</p>':'<p>Restore it here? What is on this device right now gets replaced (a backup is kept under Settings for 7 days).</p>'}<div class="grid2"><button class="btn${localNewer?' r':''}" onclick="closeSheet();pushPlayer()">Keep this one</button><button class="btn${localNewer?'':' r'}" id="restoreBtn">Restore the cloud copy</button></div>`,true);
-        $('#restoreBtn').onclick=()=>{try{localStorage.setItem('deadmiles.backup',JSON.stringify({t:Date.now(),why:'before cloud restore',s:S}));}catch(e){}const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),cs);S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();log('Restored your save from the cloud.');save();closeSheet();render();toast('Save restored. Undo is under Settings.','z');pushPlayer();};return;}
+        $('#restoreBtn').onclick=()=>{try{localStorage.setItem('deadmiles.backup',JSON.stringify({t:Date.now(),why:'before cloud restore',s:S}));}catch(e){}const keep=S.online,keepTown=S.town;S=Object.assign(fresh(),seasonize(cs));S.online=keep;if(keepTown&&!S.town)S.town=keepTown;S.combat=false;S.journal=[];ensureState();log('Restored your save from the cloud.');save();closeSheet();render();toast('Save restored. Undo is under Settings.','z');pushPlayer();};return;}
       else if(!S.onboarded){toast('That handle and key match, but there is no saved character on the server yet.','d');return;}}catch(e){if(!S.onboarded){toast('Could not reach the server to find that save. Try again.','d');return;}}}
     await pushPlayer();await pullSteps();await loadFriends();await partySync();
   }catch(e){o.ok=false;o.err=e.message;save();render();}
@@ -5561,6 +5581,7 @@ function countTo(el,to){
 function render(){
   ensureState();rollDay();rollWeek();ctRoll();checkRaids();storyCheck();
   try{renderSeason();}catch(e){}   // after ensureState - it writes to S
+  try{campMorning();renderScout();renderCond();renderCamp();}catch(e){console.warn(e);}
   $('#hpNum').textContent=S.hp+' / '+maxHp();$('#hpBar').style.width=clamp(S.hp/maxHp()*100,0,100)+'%';
   countTo($('#topSteps'),S.steps.today);
   $('#sceneTag').textContent=district().n+' · '+S.walk.houses+' places';$('#arriveTag').hidden=!S.loc;
@@ -5882,7 +5903,7 @@ function prestigeSheet(){if(!canPrestige())return;
     +'<button class="btn ghost wide" style="margin-top:10px" onclick="closeSheet()">Not yet</button>');}
 function doPrestige(crewId,legendUid){if(!canPrestige())return;snapshot('before crossing the county');
   const keepCrew=S.crew.find(c=>c.id===crewId);const keepLegend=S.gear.find(g=>g.uid===legendUid);
-  S.county=county()+1;S.countyStart=S.steps.total;
+  S.county=county()+1;S.countyStart=S.steps.total;S.countyEff=S.steps.eff||0;
   S.base=null;S.work=null;S.stock={food:5,water:5,meds:1,scrap:0,ammo:0,shells:0,bolts:0,chests:0};S.pack=[];S.keys=0;S.run=0;S.vehicle=null;S.horde=null;S.raidPending=null;S.raids=[];
   S.crew=keepCrew?[keepCrew]:[];S.active=keepCrew?[keepCrew.id]:[];S.gear=keepLegend?[keepLegend]:[];S.eq={melee:null,ranged:null,armor:null,head:null,hands:null,feet:null,bag:null};if(keepLegend)S.eq[keepLegend.slot]=keepLegend.uid;
   S.walk={toNext:0,dist:500,district:0,houses:0,progress:0,banked:0};S.loc=null;S.evt=null;S.quest=null;S.quests=[];S.campCleared='';S.league.score=0;S.ask=null;S.bevt=null;S.expedNews=[];
@@ -5925,6 +5946,14 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'8.0',d:'Nov 13',t:'Season 2: a fresh start',
+  i:['Everyone starts over. Your Season 1 character is archived, not deleted. You keep your name, your look, every cosmetic and your strays.',
+     'You never stop walking. Places you pass are scouted and wait on a list (up to 10). Search them whenever you sit down.',
+     'Every day counts about the same. Your first 7,000 steps a day count fully, the next 8,000 count half, and anything past 15,000 counts a little. Steps typed in by hand count half, up to 4,000 a day.',
+     'The slow grind. Rare, epic and legendary finds are much rarer. Raids and the weekly boss are where the good gear is.',
+     'Morning check-in: put in your sleep and readiness from your ring. A great night gives +15% XP. A rough one means you take less damage. Workouts like pickleball give training, which slowly raises your HP and damage.',
+     'Shared camp: your party builds one camp together, forever. A quarter of everyone\'s counted steps go in (nobody loses any), and each project gives the whole party a perk.',
+     'Gifts are supplies only now: one a day, and you can take up to 5 a week.']},
  {v:'7.71',d:'Sep 29',t:'Stronghold rooms say why they are locked',
   i:['In a raider stronghold the Loot pile and the Boss trailer are locked until you have pushed through the stage before them - but they just sat there grey and did nothing when tapped, which looked broken. Now they show a lock, say which stage opens them, and tapping one tells you what to push to first.']},
  {v:'7.70',d:'Sep 28',t:'No more difficulty setting',
@@ -7524,7 +7553,7 @@ function wire(){
 }
 function backupInfo(){try{const b=JSON.parse(localStorage.getItem('deadmiles.backup')||'null');if(b&&b.s&&Date.now()-b.t<7*86400000)return b;}catch(e){}return null;}
 function undoRestore(){const b=backupInfo();if(!b)return;if(!confirm('Put back the save from '+ago(b.t)+' ('+(b.s.name||'Survivor')+', level '+(b.s.lvl||1)+', '+fmt((b.s.steps&&b.s.steps.total)||0)+' steps)? The current one becomes the backup instead.'))return;
-  try{localStorage.setItem('deadmiles.backup',JSON.stringify({t:Date.now(),why:'before undo',s:S}));}catch(e){}const keep=S.online;S=Object.assign(fresh(),b.s);S.online=(keep&&keep.ok)?keep:(b.s.online||keep);S.combat=false;ensureState();log('Put back the earlier save.');save();render();toast('Earlier save is back','z');pushPlayer();}
+  try{localStorage.setItem('deadmiles.backup',JSON.stringify({t:Date.now(),why:'before undo',s:S}));}catch(e){}const keep=S.online;S=Object.assign(fresh(),seasonize(b.s));S.online=(keep&&keep.ok)?keep:(b.s.online||keep);S.combat=false;ensureState();log('Put back the earlier save.');save();render();toast('Earlier save is back','z');pushPlayer();}
 function exportSave(){
   try{
     const data=JSON.stringify({game:'dead-miles',v:VERSION,at:Date.now(),save:S},null,0);
@@ -7546,7 +7575,7 @@ function importSave(input){
     if(!s||!s.onboarded){toast('That file does not have a character in it.','d');return;}
     if(!confirm('Load '+(s.name||'Survivor')+', level '+(s.lvl||1)+', '+fmt((s.steps&&s.steps.total)||0)+' lifetime steps? What is on this phone now becomes a restore point.'))return;
     snapshot('before loading a file');
-    const keep=S.online;S=Object.assign(fresh(),s);S.online=(keep&&keep.ok)?keep:(s.online||keep);S.combat=false;ensureState();
+    const keep=S.online;S=Object.assign(fresh(),seasonize(s));S.online=(keep&&keep.ok)?keep:(s.online||keep);S.combat=false;ensureState();
     S.savedAt=Date.now();log('Loaded a save from a file.');save();render();toast('Save loaded','z');pushPlayer();
   };
   r.readAsText(file);input.value='';
@@ -7641,7 +7670,7 @@ function fightBoss(){const b=bossState();if(S.loc||S.combat){toast('Finish what 
   gearCheck(()=>{const b2=bossState();if(b2.killed||S.bossFightsToday>=BOSS_FIGHTS_PER_DAY)return;
   S.bossFightsToday++;const st=strongholdStage(3);const boss=st[1];boss.warden=true;const remaining=Math.max(1,b.hp);boss.hp=boss.max=Math.min(remaining,bossPhaseHp());
   const en=bossMembers()>1?[mk('raider'),boss]:[boss];save();startCombat(en,'boss');});}
-function bossAfter(won){if(!C||C.bossDone||C.where!=='boss')return;C.bossDone=true;const boss=C.enemies.find(e=>e.warden);if(!boss)return;const dmg=Math.max(0,boss.max-Math.max(0,boss.hp));const b=bossState();
+function bossAfter(won){if(!C||C.bossDone||C.where!=='boss')return;C.bossDone=true;const boss=C.enemies.find(e=>e.warden);if(!boss)return;const dmg=Math.round(Math.max(0,boss.max-Math.max(0,boss.hp))*(campDone('watch')?1.1:1));const b=bossState();
   if(dmg>0){b.my+=dmg;ctEvent('boss',dmg);}else{S.bossFightsToday=Math.max(0,S.bossFightsToday-1);clog('You never touched the boss. That fight is not counted.','sys');log('Left the boss fight without landing a hit. It did not count.');}
   if(won){S.bossPity=(S.bossPity||0)+1;S.stock.scrap+=4;const list=table(['food','water','meds','scrap','ammo'],0.1,0.2);const it=wpick(list,'w');const item=it.gear?{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:'gear',gear:true,r:it.r}:{id:it.id,n:it.n,e:it.e,pts:it.pts,cat:it.cat,qty:it.qty,uid:uid(),r:it.r};takeItem(item,null);clog('Phase done: +4 scrap, '+it.n+'. Legendary chance now '+Math.round(bossChance()*100)+'%.','good');}
   if(S.party&&S.party.code&&O().ok){bossPost(dmg);}
@@ -7699,19 +7728,19 @@ function whileYouWereOut(){
   openSheet(`<h2>While you were out</h2><p class="help">${hrs} hours away · ${esc(w)}</p><ul class="journal" style="margin:8px 0 12px">${items.length?items.map(m=>`<li><span>${esc(m)}</span></li>`).join(''):'<li><span>Quiet night. Nothing came over the fence.</span></li>'}</ul><p>${ct?ct+' contract'+(ct>1?'s':'')+' open today. ':''}${S.raidPending?'Raiders are expected today at '+S.raidPending.hour+':00. ':''}${S.base?hordeCountdown()+' ':''}The Wanted boss this week is ${esc(bossName())}.</p><button class="btn r wide" onclick="closeSheet()">Back to the road</button>`);
 }
 function start(){
-  S=load()||fresh();try{awayArm(Date.now()-(S.lastOpen||Date.now()));}catch(e){}recoverStuckRaid();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
+  {const ld=load();const was=ld&&ld.era;S=seasonize(ld)||fresh();if(ld&&was!==S.era){ensureState();save(true);}}try{awayArm(Date.now()-(S.lastOpen||Date.now()));}catch(e){}recoverStuckRaid();S.combat=false;ensureState();if(!S.walk.dist)newDistance();if(S.wallet===undefined){S.wallet=S.steps.total||0;}
   wire();render();fetchWeather();
   if(typeof mapChrome==='function')try{mapChrome();}catch(e){}
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}
   // A keyed address is handled before anything else: this copy may be a blank
   // Safari tab that would otherwise try to onboard her instead of delivering.
   stepsBeacon();
-  if(!S.onboarded){identBoot().then(found=>{if(!found)onboard();});}else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else{whileYouWereOut();newsCheck();recapCheck();}autoSyncFromUrl();}
+  if(!S.onboarded){identBoot().then(found=>{if(!found)onboard();});}else{if(!S.cls)classSheet();else if(!S.bg)bgSheet(true);else if(!season2Intro()){whileYouWereOut();newsCheck();recapCheck();}condFromUrl();autoSyncFromUrl();}
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){LAST_ACTIVE=Date.now();S.lastOpen=Date.now();const bb=board();S.lastRank=bb.findIndex(r=>r.me)+1;save();}else{onResume();}});
   window.addEventListener('pageshow',e=>{if(e.persisted)onResume();});
   window.addEventListener('focus',()=>{if(Date.now()-LAST_ACTIVE>30000)onResume();});
-  if(O().ok){identWrite(O().handle,O().token);fetchStepKey();pullSteps();loadFriends();partySync();pushPlayer();bossSync();takeGifts();}
-  setInterval(()=>{if(document.visibilityState==='visible'&&!C){render();if(O().ok){pullSteps();partySync();}}},60000);
+  if(O().ok){identWrite(O().handle,O().token);fetchStepKey();pullSteps();loadFriends();partySync();pushPlayer();bossSync();takeGifts();campSync();}
+  setInterval(()=>{if(document.visibilityState==='visible'&&!C){render();if(O().ok){pullSteps();partySync();campSync();}}},60000);
   setInterval(()=>{if(document.visibilityState==='visible'&&O().ok){loadFriends();pushPlayer();}},180000);
   if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
   checkUpdate();setInterval(checkUpdate,600000);

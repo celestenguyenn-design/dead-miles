@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=7.71">
+<link rel="stylesheet" href="style.css?v=8.0">
 </head>
 <body>
 <div id="app">
@@ -35,7 +35,9 @@
       <div class="card amber" id="pushNudge" hidden></div>
       <div class="card blood" id="infectCard" hidden></div>
       <div class="progress"><div class="bar"><i id="pbar"></i></div><div class="row"><span id="pleft"></span><span id="pright"></span></div></div>
+      <div class="card" id="condCard" hidden></div>
       <div class="card" id="locCard" hidden></div>
+      <div class="card" id="scoutCard" hidden></div>
       <div class="card" id="packMeter" hidden></div>
       <div class="card" id="raidCard" hidden></div>
       <div class="card steel" id="rivalCard" hidden></div>
@@ -202,6 +204,7 @@
         <div class="card steel" id="convoyCard" hidden></div>
       <div class="card"><h2>Hollow County <span class="sub" id="mapSub"></span></h2><div id="mapBox" style="margin-top:10px"></div><p class="help" id="mapHelp" style="margin-top:8px"></p></div>
       <div class="card blood" id="bossCard"><h2>County boss <span class="sub" id="bossSub"></span></h2><div id="bossBody" style="margin-top:8px"></div></div>
+      <div class="card amber" id="campCard" hidden></div>
       <div class="card steel" id="partyCard"><h2>Party <span class="sub" id="partySub"></span></h2><div id="partyBody" style="margin-top:8px"></div></div>
       <div class="card rot">
         <div class="tier"><div class="badge" id="tierBadge">🔰</div><div><h2 id="tierName"></h2><p id="tierSub" style="margin:2px 0 0"></p></div></div>
@@ -228,8 +231,9 @@
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <div class="toasts" id="toasts"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="art.js?v=7.71"></script>
-<script src="street.js?v=7.71"></script>
-<script src="game.js?v=7.71"></script>
+<script src="art.js?v=8.0"></script>
+<script src="street.js?v=8.0"></script>
+<script src="s2.js?v=8.0"></script>
+<script src="game.js?v=8.0"></script>
 </body>
 </html>
