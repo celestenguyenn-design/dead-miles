@@ -1,6 +1,18 @@
 /* The test panel hands out free steps, caps and materials, so it never opens on the
    real site where friends play - only on local test copies and the claude.ai preview. */
 var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
+var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+/* Back from the Shortcuts app (?synced=1): pull the steps it just sent, then tidy the address. */
+(function () {
+  try {
+    const q = new URLSearchParams(location.search); if (!q.has('synced')) return;
+    const err = q.has('err'); history.replaceState(null, '', location.pathname + location.hash);
+    setTimeout(async () => {
+      try { if (window.NET && NET.pullSteps) await NET.pullSteps(); } catch (e) { /* offline */ }
+      if (window.DM && DM.E && DM.E.toast) DM.E.toast(err ? 'The Shortcut did not finish - open the step sync guide' : 'Steps synced', 2);
+    }, 2500);
+  } catch (e) { /* ignore */ }
+})();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
 const NEXT_VERSION = '0.6';
@@ -834,6 +846,7 @@ const NEXT_VERSION = '0.6';
           <b>${d.scouted}</b> house${d.scouted === 1 ? '' : 's'} scouted${nxt ? ` · next at ${nxt.toLocaleString('en-US')}` : ' · that\'s the max today'}</div>
         <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="My total today" maxlength="8"><button id="mLog" class="mbtn sm">Log</button></div>
         <div id="msync" class="msync"></div>
+        ${IS_IOS && window.NET && NET.ok ? '<button class="mbtn sm" id="mSyncNow" style="width:100%;margin:8px 0 2px">Sync my steps now</button>' : ''}
         ${window.SYNC ? (window.NET && NET.ok && !d.phone && new Date().getHours() >= 14 ? '<button class="synclink nudge" id="mSyncG" data-m="fix">No phone steps yet today? Fix step sync</button>' : '<button class="synclink" id="mSyncG">How to sync steps</button>') : ''}
       </div>
       ${SV.tutorialDone || SV.stats.runs ? baseCards() : ''}
@@ -849,6 +862,13 @@ const NEXT_VERSION = '0.6';
     $('#mnet').onclick = openAccount;
     bindBaseCards();
     if ($('#evBan')) $('#evBan').onclick = () => { SFX.play('ui'); openEvent(); };
+    // iPhone: run the player's own "Dead Miles Steps" Shortcut and come straight back here
+    // (x-callback-url), so a manual sync is one tap instead of a trip to the Shortcuts app.
+    if ($('#mSyncNow')) $('#mSyncNow').onclick = () => {
+      SFX.play('ui'); Game.save();
+      const back = location.origin + location.pathname + '?synced=1';
+      location.href = 'shortcuts://x-callback-url/run-shortcut?name=' + encodeURIComponent('Dead Miles Steps') + '&x-success=' + encodeURIComponent(back) + '&x-error=' + encodeURIComponent(back + '&err=1');
+    };
     if ($('#mSyncG')) $('#mSyncG').onclick = () => { SFX.play('ui'); try { SYNC.open($('#mSyncG').dataset.m || undefined); } catch (e) { toast('Sync guide failed to open', 1.6); } };
     $('#mLook').onclick = () => { SFX.play('ui'); editLook(); };
     $('#mWard').onclick = () => { SFX.play('ui'); editLook('wardrobe'); };
@@ -940,7 +960,7 @@ const NEXT_VERSION = '0.6';
     const N = window.NET, p = N && N.party;
     if (!N || !N.ok) { sheetOpen(`<div class="kick">Horde night</div><h3>Party</h3><p class="mp">Up to 6 friends share one horde. Sign in first (Account & friends), then everyone types the same party code.</p><button class="mbtn" id="pAcc">Account &amp; friends</button><button class="mbtn ghost" id="pClose">Close</button>`); $('#pAcc').onclick = () => { sheetClose(); openAccount(); }; $('#pClose').onclick = sheetClose; return; }
     sheetOpen(`<div class="kick">Horde night</div><h3>Party</h3>${p && p.code ? `<p class="mp">You are in <b>${esc(p.code)}</b> (${(p.members || []).length}/6): ${(p.members || []).map(m => '@' + esc(m)).join(', ')}.</p><p class="mp">Everyone's watch-shift kills thin the same horde. Each base is checked against what is left.</p><button class="mbtn ghost" id="pLeave">Leave party</button>`
-      : `<p class="mp">Up to 6 friends share one horde, with one deadline: Sunday 9 PM New York time. Everyone types the same code.</p><div class="steprow"><input id="pCode" placeholder="party code" maxlength="20" autocapitalize="off"><button class="mbtn sm" id="pJoin">Join</button></div><div class="mp" id="pMsg"></div>`}
+      : `<p class="mp">Up to 6 friends share one horde, with one deadline: Sunday 9 PM New York time. Everyone types the same code.</p><input id="pCode" placeholder="party code, e.g. brooklyn" maxlength="20" autocapitalize="off" autocorrect="off" spellcheck="false" style="display:block;width:100%;box-sizing:border-box;height:50px;margin:10px 0 8px;padding:0 14px;border-radius:14px;border:2.5px solid #5a4a86;background:#11142f;color:#f6e3bb;font:800 16px Inter,system-ui,sans-serif;-webkit-user-select:text;user-select:text"><button class="mbtn" id="pJoin">Join party</button><div class="mp" id="pMsg"></div>`}
       <button class="mbtn ghost" id="pClose">Close</button>`);
     $('#pClose').onclick = sheetClose;
     if ($('#pJoin')) $('#pJoin').onclick = async () => { const r = await N.partyJoin($('#pCode').value); if (r.ok) { sheetClose(); renderHome(); toast('Joined the party', 1.6); } else $('#pMsg').textContent = r.error || 'Could not join'; };

@@ -40,13 +40,15 @@
     beds: { n: 'Garden bed', d: 'Plant seeds you find while looting. Water them every day.', unit: 1, tiers: [
       { n: 'Garden bed 1', s: 800, m: { wood: 3, nails: 4 }, def: 0 }, { n: 'Garden bed 2', s: 800, m: { wood: 3, nails: 4 }, def: 0 },
       { n: 'Garden bed 3', s: 1000, m: { wood: 3, nails: 6 }, def: 0 }, { n: 'Garden bed 4', s: 1000, m: { wood: 3, nails: 6 }, def: 0 }] },
+    bunks: { n: 'Bunk bed', d: 'Room in the shack for one more crew member (you start with 2 bunks).', unit: 1, tiers: [
+      { n: 'Third bunk', s: 2500, m: { wood: 6, nails: 10, cloth: 3 }, def: 0 }, { n: 'Fourth bunk', s: 4000, m: { wood: 8, nails: 14, cloth: 4 }, def: 0 }] },
     gen: { n: 'Generator', d: 'Floodlight over the yard (+defence). More perks later.', tiers: [
       { n: 'Generator', s: 8000, m: { scrap: 12, battery: 6, tape: 3 }, def: 5 }] },
   };
-  const ORDER = ['walls', 'gate', 'spikes', 'wire', 'tower', 'beds', 'barrel', 'gen'];
+  const ORDER = ['walls', 'gate', 'spikes', 'wire', 'tower', 'beds', 'barrel', 'bunks', 'gen'];
   const mech = () => G().survivor && G().survivor.job === 'mechanic';
   function costOf(key, tier, repair) { // tier: 1-based tier being built
-    const t = PIECES[key].tiers[tier - 1], k = (mech() ? .75 : 1) * (repair ? .3 : 1), m = {};
+    const t = PIECES[key].tiers[tier - 1], k = (mech() ? .75 : 1) * (repair ? .3 * (DM.Crew ? DM.Crew.repairMul() : 1) : 1), m = {};   // a Tinkerer in the crew makes repairs cheaper
     for (const i in t.m) m[i] = Math.max(1, Math.ceil(t.m[i] * k));
     return { s: Math.ceil(t.s * k / 50) * 50, m };
   }
@@ -58,7 +60,7 @@
       const d = st && st.day; b.pool = d ? Math.min(POOL_MAX, Math.round((d.phone || 0) + (d.walk || 0) + (d.typed || 0) * .5)) : 0;
     }
     b.v = b.v || 1;
-    b.built = Object.assign({ walls: 0, gate: 0, tower: 0, spikes: 0, wire: 0, barrel: 0, beds: 0, gen: 0 }, b.built || {});
+    b.built = Object.assign({ walls: 0, gate: 0, tower: 0, spikes: 0, wire: 0, barrel: 0, beds: 0, gen: 0, bunks: 0 }, b.built || {});
     b.broken = b.broken && typeof b.broken === 'object' ? b.broken : {};
     b.beds = Array.isArray(b.beds) ? b.beds : [];
     while (b.beds.length < 4) b.beds.push(null);
@@ -86,6 +88,7 @@
     if (b.built.walls) { const ids = wallIds(), ok = ids.filter(i => !b.broken[i]).length; d += PIECES.walls.tiers[b.built.walls - 1].def * ok / ids.length; }
     for (const k of ['gate', 'tower', 'gen']) if (b.built[k] && !b.broken[k]) d += PIECES[k].tiers[b.built[k] - 1].def;
     for (const k of ['spikes', 'wire']) if (b.built[k] && !b.broken[k]) d += 5 * b.built[k];
+    if (DM.Crew && b === base()) d += DM.Crew.guardDef();   // Guards in the crew stand watch on horde night
     return Math.round(d);
   };
 
@@ -126,6 +129,12 @@
     p.w = (p.w || []).filter(d => d > dayNo() - 12).concat(dayNo());
     SFX.play('pick'); splash(i); G().save(); syncPieces();
   }
+  // the crew's Gardener waters one thirsty plant a day for free. Returns the crop's name, or ''.
+  B.crewWater = function () {
+    const b = base(); if (!b || !b.built.beds) return '';
+    for (let i = 0; i < b.built.beds; i++) { const p = b.beds[i], s = B.plantState(p); if (!s || s.dead || s.ready || s.today) continue; p.w = (p.w || []).filter(d => d > dayNo() - 12).concat(dayNo()); return s.n.toLowerCase(); }
+    return '';
+  };
   function harvest(i) {
     const b = base(), p = b.beds[i], s = B.plantState(p); if (!s || !s.ready) return;
     const rnd = D.mulberry32(D.hashStr(SV().seedBase + ':crop:' + i + ':' + p.d0)), C = D.CROPS[p.k];
@@ -497,7 +506,7 @@
     panel(`<div class="kick">Your base</div><h3>Repairs</h3>${rows.length ? rows.map(r => r.html).join('') : '<div class="empty">Nothing is broken.</div>'}<button class="mbtn ghost" data-close>Close</button>`, 1);
     $('#msheet').querySelectorAll('[data-rep]').forEach(bt => bt.onclick = () => {
       const r = rows.find(x => x.k === bt.dataset.rep); if (!canPay(r.c)) { toast('Not enough build steps or materials', 1.6); return; }
-      pay(r.c); for (const id of r.ids) delete b.broken[id]; G().save(); SFX.play('open'); syncPieces(); repairSheet(); toast('Repaired', 1.4);
+      pay(r.c); for (const id of r.ids) delete b.broken[id]; if (DM.Crew) DM.Crew.onTask('tinkerer'); G().save(); SFX.play('open'); syncPieces(); repairSheet(); toast('Repaired', 1.4);
     });
   }
 
@@ -708,7 +717,7 @@
     L.furn = pieceFurn().concat(b.decor.filter(o => !D.DECOR[o.k].floor).map(decorFurn));
     if (shift) L.start = { x: 10, y: 17.5 };
     document.body.classList.add('atbase'); document.body.classList.toggle('shift', shift);
-    House().start(L, {
+    const O = {
       hint: shift ? 'Hold the yard! Zombies come from every side.' : 'Your base · tap BUILD to add walls, beds and more',
       noFog: true, noExit: true, acts, tick, ztick, zslow, tap: tapEdit, drawUnder, drawOver,
       onDown: () => { if (shift) endShift(true); else House().exit('down'); },
@@ -717,7 +726,8 @@
         const was = S; S = null; panelClose();
         if (o.onExit) o.onExit(res, was);
       },
-    });
+    };
+    House().start(L, DM.Crew ? DM.Crew.wrap(O, shift ? 'shift' : 'base', { yard: { x0: FX0 + 1, x1: FX1 - 1, y0: SY1 + 2, y1: FY1 - 1 }, edit: () => S && S.edit }) : O);
     const g = House().G;
     for (const f of g.furn) { thin(f); if (shift && f.fence) f.maxHp = f.hp = (f.piece === 'gate' ? PIECES.gate : PIECES.walls).tiers[f.tier - 1].hp; }
     House().refresh();
