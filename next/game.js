@@ -216,6 +216,13 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
     let got = addTo(SV.survivor.pack, packSlots(), k, n, d); if (got < n) got += addTo(SV.survivor.stash, STASH_SLOTS, k, n - got, d);
     return n - got;
   }
+  function canGive(items, remove = []) { // dry run of give() on copies: does everything fit in pack + stash?
+    const pk = SV.survivor.pack.map(e => Object.assign({}, e)), st = SV.survivor.stash.map(e => Object.assign({}, e));
+    for (let [k, n] of remove) for (const list of [st, pk]) for (let i = list.length - 1; i >= 0 && n > 0; i--) if (list[i].k === k) { const t = Math.min(n, list[i].n); list[i].n -= t; n -= t; if (!list[i].n) list.splice(i, 1); }
+    for (const [k, n] of items) { let got = addTo(pk, packSlots(), k, n, D.isWeapon(k) ? 1 : undefined); if (got < n) got += addTo(st, STASH_SLOTS, k, n - got, D.isWeapon(k) ? 1 : undefined); if (got < n) return false; }
+    return true;
+  }
+  Game.canGive = canGive;
   function refreshTrader(force) {
     const T = SV.trader, day = SV.day.key;
     if (T.day === day && !force) return;
@@ -395,7 +402,12 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
       const q = T.active.find(x => x.id === b.dataset.turn), opts = rewardOptions(q);
       sheetOpen(`<div class="kick">${D.QUESTS[q.type].n} · tier ${q.tier}</div><h3>Pick your reward</h3><p class="mp">Plus ${q.reward.caps} caps and ${q.reward.xp} xp.</p>
         ${opts.map((o, i) => `<button class="pick" data-opt="${i}"><b>${o.n}</b><span class="picons">${o.items.map(([k, n]) => `${icon(k)}${D.ITEMS[k].n}${n > 1 ? ' x' + n : ''}`).join(' ')}</span></button>`).join('')}`);
-      $('#msheet').querySelectorAll('[data-opt]').forEach(o => o.onclick = () => { sheetClose(); turnIn(q, opts[+o.dataset.opt]); renderTrader(); });
+      $('#msheet').querySelectorAll('[data-opt]').forEach(o => o.onclick = () => {
+        const opt = opts[+o.dataset.opt];
+        // supply/fetch items leave first, so check room as if they were gone
+        if (!canGive(opt.items, q.type === 'supply' ? [[q.item, q.need]] : q.type === 'fetch' ? [['parcel', 1]] : [])) { toast('Make room in your pack or stash first', 1.8); return; }
+        sheetClose(); turnIn(q, opt); renderTrader();
+      });
     });
   }
   function tShop() {
@@ -406,7 +418,8 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
       const e = T.stock[+b.dataset.buy];
       if (T.caps < e.price) { toast('Not enough caps, sugar', 1.4); return; }
       const d = D.isWeapon(e.k) ? D.WEAPONS[D.ITEMS[e.k].w].dur : undefined;
-      if (give(e.k, e.n, d) === e.n) { toast('No room in pack or stash', 1.6); return; }
+      if (!canGive([[e.k, e.n]])) { toast('No room in pack or stash for all of it', 1.6); return; }
+      give(e.k, e.n, d);
       T.caps -= e.price; e.left--; if (e.k === 'backpack') T.boughtPack = true;
       SFX.play('pick'); Game.save(); renderTrader();
     });
@@ -555,14 +568,14 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
         <div class="steps"><b>${Math.round(d.phone + d.walk + d.typed).toLocaleString('en-US')}</b><span>steps today</span></div>
         <div class="stepinfo">${d.typed ? `${d.typed.toLocaleString('en-US')} typed (half value) · ` : ''}${Math.round(w).toLocaleString('en-US')} worth<br>
           <b>${d.scouted}</b> house${d.scouted === 1 ? '' : 's'} scouted${nxt ? ` · next at ${nxt.toLocaleString('en-US')}` : ' · that\'s the max today'}</div>
-        <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="My total today" maxlength="6"><button id="mLog" class="mbtn sm">Log</button></div>
+        <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="My total today" maxlength="8"><button id="mLog" class="mbtn sm">Log</button></div>
         <div id="msync" class="msync"></div>
       </div>
       <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Pack &amp; stash</button><button data-t="bench">Workbench</button></div>
       <div id="mpane"></div>`;
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { SFX.play('ui'); tab(b.dataset.t); }; });
     $('#mLog').onclick = () => {
-      const v = parseInt($('#mSteps').value, 10); if (!(v > 0)) { toast('Type your step total for today', 1.6); return; }
+      const v = parseInt(String($('#mSteps').value).replace(/[^0-9]/g, ''), 10); /* "8,500" or "8 500" is 8500, not 8 */ if (!(v > 0)) { toast('Type your step total for today', 1.6); return; }
       // typed steps go through the step ledger so a phone catching up later never counts the same steps twice
       if (window.NET) { const before = SV.day.typed; const g = NET.typeSteps(v, 'total'); if (!g && SV.day.typed === before) toast(NET.onSteps ? 'Already counted that many today' : 'Saved - it will count in a moment', 2); else if (g < v - (NET.stepsDay().ap || 0)) toast('Typed steps above your phone count are capped at 4,000 a day', 2.4); return; }
       const used = DM.addSteps(v, 'typed'); if (used < v) toast(`Typed steps are capped at 4,000 a day (${used.toLocaleString('en-US')} counted)`, 2.6);
@@ -620,10 +633,15 @@ var DM_DEV_OK = !/github\.io$/i.test(location.hostname);
       <div class="grid g4">${s.hands ? slot({ k: s.hands.k, n: 1, d: s.hands.d }, 'hands', 0) : '<div class="slot ph"><span>Fists</span></div>'}</div>
       <div class="kick sect">Backpack · ${s.pack.length}/${packSlots()}</div>
       <div class="grid g4">${s.pack.map((e, i) => slot(e, 'pack', i)).join('')}${empty(packSlots() - s.pack.length)}</div>
+      ${s.pack.length && !sel ? '<button class="mbtn sm" id="sAll" style="margin-top:8px;width:100%">Stash all</button>' : ''}
       <div id="sacts"></div>
       <div class="kick sect">Home stash · ${s.stash.length}/${STASH_SLOTS}</div>
       <div class="grid g5">${s.stash.map((e, i) => slot(e, 'stash', i)).join('')}${empty(Math.min(10, STASH_SLOTS - s.stash.length))}</div>`;
     el.querySelectorAll('.slot[data-from]').forEach(b => b.onclick = () => { const f = b.dataset.from, i = +b.dataset.i; sel = sel && sel.from === f && sel.i === i ? null : { from: f, i }; SFX.play('ui'); renderStash(); });
+    if ($('#sAll')) $('#sAll').onclick = () => {
+      for (let i = s.pack.length - 1; i >= 0; i--) { const e = s.pack[i]; const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d); e.n -= n; if (!e.n) s.pack.splice(i, 1); }
+      SFX.play('ui'); Game.save(); renderStash(); toast(s.pack.length ? 'Stash is full - some things stayed in your pack' : 'Everything is in the stash', 1.8);
+    };
     if (sel) stashActions();
   }
   function stashActions() {
