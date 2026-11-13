@@ -258,13 +258,40 @@ const MUSIC_TRACKS={
   campfire:{n:'Campfire',d:'slow, warm, a guitar by the fire',bpm:68,root:57,scale:[0,2,4,7,9],chords:[[0,4,7],[-3,0,4],[5,9,12],[7,11,14]],wave:'triangle',pad:'sine'},
   rain:{n:'Rainy walk',d:'soft and sleepy, lo-fi',bpm:74,root:55,scale:[0,3,5,7,10],chords:[[0,3,7,10],[5,8,12],[3,7,10],[-2,2,5]],wave:'sine',pad:'triangle',rain:true},
   dusk:{n:'Dusk road',d:'a little eerie, still cute',bpm:84,root:52,scale:[0,2,3,7,8],chords:[[0,3,7],[8,12,15],[5,8,12],[7,10,14]],wave:'square',pad:'sine'},
+  eerie:{n:'Eerie',d:'quiet and creepy - speeds up when things get scary',bpm:60,root:45,eerie:true},
   own:{n:'My own song',d:'a file from your phone'},
 };
 const MUSIC={ctx:null,gain:null,timer:null,beat:0,el:null,url:null,noise:null};
-function musicPick(){return (S&&S.music)||'off';}
+function musicPick(){return (S&&S.music)||'eerie';}
 function musicStop(){clearInterval(MUSIC.timer);MUSIC.timer=null;if(MUSIC.el){MUSIC.el.pause();}if(MUSIC.noise){try{MUSIC.noise.stop();}catch(e){}MUSIC.noise=null;}if(MUSIC.gain){try{MUSIC.gain.gain.setTargetAtTime(0,MUSIC.ctx.currentTime,0.3);}catch(e){}}}
-function musicNote(t,midi,dur,type,vol){const c=MUSIC.ctx;const o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.value=440*Math.pow(2,(midi-69)/12);
-  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g);g.connect(MUSIC.gain);o.start(t);o.stop(t+dur+0.05);}
+function musicNote(t,midi,dur,type,vol,cut){const c=MUSIC.ctx;const o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.value=440*Math.pow(2,(midi-69)/12);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+Math.min(0.02,dur/4));g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  if(cut){const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=cut;o.connect(f);f.connect(g);}else o.connect(g);
+  g.connect(MUSIC.gain);o.start(t);o.stop(t+dur+0.05);}
+function musicThump(t,vol){const c=MUSIC.ctx;const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(70,t);o.frequency.exponentialRampToValueAtTime(38,t+0.18);
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.25);o.connect(g);g.connect(MUSIC.gain);o.start(t);o.stop(t+0.3);}
+/* How scary is it right now? 0 = walking, about 0.3 = inside a house (more as the
+   noise climbs), 0.75 = a fight, 1 = a boss or a raid. The eerie track reads this
+   every half-beat, so it speeds up and thickens the moment a fight starts. */
+function musicTension(){try{
+  if(typeof C!=='undefined'&&C)return (C.where==='boss'||C.where==='raid'||(C.enemies||[]).some(e=>e.warden))?1:0.75;
+  if(S&&S.loc)return Math.min(0.6,0.25+((S.loc.noise||0)/100)*0.35);
+}catch(e){}return 0;}
+// Phrygian-ish minor: the flat second is what makes it sound wrong in a good way.
+const EERIE_SCALE=[0,1,3,5,7,8,10];
+function musicEerieStep(t,tr,step,bar,T){
+  const r=tr.root;
+  // drone: two detuned low saws under a dark filter, a new root every 2 bars (drifts down a half step)
+  if(step===0&&bar%2===0){const d=[0,0,-1,1][(bar/2)%4];musicNote(t,r-12+d,8*60/tr.bpm*2,'sawtooth',0.035,320+T*500);musicNote(t,r-12+d+7.1,8*60/tr.bpm*2,'sawtooth',0.02,300+T*400);}
+  // music-box bells, sparse when calm
+  if(Math.random()<0.12+T*0.25){const deg=EERIE_SCALE[Math.floor(Math.random()*EERIE_SCALE.length)];musicNote(t,r+24+deg,2.5-T*1.5,'sine',0.045-T*0.015);}
+  // heartbeat once anything is going on
+  if(T>=0.2&&(step===0||step===1||(T>=0.7&&(step===4||step===5))))musicThump(t,0.12+T*0.15);
+  // fight: tremolo strings on a minor-second cluster, climbing each bar
+  if(T>=0.7){const up=bar%4;musicNote(t,r+12+up,0.12,'sawtooth',0.02,1800);musicNote(t,r+13+up,0.12,'sawtooth',0.016,1800);}
+  // boss: a stab every bar
+  if(T>=1&&step===0)musicNote(t,r+6,0.6,'square',0.03,900);
+}
 function musicRain(){const c=MUSIC.ctx;const b=c.createBuffer(1,c.sampleRate*2,c.sampleRate);const d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*0.5;
   const s=c.createBufferSource();s.buffer=b;s.loop=true;const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=1200;const g=c.createGain();g.gain.value=0.05;s.connect(f);f.connect(g);g.connect(MUSIC.gain);s.start();MUSIC.noise=s;}
 function musicPlay(){
@@ -274,13 +301,18 @@ function musicPlay(){
   try{if(!MUSIC.ctx){MUSIC.ctx=new (window.AudioContext||window.webkitAudioContext)();MUSIC.gain=MUSIC.ctx.createGain();MUSIC.gain.connect(MUSIC.ctx.destination);}}catch(e){return;}
   const c=MUSIC.ctx;if(c.state==='suspended')c.resume();MUSIC.gain.gain.cancelScheduledValues(c.currentTime);MUSIC.gain.gain.setTargetAtTime(0.35,c.currentTime,0.5);
   if(tr.rain)musicRain();
-  const spb=60/tr.bpm;MUSIC.beat=0;let next=c.currentTime+0.1;
+  MUSIC.beat=0;let next=c.currentTime+0.1;MUSIC.T=0;
   MUSIC.timer=setInterval(()=>{
+    // ease the tension toward its target so the change feels like a swell, not a switch
+    const want=tr.eerie?musicTension():0;MUSIC.T+=(want-MUSIC.T)*(want>MUSIC.T?0.35:0.06);
+    const spb=60/(tr.bpm*(1+MUSIC.T*0.9));
     while(next<c.currentTime+0.5){
-      const bar=Math.floor(MUSIC.beat/8)%tr.chords.length,step=MUSIC.beat%8,ch=tr.chords[bar];
-      if(step===0)for(const n of ch)musicNote(next,tr.root+n,spb*8,tr.pad,0.05);
-      if(step===0||step===4)musicNote(next,tr.root-12+ch[0],spb*2,'sine',0.09);
-      if(Math.random()<(step%2?0.35:0.7)){const deg=tr.scale[Math.floor(Math.random()*tr.scale.length)];musicNote(next,tr.root+12+deg,spb*1.5,tr.wave,tr.wave==='square'?0.018:0.05);}
+      const bar=Math.floor(MUSIC.beat/8),step=MUSIC.beat%8;
+      if(tr.eerie)musicEerieStep(next,tr,step,bar,MUSIC.T);
+      else{const ch=tr.chords[bar%tr.chords.length];
+        if(step===0)for(const n of ch)musicNote(next,tr.root+n,spb*8,tr.pad,0.05);
+        if(step===0||step===4)musicNote(next,tr.root-12+ch[0],spb*2,'sine',0.09);
+        if(Math.random()<(step%2?0.35:0.7)){const deg=tr.scale[Math.floor(Math.random()*tr.scale.length)];musicNote(next,tr.root+12+deg,spb*1.5,tr.wave,tr.wave==='square'?0.018:0.05);}}
       MUSIC.beat++;next+=spb/2;}
   },120);
 }

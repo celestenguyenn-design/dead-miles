@@ -5954,7 +5954,7 @@ const NEWS=[
      'Morning check-in: put in your sleep and readiness from your ring. A great night gives +15% XP. A rough one means you take less damage. Workouts like pickleball give training, which slowly raises your HP and damage.',
      'Shared camp: your party builds one camp together, forever. A quarter of everyone\'s counted steps go in (nobody loses any), and each project gives the whole party a perk.',
      'Gifts are supplies only now: one a day, and you can take up to 5 a week.',
-     'Music: pick a background track in Settings (Campfire, Rainy walk, Dusk road), or play your own song from your phone.']},
+     'Music: a new Eerie track plays by default. It is quiet and creepy while you walk, a heartbeat comes in when you are inside a house, and it speeds up in a fight (more for a boss). Change it or turn it off in Settings, or play your own song from your phone.']},
  {v:'7.71',d:'Sep 29',t:'Stronghold rooms say why they are locked',
   i:['In a raider stronghold the Loot pile and the Boss trailer are locked until you have pushed through the stage before them - but they just sat there grey and did nothing when tapped, which looked broken. Now they show a lock, say which stage opens them, and tapping one tells you what to push to first.']},
  {v:'7.70',d:'Sep 28',t:'No more difficulty setting',
