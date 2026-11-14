@@ -21,6 +21,7 @@ window.DM = window.DM || {};
     coffee: { n: 'Canned coffee', i: 'coffee', use: 'Drink', sta: 60, th: 15 },
     bandage: { n: 'Bandage', i: 'bandage', use: 'Use', hp: 25 },
     meds: { n: 'Painkillers', i: 'meds', use: 'Take', hp: 40 },
+    antibio: { n: 'Antibiotics', i: 'antibio', use: 'Take', cure: 1, rare: 1, tag: 'cures infection' },   // 0.18: infection.js
     wrench: { n: 'Rusty wrench', i: 'wrench' },
     scrap: { n: 'Scrap metal', i: 'scrap' },
     knife: { n: 'Kitchen knife', i: 'knife', w: 'knife' },
@@ -130,7 +131,7 @@ window.DM = window.DM || {};
     const it = D.ITEMS[k]; if (!it) return 'sell';
     if (it.cos) return 'cos'; if (it.decor) return 'decor'; if (it.seed) return 'seed'; if (it.quest) return 'quest'; if (k === 'key') return 'key';
     if (it.bp) return 'bp'; if (it.w) return 'weapon'; if (k === 'ammo' || k === 'arrow') return 'ammo'; if (it.gift || k === 'hat') return 'event';
-    if (it.use === 'Drink') return 'drink'; if (it.use === 'Eat') return 'food'; if (it.hp) return 'med'; if (k === 'note') return 'note';
+    if (it.use === 'Drink') return 'drink'; if (it.use === 'Eat') return 'food'; if (it.hp || it.cure) return 'med'; if (k === 'note') return 'note';
     if (it.slots || k === 'shoes' || k === 'lockset') return 'gear'; if (k === 'lockpick' || k === 'pole') return 'tool';
     return D.uses(k).length ? 'mat' : 'sell';
   };
@@ -205,12 +206,12 @@ window.DM = window.DM || {};
   D.COS_POOL = { 'cos_*': [], 'cosZ_*': ['corpse'], 'cosP_*': ['police'], 'cosM_*': ['mansion'], 'cosH_*': ['horde'] };
   // what the trader pays (caps each); she sells for about 4x
   D.VALUE = { beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
-    lockpick: 3, gift: 8, candy: 1, cranberry: 3, stuffing: 3, pie: 4, turkey: 20, hat: 0, pole: 2, watch: 25, jewelry: 20, wood: 1, nails: .25, spikedbat: 20, machete: 22, prybar: 14, packplus: 15, backpack: 40, shoes: 10, lockset: 18, note: 0, parcel: 0 };
+    lockpick: 3, gift: 8, candy: 1, cranberry: 3, stuffing: 3, pie: 4, turkey: 20, hat: 0, pole: 2, watch: 25, jewelry: 20, wood: 1, nails: .25, spikedbat: 20, machete: 22, prybar: 14, packplus: 15, backpack: 40, shoes: 10, lockset: 18, note: 0, parcel: 0, antibio: 12 };
   Object.assign(D.VALUE, { seed_tomato: 2, seed_potato: 2, seed_carrot: 2, seed_corn: 3, seed_herbs: 2, tomato: 2, potato: 2, carrot: 2, corn: 2, herbs: 3, coffee: 2 });
   for (const k in D.DECOR) D.VALUE[k] = D.DECOR[k].v;
   D.valueOf = (k, d) => { if (k.startsWith('bp_')) return 25; let v = D.VALUE[k] || 1; if (d != null && D.ITEMS[k] && D.ITEMS[k].w) v = Math.max(1, Math.round(v * (.3 + .7 * d / D.WEAPONS[D.ITEMS[k].w].dur))); return v; };
   // how many fit in one slot (anything not listed does not stack)
-  D.STACK = { gift: 3, candy: 5, seed_tomato: 10, seed_potato: 10, seed_carrot: 10, seed_corn: 10, seed_herbs: 10, tomato: 3, potato: 3, carrot: 3, corn: 3, herbs: 3, wood: 10, nails: 20, lockpick: 5, arrow: 20, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, coffee: 3, bandage: 5, meds: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
+  D.STACK = { gift: 3, candy: 5, seed_tomato: 10, seed_potato: 10, seed_carrot: 10, seed_corn: 10, seed_herbs: 10, tomato: 3, potato: 3, carrot: 3, corn: 3, herbs: 3, wood: 10, nails: 20, lockpick: 5, arrow: 20, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, coffee: 3, bandage: 5, meds: 5, antibio: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
   D.stackMax = k => D.STACK[k] || 1;
   D.QUIVER = 60;   // 0.7: arrows live in a quiver (survivor.quiver.n), not in a pack slot
 
@@ -305,6 +306,8 @@ window.DM = window.DM || {};
   for (const [t, w] of [['wardrobe', .1], ['dresser', .08], ['coat', .09], ['hutch', .06], ['washer', .07], ['night', .04], ['gym', .05]]) D.LOOT[t][1]['cos_*'] = w;
   D.LOOT.corpse[1]['cosZ_*'] = 1;   // ~4.5% per body vs ~2.5-3.7% per wardrobe or dresser
   for (const [t, w] of [['locker', .22], ['evidence', .25], ['armory', .15]]) D.LOOT[t][1]['cosP_*'] = w;
+  // 0.18: antibiotics (cure infection, infection.js) - rare, only where medicine is kept (~3-8% per container)
+  for (const [t, w] of [['medcab', .12], ['vanity', .05], ['pharm', .12], ['pharmstore', .2], ['cage', .35], ['nurse', .2]]) D.LOOT[t][1].antibio = w;
   // event loot: the running event adds its foods / gifts to the tables
   if (D.EV && D.EV.ev.loot) for (const t in D.EV.ev.loot) if (D.LOOT[t]) Object.assign(D.LOOT[t][1], D.EV.ev.loot[t]);
   // a Christmas gift box (opened at home)
@@ -341,7 +344,7 @@ window.DM = window.DM || {};
     return out;
   };
 
-  D.maxHp = s => (s && s.job === 'brawler' ? 130 : 100) + (DM.Skills && s ? DM.Skills.hpBonus(s) : 0);   // 0.13: Combat ranks add HP
+  D.maxHp = s => (s && s.job === 'brawler' ? 130 : 100) + (DM.Skills && s ? DM.Skills.hpBonus(s) : 0) - (DM.Infect && s ? DM.Infect.hpLoss(s) : 0);   // 0.13: Combat ranks add HP; 0.18: infection takes some away
 
   // ---------------------------------------------------------------- scavenging skill
   D.XPCUM = L => L <= 1 ? 0 : Math.round(14 * Math.pow(L - 1, 1.75) + (L > 5 ? 30 * (L - 5) * (L - 5) : 0));
@@ -406,6 +409,7 @@ window.DM = window.DM || {};
     ['arrow', 10, 3, 1, .8], ['cloth', 4, 4, 1, .5], ['tape', 2, 8, 1, .5], ['nails', 12, 1, 1, .5], ['wood', 4, 4, 1, .5], ['crowbar', 1, 60, 1, .6], ['bat', 1, 45, 1, .5], ['knife', 1, 25, 1, .5],
     ['backpack', 1, 150, 2, 1], ['machete', 1, 90, 2, .5], ['ammo', 15, 2, 2, .6], ['prybar', 1, 65, 2, .5], ['axe', 1, 120, 3, .5], ['bow', 1, 130, 3, .4], ['lockset', 1, 80, 3, .5],
     ['key', 1, 30, 2, .35], ['bp_*', 1, 110, 2, .45], ['bp_*', 1, 110, 4, .6],
+    ['antibio', 1, 45, 2, .5],   // 0.18: Dot sells antibiotics from trader level 2 (about every other day)
   ];
   D.STREETS = ['Halsey St', 'Bergen St', 'Dean St', 'Putnam Ave', 'Jefferson Ave', 'Macon St', 'Decatur St', 'Hancock St', 'Lafayette Ave', 'Greene Ave', 'Quincy St', 'Gates Ave', 'Madison St', 'Monroe St', 'Kosciuszko St', 'Stuyvesant Ave', 'Tompkins Ave', 'Marcy Ave', 'Nostrand Ave', 'Bedford Ave', 'Franklin Ave', 'Classon Ave', 'Atlantic Ave', 'Fulton St', 'Pacific St', 'Prospect Pl', 'Sterling Pl', 'St Marks Ave', 'Park Pl', 'Sterling St'];
 })();

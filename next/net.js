@@ -531,6 +531,28 @@
     } catch (e) { setErr(e); const c = lsGet(K.board); NET.boardRows = (c && c.rows) || []; return NET.boardRows; }
   };
 
+  /* ---------------- 0.18: daily challenge (daily.js; SQL in next/daily.sql) ---------------- */
+  // One scored run per handle per New York day; the server keeps the FIRST submission. Returns {ok, best} or
+  // {ok:false, error:'signed-out'|'offline'|'auth'|...}. The caller keeps the score and retries on 'offline'.
+  NET.dailySubmit = async function (day, score, detail) {
+    if (!NET.ok) return { ok: false, error: 'signed-out' };
+    try {
+      const r = await rpc('next_daily_submit', { p_handle: NET.handle, p_token: NET.token, p_day: String(day), p_score: Math.max(0, Math.round(+score || 0)), p_detail: detail || {} });
+      if (r && r.ok) return r;
+      if (r && r.error === 'auth') { NET.ok = false; NET.status = 'bad-key'; changed(); }
+      return { ok: false, error: (r && r.error) || 'failed' };
+    } catch (e) { setErr(e); return { ok: false, error: 'offline' }; }
+  };
+  // Today's scores: [{handle, name, score, detail, at}] best first (top 50). Cached per day for offline.
+  NET.dailyBoard = async function (day) {
+    try {
+      const rows = await rpc('next_daily_board', { p_day: String(day) });
+      const out = Array.isArray(rows) ? rows : [];
+      lsSet('dm-next-daily', { day, at: Date.now(), rows: out });
+      return { ok: true, rows: out };
+    } catch (e) { setErr(e); const c = lsGet('dm-next-daily'); return { ok: false, rows: c && c.day === day ? c.rows : [], cached: !!(c && c.day === day) }; }
+  };
+
   /* ---------------- parties (party horde night) ---------------- */
   NET.partyJoin = async function (code) {
     if (!NET.ok) return { ok: false, error: 'Sign in first.' };

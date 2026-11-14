@@ -311,3 +311,29 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   itself a car-speed jump from the last one cannot claim (it used to be able to, before the 3-reading lock kicked in).
 - Privacy unchanged: position only in memory while the map is open; the save holds no coordinates or OSM ids. The phone now
   also keeps which ~700 m square was shown last (a square, never a point), next to the cached squares, outside the save.
+
+## Done in 0.18 (daily challenge house, light infection)
+- Daily challenge (daily.js): one special house a day, the same for everyone. Type and seed come only from the New York
+  date (types weighted: rowhouse L, bodega, pharmacy 3 · auto shop 2.5 · apartment, school 2 · laundromat, police 1.5 ·
+  mansion 1), generator pinned to GV 4. house.js seeds every loot roll from the house seed when opts.lootSeed is set:
+  the empty containers, each container's pre-roll (its own stream per furniture id), the extra-find and pry-smash rolls,
+  corpses (per zombie index) and the secret caches, so search order never changes what is inside. No raid, no event
+  mini-boss, no hiding survivor or stray in it. Zombie AI wander is still random; skills (extra find, pack size) still apply.
+- It sits at the top of the Houses tab (gold card): "Daily challenge · Pharmacy · 3 h left", address, danger, tags,
+  your score / rank and the top 3. No scouting, no Crew button. Scores button: the whole board (top 50) and the rules.
+- One scored attempt: the FIRST exit (leaving or going down) is scored. Going back in is for fun: the house keeps what was
+  searched and who was killed (run state kept on exit, dead zombies stay dead on resume), so it cannot be farmed.
+  Closing the app mid-run keeps the tally (G.dly rides in the run save).
+- Score: loot value taken (D.valueOf, from containers / corpses / caches, not floor pick-ups) x4, halved if downed
+  + 60 a secret + 15 a zombie (40 a special infected) + time bonus (540 - seconds inside) / 2, capped 0..150, only with
+  60%+ of the containers searched - 150 if downed. Never below 0. The summary sheet shows the breakdown and the top 10.
+- Backend: NET.dailySubmit / NET.dailyBoard -> next_daily_submit / next_daily_board (SQL in next/daily.sql, NOT applied:
+  the owner applies it). Submitted once; offline / signed out the score waits on the phone ("Scores need sign-in /
+  offline") and is sent when possible (yesterday's too). The last board is cached for offline.
+- Light infection (infection.js; owner: "infection seems cool but don't do too much of it"): 10% of zombie hits that land
+  infect (15% special infected; never raiders, the weekly boss or event bosses; Field medic halves it). While infected max
+  HP is -5, then -5 more each real day, down to -25; it never kills and HP is only clamped to the new max. Hunger drains
+  15% faster. Antibiotics (new item, Medical): rare in medicine cabinets (~4.5%), pharmacy shelves, nurse offices, pharmacy
+  cages (~6%), vanities; Dot sells one at trader level 2+ (about every other day, 45 caps). Taking them cures it at once.
+  Left alone it clears after 5 days. Shown on the home card ("Infected · -10 max HP", tap for details), the eat & drink
+  sheet and a green chip in the run HUD; a first-time tip explains it. Old saves are simply healthy.

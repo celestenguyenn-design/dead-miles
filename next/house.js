@@ -12,6 +12,7 @@
   const F = DM.Food;                   // 0.8: hunger + thirst (food.js)
   const SK = DM.Skills, INF = DM.Inf;  // 0.13: skill trees (skills.js), special infected (infected.js)
   const RA = DM.Raid;                  // 0.15: raiders (raiders.js)
+  const IFX = DM.Infect;               // 0.18: light infection (infection.js)
 
   // ---------------------------------------------------------------- layout
   let L = null, ROWS = [], MW = 0, MH = 0, opts = {};
@@ -59,6 +60,7 @@
     ROWS = L.rows; MW = ROWS[0].length; MH = ROWS.length;
     const st = L.start;
     if (S() && S().food) S().hp = F.tick(S(), S().hp);   // hunger/thirst catch up before she goes in
+    if (IFX && S()) { const m = IFX.tick(S()); if (m) setTimeout(() => toast(m, 2.6), 3400); }   // 0.18: infection catches up too
     G = {
       t: 0, secretOpen: false, paused: false, over: false, hitstop: 0, shake: 0, redFlash: 0,
       p: {
@@ -72,6 +74,11 @@
       stats: { searched: 0, kills: 0, start: performance.now() }, entered: false, lastNoise: null, field: null, fieldT: 0, fieldCell: -1,
       secretHint: 0, sheet: null, food: { h: 0, t: 0 }, foodT: 0, shots: [], raid: null, raidDone: false,
     };
+    // 0.18 DAILY CHALLENGE (daily.js): opts.daily = { scored } marks the daily house. G.dly is the score tally
+    // (loot value taken, kills, special kills, seconds inside). It rides along in the run save, so closing the app
+    // mid-run keeps the tally; dead zombies stay dead on resume (opts.resume.zd).
+    G.dly = opts.daily ? { v: 0, n: 0, k: 0, sp: 0, t: 0 } : null;
+    if (G.dly && opts.resume && opts.resume.dly) Object.assign(G.dly, opts.resume.dly);
     // 0.15: a rare raid (raiders.js) - seeded from the house; only normal house runs ask for one (opts.raid)
     const rp = RA && !opts.noRaid ? RA.plan(L, opts) : null;
     if (rp) { G.raid = Object.assign(rp, { on: false, ents: [] }); RA.ensureRigs(rp); }
@@ -92,9 +99,10 @@
     }
     // some containers turn out empty - never the fridge, secret stashes, or ones the generator marked
     const elig = G.furn.filter(f => f.lootable && !f.noEmpty && f.art !== 'fridge' && !f.secretLoot && !f.lock && !(f.extra && f.extra.length));
-    for (let i = elig.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [elig[i], elig[j]] = [elig[j], elig[i]]; }
+    const er = LR('empty');   // 0.18: seeded for the daily house (everyone gets the same rolls), Math.random otherwise
+    for (let i = elig.length - 1; i > 0; i--) { const j = Math.floor(er() * (i + 1)); [elig[i], elig[j]] = [elig[j], elig[i]]; }
     elig.slice(0, Math.round(elig.length * (L.emptyPct == null ? .2 : L.emptyPct))).forEach(f => f.empty = true);
-    for (const f of G.furn) if (f.lootable) { f.pre = f.empty ? [] : rollLoot(f.loot); if (f.jack) f.pre.push(...D.rollJack(f.jack).filter(Boolean)); if (f.extra) f.pre.push(...f.extra); } // rolled up front so Keen eye can sense rares
+    for (const f of G.furn) if (f.lootable) { const r = LR('f' + f.fid); f.pre = f.empty ? [] : rollLoot(f.loot, r); if (f.jack) f.pre.push(...D.rollJack(f.jack, r).filter(Boolean)); if (f.extra) f.pre.push(...f.extra); } // rolled up front so Keen eye can sense rares
     const houseZs = [];
     for (const zd of L.zombies || []) {
       const z = mkZombie(zd.x * T, zd.y * T, zd.st || 'idle', null);
@@ -108,6 +116,8 @@
     if (opts.resume) restoreRun(opts.resume);
     buildWalls(); buildSolid();
     spawnInfected(houseZs);
+    houseZs.forEach((z, i) => { z.zi = i; });   // 0.18: a stable index (seeded corpse loot, dead-on-resume for the daily house)
+    if (G.dly && opts.resume && Array.isArray(opts.resume.zd)) G.zs = G.zs.filter(z => z.zi == null || !opts.resume.zd.includes(z.zi));
     for (const z of G.zs) if (z.special) ensureInfRig(z.kind);
     G.p.flip = false;
     hideCards(); closeSheet(true);
@@ -119,6 +129,11 @@
     toast(opts.hint || 'Joystick to move  ·  SEARCH near furniture', 3.2);
     hudChips();
   }
+  // 0.18: loot rolls. Daily house (opts.lootSeed): every container, corpse and secret cache gets its own stream from
+  // (seed, tag), so the order she searches in does not change what is inside. Anything else: plain Math.random.
+  function LR(tag) { return opts.lootSeed != null ? D.mulberry32(D.hashStr(opts.lootSeed + ':' + tag)) : Math.random; }
+  // 0.18: the daily score tally - what she takes from containers, corpses and caches (not floor pick-ups)
+  function tally(k, n, d) { if (G.dly && n > 0) { G.dly.v += D.valueOf(k, d) * n; G.dly.n += n; } }
   // top-left chip: the running event
   /* RUN PROGRESS SURVIVES CLOSING THE APP. The pack is saved after every search, but the house
      itself was not - so closing the game mid-run gave back a fresh house to loot again. Now what was
@@ -132,7 +147,9 @@
       const d = L.furn[i], ch = x.searched || (d.lock && !x.locked) || (d.keyLock && !x.keyLock) || x.opened || x.slideState || x.swing;
       if (!ch) return; const o = {}; for (const k of FKEEP) if (x[k] != null) o[k] = x[k]; f[i] = o;
     });
-    return { f, sec, so: !!G.secretOpen, fp: runPrint(), raid: G.raidDone || !!(G.raid && G.raid.on) ? 1 : 0 };   // 0.15: a raid happened (it never fires twice)
+    const o = { f, sec, so: !!G.secretOpen, fp: runPrint(), raid: G.raidDone || !!(G.raid && G.raid.on) ? 1 : 0 };   // 0.15: a raid happened (it never fires twice)
+    if (G.dly) { o.dly = { v: G.dly.v, n: G.dly.n, k: G.dly.k, sp: G.dly.sp, t: Math.round(G.dly.t) }; o.zd = G.zs.filter(z => z.dead && z.zi != null).map(z => z.zi).concat((opts.resume && opts.resume.zd) || []).filter((v, i, a) => a.indexOf(v) === i); }   // 0.18 daily
+    return o;
   }
   // 0.9: a fingerprint of the house's furniture, so saved progress is never laid onto a different layout
   const runPrint = () => (L.furn || []).length + ':' + (L.furn || []).map(d => d.art[0] + d.at.join('')).join('').length + ':' + (L.furn || []).reduce((a, d, i) => (a * 31 + d.at[0] * 7 + d.at[1] + i) % 1000003, 7);
@@ -155,6 +172,9 @@
   function hudChips() {
     const ev = $('#evchip');
     if (ev) { ev.style.display = EVA ? '' : 'none'; if (EVA) { ev.innerHTML = EVS.glyph(EVA.id) + '<span>' + EVA.ev.short + '</span>'; ev.style.background = EVA.ev.accent.c; } }
+    const ic = $('#infchip');   // 0.18: infected (infection.js) / the daily challenge run
+    if (ic) { const on = IFX && IFX.is(S()); ic.style.display = on ? '' : 'none'; if (on) ic.innerHTML = '<span>☣ ' + IFX.label(S()) + '</span>'; }
+    const dc = $('#dlychip'); if (dc) { dc.style.display = opts.daily ? '' : 'none'; if (opts.daily) dc.innerHTML = '<span>' + (opts.daily.scored ? 'Daily · for fun' : 'Daily challenge · scored') + '</span>'; }
   }
   // 0.13: danger 3+ houses get a couple more zombies and some special infected (infected.js). Seeded from the house,
   // so a resumed run has the same ones. Extra zombies stand on reachable open floor away from the front door.
@@ -503,13 +523,13 @@
   function moveRug(s) { s.st = 1; SFX.play('whoosh'); const R = rugRect(s); puff(R.x + R.w * .8, R.y + R.h * .7, 2, 8, 'rgba(234,210,164,.5)', 50, .7, 3); }
   function pryBoard(s) {
     s.st = 2; SFX.play('hit'); s.name = 'Floor cache'; s.room = s.room || G.room;
-    s.loot0 = toStacks(rollLoot('cache'));
+    { const r = LR('s' + G.sec.indexOf(s)); s.loot0 = toStacks(rollLoot('cache', r), r); }
     foundSecret(s);
     openLoot(s, { act: 'Open', name: 'Floor cache' });
   }
   function pryPanel(s, f) {
     f.opened = true; f._key = null; SFX.play('break'); emitNoise(f.x + f.w / 2, f.y + f.h, 4.5);
-    f.loot0 = toStacks(rollLoot('wallcache')); f.name = 'Wall cache';
+    { const r = LR('s' + G.sec.indexOf(s)); f.loot0 = toStacks(rollLoot('wallcache', r), r); } f.name = 'Wall cache';
     foundSecret(s);
     openLoot(f, { act: 'Open', name: 'Wall cache' });
   }
@@ -582,12 +602,13 @@
       return;
     }
     o.searched = true; G.stats.searched++;
-    const keys = it.corpse ? (o.raider ? o.drop.slice() : EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse').concat(o.special ? INF.loot(o.kind) : [])) : o.pre.slice();   // 0.13: special infected carry more
-    if (keys.length && Math.random() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot); if (more.length) keys.push(more[0]); }
-    o.loot0 = toStacks(keys);
+    const lr = LR(it.corpse ? 'z' + (o.zi != null ? o.zi : 'x') : 'x' + o.fid);   // 0.18: seeded for the daily house
+    const keys = it.corpse ? (o.raider ? o.drop.slice() : EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse', lr).concat(o.special ? INF.loot(o.kind, lr) : [])) : o.pre.slice();   // 0.13: special infected carry more
+    if (keys.length && lr() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot, lr); if (more.length) keys.push(more[0]); }
+    o.loot0 = toStacks(keys, lr);
     // A torn note remembers the house it came from, so reading it somewhere else is not misleading.
     for (const e of o.loot0) if (e.k === 'note') e.d = { addr: L.address, text: L.note || '' };
-    if (it.pry && !SK.noSmash() && o.loot0.length && Math.random() < .25) { const i = Math.floor(Math.random() * o.loot0.length), sm = o.loot0[i]; sm.n--; if (!sm.n) o.loot0.splice(i, 1); toast('Smashed: ' + ITEMS[sm.k].n.toLowerCase(), 1.8); }
+    if (it.pry && !SK.noSmash() && o.loot0.length && lr() < .25) { const i = Math.floor(lr() * o.loot0.length), sm = o.loot0[i]; sm.n--; if (!sm.n) o.loot0.splice(i, 1); toast('Smashed: ' + ITEMS[sm.k].n.toLowerCase(), 1.8); }
     // xp: bigger containers teach more, the hidden stash a lot
     gainXP(it.corpse ? 2 : 2 + (o.time >= 2.2 ? 1 : 0) + (o.rare ? 6 : 0), G.p.x, G.p.y);
     o._key = null;
@@ -690,6 +711,7 @@
     G.shake = Math.max(0, G.shake - dt * 30);
     if (G.hitstop > 0) { G.hitstop -= dt; return; }
     if (G.paused) return;
+    if (G.dly && !G.over && G.entered !== false) G.dly.t += dt;   // 0.18: daily score clock (time inside)
 
     let inp = E.moveInput();
     if (G.p.auto) {
@@ -880,6 +902,7 @@
       z.dead = true; z.st = 'dead'; z.stT = 0; z.fallDir = z.hurtDir;
       if (by) { if (z.kind === 'bloater') burst(z); return; }   // a raider got it: not her kill
       G.stats.kills++;
+      if (G.dly) { G.dly.k++; if (z.special) G.dly.sp++; }   // 0.18 daily score
       if (DM.Game && DM.Game.onKill) DM.Game.onKill(z);
       // 0.13: kills teach too (special infected and bosses more)
       const kx = K ? K.xp : z.kind === 'wboss' ? 0 : z.boss || EVS.isBoss(z) ? 15 : 2;
@@ -906,6 +929,15 @@
     dmgNum(p.x, p.y - 90, dmg, '#ff6b5a');
     splat(p.x, p.y, Math.atan2(dy, dx), false);
     if (p.hp <= 0) { p.st = 'down'; p.stT = 0; closeSheet(true); }
+    else if (z && !opts.noInfect && IFX && IFX.bite(z, S())) infectedNow();   // 0.18: some bites infect (infection.js)
+  }
+  // 0.18: light infection - say so once, clamp HP to the lower max, show the HUD chip
+  function infectedNow() {
+    const s = S(); G.p.hp = Math.min(G.p.hp, maxHp());
+    banner('INFECTED', 'max HP -' + IFX.hpLoss(s)); SFX.play('alert');
+    if (IFX.firstNote(s)) setTimeout(() => { if (G && !G.over) toast(IFX.NOTE[1], 7); }, 900);
+    else toast('Infected - antibiotics will cure it', 2.4);
+    hudChips(); lastHud = ''; DM.Game && DM.Game.save();
   }
 
   // ---------------------------------------------------------------- zombies
@@ -1972,6 +2004,7 @@
     const o = G.sheet.o, e = o.loot0[i];
     const got = addToPack(e.k, e.n, e.d);
     if (!got) { toast(`No room for ${ITEMS[e.k].n.toLowerCase()}`, 1.4); $('#shCap').classList.add('shake'); setTimeout(() => $('#shCap').classList.remove('shake'), 400); return; }
+    tally(e.k, got, e.d);   // 0.18 daily score
     e.n -= got; if (!e.n) o.loot0.splice(i, 1);
     SFX.play('pick'); lootedWeapon(e.k);
     if (e.k === 'ammo' || e.k === 'key') toast(ITEMS[e.k].n + (got > 1 ? ' x' + got : '') + '!', 1.2);
@@ -1980,7 +2013,7 @@
   function takeAll() {
     const o = G.sheet && G.sheet.o; if (!o || G.sheet.kind !== 'loot') return;
     let took = 0;
-    for (const e of o.loot0) { const got = addToPack(e.k, e.n, e.d); e.n -= got; took += got; if (got) lootedWeapon(e.k); }
+    for (const e of o.loot0) { const got = addToPack(e.k, e.n, e.d); tally(e.k, got, e.d); e.n -= got; took += got; if (got) lootedWeapon(e.k); }
     o.loot0 = o.loot0.filter(e => e.n > 0);
     if (took) SFX.play('pick');
     if (o.loot0.length) { const left = o.loot0.reduce((a, e) => a + e.n, 0); toast(`Pack full - left ${left} item${left > 1 ? 's' : ''} here`, 1.8); renderLoot(); } else closeSheet();
@@ -2018,6 +2051,10 @@
       const here = nd.addr === L.address;
       $('#shActs').innerHTML = `<div class="note">${nd.text || '"...the rest is torn away."'}<br><small>Found at <b>${nd.addr || 'a house'}</b>${here ? ' - this house.' : ' - not this house. The clue is about that place.'}</small></div>`;
       SFX.play('pick'); return; }
+    if (it.cure && IFX) {   // 0.18: antibiotics cure the infection (only used when infected)
+      if (!IFX.is(S())) { toast('You are not infected - save them for a bite', 1.8); return; }
+      const m = IFX.cure(S()); e.n--; if (!e.n) G.pack.splice(i, 1); SFX.play('pick'); toast(m, 2.4); hudChips(); lastHud = ''; DM.Game && DM.Game.save(); openPack(); return;
+    }
     if (it.hp) p.hp = Math.min(maxHp(), p.hp + SK.heal(it.hp));   // 0.13: Field medic heals more
     const fed = F.isFood(e.k) ? F.eat(S(), e.k) : '';
     if (it.sta) p.sta = Math.min(F.staMax(), p.sta + it.sta);
@@ -2315,8 +2352,10 @@
     const res = {
       kind, address: L.address, type: L.type, id: L.id,
       kills: G.stats.kills, searched: G.furn.filter(f => f.lootable && f.searched).length,
-      secrets: G.sec.filter(s => s.found).length, secretsTotal: G.sec.length, zombies: zombieCount(), raid: G.raid && G.raid.on ? { n: G.raid.n, killed: G.raid.killed || 0, away: G.raid.away || 0 } : null, left: G.drops.map(d => ({ k: d.k, n: d.n })),
+      secrets: G.sec.filter(s => s.found).length, secretsTotal: G.sec.length, zombies: zombieCount(),
+      daily: G.dly ? Object.assign({}, G.dly, { t: Math.round(G.dly.t), searched: G.furn.filter((f, i) => i < (L.furn || []).length && f.lootable && !f.secretLoot && f.searched).length, total: G.furn.filter((f, i) => i < (L.furn || []).length && f.lootable && !f.secretLoot).length }) : null,   // 0.18 raid: G.raid && G.raid.on ? { n: G.raid.n, killed: G.raid.killed || 0, away: G.raid.away || 0 } : null, left: G.drops.map(d => ({ k: d.k, n: d.n })),
     };
+    if (G.dly && opts.onState) opts.onState(snapRun());   // 0.18: the daily house keeps its state for re-entry (for fun)
     G.drops = []; G.over = true; LP.on = false; lpEl.classList.remove('on');
     closeSheet(true); hideCards();
     DM.scene = null; document.body.classList.remove('inrun');
