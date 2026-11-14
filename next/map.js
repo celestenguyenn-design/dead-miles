@@ -4,14 +4,14 @@
    The map is drawn by hand on a canvas from OpenStreetMap vector data: thick dark-purple streets with ink edges and
    curbs, flat plum building blocks with a 3/4 wall face (lit windows here and there), teal parks with trees, deep blue
    water, her own survivor sprite under a lamp-light circle, real places as the game's house-type icons on round badges,
-   and fog around the edges. No CDN, no tiles: one compact Overpass query per ~700 m grid square, cached per square in
-   IndexedDB (LRU, MAX_CELLS squares) so a square she has walked before draws instantly, even offline.
+   and fog around the edges. 0.25: the data comes from OpenFreeMap vector tiles (z14, decoded by mvt.js; Overpass only as
+   a fallback), turned into one compact record per ~700 m grid square, cached per square in IndexedDB (LRU, MAX_CELLS squares) so a square she has walked before draws instantly, even offline.
 
    Walk within ~35 m of a marked place with the map open and it becomes a LANDMARK house in the house list: its real
    name, a pin, and a type from its tags. Up to 3 a day, on foot only.
 
-   Privacy: location is asked for only when the map opens and lives only in memory while it is open. Overpass is asked
-   for a whole ~700 m grid square, never her exact spot. The phone keeps the squares' map data and which square was
+   Privacy: location is asked for only when the map opens and lives only in memory while it is open. The tile server is
+   asked for whole ~1.8 km tiles (Overpass, the fallback, for a ~700 m square), never her exact spot. The phone keeps the squares' map data and which square was
    shown last (so the map can open instantly) - a square, never a point - and none of it goes into the save. The save
    (cloud too) keeps only each landmark house's type, name/street and seed - never a coordinate or an OpenStreetMap id.
 
