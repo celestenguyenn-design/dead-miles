@@ -882,14 +882,17 @@
     if (Math.abs(p.dodx) > .2) p.flip = p.dodx < 0;
     SFX.play('whoosh'); puff(p.x, p.y, 3, 6, 'rgba(157,144,191,.7)', 70, .45, 4);
   }
+  // 0.23.1 (owner: "as a hunter if I run out of arrows I'm f*cked"): an empty bow is swung like a club instead of doing nothing
+  const BOWBASH = Object.assign({}, WEAPONS.fists, { n: 'Bow bash', dmg: 15, reach: 1.3, ranged: false });
+  const fightW = () => { const W = weapon(); return W.ranged && !arrowsLeft() ? BOWBASH : W; };
   function startSwing() {
     const p = G.p;
     // soft auto-aim toward the nearest live zombie in reach
     let best = null, bd = 2.3 * T;
     for (const z of G.zs) { if (z.dead) continue; const d = Math.hypot(z.x - p.x, z.y - p.y); if (d < bd) { bd = d; best = z; } }
-    if (best && !weapon().ranged) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; p.fx = dx / d; p.fy = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; }
-    const W = weapon(); SW_WIND = W.wind; SW_STRIKE = W.strike; SW_REC = W.rec; p.swRanged = !!W.ranged;
-    if (W.ranged && !arrowsLeft()) { toast('No arrows - press R or tap the weapon to swap', 1.6); return; }
+    if (best && !fightW().ranged) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; p.fx = dx / d; p.fy = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; }
+    const W = fightW(); SW_WIND = W.wind; SW_STRIKE = W.strike; SW_REC = W.rec; p.swRanged = !!W.ranged;
+    if (W === BOWBASH && !G.bashTold) { G.bashTold = 1; toast('Out of arrows - bashing with the bow', 1.6); }
     p.st = 'swing'; p.stT = 0; p.swingHit = false; p.swingQ = false; p.sta = Math.max(0, p.sta - (W.ranged ? 3 : 7)); p.staDelay = .5; F.fight(G);
   }
   let SW_WIND = .12, SW_STRIKE = .1, SW_REC = .22;
@@ -897,7 +900,7 @@
     const p = G.p;
     if (!p.swingHit && p.stT >= SW_WIND) {
       p.swingHit = true;
-      const W = weapon();
+      const W = fightW();
       if (W.ranged) { fireArrow(); }
       else {
         SFX.play('swing');
@@ -910,7 +913,7 @@
           if (d > 18 && Math.abs(angDiff(Math.atan2(dy, dx), fa)) > 1.35) continue;
           hitZombie(z, fa, W.dmg * qMul() * (job() === 'brawler' ? 1.3 : 1) * SK.meleeMul()); any = true;   // 0.19: qMul = weapon quality
         }
-        if (any) { G.hitstop = .055; G.shake = Math.max(G.shake, 5); wearWeapon(); }
+        if (any) { G.hitstop = .055; G.shake = Math.max(G.shake, 5); if (W !== BOWBASH) wearWeapon(); }
         emitNoise(p.x, p.y, (any ? W.noise : 1.5) * SK.allNoise(), any);
       }
     }
@@ -2333,14 +2336,26 @@
     const ws = G.pack.map((e, i) => [e, i]).filter(([e]) => D.isWeapon(e.k));
     G.sheet = { kind: 'swap' };
     $('#shKick').textContent = 'Swap weapon · holding ' + (h ? ITEMS[h.k].n.toLowerCase() : 'nothing') + ', ' + cur + ' dmg';
-    $('#shTitle').textContent = ws.length ? 'Weapons in your pack' : 'No other weapons';
+    $('#shTitle').textContent = ws.length ? 'Weapons in your pack' : h ? 'Fight with your fists?' : 'No other weapons';
     const grid = $('#shGrid'); grid.innerHTML = ''; $('#shActs').innerHTML = '';
-    if (!ws.length) grid.innerHTML = '<div class="empty">Weapons you loot go in your pack. Come back here to swap to one mid-run.</div>';
+    if (!ws.length && !h) grid.innerHTML = '<div class="empty">Weapons you loot go in your pack. Come back here to swap to one mid-run.</div>';
+    if (h) {   // 0.23.1: fists are always an option - the weapon goes back in the pack
+      const el = document.createElement('button'), df = WEAPONS.fists.dmg - cur; el.className = 'slot fistslot';
+      el.innerHTML = `<span class="fistico">✊</span><span>Fists</span><em class="wdmg${df > 0 ? ' up' : df < 0 ? ' down' : ''}">${WEAPONS.fists.dmg} dmg</em>`;
+      el.addEventListener('click', ev => { ev.stopPropagation(); holster(); closeSheet(); }); grid.appendChild(el);
+    }
     ws.forEach(([e, i]) => { const dm = D.wDmg(e), df = dm - cur;
       grid.appendChild(itemCard(e, () => { equipFromPack(i); closeSheet(); }, `<em class="wdmg${df > 0 ? ' up' : df < 0 ? ' down' : ''}">${dm} dmg${df ? ` ${df > 0 ? '+' : ''}${df}` : ''}</em>`)); });
     $('#shCap').textContent = ws.length ? 'Tap one to fight with it' : '';
     $('#shTake').style.display = 'none';
     sheet.classList.add('on');
+  }
+  function holster() {
+    const h = S().hands; if (!h) return;
+    if (G.pack.length >= packSlots()) { toast('No room in your pack to put it away', 1.6); return; }
+    G.pack.push({ k: h.k, n: 1, d: h.d, q: D.qOf(h) }); S().hands = null;
+    if (DM.Game && DM.Game.onEquip) DM.Game.onEquip();
+    SFX.play('pick'); toast('Fists up', 1); lastHud = '';
   }
   function equipFromPack(i) {
     const e = G.pack[i]; if (!e || !D.isWeapon(e.k)) return;
