@@ -276,7 +276,10 @@ window.DM = window.DM || {};
   // 0.19: qa = { base, bonus } for the weapon quality roll (default: normal house loot, base 1.5, no bonus)
   D.toStacks = function (keys, rnd = Math.random, qa) {
     const out = [];
-    for (const k of keys) {
+    for (let k of keys) {
+      // 0.24.4: last check when a container opens - a blueprint she already knows (rolled before 0.24.3, or pre-rolled when the
+      // house or today's route was made) is swapped for another one she can use, or a pocket watch
+      if (k.startsWith('bp_') && D.ITEMS[k] && DM.S && (DM.S.known || []).includes(D.ITEMS[k].bp)) k = D.pickBP(rnd);
       const n = k === 'ammo' ? 4 + Math.floor(rnd() * 9) : k === 'arrow' ? 3 + Math.floor(rnd() * 5) : k === 'nails' ? 3 + Math.floor(rnd() * 6) : D.ITEMS[k] && D.ITEMS[k].seed ? 2 + Math.floor(rnd() * 3) : 1;
       if (D.isWeapon(k)) { const f = .45 + rnd() * .5; out.push(D.mkWeapon(k, D.rollQuality(qa ? qa.base : 1.5, qa ? qa.bonus : 0, rnd), f)); continue; }   // 0.19: quality
       const e = out.find(e => e.k === k && D.STACK[k]);
