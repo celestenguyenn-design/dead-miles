@@ -50,6 +50,19 @@
   }
   const weaponKey = () => (S().hands && S().hands.k) ? D.ITEMS[S().hands.k].w : 'fists';
   const weapon = () => WEAPONS[weaponKey()];
+  // 0.19: weapon quality (data.js D.QUAL) and the gamestage this run was started with (L.gs, snapshotted by game.js loot())
+  const qMul = () => S().hands ? D.qDmgMul(D.qOf(S().hands)) : 1;
+  const gsFx = () => D.gsFx((L && L.gs) || 0);
+  const qTag = e => { if (!e || !ITEMS[e.k] || !ITEMS[e.k].w) return ''; const q = D.qOf(e); return `<small class="qtag q${q}" style="--qc:${D.QUAL[q].c}">${D.qStars(q)} ${D.QUAL[q].n}</small>`; };
+  // where a weapon was found decides how good it tends to be (data.js D.rollQuality)
+  function qualFor(o, it) {
+    let b = D.qBaseFor(L.danger || (D.BTYPES[L.type] || {}).danger || 1);
+    if (it && it.corpse) b = Math.max(b, o.raider ? 2.7 : o.special || EVS.isBoss(o) ? 2.6 : b);
+    else if (o.jack || o.keyRoom || o.keyDoor) b = Math.max(b, 2.8);   // key-locked room / trunk jackpots
+    else if (o.secretLoot) b = Math.max(b, 2.3);
+    else if (o.lock) b = Math.max(b, 2);
+    return { base: b, bonus: gsFx().qBonus };
+  }
 
   // ---------------------------------------------------------------- state
   let G;
@@ -108,6 +121,7 @@
     if (opts.resume) restoreRun(opts.resume);
     buildWalls(); buildSolid();
     spawnInfected(houseZs);
+    for (const z of G.zs) if (!z.boss) gsZombie(z);   // 0.19: gamestage (L.gs) - zombie HP and hits, up to +25%
     for (const z of G.zs) if (z.special) ensureInfRig(z.kind);
     G.p.flip = false;
     hideCards(); closeSheet(true);
@@ -177,6 +191,13 @@
       }
     }
     houseZs.forEach((z, i) => { const k = plan.kinds[i]; if (k) makeSpecial(z, k); });
+  }
+  // 0.19: gamestage scaling for one zombie (never the event or weekly bosses, never raiders). Gamestage <= 10: no change.
+  function gsZombie(z) {
+    const fx = gsFx(); if (fx.hp === 1 || z.boss || z.raider || z.gsx) return z;
+    z.gsx = 1; z.hp = z.maxHp = Math.round((z.maxHp || z.hp || 100) * fx.hp); z.dmgMul = (z.dmgMul || 1) * fx.dmg;
+    if (z.armor) z.armor = z.armor0 = Math.round(z.armor * fx.hp);
+    return z;
   }
   function makeSpecial(z, k) {
     const K = INF.KINDS[k]; if (!K) return z;
@@ -584,7 +605,9 @@
     o.searched = true; G.stats.searched++;
     const keys = it.corpse ? (o.raider ? o.drop.slice() : EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse').concat(o.special ? INF.loot(o.kind) : [])) : o.pre.slice();   // 0.13: special infected carry more
     if (keys.length && Math.random() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot); if (more.length) keys.push(more[0]); }
-    o.loot0 = toStacks(keys);
+    // 0.19: a higher gamestage finds a rare thing a little more often (up to +6%: one rare item from the same table)
+    if (!it.corpse && o.loot && D.LOOT[o.loot] && Math.random() < gsFx().rare) for (let i = 0; i < 4; i++) { const r = rollLoot(o.loot).find(k => ITEMS[k] && ITEMS[k].rare); if (r) { keys.push(r); break; } }
+    o.loot0 = toStacks(keys, Math.random, qualFor(o, it));   // 0.19: weapon quality by place
     // A torn note remembers the house it came from, so reading it somewhere else is not misleading.
     for (const e of o.loot0) if (e.k === 'note') e.d = { addr: L.address, text: L.note || '' };
     if (it.pry && !SK.noSmash() && o.loot0.length && Math.random() < .25) { const i = Math.floor(Math.random() * o.loot0.length), sm = o.loot0[i]; sm.n--; if (!sm.n) o.loot0.splice(i, 1); toast('Smashed: ' + ITEMS[sm.k].n.toLowerCase(), 1.8); }
@@ -844,7 +867,7 @@
           const dx = z.x - p.x, dy = (z.y - p.y) * 1.15, d = Math.hypot(dx, dy);
           if (d > W.reach * T) continue;
           if (d > 18 && Math.abs(angDiff(Math.atan2(dy, dx), fa)) > 1.35) continue;
-          hitZombie(z, fa, W.dmg * (job() === 'brawler' ? 1.3 : 1) * SK.meleeMul()); any = true;
+          hitZombie(z, fa, W.dmg * qMul() * (job() === 'brawler' ? 1.3 : 1) * SK.meleeMul()); any = true;   // 0.19: qMul = weapon quality
         }
         if (any) { G.hitstop = .055; G.shake = Math.max(G.shake, 5); wearWeapon(); }
         emitNoise(p.x, p.y, (any ? W.noise : 1.5) * SK.allNoise(), any);
@@ -1109,7 +1132,7 @@
     updateClouds(dt);
     // the third zombie wanders in from the street
     if (!G.z3 && L.wanderer !== false && (G.t > (L.wandererT || 70) || (G.stats.searched >= 9 && G.t > 35))) {
-      G.z3 = true; const z = mkZombie(1.5 * T, (L.streetY + 1.4) * T, 'investigate', streetRoom()); z.target = { x: L.stoop.x * T, y: (L.streetY - 3) * T }; z.hunter = true; if (L.wanderHp) z.hp = z.maxHp = L.wanderHp; G.zs.push(z);
+      G.z3 = true; const z = mkZombie(1.5 * T, (L.streetY + 1.4) * T, 'investigate', streetRoom()); z.target = { x: L.stoop.x * T, y: (L.streetY - 3) * T }; z.hunter = true; if (L.wanderHp) z.hp = z.maxHp = L.wanderHp; gsZombie(z); G.zs.push(z);
       toast('Something is shuffling up the stoop...', 3); SFX.play('groan');
     }
     // camera
@@ -1850,7 +1873,8 @@
       $('#skXp').style.width = xl.pct + '%';
       const h = S().hands, wk = weaponKey();
       $('#wpn img').src = ART.iconURL[h ? ITEMS[h.k].i : 'scrap'] || ''; $('#wpn').classList.toggle('fists', !h);
-      $('#wpn i').style.width = (h && h.d != null ? Math.max(0, h.d / WEAPONS[wk].dur) * 100 : 0) + '%';
+      $('#wpn i').style.width = (h && h.d != null ? Math.max(0, Math.min(1, h.d / D.wMax(h))) * 100 : 0) + '%';   // 0.19: max durability by quality
+      if (h && D.qOf(h) >= 3) $('#wpn').style.setProperty('--qc', D.QUAL[D.qOf(h)].c); else $('#wpn').style.removeProperty('--qc');   // 0.19: Solid+ tint the chip
       $('#wpn b').textContent = wk === 'bow' ? arrowsLeft() : '';   // the quiver (plus any spare arrows in the pack)
       const n = Math.round(G.noiseLvl * 5);
       noiseBars.forEach((b, i) => b.classList.toggle('on', i < n));
@@ -1928,13 +1952,13 @@
     for (const e of G.pack) if (e.k === k) room += m - e.n;
     return room + (packSlots() - G.pack.length) * m;
   }
-  function addToPack(k, n, d) { // tops up existing stacks first, then new slots; returns how many fit
+  function addToPack(k, n, d, q) { // tops up existing stacks first, then new slots; returns how many fit (0.19: q = weapon quality)
     if (isCos(k)) { if (DM.Game && DM.Game.unlockCos) DM.Game.unlockCos(k); return n; }
     if (k === 'key') { ring().keys += n; return n; }   // straight onto the keyring
     const m = stackMax(k); let left = n;
     if (k === 'arrow') { const q = quiver(), t = Math.min(left, Math.max(0, D.QUIVER - q.n)); q.n += t; left -= t; }
     for (const e of G.pack) if (e.k === k && e.n < m && left) { const t = Math.min(left, m - e.n); e.n += t; left -= t; }
-    while (left && G.pack.length < packSlots()) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; G.pack.push(e); left -= t; }
+    while (left && G.pack.length < packSlots()) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; if (q != null) e.q = q; G.pack.push(e); left -= t; }
     return n - left;
   }
   DM.addToPack = addToPack;
@@ -1942,8 +1966,9 @@
   const ctag = (k, it) => { const c = D.cat(k); return it.tag && (c === 'event' || c === 'quest') ? `<small class="tag">${it.tag}</small>` : `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
   function itemCard(e, onTap, extra = '', cls = '') {
     const it = ITEMS[e.k], el = document.createElement('button');
-    el.className = 'slot' + (it.rare ? ' rare' : '') + cls;
-    el.innerHTML = `<img alt="" src="${ART.iconURL[it.i]}"><span>${it.n}</span>${ctag(e.k, it)}${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${e.d != null && it.w ? `<i class="dur"><i style="width:${Math.max(4, e.d / WEAPONS[it.w].dur * 100)}%"></i></i>` : ''}${extra}`;
+    el.className = 'slot' + (it.rare ? ' rare' : '') + (it.w ? ' wq q' + D.qOf(e) : '') + cls;   // 0.19: tier colour on weapons
+    if (it.w) el.style.setProperty('--qc', D.QUAL[D.qOf(e)].c);
+    el.innerHTML = `<img alt="" src="${ART.iconURL[it.i]}"><span>${it.n}</span>${it.w ? qTag(e) : ctag(e.k, it)}${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${e.d != null && it.w ? `<i class="dur"><i style="width:${Math.max(4, Math.min(100, e.d / D.wMax(e) * 100))}%"></i></i>` : ''}${extra}`;
     el.addEventListener('click', ev => { ev.stopPropagation(); onTap(el); });
     return el;
   }
@@ -1962,7 +1987,9 @@
     $('#shActs').innerHTML = '';
     const items = o.loot0 || [];
     if (!items.length) grid.innerHTML = `<div class="empty">${s.it.corpse ? 'Nothing useful on it.' : 'Nothing useful.'}</div>`;
-    items.forEach((e, i) => { const fits = roomFor(e.k) > 0; grid.appendChild(itemCard(e, () => takeItem(i), fits ? '' : '<em class="nofit">won\'t fit</em>', fits ? '' : ' full')); });
+    const hd = S().hands ? D.wDmg(S().hands) : WEAPONS.fists.dmg;   // 0.19: weapons show their damage (with quality) against what she holds
+    items.forEach((e, i) => { const fits = roomFor(e.k) > 0, w = ITEMS[e.k].w, dm = w ? D.wDmg(e) : 0;
+      grid.appendChild(itemCard(e, () => takeItem(i), !fits ? '<em class="nofit">won\'t fit</em>' : w ? `<em class="wdmg${dm > hd ? ' up' : dm < hd ? ' down' : ''}">${dm} dmg</em>` : '', fits ? '' : ' full')); });
     $('#shCap').textContent = note || `Pack ${G.pack.length}/${packSlots()}`;
     const can = items.some(e => roomFor(e.k) > 0);
     $('#shTake').style.display = can ? '' : 'none';
@@ -1970,22 +1997,22 @@
   }
   function takeItem(i) {
     const o = G.sheet.o, e = o.loot0[i];
-    const got = addToPack(e.k, e.n, e.d);
+    const got = addToPack(e.k, e.n, e.d, e.q);
     if (!got) { toast(`No room for ${ITEMS[e.k].n.toLowerCase()}`, 1.4); $('#shCap').classList.add('shake'); setTimeout(() => $('#shCap').classList.remove('shake'), 400); return; }
     e.n -= got; if (!e.n) o.loot0.splice(i, 1);
-    SFX.play('pick'); lootedWeapon(e.k);
+    SFX.play('pick'); lootedWeapon(e.k, e.q);
     if (e.k === 'ammo' || e.k === 'key') toast(ITEMS[e.k].n + (got > 1 ? ' x' + got : '') + '!', 1.2);
     renderLoot(e.n ? `Only ${got} fit - ${e.n} left here` : null); o._key = null;
   }
   function takeAll() {
     const o = G.sheet && G.sheet.o; if (!o || G.sheet.kind !== 'loot') return;
     let took = 0;
-    for (const e of o.loot0) { const got = addToPack(e.k, e.n, e.d); e.n -= got; took += got; if (got) lootedWeapon(e.k); }
+    for (const e of o.loot0) { const got = addToPack(e.k, e.n, e.d, e.q); e.n -= got; took += got; if (got) lootedWeapon(e.k, e.q); }
     o.loot0 = o.loot0.filter(e => e.n > 0);
     if (took) SFX.play('pick');
     if (o.loot0.length) { const left = o.loot0.reduce((a, e) => a + e.n, 0); toast(`Pack full - left ${left} item${left > 1 ? 's' : ''} here`, 1.8); renderLoot(); } else closeSheet();
   }
-  function lootedWeapon(k) { if (D.isWeapon(k) && DM.Game && DM.Game.onWeaponLoot) DM.Game.onWeaponLoot(k, true); }
+  function lootedWeapon(k, q) { if (D.isWeapon(k) && DM.Game && DM.Game.onWeaponLoot) DM.Game.onWeaponLoot(k, true, q); }
   function closeSheet(silent) { sheet.classList.remove('on'); if (G) G.sheet = null; }
   function openPack(sel = -1) {
     if (G.over) return;
@@ -2029,12 +2056,12 @@
   function dropItem(i) {
     const e = G.pack.splice(i, 1)[0], p = G.p;
     const a = G.drops.length * 2.1; // nudge so several drops do not sit exactly on top of each other
-    G.drops.push({ k: e.k, n: e.n, d: e.d, x: p.x + (p.flip ? -18 : 18) + Math.cos(a) * 6, y: p.y + 6 + Math.sin(a) * 5, t: 0 });
+    G.drops.push({ k: e.k, n: e.n, d: e.d, q: e.q, x: p.x + (p.flip ? -18 : 18) + Math.cos(a) * 6, y: p.y + 6 + Math.sin(a) * 5, t: 0 });
     SFX.play('open'); toast('Dropped - it stays here until you leave', 1.6);
     closeSheet(); // let her see it land
   }
   function pickUp(d) {
-    const got = addToPack(d.k, d.n, d.d);
+    const got = addToPack(d.k, d.n, d.d, d.q);
     if (!got) { toast('Your pack is full', 1.3); return; }
     d.n -= got; if (!d.n) G.drops.splice(G.drops.indexOf(d), 1);
     SFX.play('pick'); toast(`Picked up ${ITEMS[d.k].n.toLowerCase()}${got > 1 ? ' x' + got : ''}`, 1.1);
@@ -2231,8 +2258,8 @@
     const ws = G.pack.map((e, i) => [e, i]).filter(([e]) => D.isWeapon(e.k));
     if (!ws.length) { toast(S().hands ? 'No other weapon in your pack' : 'No weapon - fists it is', 1.4); return; }
     const [e, i] = ws[0], cur = S().hands;
-    S().hands = { k: e.k, d: e.d == null ? WEAPONS[ITEMS[e.k].w].dur : e.d };
-    if (cur) G.pack[i] = { k: cur.k, n: 1, d: cur.d }; else G.pack.splice(i, 1);
+    S().hands = { k: e.k, d: e.d == null ? D.wMax(e) : e.d, q: D.qOf(e) };   // 0.19: quality goes with it
+    if (cur) G.pack[i] = { k: cur.k, n: 1, d: cur.d, q: D.qOf(cur) }; else G.pack.splice(i, 1);
     // rotate so repeated taps cycle through every weapon
     if (cur) { const moved = G.pack.splice(i, 1)[0]; G.pack.push(moved); }
     SFX.play('pick'); toast('Equipped ' + ITEMS[e.k].n.toLowerCase(), 1); lastHud = '';
@@ -2240,14 +2267,14 @@
   // the weapon chip: a list of every weapon in the pack, tap one to fight with it
   function openSwap() {
     if (G.over) return;
-    const h = S().hands, cur = h ? WEAPONS[ITEMS[h.k].w].dmg : WEAPONS.fists.dmg;
+    const h = S().hands, cur = h ? D.wDmg(h) : WEAPONS.fists.dmg;   // 0.19: damage with quality
     const ws = G.pack.map((e, i) => [e, i]).filter(([e]) => D.isWeapon(e.k));
     G.sheet = { kind: 'swap' };
     $('#shKick').textContent = 'Swap weapon · holding ' + (h ? ITEMS[h.k].n.toLowerCase() : 'nothing') + ', ' + cur + ' dmg';
     $('#shTitle').textContent = ws.length ? 'Weapons in your pack' : 'No other weapons';
     const grid = $('#shGrid'); grid.innerHTML = ''; $('#shActs').innerHTML = '';
     if (!ws.length) grid.innerHTML = '<div class="empty">Weapons you loot go in your pack. Come back here to swap to one mid-run.</div>';
-    ws.forEach(([e, i]) => { const dm = WEAPONS[ITEMS[e.k].w].dmg, df = dm - cur;
+    ws.forEach(([e, i]) => { const dm = D.wDmg(e), df = dm - cur;
       grid.appendChild(itemCard(e, () => { equipFromPack(i); closeSheet(); }, `<em class="wdmg${df > 0 ? ' up' : df < 0 ? ' down' : ''}">${dm} dmg${df ? ` ${df > 0 ? '+' : ''}${df}` : ''}</em>`)); });
     $('#shCap').textContent = ws.length ? 'Tap one to fight with it' : '';
     $('#shTake').style.display = 'none';
@@ -2256,8 +2283,8 @@
   function equipFromPack(i) {
     const e = G.pack[i]; if (!e || !D.isWeapon(e.k)) return;
     const cur = S().hands;
-    S().hands = { k: e.k, d: e.d == null ? WEAPONS[ITEMS[e.k].w].dur : e.d };
-    if (cur) G.pack[i] = { k: cur.k, n: 1, d: cur.d }; else G.pack.splice(i, 1);
+    S().hands = { k: e.k, d: e.d == null ? D.wMax(e) : e.d, q: D.qOf(e) };   // 0.19: quality goes with it
+    if (cur) G.pack[i] = { k: cur.k, n: 1, d: cur.d, q: D.qOf(cur) }; else G.pack.splice(i, 1);
     if (DM.Game && DM.Game.onEquip) DM.Game.onEquip();
     SFX.play('pick'); toast('Equipped ' + ITEMS[e.k].n.toLowerCase(), 1.1); lastHud = '';
   }
@@ -2274,7 +2301,7 @@
     let ax = p.fx, ay = p.fy;
     if (best) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; ax = dx / d; ay = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; p.fx = ax; p.fy = ay; }
     const sp = 15 * T;
-    G.arrows.push({ x: p.x + ax * 16, y: p.y + ay * 10, vx: ax * sp, vy: ay * sp, z: 36, life: 1.1 });
+    G.arrows.push({ x: p.x + ax * 16, y: p.y + ay * 10, vx: ax * sp, vy: ay * sp, z: 36, life: 1.1, qm: qMul() });   // 0.19: the bow's quality
     SFX.play('bow'); emitNoise(p.x, p.y, WEAPONS.bow.noise * SK.allNoise(), false); wearWeapon();
     return true;
   }
@@ -2289,7 +2316,7 @@
       for (let i = 0; i < steps && a.life > 0; i++) {
         a.x += a.vx * dt / steps; a.y += a.vy * dt / steps;
         const hitZ = G.zs.find(z => !z.dead && Math.hypot(z.x - a.x, (z.y - a.y) * 1.3) < 22);
-        if (hitZ) { hitZombie(hitZ, Math.atan2(a.vy, a.vx), WEAPONS.bow.dmg * SK.bowMul(), true); a.life = 0; landArrow(hitZ.x + (Math.random() - .5) * 20, hitZ.y + 8); break; }
+        if (hitZ) { hitZombie(hitZ, Math.atan2(a.vy, a.vx), WEAPONS.bow.dmg * (a.qm || 1) * SK.bowMul(), true); a.life = 0; landArrow(hitZ.x + (Math.random() - .5) * 20, hitZ.y + 8); break; }
         if (overlapsSolid({ hw: 2, hh: 2 }, a.x, a.y)) { a.life = 0; SFX.play('thunk'); landArrow(a.x - a.vx * .012, a.y - a.vy * .012); break; }
       }
       a.life -= dt;
