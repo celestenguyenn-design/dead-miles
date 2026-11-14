@@ -50,7 +50,7 @@
   function costOf(key, tier, repair) { // tier: 1-based tier being built
     const t = PIECES[key].tiers[tier - 1], k = (mech() ? .75 : 1) * (repair ? .3 * (DM.Crew ? DM.Crew.repairMul() : 1) : 1), m = {};   // a Tinkerer in the crew makes repairs cheaper
     for (const i in t.m) m[i] = Math.max(1, Math.ceil(t.m[i] * k));
-    return { s: Math.ceil(t.s * k / 50) * 50, m };
+    return { s: Math.ceil(t.s * k * COST_MUL / 50) * 50, m };
   }
 
   // ---------------------------------------------------------------- save data
@@ -80,7 +80,10 @@
     const ws = Object.keys(h.weeks).sort(); while (ws.length > 8) delete h.weeks[ws.shift()];
     return h;
   };
-  B.addPool = function (st, n) { if (!st || !st.base || !(n > 0)) return; st.base.pool = Math.min(POOL_MAX, st.base.pool + n); };
+  // 0.14.1 (owner: "I built 4 things with just my 4k steps"): build steps fill at half the walking rate and pieces cost twice
+  // as many, so a piece is ~4x the walking it was. Watering stays 300 build steps (= ~600 steps walked).
+  const POOL_RATE = .5, COST_MUL = 2;
+  B.addPool = function (st, n) { if (!st || !st.base || !(n > 0)) return; st.base.pool = Math.min(POOL_MAX, st.base.pool + n * POOL_RATE); };
   const base = () => SV().base;
 
   B.defense = function (b = base()) {
@@ -483,7 +486,7 @@
     }
     const broken = Object.keys(b.broken).filter(k => b.broken[k]);
     panel(`<div class="kick">Your base · defence ${B.defense()}</div><h3>Build</h3>
-      <div class="poolline"><b>${fmt(b.pool)}</b> build steps <span>fills from every step you walk (houses are not affected)${mech() ? ' · Mechanic: 25% off' : ''}</span></div>
+      <div class="poolline"><b>${fmt(b.pool)}</b> build steps <span>fills at half the rate you walk (houses are not affected)${mech() ? ' · Mechanic: 25% off' : ''}</span></div>
       ${broken.length ? `<button class="mbtn sm" id="bRep" style="width:100%;margin:6px 0">Repairs needed (${broken.length})</button>` : ''}
       ${rows.join('')}<button class="mbtn ghost" data-close>Close</button>`, 1);
     $('#msheet').querySelectorAll('[data-build]').forEach(bt => bt.onclick = () => {

@@ -250,3 +250,7 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   rooms put their wall pieces along any wall, so the same room kind is not furnished the same way.
 - Same 0.9 guarantees (all checked again: 301 houses, nothing unreachable, nothing standing inside solids). Generator
   v1-3 output is byte-identical. Random rolls are never made inside a sort (engines sort differently).
+
+## Done in 0.14.1 (owner: "I was able to build like 4 things today with just my 4k steps")
+- Base build steps fill at 50% of steps walked and every piece costs 2x the steps (so ~4x the walking per piece).
+  Walls tier 1 = 6,000 build steps (~12k walked), generator 16,000 (~32k walked). Materials unchanged. Existing pools kept.
