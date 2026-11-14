@@ -366,11 +366,26 @@ window.DM = window.DM || {};
     stash: [[2, ['bp_*']], [2, ['cos_*']], [2, ['decor_*']], [1, ['backpack']], [2, ['packplus']], [1, ['machete']], [1, ['lockset']], [1, ['watch', 'jewelry']]],
     trunk: [[2, ['machete']], [1, ['axe']], [2, ['crowbar']], [2, ['prybar']], [1, ['spikedbat']], [2, ['ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo']], [1, ['lockset']], [2, ['cos_*']]]
   };
+  // 0.24.3 (owner: "make it so that we can't get the same blueprints"): a blueprint roll never gives one she already knows,
+  // already carries (pack, stash, hands) or was just rolled in the last 30 min (so one house can't hold two of the same).
+  // Once she has them all it becomes a pocket watch (worth about the same to Dot). Always uses exactly one rnd() call,
+  // so seeded rolls (the daily house) stay in step.
+  const bpRecent = {};
+  D.pickBP = function (rnd = Math.random) {
+    const x = rnd(), s = DM.S, now = Date.now();
+    const known = (s && s.known) || [], held = {};
+    if (s) for (const e of [].concat(s.pack || [], s.stash || [], s.hands ? [s.hands] : [])) if (e && e.k) held[e.k] = 1;
+    if (DM.House && DM.House.G && DM.House.G.pack) for (const e of DM.House.G.pack) if (e && e.k) held[e.k] = 1;
+    for (const k in bpRecent) if (now - bpRecent[k] > 30 * 60000) delete bpRecent[k];
+    const pool = Object.keys(D.ITEMS).filter(k => k.startsWith('bp_') && !known.includes(D.ITEMS[k].bp) && !held[k] && !bpRecent[k]);
+    if (!pool.length) return 'watch';
+    const k = pool[Math.floor(x * pool.length)]; bpRecent[k] = now; return k;
+  };
   D.rollJack = function (theme, rnd = Math.random) {
     const opts = D.JACK[theme]; if (!opts) return [];
     let v = rnd() * opts.reduce((a, o) => a + o[0], 0), items = opts[0][1];
     for (const o of opts) { v -= o[0]; if (v <= 0) { items = o[1]; break; } }
-    return items.map(k => k === 'bp_*' ? (b => b[Math.floor(rnd() * b.length)])(Object.keys(D.ITEMS).filter(x => x.startsWith('bp_')))
+    return items.map(k => k === 'bp_*' ? D.pickBP(rnd)
       : k === 'decor_*' ? (b => b[Math.floor(rnd() * b.length)])(Object.keys(D.DECOR))
       : D.COS_POOL[k] ? D.pickCos(D.COS_POOL[k], rnd) : k);
   };
@@ -381,7 +396,7 @@ window.DM = window.DM || {};
     if (key === 'corpse' && rnd() > .45) n = 0;
     const ks = Object.keys(tab), tot = ks.reduce((s, k) => s + tab[k], 0);
     for (let i = 0; i < n; i++) { let v = rnd() * tot; for (const k of ks) { v -= tab[k]; if (v <= 0) { out.push(k); break; } } }
-    for (let i = 0; i < out.length; i++) if (out[i] === 'bp_*') { const b = Object.keys(D.ITEMS).filter(x => x.startsWith('bp_')); out[i] = b[Math.floor(rnd() * b.length)]; }
+    for (let i = 0; i < out.length; i++) if (out[i] === 'bp_*') { out[i] = D.pickBP(rnd); }
       else if (out[i] === 'decor_*') { const b = Object.keys(D.DECOR); out[i] = b[Math.floor(rnd() * b.length)]; }
       else if (out[i] === 'seed_*') { const b = Object.keys(D.ITEMS).filter(x => D.ITEMS[x].seed); out[i] = b[Math.floor(rnd() * b.length)]; }
       else if (D.COS_POOL[out[i]]) out[i] = D.pickCos(D.COS_POOL[out[i]], rnd);

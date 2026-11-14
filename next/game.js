@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.24.2';
+const NEXT_VERSION = '0.24.3';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -417,7 +417,7 @@ const NEXT_VERSION = '0.24.2';
       for (let i = 0; i < 3; i++) T.offers.push(makeQuest(types[i], Math.max(1, Math.min(traderLevel(), traderLevel() - (rnd() < .45 ? 1 : 0))), rnd));
     }
     // stock rotates daily and grows with trader level
-    const L = traderLevel(), unknown = Object.keys(D.ITEMS).filter(k => k.startsWith('bp_') && !SV.survivor.known.includes(D.ITEMS[k].bp));
+    const L = traderLevel(), unknown = Object.keys(D.ITEMS).filter(k => k.startsWith('bp_') && !SV.survivor.known.includes(D.ITEMS[k].bp) && !countItem(k));   // 0.24.3: nor one she carries
     T.stock = [];
     for (const [k0, n, price, lv, ch] of D.SHOP) {
       if (lv > L || rnd() > ch) continue;
@@ -511,7 +511,7 @@ const NEXT_VERSION = '0.24.2';
   };
   function rewardOptions(q) {
     const t = q.tier, opts = [];
-    const unknown = Object.keys(D.ITEMS).filter(k => k.startsWith('bp_') && !SV.survivor.known.includes(D.ITEMS[k].bp));
+    const unknown = Object.keys(D.ITEMS).filter(k => k.startsWith('bp_') && !SV.survivor.known.includes(D.ITEMS[k].bp) && !countItem(k));   // 0.24.3
     const rnd = D.mulberry32(D.hashStr(q.id + ':rw'));
     if (unknown.length) { const k = unknown[Math.floor(rnd() * unknown.length)]; opts.push({ n: 'Blueprint', items: [[k, 1]] }); }
     opts.push({ n: 'Food bundle', items: [['beans', t + 1], ['water', t], ...(D.EVENT ? [['pie', 1]] : [])] });
