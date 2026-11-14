@@ -27,10 +27,11 @@ window.DM = window.DM || {};
   const rng = (L, i) => D.mulberry32(((D.hashStr(String(L.seed) + ':' + L.type + ':inf') ^ Math.imul(i + 1, 0x9E3779B1)) >>> 0));
   I.plan = function (L) {
     const dg = I.danger(L), n0 = (L && L.zombies ? L.zombies.length : 0);
-    if (dg < 3 || L.seed == null) return { extra: 0, kinds: [] };
+    const DI = L && L.deepInf;   // 0.17 deep runs (deep.js): a deep floor sets { p, extra, mix, min } - specials on every floor, more the deeper
+    if ((dg < 3 && !DI) || L.seed == null) return { extra: 0, kinds: [] };
     const r0 = rng(L, -1);
-    const extra = dg >= 4 ? 1 + (r0() < .3 ? 1 : 0) : (r0() < .5 ? 1 : 0);   // a modest bump: +0-1 at danger 3 (half the time), +1 (sometimes 2) at 4+
-    const p = dg >= 4 ? .4 : .24, mix = MIX[L.type] || MIX.other, ks = Object.keys(mix), tot = ks.reduce((a, k) => a + mix[k], 0);
+    const extra = DI ? DI.extra : dg >= 4 ? 1 + (r0() < .3 ? 1 : 0) : (r0() < .5 ? 1 : 0);   // a modest bump: +0-1 at danger 3 (half the time), +1 (sometimes 2) at 4+
+    const p = DI ? DI.p : dg >= 4 ? .4 : .24, mix = (DI && DI.mix) || MIX[L.type] || MIX.other, ks = Object.keys(mix), tot = ks.reduce((a, k) => a + mix[k], 0);
     const kinds = []; let screams = 0;
     for (let i = 0; i < n0 + extra; i++) {
       const r = rng(L, i), roll = r(); let v = r() * tot, k = ks[0];
@@ -39,7 +40,8 @@ window.DM = window.DM || {};
       const zd = L.zombies && L.zombies[i];
       if (roll < p && !(zd && zd.kind)) { kinds.push(k); if (k === 'screamer') screams++; } else kinds.push(null);
     }
-    if (dg >= 4 && !kinds.some(Boolean)) { const i = kinds.findIndex((k, j) => !(L.zombies && L.zombies[j] && L.zombies[j].kind)); if (i >= 0) kinds[i] = ks[0]; }   // danger 4: always at least one
+    if (DI && DI.min) { let have = kinds.filter(Boolean).length; for (let i = 0; i < kinds.length && have < DI.min; i++) if (!kinds[i] && !(L.zombies && L.zombies[i] && L.zombies[i].kind)) { kinds[i] = ks[0]; have++; } }   // 0.17 deep floors: at least DI.min
+    else if (dg >= 4 && !kinds.some(Boolean)) { const i = kinds.findIndex((k, j) => !(L.zombies && L.zombies[j] && L.zombies[j].kind)); if (i >= 0) kinds[i] = ks[0]; }   // danger 4: always at least one
     return { extra, kinds };
   };
   I.count = L => I.plan(L).kinds.filter(Boolean).length;

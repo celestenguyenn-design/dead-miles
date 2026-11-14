@@ -633,6 +633,41 @@
   .rdmat em { flex: none; font-style: normal; font-size: 16px; font-weight: 900; } .rdmat.ok em { color: var(--grn); } .rdmat.miss em { color: #ff8a7a; } .rdmat.miss { box-shadow: inset 0 0 0 1.5px rgba(255,107,90,.45); }
   .recdet .mbtn.big { width: 100%; white-space: normal; height: auto; min-height: 52px; padding: 8px 14px; line-height: 1.2; }
   .recdet .mbtn.big:disabled { font-size: 14px; }
+  /* 0.17 deep runs (deep.js): home card, building sheet, floor chip, intro / stairwell / end cards */
+  .deepcard { margin-top: 10px; padding: 12px; border-radius: 18px; background: linear-gradient(160deg, #1a2a2c 0%, #1b1533 75%); border: 3px solid var(--ink); box-shadow: 0 4px 0 #3c6b55; }
+  .deepcard.ready { box-shadow: 0 4px 0 #7fd99a; }
+  .deepcard .hhead .kick { color: #8fe3a6; }
+  .dpips { display: flex; align-items: center; gap: 6px; margin: 6px 0 2px; }
+  .dpips > i { flex: none; width: 18px; height: 22px; border-radius: 5px; background: var(--ink); border: 2.5px solid #3c6b55; }
+  .dpips > i.on { background: linear-gradient(180deg, #9ff0b4, #4fae6e); border-color: var(--ink); box-shadow: 0 0 10px rgba(127,217,154,.45); }
+  .dpips .dpbar { flex: 1; margin: 0 0 0 4px; } .dpbar > i { background: linear-gradient(180deg, #9ff0b4, #4fae6e) !important; }
+  .dline { font-size: 12px; font-weight: 800; color: var(--mute); margin: 4px 0 2px; } .dline b { color: #9ff0b4; }
+  .dlast { font-size: 11px; font-weight: 700; color: var(--mute); opacity: .85; margin-top: 2px; }
+  .dheld { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 6px 8px; border-radius: 10px; background: rgba(17,20,47,.8); font-size: 11.5px; font-weight: 800; color: var(--ora); }
+  .dheld .mbtn { flex: none; height: 32px; font-size: 13px; padding: 0 10px; }
+  .deepcard .hbtnrow .mbtn:not(.ghost) { flex: 1; background: #7fd99a; }
+  .deepsheet .dpick { border-left: 8px solid var(--dc); } .deepsheet .dpick span { font-size: 12px; }
+  .deepsheet .btnrow { display: flex; gap: 8px; margin-top: 8px; } .deepsheet .btnrow .mbtn { flex: 1; }
+  .dwarn { font-size: 12px; font-weight: 800; color: #ff8a7a; margin: 6px 0 10px; line-height: 1.35; }
+  #deepchip { display: none; width: 118px; padding: 4px 8px 5px; border-radius: 12px;   /* in the HUD's right column, above the minimap */
+    background: rgba(17,20,47,.92); border: 2.5px solid var(--dc, #7fd99a); text-align: center; pointer-events: none; }
+  body.deeprun #deepchip { display: block; }
+  #deepchip b { display: block; font-size: 13px; font-weight: 900; letter-spacing: .1em; color: var(--crm); }
+  #deepchip span { display: block; font-size: 9.5px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--dc, #7fd99a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #deepchip .bbar.sm { margin: 4px 0 1px; } #deepchip em { display: block; font-style: normal; font-size: 9px; font-weight: 900; color: #ff8a7a; letter-spacing: .06em; }
+  .deepintro .kick, .deepchoice > .kick, .deepend > .kick:not(.red) { color: var(--dc); }
+  .dfloors { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; }
+  .dfloors span { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 10px; background: var(--plum); font-size: 12.5px; font-weight: 800; }
+  .dfloors span b { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; background: var(--ink); color: var(--dc); font-size: 12px; }
+  .dfloors span.boss { box-shadow: inset 0 0 0 2px #ff6b5a; } .dfloors span.boss::after { content: 'BOSS'; margin-left: auto; font-size: 9px; font-weight: 900; letter-spacing: .12em; color: #ff8a7a; }
+  .drules { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; font-size: 12px; font-weight: 700; color: var(--mute); line-height: 1.35; } .drules b { color: var(--crm); }
+  .dnext { padding: 8px 10px; margin-bottom: 8px; border-radius: 12px; background: rgba(17,20,47,.7); border: 2px solid var(--dc); font-size: 13px; font-weight: 800; }
+  .dnext em { font-style: normal; color: var(--dc); } .dnext span { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 700; color: var(--mute); }
+  .dstat { font-size: 12px; font-weight: 700; color: var(--mute); margin-bottom: 4px; } .dstat b { color: var(--crm); }
+  .deepchoice .sum, .deepend .sum { max-height: 28vh; }
+  .dnot { display: block; width: 100%; margin-top: 10px; padding: 6px; font-size: 12.5px; font-weight: 800; color: var(--mute); text-decoration: underline; }
+  .dtime { font-size: 11px; font-weight: 700; color: var(--mute); margin: -6px 0 12px; }
+  .sum-item.lostit { opacity: .6; text-decoration: line-through; }
 </style>
 </head>
 <body>
@@ -654,6 +689,7 @@
         <button id="pack" aria-label="Pack"><svg viewBox="0 0 24 24" fill="none" stroke="#f6e3bb" stroke-width="2.4" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M9 4.5V3h6v1.5M9 14h6"/></svg><b>0/12</b></button>
       </div>
       <div id="skill"><span>LEVEL <b><i id="skLv">1</i></b></span><div class="xp"><i id="skXp"></i></div></div>
+      <div id="deepchip"></div>
       <canvas id="mini" width="144" height="180"></canvas>
       <div id="qchip"></div>
     </div>
@@ -691,26 +727,27 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.16"></script>
-<script src="art.js?v=0.16"></script>
-<script src="net.js?v=0.16"></script>
-<script src="netpanel.js?v=0.16"></script>
-<script src="syncguide.js?v=0.16"></script>
-<script src="events.js?v=0.16"></script>
-<script src="data.js?v=0.16"></script>
-<script src="food.js?v=0.16"></script>
-<script src="skills.js?v=0.16"></script>
-<script src="infected.js?v=0.16"></script>
-<script src="engine.js?v=0.16"></script>
-<script src="music.js?v=0.16"></script>
-<script src="gen.js?v=0.16"></script>
-<script src="raiders.js?v=0.16"></script>
-<script src="house.js?v=0.16"></script>
-<script src="horde.js?v=0.16"></script>
-<script src="base.js?v=0.16"></script>
-<script src="crew.js?v=0.16"></script>
-<script src="boss.js?v=0.16"></script>
-<script src="game.js?v=0.16"></script>
-<script src="map.js?v=0.16"></script>
+<script src="s2art.js?v=0.17"></script>
+<script src="art.js?v=0.17"></script>
+<script src="net.js?v=0.17"></script>
+<script src="netpanel.js?v=0.17"></script>
+<script src="syncguide.js?v=0.17"></script>
+<script src="events.js?v=0.17"></script>
+<script src="data.js?v=0.17"></script>
+<script src="food.js?v=0.17"></script>
+<script src="skills.js?v=0.17"></script>
+<script src="infected.js?v=0.17"></script>
+<script src="engine.js?v=0.17"></script>
+<script src="music.js?v=0.17"></script>
+<script src="gen.js?v=0.17"></script>
+<script src="raiders.js?v=0.17"></script>
+<script src="house.js?v=0.17"></script>
+<script src="horde.js?v=0.17"></script>
+<script src="base.js?v=0.17"></script>
+<script src="crew.js?v=0.17"></script>
+<script src="boss.js?v=0.17"></script>
+<script src="deep.js?v=0.17"></script>
+<script src="game.js?v=0.17"></script>
+<script src="map.js?v=0.17"></script>
 </body>
 </html>

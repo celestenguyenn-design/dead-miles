@@ -402,6 +402,7 @@
   }
   function banner(text, sub) { G.banners.push({ text, sub, t: 0 }); }
   function emitNoise(x, y, rad, show = true, byRaider) {
+    if (opts.noiseMul && !byRaider) rad *= opts.noiseMul;   // 0.17 deep runs (deep.js): the "Gas leak" floor makes every sound carry further
     if (!byRaider) G.noiseLvl = Math.max(G.noiseLvl, Math.min(1, rad / 6));
     if (show && rad >= 1.8) G.rings.push({ x, y, r: rad * T, t: 0 });
     if (!byRaider) G.lastNoise = { x, y, t: G.t };

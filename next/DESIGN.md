@@ -311,3 +311,52 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   itself a car-speed jump from the last one cannot claim (it used to be able to, before the 3-reading lock kicked in).
 - Privacy unchanged: position only in memory while the map is open; the save holds no coordinates or OSM ids. The phone now
   also keeps which ~700 m square was shown last (a square, never a point), next to the cached squares, outside the save.
+## Done in 0.17 (deep runs, owner: loved the idea "but I can't walk 10k a day")
+- deep.js (new). Passes come from CUMULATIVE walking: every 8,000 steps of SV.walked (phone/watch steps, typed at half - the
+  same total quests and Dot use) earns a Deep Run pass, any days. Hold 2; while full, steps do not bank. Existing saves get
+  their first pass free. Home card "Deep run" (after the base card): 2 pass pips, a progress bar, "Next pass in 3,120 steps ·
+  1 pass ready", the last run's result, Go deep / How it works.
+- Spending a pass: pick a building. Each floor is a normal generated house (DM.Gen.generate, existing types, seed per floor,
+  GV 4; gen.js untouched) with a light theme on top (room + furniture names):
+  - The Fulton Arms (apartment tower, 5 floors: apt, rowS, apt, rowL, rowL; leans runners/screamers; boss The Super, a
+    screamer with 380 HP).
+  - Kings Mercy Hospital (teaching hospital, 4: pharmacy, school, pharmacy, school - classrooms are lecture rooms, the nurse
+    office the nurses' station...; leans bloaters; boss Patient Zero, a bloater with 520 HP).
+  - Checkpoint Bravo (army checkpoint, 3: garage, police, police - motor pool, command post, barracks, mess...; leans
+    armored; boss The Sergeant, armored, 420 HP + 240 armour).
+  Floor 1 starts on the street; floors 2+ start on a "Stairwell landing" (the street strip restyled, no road, street cars
+  become crates, lamp posts radiators; the house number reads as the unit number).
+- Harder each floor (d = 0 on floor 1 .. 1 on the last): +f extra zombies (x0.75 in schools/police), special infected on
+  every floor via infected.js L.deepInf (chance 20% -> 65%, at least 1 from floor 2, 2 on the last floor, building mix).
+  Typical totals: tower 3 -> 8.5 zombies (0.7 -> 4.8 specials), hospital 4.8 -> 8.8, checkpoint 4.3 -> 8.9 (+ the boss).
+  Better loot: empty containers 20% -> 5%; each container has a 10% -> 40% chance of a bonus roll from D.LOOT.deep1/2/3
+  (meds/ammo/lockpicks, then blueprints/cosmetics/decor/pack upgrades/machetes, then backpacks/locksets/axes).
+- One twist per floor, on the start banner and the floor chip: Power's out (a flashlight pool, the rest near black),
+  Nest (twice the floor's zombies), Gas leak (all her noise x1.75, a green haze; house.js opts.noiseMul), Looted (60%
+  empty but one container holds a jackpot from D.JACK.stash), Quiet (every zombie asleep). Never the same twist twice in a
+  row; the boss floor only gets Power's out / Gas leak / Looted.
+- The stairwell: a stairwell with a green EXIT sign in the farthest reachable room (BFS over the layout: walls, unopened
+  secret doors, key-locked doors and solid furniture block; never next to a door, never in hidden rooms). "Take the
+  stairs" opens the choice: what is below (floor name, twist), HP/hunger/thirst, all the run loot so far, Get out / Go
+  deeper, or "Not yet - keep looting this floor". Floor 1's front door works as a way out too ("Leave the building?").
+  Reaching each stairwell: +8 xp x floor. Getting out: +6 xp per floor cleared (+20 with the boss down). Boss kill +40 xp
+  (plus the special's own).
+- Last floor: the boss stands next to a Supply chest (deepchest table: 5-6 items, a blueprint and a cosmetic guaranteed,
+  plus a D.JACK.stash prize). The chest cannot be searched until the boss is down. The stairwell there is the fire exit
+  (Get out only). The floor chip shows the boss's health once its room is seen.
+- Loot ownership: run.own = what she brought (pack + hands), kept as a running minimum so things she used up are not given
+  back. Anything above that is run loot. Go deeper: run loot that is not food/drink/meds/tools is bagged (run.haul) so the
+  pack has room on the next floor. Cosmetics found wait in run.cos. Packs, blueprints, shoes and locksets found in the run
+  cannot be fitted/learned until she is out. Get out: everything goes to the stash, then the pack; whatever still does not
+  fit waits on the home card ("Claim"). A found weapon she is fighting with stays in her hands. Downed: all run loot is
+  lost, her own gear stays (no half-pack spill), HP 20, her own weapon goes back in her hand. Quiver and keyring are never
+  spilled (as always).
+- Rules: HP, hunger/thirst, pack, quiver and keyring carry between floors (no healing in between). No raiders (noRaid),
+  no event mini-boss in deep runs. The crew pet comes along.
+- Closing the app mid-run: the safest option is to resume. On the next start the game drops her straight back in - no home
+  screen in between, so nothing can be moved to the stash - on the same floor with its saved progress (house.js
+  snapRun/restoreRun via opts.onState/opts.resume), with her HP as it was when she left (saved as it changes, not the
+  floor-start HP), or at the stairwell choice if that card was open. Zombies come back to their spots (as in any resumed
+  house). If she was already down when the app closed she comes back home, down, run loot gone.
+- Save: SV.deep = { passes, mark, seq, stats, run, last, held } (made on first use). Small hooks only: game.js (card,
+  boot resume), house.js (opts.noiseMul in emitNoise), infected.js (L.deepInf).

@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.16';
+const NEXT_VERSION = '0.17';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1007,7 +1007,7 @@ const NEXT_VERSION = '0.16';
         ${IS_IOS && window.NET && NET.ok ? '<button class="mbtn sm" id="mSyncNow" style="width:100%;margin:8px 0 2px">Sync my steps now</button>' : ''}
         ${window.SYNC ? (window.NET && NET.ok && !d.phone && new Date().getHours() >= 14 ? '<button class="synclink nudge" id="mSyncG" data-m="fix">No phone steps yet today? Fix step sync</button>' : '<button class="synclink" id="mSyncG">How to sync steps</button>') : ''}
       </div>
-      ${SV.tutorialDone || SV.stats.runs ? baseCards() + DM.Boss.cardHTML() + DM.Crew.cardHTML() : ''}
+      ${SV.tutorialDone || SV.stats.runs ? baseCards() + (DM.Deep ? DM.Deep.cardHTML() : '') + DM.Boss.cardHTML() + DM.Crew.cardHTML() : ''}
       <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}</div>
       <div id="mpane"></div>`;
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { SFX.play('ui'); if (b.dataset.t === 'map') { DM.Map.open(); return; } tab(b.dataset.t); }; });
@@ -1020,6 +1020,7 @@ const NEXT_VERSION = '0.16';
     $('#mnet').onclick = openAccount;
     bindBaseCards();
     DM.Boss.bind($('#mbody')); DM.Crew.bindCard(() => renderHome());
+    if (DM.Deep) DM.Deep.bind($('#mbody'));   // 0.17 deep runs (deep.js)
     if ($('#evBan')) $('#evBan').onclick = () => { SFX.play('ui'); openEvent(); };
     // iPhone: run the player's own "Dead Miles Steps" Shortcut and come straight back here
     // (x-callback-url), so a manual sync is one tap instead of a trip to the Shortcuts app.
@@ -1454,7 +1455,8 @@ const NEXT_VERSION = '0.16';
     rollDay();
     if (!SV.survivor) { cre = { name: '', look: ART.LOOK.random(), job: 'scavenger' }; creEdit = false; E.buildSurvivor(cre.look).then(renderCreate); return; }
     DM.S = SV.survivor;
-    E.buildSurvivor(SV.survivor.look).then(renderHome);
+    // 0.17: a deep run still going (the app was closed mid-run) drops her straight back in - no home screen in between (deep.js RESUME)
+    E.buildSurvivor(SV.survivor.look).then(() => { if (DM.Deep && !DM.scene && DM.Deep.boot()) return; renderHome(); });
   }
   Game.renderHome = renderHome;
 
