@@ -614,10 +614,31 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   returns). 12k at once -> visit, visit, visit (then the 3-a-day cap). Same for everyone; no visit without steps.
   A route Dot stop sets ready to now.
 
+## Done in 0.26 (owner: "more cosmetics, gachapon", "thanksgiving themes now, Christmas 2 weeks before", "an event for Christmas / Thanksgiving decorations for our base")
+- Event windows: Thanksgiving from 2 weeks before Thanksgiving to the Tuesday after (2026: Nov 12 - Dec 1); Christmas
+  Dec 11 - Jan 2 (was Dec 18).
+- Capsule machine (gacha.js, home card on the Houses tab): a token = a random cosmetic (D.COS src 'gacha'; event ones with
+  ev only while that event runs). Odds c 55 / r 30 / e 12 / l 3; pity: the 10th pull without an epic+ is epic (80) or
+  legendary (20). Unowned first; duplicates are sold to Dot (Game.unlockCos). During a holiday 1 pull in 4 is holiday decor
+  (to the stash). Tokens: 1 per 4,000 steps of SV.walked, max 3 a day (steps past the cap do not bank), or 50 caps; new
+  saves start with 1. SV.gacha = { tok, at, day, dayTok, pulls, pity }.
+- New cosmetics (art.js): all-year capsules catears, bowtie, tracksuit (c), crown, starshades, cape (r), halo (e), batwings
+  (l); Thanksgiving capsules leafcrown, flannel (r), turkeyhat, cornback (e); Christmas capsules antlers, sweater (r),
+  elfhat, giftpack (e); Deck the base prizes strawhat (Thanksgiving) and starhat (Christmas), legendary, src 'festive'.
+- Holiday decor (D.DECOR with ev; art in base.js): Thanksgiving d_scarecrow, d_hay, d_cornu, d_fallwreath, d_garland;
+  Christmas d_xtree (glows), d_snowman, d_wreath, d_stockings, d_presents. Sources: Dot's holiday shelf (2 a day,
+  price v x 6 caps), event loot (pantry/storage; hutch/dresser/cellar) and the capsule machine.
+- Deck the base (gacha.js, home card while the event runs): counts that event's decor placed at the base (SV.base.decor).
+  2 / 5 / 8 placed -> 2 tokens + 40 caps / 3 tokens + 80 caps / ev.deckCos + 100 caps; SV.deck['<id>-<year>'] = claimed.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
-### 2. Other open items
+### 2. Owner's list (2026-11-14), still to do, in this order
+- NPCs in houses who need help: a quest found inside a house; walk back (steps) to that house to turn it in.
+- 5 job-only skill trees (the 5 current trees stay open to everyone).
+- Lifetime step milestones (badges / rewards).
+### 3. Other open items
 - A friend's Android blocks the step-sync app install: waiting on her handle or a screenshot (fallback: add her handle to
   NET.cfg.trustedTyped in net.js so typed steps count like phone steps).
 - Not yet heard on a real iPhone: area music, positional groans (older Safari has no StereoPanner), title screen thunder.

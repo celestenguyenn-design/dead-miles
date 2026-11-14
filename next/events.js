@@ -18,13 +18,16 @@ window.DM = window.DM || {};
   const CAL = {
     thanksgiving: {
       id: 'thanksgiving', name: 'Thanksgiving', short: 'Thanksgiving',
-      // Thanksgiving week: the Friday before to the Tuesday after (2026: Nov 20 - Dec 1, Thanksgiving is Thu Nov 26)
-      window: y => { const t = thanksDay(y); return { start: key(y, 11, t - 6), end: key(y, 11, t + 5) }; },
+      // 0.26 (owner: "add thanksgiving themes into the game currently"): two weeks before Thanksgiving to the Tuesday after
+      // (2026: Nov 12 - Dec 1, Thanksgiving is Thu Nov 26)
+      window: y => { const t = thanksDay(y); return { start: key(y, 11, t - 14), end: key(y, 11, t + 5) }; },
       accent: { c: '#f07b3c', c2: '#c95f2c', ink: '#11142f', bg: '#3a1f1a', glyph: 'leaf' },
       blurb: 'Zombie turkeys are loose in about 1 in 3 yards and kitchens. Holiday food turns up in fridges and pantries.',
-      loot: { fridge: { cranberry: 2, pie: 2 }, pantry: { stuffing: 3, cranberry: 2 }, cabinet: { stuffing: 2, cranberry: 1 }, store: { cranberry: 2, stuffing: 2 }, storage: { stuffing: 1, pie: 1 } },
+      loot: { fridge: { cranberry: 2, pie: 2 }, pantry: { stuffing: 3, cranberry: 2, d_cornu: .25 }, cabinet: { stuffing: 2, cranberry: 1 }, store: { cranberry: 2, stuffing: 2 }, storage: { stuffing: 1, pie: 1, d_hay: .3, d_fallwreath: .3 } },
       boss: { kind: 'turkey', name: 'Zombie turkey', chance: 1 / 3, hp: 170, props: { hw: 10, hh: 7 }, tutorial: true },
-      cos: ['pilgrim', 'feathers', 'pietin', 'harvest'],
+      cos: ['pilgrim', 'feathers', 'pietin', 'harvest', 'turkeyhat', 'leafcrown', 'flannel', 'cornback', 'strawhat'],
+      decor: ['d_scarecrow', 'd_hay', 'd_cornu', 'd_fallwreath', 'd_garland'],   // 0.26: holiday decor (Deck the base, Dot's shelf, capsules)
+      deckCos: 'strawhat',                                                     // 0.26: the Deck the base top prize
       // Dot's event job chain (one at a time, on top of the normal 2 jobs)
       quests: [
         { id: 'dinner', n: "The block's dinner", d: "Bring Dot a whole turkey and 3 pumpkin pies for the block's dinner.", give: [['turkey', 1], ['pie', 3]], caps: 40, cos: 'pietin' },
@@ -36,12 +39,14 @@ window.DM = window.DM || {};
     },
     christmas: {
       id: 'christmas', name: 'Christmas', short: 'Christmas',
-      window: y => ({ start: key(y, 12, 18), end: key(y + 1, 1, 2) }),
+      window: y => ({ start: key(y, 12, 11), end: key(y + 1, 1, 2) }),   // 0.26 (owner): from two weeks before Christmas
       accent: { c: '#d9483a', c2: '#9e2f2a', ink: '#11142f', bg: '#16302a', glyph: 'flake', snow: 1 },
       blurb: 'Snow on the block. The Krampus walker (a big one in a Santa hat) haunts about 1 in 3 houses. Gift boxes turn up in closets - open them at home.',
-      loot: { hutch: { gift: .8 }, side: { gift: .6 }, coat: { gift: .5 }, dresser: { gift: .4 }, wardrobe: { gift: .5 }, cellar: { gift: .5 }, store: { candy: 3 }, cabinet: { candy: 1.5 }, pantry: { candy: 2 } },
+      loot: { hutch: { gift: .8, d_wreath: .25 }, side: { gift: .6 }, coat: { gift: .5 }, dresser: { gift: .4, d_stockings: .25 }, wardrobe: { gift: .5 }, cellar: { gift: .5, d_presents: .3 }, store: { candy: 3 }, cabinet: { candy: 1.5 }, pantry: { candy: 2 } },
       boss: { kind: 'krampus', name: 'Krampus walker', chance: 1 / 3, hp: 320, props: { hw: 13, hh: 9, dmgMul: 1.4 } },
-      cos: ['santa', 'candycane'],
+      cos: ['santa', 'candycane', 'antlers', 'elfhat', 'sweater', 'giftpack', 'starhat'],
+      decor: ['d_xtree', 'd_snowman', 'd_wreath', 'd_stockings', 'd_presents'],
+      deckCos: 'starhat',
       quests: [
         { id: 'wrap', n: 'Wrap it up', d: 'The kids on Macon St get something this year. Bring Dot 3 gift boxes - unopened, baby.', give: [['gift', 3]], caps: 40, cos: 'candycane' },
         { id: 'krampus', n: 'Naughty list', d: 'Something big in a Santa hat is walking the block. Put down 2 Krampus walkers.', kills: 2, caps: 80, items: [['candy', 3], ['meds', 2]] },

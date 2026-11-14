@@ -103,6 +103,17 @@ window.DM = window.DM || {};
     d_map: { n: 'Map of Brooklyn', art: 'dmap', w: 2, h: 1, H: 0, rot: 'flip', wall: 1, v: 5 },
     d_gnome: { n: 'Garden gnome', art: 'dgnome', w: 1, h: 1, H: 26, rot: 'flip', v: 7 },
     d_flamingo: { n: 'Lawn flamingo', art: 'dflamingo', w: 1, h: 1, H: 40, rot: 'flip', solid: 0, v: 5 },
+    // 0.26 holiday decor (ev: the event it belongs to; counts for that event's Deck the base)
+    d_scarecrow: { n: 'Scarecrow', art: 'dscarecrow', w: 1, h: 1, H: 64, rot: 'flip', v: 8, ev: 'thanksgiving' },
+    d_hay: { n: 'Hay bale & pumpkins', art: 'dhay', w: 2, h: 1, H: 24, rot: 'swap', v: 7, ev: 'thanksgiving' },
+    d_cornu: { n: 'Cornucopia', art: 'dcornu', w: 1, h: 1, H: 20, rot: 'flip', v: 6, ev: 'thanksgiving' },
+    d_fallwreath: { n: 'Autumn wreath', art: 'dfallwreath', w: 1, h: 1, H: 0, rot: 'flip', wall: 1, v: 5, ev: 'thanksgiving' },
+    d_garland: { n: 'Leaf garland', art: 'dgarland', w: 3, h: 1, H: 0, rot: 'flip', wall: 1, v: 6, ev: 'thanksgiving' },
+    d_xtree: { n: 'Christmas tree', art: 'dxtree', w: 1, h: 1, H: 72, rot: 'flip', glow: 1, v: 10, ev: 'christmas' },
+    d_snowman: { n: 'Snowman', art: 'dsnowman', w: 1, h: 1, H: 44, rot: 'flip', v: 7, ev: 'christmas' },
+    d_wreath: { n: 'Christmas wreath', art: 'dwreath', w: 1, h: 1, H: 0, rot: 'flip', wall: 1, v: 5, ev: 'christmas' },
+    d_stockings: { n: 'Stockings', art: 'dstockings', w: 2, h: 1, H: 0, rot: 'flip', wall: 1, v: 6, ev: 'christmas' },
+    d_presents: { n: 'Pile of presents', art: 'dpresents', w: 1, h: 1, H: 20, rot: 'flip', solid: 0, v: 6, ev: 'christmas' },
   };
   for (const k in D.DECOR) D.ITEMS[k] = { n: D.DECOR[k].n, i: k, decor: 1, tag: 'decor' };
   // blueprints: one item per recipe, e.g. bp_machete
@@ -181,12 +192,27 @@ window.DM = window.DM || {};
     // weekly group boss (boss.js): a chance when the boss your party fought goes down
     wardencap: { n: "Warden's cap", slot: 'hat', r: 'e', src: 'boss' }, ashcrown: { n: 'Ash crown', slot: 'hat', r: 'l', src: 'boss' },
     stetho: { n: 'Stethoscope', slot: 'neck', r: 'e', src: 'boss' }, apron: { n: "Butcher's apron", slot: 'outfit', r: 'e', src: 'boss' },
+    // 0.26 capsule machine (gacha.js): the all-year line
+    catears: { n: 'Cat-ear beanie', slot: 'hat', r: 'c', src: 'gacha' }, bowtie: { n: 'Bow tie', slot: 'neck', r: 'c', src: 'gacha' },
+    tracksuit: { n: 'Track jacket', slot: 'outfit', r: 'c', src: 'gacha' }, crown: { n: 'Paper crown', slot: 'hat', r: 'r', src: 'gacha' },
+    starshades: { n: 'Star shades', slot: 'face', r: 'r', src: 'gacha' }, cape: { n: 'Hero cape', slot: 'back', r: 'r', src: 'gacha' },
+    halo: { n: 'Glow halo', slot: 'hat', r: 'e', src: 'gacha' }, batwings: { n: 'Bat wings', slot: 'back', r: 'l', src: 'gacha' },
+    // 0.26 holiday capsules (only in the machine while their event runs) + the Deck the base top prizes
+    leafcrown: { n: 'Autumn-leaf crown', slot: 'hat', r: 'r', src: 'gacha', ev: 'thanksgiving' }, flannel: { n: 'Flannel shirt', slot: 'outfit', r: 'r', src: 'gacha', ev: 'thanksgiving' },
+    turkeyhat: { n: 'Roast-turkey hat', slot: 'hat', r: 'e', src: 'gacha', ev: 'thanksgiving' }, cornback: { n: 'Corn-stalk bundle', slot: 'back', r: 'e', src: 'gacha', ev: 'thanksgiving' },
+    strawhat: { n: 'Scarecrow hat', slot: 'hat', r: 'l', src: 'festive', ev: 'thanksgiving' },
+    antlers: { n: 'Reindeer antlers', slot: 'hat', r: 'r', src: 'gacha', ev: 'christmas' }, sweater: { n: 'Ugly sweater', slot: 'outfit', r: 'r', src: 'gacha', ev: 'christmas' },
+    elfhat: { n: 'Elf hat', slot: 'hat', r: 'e', src: 'gacha', ev: 'christmas' }, giftpack: { n: 'Present pack', slot: 'back', r: 'e', src: 'gacha', ev: 'christmas' },
+    starhat: { n: 'Tree-topper star', slot: 'hat', r: 'l', src: 'festive', ev: 'christmas' },
   };
-  D.cosHint = k => { const c = D.COS[k]; return { loot: 'Found in houses', corpse: 'Found on zombies', police: 'Police stations', mansion: 'Mansions', horde: 'Horde-night crates', quest: "Dot's quest rewards", trader: 'Trader level ' + c.lv, event: D.EVHINT[k] || 'Seasonal event', boss: D.BOSSHINT[k] || 'Weekly boss' }[c.src]; };
+  D.cosHint = k => { const c = D.COS[k]; return { loot: 'Found in houses', corpse: 'Found on zombies', police: 'Police stations', mansion: 'Mansions', horde: 'Horde-night crates', quest: "Dot's quest rewards", trader: 'Trader level ' + c.lv, event: D.EVHINT[k] || 'Seasonal event', gacha: 'Capsule machine', festive: 'Deck the base', boss: D.BOSSHINT[k] || 'Weekly boss' }[c.src]; };
   D.BOSSHINT = { apron: 'Weekly boss: the Butcher of Bed-Stuy', ashcrown: 'Weekly boss: Mother Ash', wardencap: 'Weekly boss: the Bridge Warden', stetho: 'Weekly boss: the Night Nurse' };
   // where each event cosmetic comes from (the wardrobe also tags them "Thanksgiving 2026" etc.)
   D.EVHINT = { pilgrim: 'Thanksgiving: the zombie turkey', feathers: 'Thanksgiving: zombie turkeys', pietin: "Thanksgiving: Dot's dinner job", harvest: "Thanksgiving: Dot's jobs",
-    santa: 'Christmas: the Krampus walker', candycane: "Christmas: Dot's gift job" };
+    santa: 'Christmas: the Krampus walker', candycane: "Christmas: Dot's gift job",
+    leafcrown: 'Thanksgiving: capsule machine', flannel: 'Thanksgiving: capsule machine', turkeyhat: 'Thanksgiving: capsule machine', cornback: 'Thanksgiving: capsule machine',
+    strawhat: 'Thanksgiving: Deck the base (top prize)', antlers: 'Christmas: capsule machine', sweater: 'Christmas: capsule machine', elfhat: 'Christmas: capsule machine',
+    giftpack: 'Christmas: capsule machine', starhat: 'Christmas: Deck the base (top prize)' };
   for (const k in D.COS) D.ITEMS['cos_' + k] = { n: D.COS[k].n, i: 'cos_' + k, cos: k, rare: D.COS[k].r !== 'c' ? 1 : 0, tag: D.RARITY[D.COS[k].r].n.toLowerCase() + ' cosmetic' };
   D.ITEMS.hat.cos = 'pilgrim';   // the old pack item (0.4) is the same pilgrim hat: picking one up unlocks it
   D.cosOwned = () => ({});       // game.js points this at the save's wardrobe, so rolls prefer cosmetics you do not have yet

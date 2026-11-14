@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.25.1';
+const NEXT_VERSION = '0.26.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -431,6 +431,8 @@ const NEXT_VERSION = '0.25.1';
     const own = SV.survivor ? SV.survivor.wardrobe.own : {}, mine = Object.keys(D.COS).filter(c => D.COS[c].src === 'trader' && D.COS[c].lv <= L && !own[c]);
     if (mine.length) { const c = mine[Math.floor(rnd() * mine.length)]; T.stock.push({ k: 'cos_' + c, n: 1, price: D.RARITY[D.COS[c].r].price, left: 1 }); }
     if (L >= 2 && rnd() < .35) { const c = cosOf(D.pickCos([], rnd)); if (!own[c] && !T.stock.some(e => e.k === 'cos_' + c)) T.stock.push({ k: 'cos_' + c, n: 1, price: D.RARITY[D.COS[c].r].price, left: 1 }); }
+    // 0.26: Dot's holiday shelf - two pieces of the running holiday's decor (Deck the base), new each day
+    if (EVA && EVA.ev.decor) { const dk = EVA.ev.decor.slice().sort(() => rnd() - .5).slice(0, 2); for (const k of dk) T.stock.push({ k, n: 1, price: D.DECOR[k].v * 6, left: 2 }); }
     T.day = day;
   }
   function makeQuest(type, tier, rnd) {
@@ -922,7 +924,7 @@ const NEXT_VERSION = '0.25.1';
   const TYPEICON = { tutorial: B.row, rowS: B.row, rowL: B.row, apt: B.apt, bodega: B.shop(['#f07b3c', '#f6e3bb']), laundro: B.shop(['#3fa7a0', '#f6e3bb'], '<circle cx="23" cy="38" r="5" fill="#5a6a8e" stroke="#11142f" stroke-width="1.5"/>'),
     pharmacy: B.shop(['#93a86c', '#f6e3bb'], '<path d="M20 34h6v-4h4v4h6v4h-6v4h-4v-4h-6z" fill="#b53a2e"/>'), garage: B.garage, school: B.school, police: B.police, mansion: B.mansion };
   const typeIcon = t => `<svg viewBox="0 0 64 64" class="bicon">${TYPEICON[t] || B.row}</svg>`;
-  Game.ui = { typeIcon, typeInner: t => TYPEICON[t] || B.row, esc, skulls: n => SKULL.repeat(n) + `<span class="dim">${SKULL.repeat(Math.max(0, 5 - n))}</span>`, sheetOpen: h => sheetOpen(h), sheetClose: () => sheetClose() };   // 0.18: for daily.js
+  Game.ui = { typeIcon, typeInner: t => TYPEICON[t] || B.row, esc, skulls: n => SKULL.repeat(n) + `<span class="dim">${SKULL.repeat(Math.max(0, 5 - n))}</span>`, sheetOpen: h => sheetOpen(h), sheetClose: () => sheetClose(), icon: k => icon(k) };   // 0.18: for daily.js (0.26: icon for gacha.js)
 
   function showResult(title, stacks, lost, note, kick) {
     const el = $('#mres');
@@ -1211,8 +1213,9 @@ const NEXT_VERSION = '0.25.1';
         : shut ? `<div class="hdays">Closed for today · back tomorrow (${DOT_DAY} visits a day)</div>`
         : `<div class="hdays">Safe zone · ${icon('caps')} ${T.caps} caps${dotVisits() ? ` · visit ${dotVisits() + 1} of ${DOT_DAY} today` : ''}</div>`}</div>
       <div class="hbtns"><button class="mbtn${away || shut ? ' ghost' : ''}" id="hTrader">${away || shut ? 'Away' : 'Visit'}</button></div></div>` : '';
-    const dailyCard = SV.tutorialDone && DM.Daily ? DM.Daily.cardHTML() : '';   // 0.18: the daily challenge house (daily.js)
-    if (!list.length) { el.innerHTML = rseg + traderCard + dailyCard + `<div class="empty big">No houses scouted yet.<br>Walk - every ~1,000 steps turns up another door.</div>`; if ($('#hTrader')) $('#hTrader').onclick = openTrader; if (dailyCard) DM.Daily.bind(el); if (rseg) DM.Route.bind(el, () => renderHome()); return; }
+    const dailyCard = (SV.tutorialDone && DM.Daily ? DM.Daily.cardHTML() : '')   // 0.18: the daily challenge house (daily.js)
+      + (SV.tutorialDone && DM.Gacha ? DM.Gacha.deckHTML() + DM.Gacha.cardHTML() : '');   // 0.26: Deck the base + capsule machine (gacha.js)
+    if (!list.length) { el.innerHTML = rseg + traderCard + dailyCard + `<div class="empty big">No houses scouted yet.<br>Walk - every ~1,000 steps turns up another door.</div>`; if ($('#hTrader')) $('#hTrader').onclick = openTrader; if (dailyCard) { if (DM.Daily) DM.Daily.bind(el); if (DM.Gacha) DM.Gacha.bind(el); } if (rseg) DM.Route.bind(el, () => renderHome()); return; }
     const bossCard = '';   // 0.23 ui: the weekly boss lives on its home tile only (was shown twice)
     const gstage = gamestage().gs;   // 0.19: the house list's special-infected tag uses your gamestage
     el.innerHTML = rseg + traderCard + dailyCard + bossCard + list.map(h => {
@@ -1236,7 +1239,7 @@ const NEXT_VERSION = '0.25.1';
     }).join('');
     const find = id => id === 'tutorial' ? { id: 'tutorial', type: 'tutorial', seed: 0, status: 'new' } : SV.houses.find(h => h.id === id);
     if ($('#hTrader')) $('#hTrader').onclick = () => { SFX.play('ui'); openTrader(); };
-    DM.Boss.bind(el); if (dailyCard) DM.Daily.bind(el);
+    DM.Boss.bind(el); if (dailyCard) { if (DM.Daily) DM.Daily.bind(el); if (DM.Gacha) DM.Gacha.bind(el); }
     if (rseg) DM.Route.bind(el, () => renderHome());   // 0.21 route: the List | Route toggle
     el.querySelectorAll('[data-loot]').forEach(b => b.onclick = () => { SFX.play('ui'); loot(find(b.dataset.loot)); });
     el.querySelectorAll('[data-auto]').forEach(b => b.onclick = () => { SFX.play('ui'); autoSearch(find(b.dataset.auto)); });
@@ -1581,7 +1584,9 @@ const NEXT_VERSION = '0.25.1';
     ['Real-world map', 'Tap Map on the home screen: it is your real neighbourhood (OpenStreetMap), drawn like the game. Real places near you - a pharmacy, a corner store, the police station, a laundromat, a school, a gas station, some houses and apartment blocks - show up as round badges. Walk past one with the map open: when you get within about 35 m it glows, and you scout it as a bonus landmark house in your list, with its real name. Up to 3 a day, on foot only (it ignores you while you are moving faster than about 30 km/h), and you have to walk up to a place - one right where you opened the map does not count until you have walked away and back. The card at the bottom shows how many you found today and points to the nearest place. Tap ? on the map for a reminder. Your phone asks for your location only while the map is open; your position is never saved or sent to the game server. Streets you have seen before show up instantly, even offline. No location or no signal? The rest of the game works the same.'],
     ['Base & farming', 'Your base is built with steps (the same steps also scout houses). Build walls, a gate, traps and garden beds; decorate with furniture you find. Plant seeds, water them with steps each day, and harvest real food. The stash chest lives here.'],
     ['Horde night', 'Every Sunday 9 PM New York time a horde hits. In the 24 hours before, do a watch shift (a 2-3 minute defence) - every kill thins the horde for your whole party. Strong bases hold and pay out a crate; weak ones lose something you repair with steps. Skip the shift and you get nothing.'],
-    ['Seasonal events', 'Holidays switch on by themselves: Thanksgiving (the week around it) and Christmas (Dec 18 - Jan 2). Events bring holiday loot, a mini-boss in about 1 in 3 houses, a chain of event jobs from Dot, and once-a-year cosmetics. Thanksgiving also has the Black Friday horde: a bigger Sunday horde with better crates.'],
+    ['Seasonal events', 'Holidays switch on by themselves: Thanksgiving (from two weeks before to the Tuesday after) and Christmas (Dec 11 - Jan 2). Events bring holiday loot, a mini-boss in about 1 in 3 houses, a chain of event jobs from Dot, holiday capsules in the capsule machine, holiday decor and once-a-year cosmetics. Thanksgiving also has the Black Friday horde: a bigger Sunday horde with better crates.'],
+    ['Capsule machine', 'The capsule machine (Houses tab) gives a random cosmetic for a token. You get a token for every 4,000 steps (up to 3 a day), or buy one for 50 caps. Odds: common 55%, rare 30%, epic 12%, legendary 3%, and at least one epic or better every 10 pulls. Cosmetics you do not have yet come first; Dot buys any duplicate. During a holiday its capsules join the machine, and 1 pull in 4 is a piece of holiday decor.'],
+    ['Deck the base', 'During Thanksgiving and Christmas, place that holiday\'s decor at your base (Base > Decor) for prizes: 2 pieces = 2 capsule tokens + 40 caps, 5 = 3 tokens + 80 caps, 8 = a legendary holiday hat + 100 caps. Holiday decor comes from Dot\'s holiday shelf, holiday houses (storage, pantries, closets) and the capsule machine.'],
     ['Workbench & crafting', 'Workbench (home tab, or at the base) lists every recipe you know with each material, what you have and what you need. Tap a recipe to see what it does, every material in full with where to find it, and a big Craft button. Materials come from the stash and the pack. New recipes come from blueprints: Dot trades them, and some turn up in hidden stashes and safes.'],
     ['Crew', 'About 1 house in 25 has a survivor hiding in a closet or a secret room (more in mansions and police stations). Talk to them: with a free bunk they move into your base (2 bunks, build up to 4). Each has a role - Scavenger (crew searches bring back more), Guard (horde-night defence), Medic (heals you each morning), Gardener (waters a plant a day), Tinkerer (cheaper repairs) - and levels up slowly. Each eats 1 food a day from your STASH; three hungry days and they leave a note (they never take anything). The more crew you have, the more a Crew search brings back.'],
     ['Strays', 'Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Move slowly near them (a small push on the joystick) until they trust you, then tap to coax them out - or offer food from your pack. One pet comes along on runs and at the base; up to 4 live with you. Dogs bark when a zombie spots you and sometimes sniff out a container with something good; cats make you quieter and bring little presents some mornings. Pets level from your steps. They never die: a zombie scare sends them running home, back the next day.'],
