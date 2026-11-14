@@ -555,3 +555,8 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   .45 s (a snarl skips the spacing). SFX.play('groan') (weekly boss, horde arriving) is the new voice, centred. Respects the
   sound-effects slider (none at 0). Raiders never groan.
 - Demo for the owner: mockups/music/looting-demo.mp3 (44 s), rendered offline with the game's own WebAudio code.
+
+## Done in 0.23.1 (owner: "as a hunter if I run out of arrows I'm f*cked ... adding fists in general would help")
+- A bow with no arrows (quiver + pack) is swung as a club: "Bow bash", 15 dmg (x quality/skills), fists timing, reach 1.3, no
+  bow wear; a one-time toast "Out of arrows - bashing with the bow".
+- The weapon swap sheet always offers Fists when she holds a weapon: the weapon goes back into the pack (needs a free slot).
