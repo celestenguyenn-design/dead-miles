@@ -54,6 +54,7 @@
   let G;
   function startRun(layout, o) {
     L = layout; opts = o || {};
+    const lookSeed = L.seed != null && !L.base ? L.seed : null; ART.houseLook(lookSeed); rugLook(lookSeed);   // 0.10: each house its own colours
     ROWS = L.rows; MW = ROWS[0].length; MH = ROWS.length;
     const st = L.start;
     if (S() && S().food) S().hp = F.tick(S(), S().hp);   // hunger/thirst catch up before she goes in
@@ -1031,7 +1032,7 @@
     for (let i = 0; i < 3; i++) ART.blk(c, (L.stoop.x - 1.5) * T + 6 - i * 4, sy * T + i * 13, 2 * T + 20 + i * 8, 13, ['#5a5878', '#4f4d6c', '#45435f'][i], 2, 2);
     }
     // rugs
-    for (const r of L.rugs || []) rug(c, r[0] * T, r[1] * T, r[2] * T, r[3] * T, ...RUGS[r[4] || 0]);
+    for (const r of L.rugs || []) rug(c, r[0] * T, r[1] * T, r[2] * T, r[3] * T, ...rugCols(r[4] || 0), rugPat[r[4] || 0]);
     // ambient occlusion under wall faces
     for (const w of wallCells.concat(...wallCells.map(c => c.sub || []))) if (w.face) {
       const g = c.createLinearGradient(0, w.key, 0, w.key + 16); g.addColorStop(0, 'rgba(10,8,24,.45)'); g.addColorStop(1, 'rgba(10,8,24,0)');
@@ -1041,11 +1042,27 @@
     faceCache.clear();
     for (const f of G.furn) f._key = null;
   }
-  const RUGS = [[P.ORAD, P.ORA, '#8a3f20'], ['#3f4c7a', '#5a6aa0', P.CRMD], ['#5c2f3c', '#7a3f4e', P.CRMD], ['#93a86c', '#7a8f58', P.CRM], ['#4a3c70', '#6e5ea0', P.CRM]];
-  function rug(c, x, y, w, h, a, b, edge) {
+  // 0.10: 12 rug colourways x 4 patterns, shuffled per house (the secret rug uses the same set, so it never stands out)
+  const RUGS = [[P.ORAD, P.ORA, '#8a3f20'], ['#3f4c7a', '#5a6aa0', P.CRMD], ['#5c2f3c', '#7a3f4e', P.CRMD], ['#93a86c', '#7a8f58', P.CRM], ['#4a3c70', '#6e5ea0', P.CRM],
+    ['#2f5a5a', '#4a8080', P.CRMD], ['#6a5a2c', '#a08a44', '#4a3e1e'], ['#5e2a36', '#c95f2c', '#8a4050'], ['#3a3a4e', '#8a8aa0', P.CRM], ['#7a4a5a', '#c08a9a', P.CRMD],
+    ['#2c3e2c', '#5a7a4a', P.CRM], ['#4e2e1e', '#8a5a3a', '#c9a070']];
+  let rugPerm = RUGS.map((_, i) => i), rugPat = [0, 1, 2, 3, 0, 1];
+  function rugLook(seed) {
+    rugPerm = RUGS.map((_, i) => i); rugPat = [0, 1, 2, 3, 0, 1];
+    if (seed == null) return;
+    let n = 0; const rnd = () => ART.hash(seed | 0, 4243, ++n);
+    for (let i = rugPerm.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [rugPerm[i], rugPerm[j]] = [rugPerm[j], rugPerm[i]]; }
+    rugPat = rugPat.map(() => Math.floor(rnd() * 4));
+  }
+  const rugCols = k => RUGS[rugPerm[k % RUGS.length]];
+  function rug(c, x, y, w, h, a, b, edge, pat = 0) {
     ART.rr(c, x, y, w, h, 6); c.fillStyle = a; c.fill(); c.lineWidth = 2.4; c.strokeStyle = P.INK; c.stroke();
     ART.rr(c, x + 6, y + 6, w - 12, h - 12, 4); c.strokeStyle = b; c.lineWidth = 3; c.stroke();
-    c.fillStyle = b; for (let i = 0; i < 6; i++) { const xx = x + w * (.2 + .6 * ART.hash(i, 1)), yy = y + h * (.2 + .6 * ART.hash(i, 2)); c.save(); c.translate(xx, yy); c.rotate(.785); c.fillRect(-4, -4, 8, 8); c.restore(); }
+    c.fillStyle = b;
+    if (pat === 0) { for (let i = 0; i < 6; i++) { const xx = x + w * (.2 + .6 * ART.hash(i, 1)), yy = y + h * (.2 + .6 * ART.hash(i, 2)); c.save(); c.translate(xx, yy); c.rotate(.785); c.fillRect(-4, -4, 8, 8); c.restore(); } }
+    else if (pat === 1) { const hz = w >= h; for (let t = 14; t < (hz ? h : w) - 12; t += 10) hz ? c.fillRect(x + 12, y + t, w - 24, 3) : c.fillRect(x + t, y + 12, 3, h - 24); }
+    else if (pat === 2) { ART.rr(c, x + 13, y + 13, Math.max(4, w - 26), Math.max(4, h - 26), 3); c.lineWidth = 1.6; c.stroke(); c.beginPath(); c.ellipse(x + w / 2, y + h / 2, Math.min(w, h) * .16, Math.min(w, h) * .16, 0, 0, 7); c.fill(); }
+    else { for (let i = 0; x + 12 + i * 10 < x + w - 12; i++) for (let j = 0; y + 12 + j * 10 < y + h - 12; j++) if ((i + j) % 2 === 0) c.fillRect(x + 12 + i * 10, y + 12 + j * 10, 5, 5); }
     c.strokeStyle = edge; c.lineWidth = 1.2; for (let xx = x + 4; xx < x + w - 2; xx += 6) { ART.line(c, xx, y - 3, xx, y, edge, 1.2); ART.line(c, xx, y + h, xx, y + h + 3, edge, 1.2); }
   }
   function faceCanvas(w) {
@@ -1255,11 +1272,10 @@
   function drawRug(r) {
     const R = rugRect(r);
     const w = r.st ? R.w * .58 : R.w;
-    ART.rr(ctx, R.x, R.y, w, R.h, 5); ctx.fillStyle = '#5e2a36'; ctx.fill(); ctx.lineWidth = 2.4; ctx.strokeStyle = P.INK; ctx.stroke();
-    ART.rr(ctx, R.x + 7, R.y + 7, w - 14, R.h - 14, 3); ctx.strokeStyle = '#8a4050'; ctx.lineWidth = 3; ctx.stroke();
-    ctx.fillStyle = '#c95f2c'; for (let i = 0; i < 5; i++) { const xx = R.x + 20 + i * 36; if (xx > R.x + w - 14) break; ctx.save(); ctx.translate(xx, R.y + R.h / 2); ctx.rotate(.785); ctx.fillRect(-4, -4, 8, 8); ctx.restore(); }
+    const [ra, rb, re] = rugCols(5);
+    ctx.save(); ctx.beginPath(); ctx.rect(R.x - 4, R.y - 6, w + 4, R.h + 12); ctx.clip(); rug(ctx, R.x, R.y, R.w, R.h, ra, rb, re, rugPat[5]); ctx.restore();
     if (r.st) { // rolled edge
-      ART.blk(ctx, R.x + w - 10, R.y - 2, 16, R.h + 4, '#6e3240', 8, 2.4);
+      ART.blk(ctx, R.x + w - 10, R.y - 2, 16, R.h + 4, rb, 8, 2.4);
       const B = boardRect(r);
       if (r.st === 1) { ART.blk(ctx, B.x, B.y, B.w, B.h, '#5a4560', 1, 1.6); ART.dot(ctx, B.x + 4, B.y + 5, 1.4, P.MUTE); ART.dot(ctx, B.x + B.w - 4, B.y + 5, 1.4, P.MUTE); }
       else {
