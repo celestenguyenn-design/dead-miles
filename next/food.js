@@ -36,8 +36,9 @@ window.DM = window.DM || {};
     const f = s.food, real = (now - f.at) / DAY;
     if (!(real > 0)) { if (real < 0) f.at = now; return hp; }   // clock went backwards: just restart from now
     const days = real * SKM(s);   // 0.13: Survival ranks slow the drain (starving HP loss runs on the same slowed clock)
-    const empty = Math.min(f.h / F.RATE.h, f.t / F.RATE.t);      // days until the first bar hits 0
-    f.h = Math.max(0, f.h - F.RATE.h * days);
+    const rh = F.RATE.h * (DM.Infect ? DM.Infect.hungerMul(s) : 1);   // 0.18: infected = hunger drains 15% faster (infection.js)
+    const empty = Math.min(f.h / rh, f.t / F.RATE.t);      // days until the first bar hits 0
+    f.h = Math.max(0, f.h - rh * days);
     f.t = Math.max(0, f.t - F.RATE.t * days);
     f.at = now;
     const starving = Math.max(0, days - empty);
@@ -105,6 +106,7 @@ window.DM = window.DM || {};
     if (F.thirsty(s)) out.push('Thirsty: searches take 20% longer and max stamina is 80.');
     if (s.food.h <= 0 || s.food.t <= 0) out.push(`Empty: you lose 1 HP an hour (never below ${F.FLOOR} from this alone).`);
     if (F.wellFed(s)) out.push('Well fed and hydrated: +10% scavenging XP.');
+    if (DM.Infect) out.push(...DM.Infect.effects(s));   // 0.18
     if (!out.length) out.push('Fine. Keep both bars above 30 to stay sharp; above 80 both gives +10% XP.');
     return out;
   };

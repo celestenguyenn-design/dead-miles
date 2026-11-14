@@ -458,6 +458,12 @@ const ART = (() => {
       <rect x="-14" y="-6" width="28" height="18" fill="#f6e3bb" stroke="#11142f" stroke-width="2"/><path d="M-6,8 Q-7,0 0,-2 Q7,0 6,8 Z" fill="#8a5a36" stroke="#11142f" stroke-width="1.6"/><path d="M0,-1 Q-2,3 0,7" stroke="#11142f" stroke-width="1.3" fill="none"/><path d="M-10,16 L-10,19" stroke="#f6e3bb" stroke-width="2" stroke-linecap="round" opacity=".5"/></g>`,
     hat: `<ellipse cx="0" cy="14" rx="30" ry="9" fill="#2a2440" stroke="#11142f" stroke-width="2.6"/><path d="M-16,12 L-12,-22 L12,-22 L16,12 Z" fill="#2a2440" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/><rect x="-15" y="2" width="30" height="8" fill="#5a4a86" stroke="#11142f" stroke-width="1.8"/><rect x="-6" y="0" width="12" height="12" rx="1" fill="none" stroke="#e0b94a" stroke-width="3"/>`,
   });
+  // 0.18: antibiotics (infection.js) - an amber pill bottle with a white cap and a capsule beside it
+  EXTRA_ICONS.antibio = `<g transform="rotate(-10)"><rect x="-17" y="-16" width="26" height="38" rx="4" fill="#e08a2e" stroke="#11142f" stroke-width="2.6"/>
+      <rect x="-20" y="-26" width="32" height="11" rx="3" fill="#f6e3bb" stroke="#11142f" stroke-width="2.6"/><path d="M-15,-21 h22" stroke="#cfc4a0" stroke-width="1.6"/>
+      <rect x="-17" y="-6" width="26" height="17" fill="#f6e3bb" stroke="#11142f" stroke-width="2"/><path d="M-4,-2.5 v10 M-9,2.5 h10" stroke="#3fa7a0" stroke-width="3" stroke-linecap="round"/>
+      <path d="M-13,-12 v6" stroke="#f6c58a" stroke-width="2.2" stroke-linecap="round" opacity=".8"/></g>
+    <g transform="translate(19 14) rotate(35)"><rect x="-6" y="-13" width="12" height="26" rx="6" fill="#f6e3bb" stroke="#11142f" stroke-width="2.4"/><path d="M-6,0 h12 v7 a6,6 0 0 1 -12,0 z" fill="#3fa7a0" stroke="#11142f" stroke-width="2.4" stroke-linejoin="round"/></g>`;
   const iconURL = {};
   function buildIcons() {
     const all = Object.assign({}, S.icons, EXTRA_ICONS);

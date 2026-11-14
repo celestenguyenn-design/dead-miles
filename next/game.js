@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.17';
+const NEXT_VERSION = '0.18';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -311,13 +311,21 @@ const NEXT_VERSION = '0.17';
     }
     SV.stats.runs++; Game.save();
     hideMenu();
-    const hide = DM.Crew.forHouse(h, L);   // phase 5b: a survivor hiding in a closet, a stray under the furniture (rare)
-    DM.House.start(L, DM.Crew.wrap({
-      hint: h.type === 'tutorial' ? (SV.tutorialRun ? 'Back at 14 Halsey St - picking up where you left off' : 'Joystick to move  ·  SEARCH near furniture') : (h.run ? `Back at ${L.address} - picking up where you left off` : `${L.name} · ${L.address}`),
+    const hide = h.daily ? {} : DM.Crew.forHouse(h, L);   // phase 5b: a survivor hiding in a closet, a stray under the furniture (rare). 0.18: never in the daily house
+    // 0.18 DAILY CHALLENGE (daily.js): seeded loot rolls, no raid, no event mini-boss, the score tally (house.js G.dly)
+    const daily = h.daily ? { lootSeed: h.seed, daily: { scored: !!(SV.daily && SV.daily.res) }, noRaid: true, noBoss: true } : {};
+    DM.House.start(L, DM.Crew.wrap(Object.assign(daily, {
+      hint: h.daily ? (h.run ? `Daily challenge · back at ${L.address}` : `Daily challenge · ${L.name} · ${L.address}`) : h.type === 'tutorial' ? (SV.tutorialRun ? 'Back at 14 Halsey St - picking up where you left off' : 'Joystick to move  ·  SEARCH near furniture') : (h.run ? `Back at ${L.address} - picking up where you left off` : `${L.name} · ${L.address}`),
       resume: (h.type === 'tutorial' ? SV.tutorialRun : h.run) || null,
-      raid: h.type !== 'tutorial',   // 0.15: a rare raid can happen (raiders.js decides, seeded from the house)   // the tutorial card is rebuilt each render, so its progress lives on SV
+      raid: h.type !== 'tutorial' && !h.daily,   // 0.15: a rare raid can happen (raiders.js decides, seeded from the house)   // the tutorial card is rebuilt each render, so its progress lives on SV
       onState: st => { if (h.type === 'tutorial') SV.tutorialRun = st; else h.run = st; Game.save(); },
       onExit: res => {
+        if (h.daily) {   // 0.18: the daily house keeps its run state (re-entry is for fun); the first exit is scored
+          dropNotes(SV.survivor);
+          SV.stats.kills += res.kills; SV.stats.secrets += res.secrets; if (res.kind === 'down') SV.stats.downs++;
+          Game.save(); publish(); showMenu(); tab('houses'); renderHome();
+          DM.Daily.onExit(h, res); return;
+        }
         delete h.run; delete SV.tutorialRun;
         dropNotes(SV.survivor);   // 0.11.1: a torn note only makes sense inside its house - it is gone once she leaves
         h.status = q && !q.done ? 'new' : 'looted'; if (h.type === 'tutorial') SV.tutorialDone = true;
@@ -327,8 +335,9 @@ const NEXT_VERSION = '0.17';
         Game.save(); publish(); showMenu(); tab('houses'); renderHome();
         toast(res.kind === 'down' ? 'You made it home. Barely.' : `Home safe from ${res.address}`, 2.4);
       },
-    }, 'house', { hide }));
+    }), 'house', { hide }));
   }
+  Game.loot = loot;   // 0.18: daily.js starts the daily house through the normal run
   // after a boss fight (boss.js)
   Game.hideMenu = () => hideMenu();
   Game.afterRun = function (res) {
@@ -586,6 +595,7 @@ const NEXT_VERSION = '0.17';
     cosmetic: ['Cosmetics are earned', 'They unlock straight into your Wardrobe (home screen, next to Edit look). Tap any you own to wear it - hats, glasses, scarves, packs and jackets.'],
     base: ['Your base', 'Build steps come from walking (half of every step). Tap BUILD for walls, traps and garden beds, DECORATE to place furniture you found. The stash chest is here too.'],
     food: ['Hungry or thirsty', 'Your Hunger and Thirst bars drain slowly, even with the app closed. Below 30 you tire faster and search slower. Tap the bars to eat or drink - beans, water, soda, garden food, or a rain barrel at the base.'],
+    infect: DM.Infect ? DM.Infect.NOTE : ['Infected', ''],   // 0.18 (infection.js)
     lock: ['Locked', 'Lockpicks are silent but can snap - aim, then hold TURN and let go if it binds. A crowbar always works, but it is loud and may smash something.'],
   };
   let tipQ = [], tipOn = false;
@@ -821,6 +831,7 @@ const NEXT_VERSION = '0.17';
   const TYPEICON = { tutorial: B.row, rowS: B.row, rowL: B.row, apt: B.apt, bodega: B.shop(['#f07b3c', '#f6e3bb']), laundro: B.shop(['#3fa7a0', '#f6e3bb'], '<circle cx="23" cy="38" r="5" fill="#5a6a8e" stroke="#11142f" stroke-width="1.5"/>'),
     pharmacy: B.shop(['#93a86c', '#f6e3bb'], '<path d="M20 34h6v-4h4v4h6v4h-6v4h-4v-4h-6z" fill="#b53a2e"/>'), garage: B.garage, school: B.school, police: B.police, mansion: B.mansion };
   const typeIcon = t => `<svg viewBox="0 0 64 64" class="bicon">${TYPEICON[t] || B.row}</svg>`;
+  Game.ui = { typeIcon, esc, skulls: n => SKULL.repeat(n) + `<span class="dim">${SKULL.repeat(Math.max(0, 5 - n))}</span>`, sheetOpen: h => sheetOpen(h), sheetClose: () => sheetClose() };   // 0.18: for daily.js
 
   function showResult(title, stacks, lost, note, kick) {
     const el = $('#mres');
@@ -1039,12 +1050,15 @@ const NEXT_VERSION = '0.17';
     drawPortrait($('#mPort'), s.hands && s.hands.k, .78);
     if (curTab === 'houses') renderHouses(); else if (curTab === 'bench') renderBench(); else renderStash();
     updateSync();
-    if (cosQueue.length) setTimeout(showCosPop, 400); else { tip('home'); if (s.food.h < DM.Food.LOW || s.food.t < DM.Food.LOW) tip('food'); }
+    if (cosQueue.length) setTimeout(showCosPop, 400); else { tip('home'); if (s.food.h < DM.Food.LOW || s.food.t < DM.Food.LOW) tip('food'); if (DM.Infect && DM.Infect.is(s)) tip('infect'); }
+    const ic = document.querySelector('.nstat .inf'); if (ic) ic.onclick = () => { SFX.play('ui'); toast(DM.Infect.effects(s)[0], 5); };   // 0.18
   }
   // ---- 0.8: hunger + thirst (food.js). Real time drains them, so catch up whenever the home screen shows.
   const FD = DM.Food;
-  function foodTick() { const s = SV && SV.survivor; if (!s || !s.food) return; const h0 = s.hp; s.hp = FD.tick(s, s.hp); if (s.hp !== h0) Game.save(); }
-  const needStat = s => { const st = FD.status(s); return st.length ? `<div class="nstat">${st.map(([c, t]) => `<span class="${c}">${t}</span>`).join('')}</div>` : ''; };
+  function foodTick() { const s = SV && SV.survivor; if (!s || !s.food) return; const h0 = s.hp; s.hp = FD.tick(s, s.hp);
+    if (DM.Infect) { const m = DM.Infect.tick(s); if (m) { toast(m, 2.8); Game.save(); } }   // 0.18: infection clears after 5 days; HP never above the lower max
+    if (s.hp !== h0) Game.save(); }
+  const needStat = s => { const st = FD.status(s).concat(DM.Infect ? DM.Infect.status(s) : []); return st.length ? `<div class="nstat">${st.map(([c, t]) => `<span class="${c}">${t}</span>`).join('')}</div>` : ''; };
   // the bars on the home card follow the clock while the app stays open
   setInterval(() => {
     if (!SV || !SV.survivor || DM.scene || !$('#mNeeds')) return;
@@ -1097,9 +1111,10 @@ const NEXT_VERSION = '0.17';
       ${away ? `<div class="hdays">Dot's back in ${fmtN(away)} steps</div><div class="mbar dotbar"><i style="width:${Math.max(3, (1 - away / DOT_AWAY) * 100)}%"></i></div>`
         : `<div class="hdays">Safe zone · ${icon('caps')} ${T.caps} caps</div>`}</div>
       <div class="hbtns"><button class="mbtn${away ? ' ghost' : ''}" id="hTrader">${away ? 'Away' : 'Visit'}</button></div></div>` : '';
-    if (!list.length) { el.innerHTML = traderCard + `<div class="empty big">No houses scouted yet.<br>Walk - every ~1,000 steps turns up another door.</div>`; if ($('#hTrader')) $('#hTrader').onclick = openTrader; return; }
+    const dailyCard = SV.tutorialDone && DM.Daily ? DM.Daily.cardHTML() : '';   // 0.18: the daily challenge house (daily.js)
+    if (!list.length) { el.innerHTML = traderCard + dailyCard + `<div class="empty big">No houses scouted yet.<br>Walk - every ~1,000 steps turns up another door.</div>`; if ($('#hTrader')) $('#hTrader').onclick = openTrader; if (dailyCard) DM.Daily.bind(el); return; }
     const bossCard = SV.tutorialDone ? DM.Boss.cardHTML(true) : '';
-    el.innerHTML = traderCard + bossCard + list.map(h => {
+    el.innerHTML = traderCard + dailyCard + bossCard + list.map(h => {
       const T = D.BTYPES[h.type], left = 3 - (dayNum(SV.day.key) - dayNum(h.day)), done = h.status !== 'new' && h.status !== 'far';
       const q = h.quest && questById(h.quest), far = h.status === 'far';
       const tags = [h.nLocks ? `${h.nLocks} lock${h.nLocks > 1 ? 's' : ''}` : 'no locks', `${h.nZombies} zombie${h.nZombies === 1 ? '' : 's'}`];
@@ -1119,7 +1134,7 @@ const NEXT_VERSION = '0.17';
     }).join('');
     const find = id => id === 'tutorial' ? { id: 'tutorial', type: 'tutorial', seed: 0, status: 'new' } : SV.houses.find(h => h.id === id);
     if ($('#hTrader')) $('#hTrader').onclick = () => { SFX.play('ui'); openTrader(); };
-    DM.Boss.bind(el);
+    DM.Boss.bind(el); if (dailyCard) DM.Daily.bind(el);
     el.querySelectorAll('[data-loot]').forEach(b => b.onclick = () => { SFX.play('ui'); loot(find(b.dataset.loot)); });
     el.querySelectorAll('[data-auto]').forEach(b => b.onclick = () => { SFX.play('ui'); autoSearch(find(b.dataset.auto)); });
   }
@@ -1324,6 +1339,7 @@ const NEXT_VERSION = '0.17';
       }]);
     }
     if (it.use && it.use !== 'Read' && (it.hp || it.sta || FD.isFood(e.k)) && !it.slots) btns.push([it.use, () => { if (FD.isFood(e.k)) { const m = eatEntry(s, sel.from, sel.i); done(`${FD.verb(e.k)} ${it.n.toLowerCase()} · ${m}`); return; } s.hp = Math.min(maxHp(s), s.hp + (it.hp || 0)); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(`${it.n}: +${it.hp || 0} HP`); }]);
+    if (it.cure && DM.Infect) btns.push([it.use, () => { if (!DM.Infect.is(s)) return toast('You are not infected - keep them for a bite', 1.8); const m = DM.Infect.cure(s); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(m); renderHome(); }, 'big']);   // 0.18: antibiotics
     if (it.slots || it.bp || e.k === 'shoes' || e.k === 'lockset') btns.push([it.use, () => { const msg = Game.applyUse(e.k); if (!msg) return; e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(msg); }]);
     if (e.k === 'note') btns.push(['Read', () => { const nd = e.d && typeof e.d === 'object' ? e.d : null; toast(nd && nd.text ? nd.text + '  (found at ' + nd.addr + ')' : 'The note is too faded to make sense of here.', nd ? 5 : 2); }]);
     if (it.gift) btns.push(['Open', () => {
@@ -1375,6 +1391,8 @@ const NEXT_VERSION = '0.17';
     ['Looting', 'Walk with the joystick (drag anywhere). Stand by furniture and tap the magnifier to search. Searching makes noise. Your pack has 12 slots; things stack. Leave by the front door - anything you dropped stays behind. Your level makes searches a little faster and luckier (up to level 10).'],
     ['Levels & skills', 'Everything you do earns XP: searching, kills (special infected more), secrets, locks and keys, Dot\'s jobs, horde watch shifts and boss fights. Every level gives 1 skill point - early levels come every few houses, later ones slower. Tap Skills on the home card to spend them in five trees, 5 ranks each: Scavenging (faster searches, extra finds, Keen eye, Pack rat), Stealth (quieter steps and searches, zombies spot you later), Combat (melee and bow damage, longer dodge, more HP), Survival (slower hunger and thirst, better healing, more stamina) and Lockwork (wider sweet spots, picks last longer, quieter crowbar). Each rank needs the one before it; later ranks cost 2-3 points. Your job gives rank 1 of its tree free (Scavenger: Scavenging, Hunter: Stealth, Brawler: Combat, Mechanic: Survival, Thief: Lockwork). Survivors from before 0.13 kept Quiet hands, Keen eye and Pack rat for free and got every point their level earned. Once a week you can reset your skills for 150 caps.'],
     ['Special infected', 'Danger 3+ places (pharmacies, schools, police stations, mansions; look for the ☣ tag on the house list) have a couple more zombies and some special infected. Armored (riot gear, police stations): slow and hits hard; melee barely dents it until the armour cracks, arrows do full damage. Runner: fast and fragile, sprints the moment it sees you - you can only outrun it at a sprint. Bloater (green and swollen, pharmacies): bursts into a toxic cloud when it dies - shoot it, or dodge straight out. Screamer (gaping mouth, schools and mansions): if it sees you it stops and shrieks, and when it finishes every zombie in the house comes for you - kill it fast or stay out of sight. They carry better loot (ammo and police cosmetics, meds, lockpicks) and give much more XP.'],
+    ['Daily challenge', 'Every day one special house sits at the top of the Houses list: the same house for everyone (same layout, same zombies, same loot in every container), no scouting needed. A new one at midnight New York time. Only your first run counts: the score is loot value taken x4, 60 per secret, 15 per zombie (40 per special infected), up to 150 for speed if you searched at least 60% of the containers, and -150 if you go down (and the loot score is halved). Today\'s scores from everyone show on the card and after your run (sign in to post yours; offline your score waits on the phone). You can go back in for fun - the house stays as you left it.'],
+    ['Infection', 'About 1 in 10 zombie hits that land infects you (a bit more from special infected; Field medic halves it). Raiders and bosses do not. While infected your max HP is 5 lower, then 5 more each day, never more than 25 - it never kills you - and you get hungry a little faster. Antibiotics cure it at once: rare in pharmacies, nurse offices and medicine cabinets, and Dot sells them from trader level 2. Left alone it clears after about 5 days.'],
     ['Raiders', 'Rarely (about 1 run in 25-30, more in danger 3+ places) other survivors raid the house you are in: 2 or 3 masked raiders come up the stoop after you have been inside a while. They go for containers you have not searched and empty them, fight you on sight (one may have a pistol: a red line aims at you, then locks - dodge out of it) and fight zombies too, and run for the door when badly hurt. Kill them for part of what they stole plus ammo, meds and sometimes a weapon or a cosmetic. Any that get away are gone with their loot. They never take keys, notes, the hook pole or Dot\'s parcels.'],
     ['Pack, stash & item kinds', 'The Gear tab has three parts: Equipped (weapon, quiver, keyring, pack size, wardrobe, skills, eat & drink), Backpack (what you carry into houses) and Stash (the chest at your base). Every item shows its kind: Food, Drink, Medical, Weapon, Ammo, Tool, Gear, Material (used at the workbench or for base building - tap it to see what for), Sell (junk worth caps and nothing else, like paperbacks and watches), Key, Seed, Decor, Blueprint. Sort tidies a list by kind. Sell junk in the Stash tab sells every Sell item to Dot in one go when she is around.'],
     ['Locks & secrets', 'Locked doors, safes and cages hold the best loot. Lockpicks are silent but snap; a crowbar always works but is loud. Brass keys open the two locks nothing else can: a locked car outside a few houses (one key opens the glove box and the trunk, and the trunk always holds something good) and a key-locked room (rare; it always holds a prize that fits the building - a gun cabinet at the police station, the back room at a pharmacy, a safe room in a mansion). Look for the 🔑 tag on the house list. Keys live on your keyring (no pack slot, never lost) and are used up. Some locked rooms hide their key somewhere else in the same house. After you search most of a house, hidden spots can open: a loose floorboard under a rug, a sliding bookshelf, an attic hatch (needs a hook pole), a cracked wall panel. Torn notes give hints about the house you find them in; they fall apart once you leave.'],

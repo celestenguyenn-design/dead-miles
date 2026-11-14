@@ -37,7 +37,7 @@ window.DM = window.DM || {};
     ] },
     { id: 'surv', n: 'Survival', col: '#93a86c', job: 'mechanic', blurb: 'Hunger, thirst, healing and stamina.', ranks: [
       { n: 'Light eater', d: 'Hunger and thirst drain 15% slower.', c: 1 },
-      { n: 'Field medic', d: 'Food, bandages and meds heal 40% more HP.', c: 1 },
+      { n: 'Field medic', d: 'Food, bandages and meds heal 40% more HP. Zombie bites infect half as often.', c: 1 },
       { n: 'Second wind', d: '+15 max stamina, and it refills 20% faster.', c: 2 },
       { n: 'Iron stomach', d: 'Hunger and thirst drain another 15% slower.', c: 2 },
       { n: 'Marathoner', d: 'Sprinting costs 25% less stamina; it refills another 20% faster.', c: 3 },

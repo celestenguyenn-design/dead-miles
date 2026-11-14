@@ -668,6 +668,27 @@
   .dnot { display: block; width: 100%; margin-top: 10px; padding: 6px; font-size: 12.5px; font-weight: 800; color: var(--mute); text-decoration: underline; }
   .dtime { font-size: 11px; font-weight: 700; color: var(--mute); margin: -6px 0 12px; }
   .sum-item.lostit { opacity: .6; text-decoration: line-through; }
+  /* 0.18: daily challenge card / summary (daily.js), infected chip (infection.js) */
+  #infchip, #dlychip { align-self: flex-start; margin-top: 2px; padding: 3px 8px; border-radius: 99px; font-size: 9.5px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; border: 2px solid var(--ink); white-space: nowrap; }
+  #infchip { background: #c6e05a; color: var(--ink); } #dlychip { background: #e0b94a; color: var(--ink); }
+  body.atbase #infchip, body.atbase #dlychip, body.bossfight #dlychip { display: none !important; }
+  .nstat span.inf { background: rgba(198,224,90,.18); color: #c6e05a; cursor: pointer; }
+  .hcard.daily { align-items: flex-start; background: linear-gradient(160deg, #3a2c16 0%, #1c1538 75%); box-shadow: 0 4px 0 #e0b94a; }
+  .hcard.daily .hname.dlyname { color: #ffd27a; font-size: 14px; } .hcard.daily .dlyleft { color: var(--ora); font-weight: 900; }
+  .hcard.daily .hbtns { align-self: center; } .hcard.daily .hbtns .mbtn:not(.ghost) { background: #e0b94a; color: var(--ink); }
+  .dlyme { font-size: 11px; font-weight: 800; color: #cfc4ec; margin-top: 4px; } .dlyme b { color: #ffd27a; }
+  .dlyoff { font-size: 10.5px; font-weight: 800; color: var(--mute); margin-top: 4px; }
+  .dlyrows { list-style: none; margin: 5px 0 0; padding: 0; display: grid; gap: 2px; }
+  .dlyrows li { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; align-items: baseline; font-size: 11.5px; font-weight: 800; color: var(--crm); padding: 2px 6px; border-radius: 6px; background: rgba(255,255,255,.04); }
+  .dlyrows li i { font-style: normal; color: var(--mute); } .dlyrows li b { color: #ffd27a; } .dlyrows li.me { background: rgba(224,185,74,.22); }
+  .dlyrows li.gap { background: none; display: block; text-align: center; color: var(--mute); padding: 0; }
+  #msheet .dlyrows { max-height: 44vh; overflow: auto; }
+  .dlytot { font-size: 34px !important; color: #ffd27a; margin: 2px 0 6px; } .dlytot small { font-size: 14px; color: var(--mute); }
+  .dlyparts { width: 100%; border-collapse: collapse; font-size: 13px; font-weight: 800; color: var(--crm); }
+  .dlyparts td { padding: 5px 2px; border-bottom: 1px solid rgba(255,255,255,.08); vertical-align: top; } .dlyparts td:last-child { text-align: right; color: #b9d08a; white-space: nowrap; }
+  .dlyparts td small { display: block; font-size: 10.5px; color: var(--mute); font-weight: 700; } .dlyparts tr.neg td:last-child { color: #ff8a72; }
+  .dlyparts tr.sum td { border-bottom: 0; font-size: 15px; } .dlyparts tr.sum td:last-child { color: #ffd27a; }
+  .dlyhow { font-size: 11px; color: var(--mute); line-height: 1.45; margin: 8px 0 4px; }
 </style>
 </head>
 <body>
@@ -682,6 +703,8 @@
       <div><span id="room">STOOP</span></div>
       <div id="srch" style="margin:-2px 0 0 4px;font-size:9.5px;font-weight:800;letter-spacing:.06em;color:#9d90bf;text-transform:uppercase;white-space:nowrap;text-shadow:0 1px 0 #11142f"></div>
       <div id="evchip"></div>
+      <div id="infchip" style="display:none"></div>
+      <div id="dlychip" style="display:none"></div>
     </div>
     <div class="right">
       <div class="rowr">
@@ -727,27 +750,29 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.17"></script>
-<script src="art.js?v=0.17"></script>
-<script src="net.js?v=0.17"></script>
-<script src="netpanel.js?v=0.17"></script>
-<script src="syncguide.js?v=0.17"></script>
-<script src="events.js?v=0.17"></script>
-<script src="data.js?v=0.17"></script>
-<script src="food.js?v=0.17"></script>
-<script src="skills.js?v=0.17"></script>
-<script src="infected.js?v=0.17"></script>
-<script src="engine.js?v=0.17"></script>
-<script src="music.js?v=0.17"></script>
-<script src="gen.js?v=0.17"></script>
-<script src="raiders.js?v=0.17"></script>
-<script src="house.js?v=0.17"></script>
-<script src="horde.js?v=0.17"></script>
-<script src="base.js?v=0.17"></script>
-<script src="crew.js?v=0.17"></script>
-<script src="boss.js?v=0.17"></script>
-<script src="deep.js?v=0.17"></script>
-<script src="game.js?v=0.17"></script>
-<script src="map.js?v=0.17"></script>
+<script src="s2art.js?v=0.18"></script>
+<script src="art.js?v=0.18"></script>
+<script src="net.js?v=0.18"></script>
+<script src="netpanel.js?v=0.18"></script>
+<script src="syncguide.js?v=0.18"></script>
+<script src="events.js?v=0.18"></script>
+<script src="data.js?v=0.18"></script>
+<script src="food.js?v=0.18"></script>
+<script src="skills.js?v=0.18"></script>
+<script src="infection.js?v=0.18"></script>
+<script src="infected.js?v=0.18"></script>
+<script src="engine.js?v=0.18"></script>
+<script src="music.js?v=0.18"></script>
+<script src="gen.js?v=0.18"></script>
+<script src="raiders.js?v=0.18"></script>
+<script src="house.js?v=0.18"></script>
+<script src="horde.js?v=0.18"></script>
+<script src="base.js?v=0.18"></script>
+<script src="crew.js?v=0.18"></script>
+<script src="boss.js?v=0.18"></script>
+<script src="daily.js?v=0.18"></script>
+<script src="deep.js?v=0.18"></script>
+<script src="game.js?v=0.18"></script>
+<script src="map.js?v=0.18"></script>
 </body>
 </html>

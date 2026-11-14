@@ -41,6 +41,8 @@ anon only:
 | `next_party_leave(h,t,code)` | `{ok}`. An empty party is deleted. |
 | `next_party_get(h,t,code)` | `{ok, party:{code,members,data,created,mine}}`. Empty code = the party I am in. |
 | `next_party_shift(h,t,code,week,kills,defense)` | `{ok, code, week, members, horde:{shifts:{handle:{k,d,n,at}}}, mine}`. Adds one watch shift to `next_parties.data.horde[week]`. `week` must be a Sunday within 8 days of today; kills clamped 0..200 (total 1200), defense 0..500; max 6 shifts per member per week (`error:'max'`). Errors: `auth`, `code`, `member`, `week`. Weeks older than 35 days are pruned; other `data` keys are kept. Migration `next_party_shift` (2026-11-13). |
+| `next_daily_submit(h,t,day,score,detail jsonb)` | 0.18, **not applied yet - SQL in `next/daily.sql`**. `{ok:true, best}` (best = the stored score). The FIRST submission per handle per New York day is kept; later ones change nothing. `day` must be today or yesterday (New York) else `error:'day'`; score clamped 0..100000; detail ≤2 KB object. Table `next_daily` (day, handle) pk. |
+| `next_daily_board(day)` | 0.18. `[{handle, name, score, detail, at}]`, score desc, top 50. `name` from `next_board`, else the handle. |
 
 Existing RPCs used as they are: `register_player`, `recover_login`, `set_recovery`,
 `get_step_key`, `get_steps`, `post_steps` (when `?steps=` arrives without a key) and
@@ -74,6 +76,8 @@ State: `ok, handle, name, token, status ('online'|'offline'|'checking'|'bad-key'
   `typed_share` are filled from the ledger if you leave them out.
 - `await NET.board()`: rows, also cached in localStorage for offline.
 - `await NET.partyJoin(code)`, `NET.partyLeave()`, `NET.partyGet(code?)`
+- `await NET.dailySubmit(day, score, detail)` → `{ok, best}` or `{ok:false, error:'signed-out'|'offline'|'auth'|'day'}` (0.18, daily.js)
+- `await NET.dailyBoard(day)` → `{ok, rows, cached}`; the last board is kept in localStorage `dm-next-daily` for offline
 - `NET.openPanel()` / `NET.closePanel()` (netpanel.js)
 - Hooks: `NET.onSteps`, `NET.onConflict`, `NET.onChange`, `NET.onRemoteAdopted(state)`.
   The panel calls the last one when the player picks "the other one" in a conflict.
