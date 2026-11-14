@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.11';
+const NEXT_VERSION = '0.11.1';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -58,6 +58,7 @@ const NEXT_VERSION = '0.11';
     if (v.survivor) migrateCos(v.survivor);
     if (v.survivor) migrateQuiver(v.survivor);
     if (v.survivor) migrateKeys(v.survivor);
+    if (v.survivor && !v.run0111) { dropNotes(v.survivor); v.run0111 = 1; }   // notes carried home before 0.11.1
     if (v.survivor) DM.Food.norm(v.survivor);   // 0.8: hunger + thirst (older saves start at 80/80, draining from now)
     DM.Crew.norm(v);                        // phase 5b: crew + strays (SV.crew, SV.pets)
     DM.Boss.norm(v);                        // phase 5b: the weekly boss (SV.boss)
@@ -88,6 +89,7 @@ const NEXT_VERSION = '0.11';
     s.keys = Math.max(0, +s.keys || 0);
     for (const list of [s.pack || [], s.stash || []]) for (let i = list.length - 1; i >= 0; i--) if (list[i].k === 'key') { s.keys += list[i].n; list.splice(i, 1); }
   }
+  function dropNotes(s) { if (!s) return; for (const k of ['pack', 'stash']) if (Array.isArray(s[k])) s[k] = s[k].filter(e => e.k !== 'note'); }
   function toQuiver(n) { const q = SV.survivor.quiver = SV.survivor.quiver || { n: 0 }, t = Math.max(0, Math.min(n, D.QUIVER - q.n)); q.n += t; return t; }
   const cosQueue = [];   // unlock popups waiting to be shown
   D.cosOwned = () => (SV && SV.survivor && SV.survivor.wardrobe ? SV.survivor.wardrobe.own : {});
@@ -315,6 +317,7 @@ const NEXT_VERSION = '0.11';
       onState: st => { if (h.type === 'tutorial') SV.tutorialRun = st; else h.run = st; Game.save(); },
       onExit: res => {
         delete h.run; delete SV.tutorialRun;
+        dropNotes(SV.survivor);   // 0.11.1: a torn note only makes sense inside its house - it is gone once she leaves
         h.status = q && !q.done ? 'new' : 'looted'; if (h.type === 'tutorial') SV.tutorialDone = true;
         SV.stats.kills += res.kills; SV.stats.secrets += res.secrets; if (res.kind === 'down') SV.stats.downs++;
         if (q && q.type === 'clear' && res.zombies.total && res.zombies.dead >= res.zombies.total) questDone(q);
@@ -1308,7 +1311,7 @@ const NEXT_VERSION = '0.11';
   const HOWTO = [
     ['Steps & houses', 'All your daily steps count. About every 1,000 steps scouts another house (up to 10 a day; the more you walk, the better the odds of big places like police stations and mansions). Houses wait 3 days. Loot one yourself, or send your Crew - they bring back less and never find secrets.'],
     ['Looting', 'Walk with the joystick (drag anywhere). Stand by furniture and tap the magnifier to search. Searching makes noise. Your pack has 12 slots; things stack. Leave by the front door - anything you dropped stays behind. Your Scavenging level makes searches faster and luckier.'],
-    ['Locks & secrets', 'Locked doors, safes and cages hold the best loot. Lockpicks are silent but snap; a crowbar always works but is loud. Brass keys open the two locks nothing else can: a locked car outside a few houses (one key opens the glove box and the trunk, and the trunk always holds something good) and a key-locked room (rare; it always holds a prize that fits the building - a gun cabinet at the police station, the back room at a pharmacy, a safe room in a mansion). Look for the 🔑 tag on the house list. Keys live on your keyring (no pack slot, never lost) and are used up. Some locked rooms hide their key somewhere else in the same house. After you search most of a house, hidden spots can open: a loose floorboard under a rug, a sliding bookshelf, an attic hatch (needs a hook pole), a cracked wall panel. Torn notes give hints.'],
+    ['Locks & secrets', 'Locked doors, safes and cages hold the best loot. Lockpicks are silent but snap; a crowbar always works but is loud. Brass keys open the two locks nothing else can: a locked car outside a few houses (one key opens the glove box and the trunk, and the trunk always holds something good) and a key-locked room (rare; it always holds a prize that fits the building - a gun cabinet at the police station, the back room at a pharmacy, a safe room in a mansion). Look for the 🔑 tag on the house list. Keys live on your keyring (no pack slot, never lost) and are used up. Some locked rooms hide their key somewhere else in the same house. After you search most of a house, hidden spots can open: a loose floorboard under a rug, a sliding bookshelf, an attic hatch (needs a hook pole), a cracked wall panel. Torn notes give hints about the house you find them in; they fall apart once you leave.'],
     ['Weapons & equipping', 'The weapon in your hand is what you fight with. At home: Pack & stash > tap a weapon > Equip. In a house: tap the Swap button (bottom right) to pick any weapon in your pack. Weapons wear out - repair them with scrap. Zombies hear noise; you can run (push the stick far) and dodge.'],
     ['Cosmetics & wardrobe', 'Cosmetics are earned: rare finds in houses and on zombies, better in mansions and police stations, plus Dot\'s shop and jobs, horde-night crates and events. They unlock straight into your Wardrobe and never use pack space. Wardrobe (home screen) > tap one to wear it. Spares are sold to Dot automatically.'],
     ['Food & water', 'Two bars under your HP: Hunger (drumstick) and Thirst (droplet). They drain with real time, even while the app is closed - about one meal and two drinks a day - and a little faster during runs (sprinting and fighting most). Tap the bars, or a food in Pack & stash, to eat or drink: beans and pie fill Hunger, water and soda fill Thirst, cranberry sauce and tomatoes a bit of both, coffee gives stamina. Garden crops are food, and a rain barrel at the base gives a drink (+50 thirst). Below 30: Hungry means slower stamina and no overnight healing; Thirsty means slower searches and max stamina 80. At 0 you lose 1 HP an hour, but never below 10 from hunger alone. Above 80 on both: +10% scavenging XP. Your crew eats from the stash separately.'],
