@@ -314,7 +314,8 @@ const NEXT_VERSION = '0.16';
     const hide = DM.Crew.forHouse(h, L);   // phase 5b: a survivor hiding in a closet, a stray under the furniture (rare)
     DM.House.start(L, DM.Crew.wrap({
       hint: h.type === 'tutorial' ? (SV.tutorialRun ? 'Back at 14 Halsey St - picking up where you left off' : 'Joystick to move  ·  SEARCH near furniture') : (h.run ? `Back at ${L.address} - picking up where you left off` : `${L.name} · ${L.address}`),
-      resume: (h.type === 'tutorial' ? SV.tutorialRun : h.run) || null,   // the tutorial card is rebuilt each render, so its progress lives on SV
+      resume: (h.type === 'tutorial' ? SV.tutorialRun : h.run) || null,
+      raid: h.type !== 'tutorial',   // 0.15: a rare raid can happen (raiders.js decides, seeded from the house)   // the tutorial card is rebuilt each render, so its progress lives on SV
       onState: st => { if (h.type === 'tutorial') SV.tutorialRun = st; else h.run = st; Game.save(); },
       onExit: res => {
         delete h.run; delete SV.tutorialRun;
@@ -570,7 +571,7 @@ const NEXT_VERSION = '0.16';
     const s = SV.survivor;
     if (wDmg(k) > handsDmg() && usable(k) && (!s.better || wDmg(k) > wDmg(s.better))) {
       s.better = k;
-      toast(`Better weapon found: ${D.ITEMS[k].n} - ${inRun ? 'tap Swap, or ' : ''}equip it in Pack & stash`, 3);
+      toast(`Better weapon found: ${D.ITEMS[k].n} - ${inRun ? 'tap Swap, or ' : ''}equip it in Gear`, 3);
     }
     tip('weapon');
   };
@@ -581,7 +582,7 @@ const NEXT_VERSION = '0.16';
   const TIPS = {
     home: ['Your steps scout houses', 'Every ~1,000 steps today turns up another house. Tap Loot to go in and search it yourself, or send your Crew.'],
     loot: ['Looting', 'Tap an item to take it, or Take all. The pack has limited slots - stash extras at home. Some loot only shows up in hidden spots.'],
-    weapon: ['You found a weapon', 'Equip it in Pack & stash at home, or tap the Swap button (bottom right) during a run to fight with it right away.'],
+    weapon: ['You found a weapon', 'Equip it in the Gear tab at home (Backpack or Stash), or tap the Swap button (bottom right) during a run to fight with it right away.'],
     cosmetic: ['Cosmetics are earned', 'They unlock straight into your Wardrobe (home screen, next to Edit look). Tap any you own to wear it - hats, glasses, scarves, packs and jackets.'],
     base: ['Your base', 'Build steps come from walking (half of every step). Tap BUILD for walls, traps and garden beds, DECORATE to place furniture you found. The stash chest is here too.'],
     food: ['Hungry or thirsty', 'Your Hunger and Thirst bars drain slowly, even with the app closed. Below 30 you tire faster and search slower. Tap the bars to eat or drink - beans, water, soda, garden food, or a rain barrel at the base.'],
@@ -705,7 +706,19 @@ const NEXT_VERSION = '0.16';
     <rect x="70" y="44" width="12" height="5" rx="2" fill="#f4b98a" stroke="#11142f" stroke-width="1.6" transform="rotate(20 76 46)"/>
     <circle cx="40" cy="70" r="3" fill="#c96a6a" opacity=".5"/><circle cx="80" cy="70" r="3" fill="#c96a6a" opacity=".5"/></svg>`;
   let tTab = 'quests', tSel = null;
-  function openTrader() { refreshTrader(); tTab = 'quests'; tSel = null; renderTrader(); }
+  // 0.15 (owner: "the trader shouldn't be infinite"): after each visit Dot heads off and is back once you have walked
+  // DOT_AWAY more steps (SV.walked: phone/watch steps, typed ones at half, the same total quests use). A visit starts when
+  // her shop opens (so closing the app inside it still counts) or when junk is sold to her from the stash.
+  const DOT_AWAY = 3000;
+  const fmtN = n => Math.round(n).toLocaleString('en-US');
+  function dotLeft() { const T = SV && SV.trader; if (!T || T.away == null) return 0; const left = T.away + DOT_AWAY - (SV.walked || 0); if (left <= 0) { T.away = null; return 0; } return Math.ceil(left); }
+  function dotVisit() { SV.trader.away = SV.walked || 0; }
+  Game.dotLeft = dotLeft;
+  function openTrader() {
+    const left = dotLeft();
+    if (left) { toast(`Dot's on the road - back in ${fmtN(left)} steps`, 2); SFX.play('alert'); return; }
+    refreshTrader(); dotVisit(); Game.save(); tTab = 'quests'; tSel = null; renderTrader();
+  }
   function renderTrader() {
     const T = SV.trader, L = traderLevel(), lines = D.TRADER.lines[L - 1];
     const line = lines[(D.hashStr(SV.day.key) + T.completed) % lines.length];
@@ -717,7 +730,7 @@ const NEXT_VERSION = '0.16';
         <div class="tlvl">Trader level ${L}${L < 5 ? ` · ${T.completed % 20}/20 quests to level ${L + 1}` : ' · max'}</div><div class="mbar xp"><i style="width:${L < 5 ? (T.completed % 20) / 20 * 100 : 100}%"></i></div></div></div>
       <div id="mtabs"><button data-t="quests">Quests</button><button data-t="shop">Shop</button><button data-t="sell">Sell</button></div>
       <div id="tpane"></div>`;
-    $('#tBack').onclick = () => { $('#menu').className = ''; renderHome(); };
+    $('#tBack').onclick = () => { $('#menu').className = ''; renderHome(); toast(`Dot packs up her cart. Back in about ${fmtN(DOT_AWAY)} steps`, 2.4); };
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === tTab); b.onclick = () => { tTab = b.dataset.t; tSel = null; SFX.play('ui'); renderTrader(); }; });
     ({ quests: tQuests, shop: tShop, sell: tSell })[tTab]();
   }
@@ -995,7 +1008,7 @@ const NEXT_VERSION = '0.16';
         ${window.SYNC ? (window.NET && NET.ok && !d.phone && new Date().getHours() >= 14 ? '<button class="synclink nudge" id="mSyncG" data-m="fix">No phone steps yet today? Fix step sync</button>' : '<button class="synclink" id="mSyncG">How to sync steps</button>') : ''}
       </div>
       ${SV.tutorialDone || SV.stats.runs ? baseCards() + DM.Boss.cardHTML() + DM.Crew.cardHTML() : ''}
-      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Pack &amp; stash${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}</div>
+      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}</div>
       <div id="mpane"></div>`;
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { SFX.play('ui'); if (b.dataset.t === 'map') { DM.Map.open(); return; } tab(b.dataset.t); }; });
     $('#mLog').onclick = () => {
@@ -1076,11 +1089,13 @@ const NEXT_VERSION = '0.16';
     list.push(...SV.houses);
     const el = $('#mpane');
     refreshTrader();
-    const T = SV.trader, ready = T.active.filter(q => q.done || supplyReady(q)).length;
-    const traderCard = SV.tutorialDone ? `<div class="hcard trader"><div class="bicon dotmini">${DOT_SVG}</div>
-      <div class="hinfo"><div class="hname">${D.TRADER.name} <em>trader</em></div><div class="haddr">${D.TRADER.place}</div>
+    const T = SV.trader, ready = T.active.filter(q => q.done || supplyReady(q)).length, away = dotLeft();
+    const traderCard = SV.tutorialDone ? `<div class="hcard trader${away ? ' away' : ''}"><div class="bicon dotmini">${DOT_SVG}</div>
+      <div class="hinfo"><div class="hname">${D.TRADER.name} <em>trader</em></div><div class="haddr">${away ? 'On the road · her cart is somewhere out there' : D.TRADER.place}</div>
       <div class="hmeta"><span>Level ${traderLevel()} · ${T.active.length}/2 jobs${ready ? ` · <b class="hot">${ready} ready to turn in</b>` : ''}</span></div>
-      <div class="hdays">Safe zone · ${icon('caps')} ${T.caps} caps</div></div><div class="hbtns"><button class="mbtn" id="hTrader">Visit</button></div></div>` : '';
+      ${away ? `<div class="hdays">Dot's back in ${fmtN(away)} steps</div><div class="mbar dotbar"><i style="width:${Math.max(3, (1 - away / DOT_AWAY) * 100)}%"></i></div>`
+        : `<div class="hdays">Safe zone · ${icon('caps')} ${T.caps} caps</div>`}</div>
+      <div class="hbtns"><button class="mbtn${away ? ' ghost' : ''}" id="hTrader">${away ? 'Away' : 'Visit'}</button></div></div>` : '';
     if (!list.length) { el.innerHTML = traderCard + `<div class="empty big">No houses scouted yet.<br>Walk - every ~1,000 steps turns up another door.</div>`; if ($('#hTrader')) $('#hTrader').onclick = openTrader; return; }
     const bossCard = SV.tutorialDone ? DM.Boss.cardHTML(true) : '';
     el.innerHTML = traderCard + bossCard + list.map(h => {
@@ -1196,43 +1211,84 @@ const NEXT_VERSION = '0.16';
   }
   Game.resolveHorde = resolveHorde;
 
-  // ---- pack & stash
-  let sel = null; // {from:'pack'|'stash'|'hands', i}
+  // ---- pack & stash (0.15: split into Equipped / Backpack / Stash sub-tabs; every item shows its category)
+  let sel = null; // {from:'pack'|'stash'|'hands'|'quiver', i}
+  let gTab = 'gear';   // which sub-tab of the Gear tab is showing
+  const subOf = from => from === 'pack' ? 'pack' : from === 'stash' ? 'stash' : 'gear';
+  const catTag = k => { const c = D.cat(k); return `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
+  Game.catTag = catTag;
+  const junkOf = s => s.stash.map((e, i) => ({ e, i })).filter(r => D.cat(r.e.k) === 'sell' && D.VALUE[r.e.k] !== 0);
+  function sortList(list) { const o = k => D.CAT_ORDER.indexOf(D.cat(k)); list.sort((a, b) => o(a.k) - o(b.k) || D.ITEMS[a.k].n.localeCompare(D.ITEMS[b.k].n)); }
   function renderStash() {
     if (stashHost && !document.body.contains(stashHost)) stashHost = null;
     const s = SV.survivor, el = stashHost || $('#mpane');
+    if (stashHost && gTab === 'gear') gTab = 'stash';   // the stash chest at the base: just the pack and the chest
     const hd = handsDmg();
     const slot = (e, from, i) => {
       const it = D.ITEMS[e.k], on = sel && sel.from === from && sel.i === i, up = it.w && from !== 'hands' ? wDmg(e.k) - hd : 0;
-      return `<button class="slot${it.rare ? ' rare' : ''}${on ? ' sel' : ''}" data-from="${from}" data-i="${i}">${icon(e.k)}<span>${it.n}</span>${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${up > 0 ? `<em class="up">+${up} dmg</em>` : ''}${e.d != null && it.w ? `<i class="dur"><i style="width:${Math.max(4, e.d / D.WEAPONS[it.w].dur * 100)}%"></i></i>` : ''}</button>`;
+      return `<button class="slot${it.rare ? ' rare' : ''}${on ? ' sel' : ''}" data-from="${from}" data-i="${i}">${icon(e.k)}<span>${it.n}</span>${catTag(e.k)}${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${up > 0 ? `<em class="up">+${up} dmg</em>` : ''}${e.d != null && it.w ? `<i class="dur"><i style="width:${Math.max(4, e.d / D.WEAPONS[it.w].dur * 100)}%"></i></i>` : ''}</button>`;
     };
-    const empty = n => Array.from({ length: n }, () => '<div class="slot ph"></div>').join('');
-    const h = s.hands, hw = h && D.ITEMS[h.k], worn = Object.values(s.look.cos || {}).filter(c => D.COS[c]);
+    const empty = n => Array.from({ length: Math.max(0, n) }, () => '<div class="slot ph"></div>').join('');
     const A = from => sel && sel.from === from ? '<div id="sacts"></div>' : '';
-    const gear = [s.shoes && 'Quiet shoes', s.lockset && 'Lockpick set'].filter(Boolean);
-    el.innerHTML = `
-      <div class="kick sect">Equipped</div>
-      <div class="eqrow">
+    const better = betterBadge() && s.better, bIn = list => better && list.some(e => e.k === s.better) ? '<i class="sbadge">!</i>' : '';
+    const seg = `<div class="seg" id="gtabs">${stashHost ? '' : `<button data-g="gear">Equipped</button>`}<button data-g="pack">Backpack <i>${s.pack.length}/${packSlots()}</i>${bIn(s.pack)}</button><button data-g="stash">Stash <i>${s.stash.length}/${STASH_SLOTS}</i>${bIn(s.stash)}</button></div>`;
+    let body = '';
+    if (gTab === 'gear') {
+      const h = s.hands, hw = h && D.ITEMS[h.k], worn = Object.values(s.look.cos || {}).filter(c => D.COS[c]);
+      const gear = [s.shoes && 'Quiet shoes', s.lockset && 'Lockpick set'].filter(Boolean), xl = DM.Skills.xpLine(s), pts = DM.Skills.points(s), f = s.food || { h: 0, t: 0 };
+      body = `<div class="eqrow">
         <button class="eqslot${sel && sel.from === 'hands' ? ' sel' : ''}" ${h ? 'data-from="hands" data-i="0"' : 'id="eqFists"'}><i class="eqk">Weapon · hand</i>${h ? icon(h.k) : '<span class="eqnone">✊</span>'}<b>${h ? esc(hw.n) : 'Fists'}</b><span>${hd} dmg${h && h.d != null ? ` · ${Math.round(h.d / D.WEAPONS[hw.w].dur * 100)}%` : ''}</span>${h && h.d != null ? `<i class="dur"><i style="width:${Math.max(4, h.d / D.WEAPONS[hw.w].dur * 100)}%"></i></i>` : ''}</button>
         <button class="eqslot quiv${sel && sel.from === 'quiver' ? ' sel' : ''}" data-from="quiver" data-i="0"><i class="eqk">Quiver</i>${(s.quiver || {}).n ? icon('arrow') : `<img class="dim" alt="" src="${ART.iconURL.arrow}">`}<b>${(s.quiver || {}).n || 0} arrow${(s.quiver || {}).n === 1 ? '' : 's'}</b><span>max ${D.QUIVER} · no pack slot</span></button>
         <div class="eqslot"><i class="eqk">Backpack</i>${s.packBonus ? icon(s.packBonus >= 4 ? 'backpack' : 'packplus') : `<img class="dim" alt="" src="${ART.iconURL.backpack}">`}<b>${packSlots()} slots</b><span>${s.packBonus ? `+${s.packBonus} from upgrades` : 'No upgrade yet'}</span></div>
         <button class="eqslot cos" id="eqWard"><i class="eqk">Cosmetics</i><span class="eqcos">${worn.length ? worn.slice(0, 4).map(c => `<img alt="" src="${ART.iconURL['cos_' + c]}">`).join('') : '<img alt="" src="' + ART.iconURL.cosS_beanie + '">'}</span><b>Wardrobe →</b><span>${worn.length ? worn.length + ' worn' : 'Nothing worn'}${newCos() ? ` · <em class="newtxt">${newCos()} new</em>` : ''}</span></button>
-      </div>
-      <div class="eqgear">🔑 Keyring: <b>${+s.keys || 0} brass key${(+s.keys || 0) === 1 ? '' : 's'}</b> · always with you, no pack slot</div>
-      ${gear.length ? `<div class="eqgear">Also wearing: ${gear.join(' · ')}</div>` : ''}${A('hands')}${A('quiver')}
-      <div class="kick sect">Backpack · ${s.pack.length}/${packSlots()}</div>
-      <div class="grid g4">${s.pack.map((e, i) => slot(e, 'pack', i)).join('')}${empty(packSlots() - s.pack.length)}</div>
-      ${s.pack.length && !sel ? '<button class="mbtn sm" id="sAll" style="margin-top:8px;width:100%">Stash all</button>' : ''}${A('pack')}
-      <div class="kick sect">${stashHost ? 'Stash chest' : 'Stash chest (at your base)'} · ${s.stash.length}/${STASH_SLOTS}</div>
-      <div class="grid g5">${s.stash.map((e, i) => slot(e, 'stash', i)).join('')}${empty(Math.min(10, STASH_SLOTS - s.stash.length))}</div>${A('stash')}`;
-    el.querySelector('#eqWard').onclick = () => { SFX.play('ui'); sel = null; stashHost = null; if (DM.scene) { toast('The wardrobe is on the home screen', 1.6); return; } editLook('wardrobe'); };
-    if (el.querySelector('#eqFists')) el.querySelector('#eqFists').onclick = () => toast(s.pack.concat(s.stash).some(e => D.isWeapon(e.k)) ? 'Tap a weapon below, then Equip' : 'No weapon yet - they turn up in kitchens, garages and lockers', 2);
+      </div>${A('hands')}${A('quiver')}
+      <div class="kick sect">Always with you</div>
+      <div class="gline"><span class="gi">🔑</span><div><b>Keyring · ${+s.keys || 0} brass key${(+s.keys || 0) === 1 ? '' : 's'}</b><span>Opens locked cars and key-locked rooms · no pack slot</span></div></div>
+      ${gear.length ? `<div class="gline"><span class="gi">👟</span><div><b>${gear.join(' · ')}</b><span>${[s.shoes && 'footsteps -30%', s.lockset && 'wider sweet spots, picks snap less'].filter(Boolean).join(' · ')}</span></div></div>` : ''}
+      <div class="kick sect">You</div>
+      <button class="gline tap${pts ? ' hot' : ''}" id="gSkills"><span class="gi">★</span><div><b>Level ${xl.L} · skills</b><span>${pts ? `${pts} skill point${pts > 1 ? 's' : ''} to spend` : 'Five skill trees · 1 point a level'}</span></div><em>›</em></button>
+      <button class="gline tap" id="gFood"><span class="gi">🍗</span><div><b>Eat &amp; drink</b><span>Hunger ${Math.round(f.h)} · Thirst ${Math.round(f.t)}</span></div><em>›</em></button>`;
+    } else if (gTab === 'pack') {
+      body = `<div class="ghead"><span class="kick">Backpack · ${s.pack.length}/${packSlots()} slots</span>${s.pack.length > 1 ? '<button class="mini" id="sSortP">Sort</button>' : ''}</div>
+      <div class="grid g4">${s.pack.map((e, i) => slot(e, 'pack', i)).join('')}${empty(packSlots() - s.pack.length)}</div>${A('pack')}
+      ${!s.pack.length ? '<div class="ghint">Empty. Whatever you loot goes here; anything that does not fit is left on the floor.</div>' : !sel ? `<div class="ptools"><button class="mbtn sm" id="sAll">Stash all</button></div><div class="ghint">Tap an item to eat, equip, use or move it.</div>` : ''}`;
+    } else {
+      const junk = junkOf(s), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n)), 0), away = dotLeft();
+      body = `<div class="ghead"><span class="kick">${stashHost ? 'Stash chest' : 'Stash chest · at your base'} · ${s.stash.length}/${STASH_SLOTS}</span>${s.stash.length > 1 ? '<button class="mini" id="sSortS">Sort</button>' : ''}</div>
+      <div class="grid g5">${s.stash.map((e, i) => slot(e, 'stash', i)).join('')}${empty(Math.min(s.stash.length ? (5 - s.stash.length % 5) % 5 + 5 : 10, STASH_SLOTS - s.stash.length))}</div>${A('stash')}
+      ${!s.stash.length ? '<div class="ghint">Nothing stored yet. Move things here from the Backpack tab so a bad run cannot cost you them.</div>' : ''}
+      ${junk.length && !sel ? `<div class="ptools"><button class="mbtn sm${away ? ' ghost' : ''}" id="sJunk"${away ? ' disabled' : ''}>${away ? `Dot is away · sell junk in ${fmtN(away)} steps` : `Sell junk to Dot · ${icon('caps')}${jv}`}</button></div>` : ''}`;
+    }
+    el.innerHTML = seg + body;
+    el.querySelectorAll('#gtabs button').forEach(b => { b.classList.toggle('on', b.dataset.g === gTab); b.onclick = () => { if (gTab === b.dataset.g) return; gTab = b.dataset.g; sel = null; SFX.play('ui'); renderStash(); }; });
+    if (el.querySelector('#eqWard')) el.querySelector('#eqWard').onclick = () => { SFX.play('ui'); sel = null; stashHost = null; if (DM.scene) { toast('The wardrobe is on the home screen', 1.6); return; } editLook('wardrobe'); };
+    if (el.querySelector('#eqFists')) el.querySelector('#eqFists').onclick = () => toast(s.pack.concat(s.stash).some(e => D.isWeapon(e.k)) ? 'Open Backpack or Stash, tap a weapon, then Equip' : 'No weapon yet - they turn up in kitchens, garages and lockers', 2);
+    if (el.querySelector('#gSkills')) el.querySelector('#gSkills').onclick = () => { SFX.play('ui'); DM.Skills.open(() => renderHome()); };
+    if (el.querySelector('#gFood')) el.querySelector('#gFood').onclick = () => { SFX.play('ui'); openFood(); };
     el.querySelectorAll('[data-from]').forEach(b => b.onclick = () => { const f = b.dataset.from, i = +b.dataset.i; sel = sel && sel.from === f && sel.i === i ? null : { from: f, i }; SFX.play('ui'); renderStash(); });
+    for (const [id, list] of [['#sSortP', s.pack], ['#sSortS', s.stash]]) if (el.querySelector(id)) el.querySelector(id).onclick = () => { sortList(list); sel = null; SFX.play('ui'); Game.save(); renderStash(); toast('Sorted by kind', 1); };
     if (el.querySelector('#sAll')) el.querySelector('#sAll').onclick = () => {
       for (let i = s.pack.length - 1; i >= 0; i--) { const e = s.pack[i]; const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d); e.n -= n; if (!e.n) s.pack.splice(i, 1); }
       SFX.play('ui'); Game.save(); renderStash(); toast(s.pack.length ? 'Stash is full - some things stayed in your pack' : 'Everything is in the stash', 1.8);
     };
+    if (el.querySelector('#sJunk')) el.querySelector('#sJunk').onclick = () => { SFX.play('ui'); sellJunk(); };
     if (sel) stashActions();
+  }
+  // 0.15: sell every "Sell" item in the stash to Dot in one go (she has to be in - it counts as a visit)
+  function sellJunk() {
+    const s = SV.survivor, junk = junkOf(s);
+    if (!junk.length) return;
+    if (dotLeft()) { toast(`Dot is on the road - back in ${fmtN(dotLeft())} steps`, 2); return; }
+    const val = r => Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n)), tot = junk.reduce((a, r) => a + val(r), 0);
+    sheetOpen(`<div class="kick">Auntie Dot · sell junk</div><h3>Sell ${junk.length} thing${junk.length === 1 ? '' : 's'} for ${tot} caps?</h3>
+      <div class="jlist">${junk.map(r => `<div class="jrow">${icon(r.e.k)}<span>${esc(D.ITEMS[r.e.k].n)}${r.e.n > 1 ? ' x' + r.e.n : ''}</span><b>${icon('caps')}${val(r)}</b></div>`).join('')}</div>
+      <p class="mp dim">Only things marked <b>Sell</b> (no crafting or base use). Dot counts this as a visit: she heads off for about ${fmtN(DOT_AWAY)} steps after.</p>
+      <div class="btnrow"><button class="mbtn sm ghost" id="jNo">Keep them</button><button class="mbtn sm" id="jYes">Sell · ${tot} caps</button></div>`);
+    $('#jNo').onclick = sheetClose;
+    $('#jYes').onclick = () => {
+      for (const r of junk.slice().sort((a, b) => b.i - a.i)) s.stash.splice(r.i, 1);
+      SV.trader.caps += tot; dotVisit(); SFX.play('pick'); Game.save(); sheetClose(); renderStash(); toast(`Dot paid ${tot} caps`, 1.8);
+    };
   }
   // the quiver: fill it from the stash/pack, or put its arrows away in the stash
   function quiverActions(s, acts) {
@@ -1275,7 +1331,7 @@ const NEXT_VERSION = '0.16';
       for (const x of stacks) { const left = give(x.k, x.n, x.d); if (left) lost.push({ k: x.k, n: left }); }
       done(); showResult('Gift box', stacks, lost, 'Somebody wrapped this before it all went bad. It went into your pack (the stash if the pack is full).', 'Opened');
     }, 'big']);
-    acts.innerHTML = `<div class="sact"><span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}${it.tag ? ` <em>${it.tag}</em>` : ''}${it.w ? ` <i class="wst">${wDmg(e.k)} dmg${sel.from === 'hands' ? ' · in your hand' : ''}</i>` : ''}</span></div>`;
+    acts.innerHTML = `<div class="sact"><span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}${it.tag ? ` <em>${it.tag}</em>` : ''}${it.w ? ` <i class="wst">${wDmg(e.k)} dmg${sel.from === 'hands' ? ' · in your hand' : ''}</i>` : ''}<small class="cline" style="--cc:${D.CATS[D.cat(e.k)].c}">${esc(D.catLine(e.k, e.d))}</small></span></div>`;
     const row = acts.firstChild;
     btns.forEach(([t, fn, big], i) => { const b = document.createElement('button'); b.className = big ? 'mbtn eqbig' : 'mbtn sm' + (i ? ' ghost' : ''); b.textContent = t; b.onclick = () => { SFX.play('pick'); fn(); }; row.appendChild(b); });
   }
@@ -1318,10 +1374,12 @@ const NEXT_VERSION = '0.16';
     ['Looting', 'Walk with the joystick (drag anywhere). Stand by furniture and tap the magnifier to search. Searching makes noise. Your pack has 12 slots; things stack. Leave by the front door - anything you dropped stays behind. Your level makes searches a little faster and luckier (up to level 10).'],
     ['Levels & skills', 'Everything you do earns XP: searching, kills (special infected more), secrets, locks and keys, Dot\'s jobs, horde watch shifts and boss fights. Every level gives 1 skill point - early levels come every few houses, later ones slower. Tap Skills on the home card to spend them in five trees, 5 ranks each: Scavenging (faster searches, extra finds, Keen eye, Pack rat), Stealth (quieter steps and searches, zombies spot you later), Combat (melee and bow damage, longer dodge, more HP), Survival (slower hunger and thirst, better healing, more stamina) and Lockwork (wider sweet spots, picks last longer, quieter crowbar). Each rank needs the one before it; later ranks cost 2-3 points. Your job gives rank 1 of its tree free (Scavenger: Scavenging, Hunter: Stealth, Brawler: Combat, Mechanic: Survival, Thief: Lockwork). Survivors from before 0.13 kept Quiet hands, Keen eye and Pack rat for free and got every point their level earned. Once a week you can reset your skills for 150 caps.'],
     ['Special infected', 'Danger 3+ places (pharmacies, schools, police stations, mansions; look for the ☣ tag on the house list) have a couple more zombies and some special infected. Armored (riot gear, police stations): slow and hits hard; melee barely dents it until the armour cracks, arrows do full damage. Runner: fast and fragile, sprints the moment it sees you - you can only outrun it at a sprint. Bloater (green and swollen, pharmacies): bursts into a toxic cloud when it dies - shoot it, or dodge straight out. Screamer (gaping mouth, schools and mansions): if it sees you it stops and shrieks, and when it finishes every zombie in the house comes for you - kill it fast or stay out of sight. They carry better loot (ammo and police cosmetics, meds, lockpicks) and give much more XP.'],
+    ['Raiders', 'Rarely (about 1 run in 25-30, more in danger 3+ places) other survivors raid the house you are in: 2 or 3 masked raiders come up the stoop after you have been inside a while. They go for containers you have not searched and empty them, fight you on sight (one may have a pistol: a red line aims at you, then locks - dodge out of it) and fight zombies too, and run for the door when badly hurt. Kill them for part of what they stole plus ammo, meds and sometimes a weapon or a cosmetic. Any that get away are gone with their loot. They never take keys, notes, the hook pole or Dot\'s parcels.'],
+    ['Pack, stash & item kinds', 'The Gear tab has three parts: Equipped (weapon, quiver, keyring, pack size, wardrobe, skills, eat & drink), Backpack (what you carry into houses) and Stash (the chest at your base). Every item shows its kind: Food, Drink, Medical, Weapon, Ammo, Tool, Gear, Material (used at the workbench or for base building - tap it to see what for), Sell (junk worth caps and nothing else, like paperbacks and watches), Key, Seed, Decor, Blueprint. Sort tidies a list by kind. Sell junk in the Stash tab sells every Sell item to Dot in one go when she is around.'],
     ['Locks & secrets', 'Locked doors, safes and cages hold the best loot. Lockpicks are silent but snap; a crowbar always works but is loud. Brass keys open the two locks nothing else can: a locked car outside a few houses (one key opens the glove box and the trunk, and the trunk always holds something good) and a key-locked room (rare; it always holds a prize that fits the building - a gun cabinet at the police station, the back room at a pharmacy, a safe room in a mansion). Look for the 🔑 tag on the house list. Keys live on your keyring (no pack slot, never lost) and are used up. Some locked rooms hide their key somewhere else in the same house. After you search most of a house, hidden spots can open: a loose floorboard under a rug, a sliding bookshelf, an attic hatch (needs a hook pole), a cracked wall panel. Torn notes give hints about the house you find them in; they fall apart once you leave.'],
-    ['Weapons & equipping', 'The weapon in your hand is what you fight with. At home: Pack & stash > tap a weapon > Equip. In a house: tap the Swap button (bottom right) to pick any weapon in your pack. Weapons wear out - repair them with scrap. Zombies hear noise; you can run (push the stick far) and dodge.'],
+    ['Weapons & equipping', 'The weapon in your hand is what you fight with. At home: Gear > Backpack or Stash > tap a weapon > Equip. In a house: tap the Swap button (bottom right) to pick any weapon in your pack. Weapons wear out - repair them with scrap. Zombies hear noise; you can run (push the stick far) and dodge.'],
     ['Cosmetics & wardrobe', 'Cosmetics are earned: rare finds in houses and on zombies, better in mansions and police stations, plus Dot\'s shop and jobs, horde-night crates and events. They unlock straight into your Wardrobe and never use pack space. Wardrobe (home screen) > tap one to wear it. Spares are sold to Dot automatically.'],
-    ['Food & water', 'Two bars under your HP: Hunger (drumstick) and Thirst (droplet). They drain with real time, even while the app is closed - about one and a half meals and two or three drinks a day - and a little faster during runs (sprinting and fighting most). Tap the bars, or a food in Pack & stash, to eat or drink: beans and pie fill Hunger, water and soda fill Thirst, cranberry sauce and tomatoes a bit of both, coffee gives stamina. Garden crops are food, and a rain barrel at the base gives a drink (+50 thirst). Below 30: Hungry means slower stamina and no overnight healing; Thirsty means slower searches and max stamina 80. At 0 you lose 1 HP an hour, but never below 10 from hunger alone. Above 80 on both: +10% scavenging XP. Your crew eats from the stash separately.'],
+    ['Food & water', 'Two bars under your HP: Hunger (drumstick) and Thirst (droplet). They drain with real time, even while the app is closed - about one and a half meals and two or three drinks a day - and a little faster during runs (sprinting and fighting most). Tap the bars, or a food in Gear > Backpack / Stash (or Gear > Equipped > Eat & drink), to eat or drink: beans and pie fill Hunger, water and soda fill Thirst, cranberry sauce and tomatoes a bit of both, coffee gives stamina. Garden crops are food, and a rain barrel at the base gives a drink (+50 thirst). Below 30: Hungry means slower stamina and no overnight healing; Thirsty means slower searches and max stamina 80. At 0 you lose 1 HP an hour, but never below 10 from hunger alone. Above 80 on both: +10% scavenging XP. Your crew eats from the stash separately.'],
     ['Real-world map', 'Tap Map on the home screen: it is your real neighbourhood (OpenStreetMap), drawn like the game. Real places near you - a pharmacy, a corner store, the police station, a laundromat, a school, a gas station, some houses and apartment blocks - show up as round badges. Walk past one with the map open: when you get within about 35 m it glows, and you scout it as a bonus landmark house in your list, with its real name. Up to 3 a day, on foot only (it ignores you while you are moving faster than about 30 km/h), and you have to walk up to a place - one right where you opened the map does not count until you have walked away and back. The card at the bottom shows how many you found today and points to the nearest place. Tap ? on the map for a reminder. Your phone asks for your location only while the map is open; your position is never saved or sent to the game server. Streets you have seen before show up instantly, even offline. No location or no signal? The rest of the game works the same.'],
     ['Base & farming', 'Your base is built with steps (the same steps also scout houses). Build walls, a gate, traps and garden beds; decorate with furniture you find. Plant seeds, water them with steps each day, and harvest real food. The stash chest lives here.'],
     ['Horde night', 'Every Sunday 9 PM New York time a horde hits. In the 24 hours before, do a watch shift (a 2-3 minute defence) - every kill thins the horde for your whole party. Strong bases hold and pay out a crate; weak ones lose something you repair with steps. Skip the shift and you get nothing.'],
@@ -1330,7 +1388,7 @@ const NEXT_VERSION = '0.16';
     ['Crew', 'About 1 house in 25 has a survivor hiding in a closet or a secret room (more in mansions and police stations). Talk to them: with a free bunk they move into your base (2 bunks, build up to 4). Each has a role - Scavenger (crew searches bring back more), Guard (horde-night defence), Medic (heals you each morning), Gardener (waters a plant a day), Tinkerer (cheaper repairs) - and levels up slowly. Each eats 1 food a day from your STASH; three hungry days and they leave a note (they never take anything). The more crew you have, the more a Crew search brings back.'],
     ['Strays', 'Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Move slowly near them (a small push on the joystick) until they trust you, then tap to coax them out - or offer food from your pack. One pet comes along on runs and at the base; up to 4 live with you. Dogs bark when a zombie spots you and sometimes sniff out a container with something good; cats make you quieter and bring little presents some mornings. Pets level from your steps. They never die: a zombie scare sends them running home, back the next day.'],
     ['Weekly boss', 'Every week (Monday to Sunday, New York time) a named boss holes up in a special house on everyone\'s list. Walk 5,000 steps that week to reach it, then fight it up to 2 times a day (90 seconds each). Red markers on the floor show where the next attack lands: a charge line, a slam ring, walkers being called. Its health is shared by your whole party for the whole week; when it falls, everyone who hit it gets a good item, caps and a chance at a boss cosmetic. Going down in a boss fight costs you nothing but the fight.'],
-    ['Trader', 'Auntie Dot (top of the Houses list) is a safe zone. Take up to 2 jobs from her board, turn them in for caps and a reward you choose. Every 20 jobs raises her trader level: harder jobs, better stock, more cosmetics. Sell her spare loot.'],
+    ['Trader', 'Auntie Dot (top of the Houses list) is a safe zone. Take up to 2 jobs from her board, turn them in for caps and a reward you choose. Every 20 jobs raises her trader level: harder jobs, better stock, more cosmetics. Sell her spare loot (or use Sell junk in the Stash tab). She does not stay put: after each visit she moves on and is back once you have walked about 3,000 more steps (her card counts down). Jobs you took keep counting while she is away; you turn them in on your next visit.'],
   ];
   function openHowTo() {
     sheetOpen(`<div class="kick">Dead Miles</div><h3>How to play</h3>

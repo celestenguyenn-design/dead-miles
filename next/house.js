@@ -11,6 +11,7 @@
   const EVS = DM.Events, EVA = D.EV;   // the running seasonal event (events.js) or null
   const F = DM.Food;                   // 0.8: hunger + thirst (food.js)
   const SK = DM.Skills, INF = DM.Inf;  // 0.13: skill trees (skills.js), special infected (infected.js)
+  const RA = DM.Raid;                  // 0.15: raiders (raiders.js)
 
   // ---------------------------------------------------------------- layout
   let L = null, ROWS = [], MW = 0, MH = 0, opts = {};
@@ -69,8 +70,11 @@
       sec: (L.secrets || []).map(s => Object.assign({ st: 0, found: false }, JSON.parse(JSON.stringify(s)))),
       fog: {}, visited: {}, room: streetRoom(), noiseLvl: 0, cam: { x: st.x * T, y: st.y * T - 120 }, z3: false,
       stats: { searched: 0, kills: 0, start: performance.now() }, entered: false, lastNoise: null, field: null, fieldT: 0, fieldCell: -1,
-      secretHint: 0, sheet: null, food: { h: 0, t: 0 }, foodT: 0,
+      secretHint: 0, sheet: null, food: { h: 0, t: 0 }, foodT: 0, shots: [], raid: null, raidDone: false,
     };
+    // 0.15: a rare raid (raiders.js) - seeded from the house; only normal house runs ask for one (opts.raid)
+    const rp = RA && !opts.noRaid ? RA.plan(L, opts) : null;
+    if (rp) { G.raid = Object.assign(rp, { on: false, ents: [] }); RA.ensureRigs(rp); }
     for (const k in L.rooms) { const R = L.rooms[k]; G.fog[k] = R.hidden || R.isolated ? .99 : .97; G.visited[k] = false; }
     G.fog[streetRoom()] = 0.12; G.visited[streetRoom()] = true;
     if (opts.noFog) for (const k in L.rooms) { G.fog[k] = 0; G.visited[k] = true; }
@@ -120,7 +124,7 @@
      itself was not - so closing the game mid-run gave back a fresh house to loot again. Now what was
      searched, what was left in it, what was unlocked and how far each secret got is saved as you go
      (opts.onState) and put back (opts.resume) if the house is entered again. */
-  const FKEEP = ['searched', 'loot0', 'locked', 'keyLock', 'opened', 'slideState', 'slide', 'swing', 'solid', 'pre', 'empty'];
+  const FKEEP = ['searched', 'loot0', 'locked', 'keyLock', 'opened', 'slideState', 'slide', 'swing', 'solid', 'pre', 'empty', 'raided'];   // 0.15: raided = emptied by raiders
   function snapRun() {
     const f = {}, sec = G.sec.map(x => ({ st: x.st || 0, found: !!x.found, loot0: x.loot0 || null, hintAt: 0 }));
     G.furn.forEach((x, i) => {
@@ -128,7 +132,7 @@
       const d = L.furn[i], ch = x.searched || (d.lock && !x.locked) || (d.keyLock && !x.keyLock) || x.opened || x.slideState || x.swing;
       if (!ch) return; const o = {}; for (const k of FKEEP) if (x[k] != null) o[k] = x[k]; f[i] = o;
     });
-    return { f, sec, so: !!G.secretOpen, fp: runPrint() };
+    return { f, sec, so: !!G.secretOpen, fp: runPrint(), raid: G.raidDone || !!(G.raid && G.raid.on) ? 1 : 0 };   // 0.15: a raid happened (it never fires twice)
   }
   // 0.9: a fingerprint of the house's furniture, so saved progress is never laid onto a different layout
   const runPrint = () => (L.furn || []).length + ':' + (L.furn || []).map(d => d.art[0] + d.at.join('')).join('').length + ':' + (L.furn || []).reduce((a, d, i) => (a * 31 + d.at[0] * 7 + d.at[1] + i) % 1000003, 7);
@@ -139,6 +143,7 @@
       for (const i of Object.keys(r.f || {})) { const x = G.furn[+i]; if (x) Object.assign(x, JSON.parse(JSON.stringify(r.f[i]))); }
       (r.sec || []).forEach((v, i) => { if (G.sec[i]) Object.assign(G.sec[i], v); });
       if (r.so) G.secretOpen = true;
+      if (r.raid) G.raidDone = true;   // 0.15: on resume the raiders are gone; what they emptied stays empty
       for (const x of G.furn) if (x.keyDoor && x.swing) x.swing = 1;
     } catch (e) { console.warn('resume', e); }
   }
@@ -396,12 +401,14 @@
     return { x: bx * T + T / 2, y: by * T + T / 2 + 6, same: bx === cx && by === cy };
   }
   function banner(text, sub) { G.banners.push({ text, sub, t: 0 }); }
-  function emitNoise(x, y, rad, show = true) {
-    G.noiseLvl = Math.max(G.noiseLvl, Math.min(1, rad / 6));
+  function emitNoise(x, y, rad, show = true, byRaider) {
+    if (!byRaider) G.noiseLvl = Math.max(G.noiseLvl, Math.min(1, rad / 6));
     if (show && rad >= 1.8) G.rings.push({ x, y, r: rad * T, t: 0 });
-    G.lastNoise = { x, y, t: G.t };
+    if (!byRaider) G.lastNoise = { x, y, t: G.t };
     for (const z of G.zs) {
+      if (z.raider) { if (!byRaider && !z.dead && z.st !== 'flee' && Math.hypot(z.x - x, z.y - y) / T <= rad * .8) { z.aggro = 1; z.lostT = 0; } continue; }   // 0.15: raiders hear her too
       if (z.dead || z.st === 'chase' || z.st === 'windup' || z.st === 'lunge' || z.st === 'rise') continue;
+      if (z.foe && !z.foe.dead && !z.foe.gone && (z.st === 'recover' || z.st === 'hurt')) continue;   // 0.15: busy with a raider
       const d = Math.hypot(z.x - x, z.y - y) / T;
       let eff = rad * (losClear(z.x, z.y - 20, x, y - 20) ? 1 : .65);
       if (z.st === 'sleep') eff *= .55 * SK.sleeperMul();
@@ -409,6 +416,7 @@
     }
   }
   function alertZombie(z, x, y, seen) {
+    if (z.raider) return;   // raiders run their own brain (raiders.js)
     if (seen && z.kind === 'screamer' && !z.shrieked && z.st !== 'shriek' && z.st !== 'sleep' && z.st !== 'rise') { // 0.13: it stops and shrieks first
       z.st = 'shriek'; z.stT = 0; z.shriekT = 0; z.alertT = 1.2; SFX.play('alert'); toast('A screamer! Kill it before it finishes', 1.6); return;
     }
@@ -533,7 +541,7 @@
     for (const z of G.zs) {
       if (!z.dead || z.rot === 0) continue;
       let act = !z.searched ? 'Search' : (z.loot0 && z.loot0.length ? 'Open' : null);
-      if (act) out.push({ obj: z, act, rect: z.kind === 'turkey' ? { x: z.x - 24, y: z.y - 14, w: 48, h: 26 } : { x: z.x + (z.fallDir || 1) * 34 - 38, y: z.y - 14, w: 76, h: 26 }, name: EVS.isBoss(z) ? EVS.bossName(z.kind) : z.special ? INF.KINDS[z.kind].n.toLowerCase() + ' zombie' : 'Zombie', noise: 1.5, corpse: true });
+      if (act) out.push({ obj: z, act, rect: z.kind === 'turkey' ? { x: z.x - 24, y: z.y - 14, w: 48, h: 26 } : { x: z.x + (z.fallDir || 1) * 34 - 38, y: z.y - 14, w: 76, h: 26 }, name: z.raider ? 'raider' : EVS.isBoss(z) ? EVS.bossName(z.kind) : z.special ? INF.KINDS[z.kind].n.toLowerCase() + ' zombie' : 'Zombie', noise: 1.5, corpse: true });
     }
     return out;
   }
@@ -574,7 +582,7 @@
       return;
     }
     o.searched = true; G.stats.searched++;
-    const keys = it.corpse ? (EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse').concat(o.special ? INF.loot(o.kind) : [])) : o.pre.slice();   // 0.13: special infected carry more
+    const keys = it.corpse ? (o.raider ? o.drop.slice() : EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse').concat(o.special ? INF.loot(o.kind) : [])) : o.pre.slice();   // 0.13: special infected carry more
     if (keys.length && Math.random() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot); if (more.length) keys.push(more[0]); }
     o.loot0 = toStacks(keys);
     // A torn note remembers the house it came from, so reading it somewhere else is not misleading.
@@ -691,6 +699,7 @@
     if (G.tapMark) { G.tapMark.t += dt; if (G.tapMark.t > .7) G.tapMark = null; }
     updateLock(dt);
     updatePlayer(dt, inp);
+    raidCheck();
     saveRunState(dt);
     for (const z of G.zs) updateZombie(z, dt);
     separate();
@@ -699,6 +708,16 @@
     btn.atkPressed = false; btn.use = false; btn.dodge = false;
   }
 
+  // 0.15: the raid starts after she has been inside a while, or once she has searched ~40% of the house
+  function raidCheck() {
+    const R = G.raid; if (!R || R.on || G.raidDone || G.over || !G.entered || !RA) return;
+    const [a, b] = searchedCount();
+    if (G.t >= R.at || (b && a / b >= R.pct && G.t > 20)) startRaid();
+  }
+  function startRaid() {
+    if (!G.raid) { G.raid = Object.assign(RA.plan(L, { raid: true }) || { n: 2, kinds: ['brute', 'gunner'], wpn: ['machete', 'pistol'], looks: [0, 1], at: 0, pct: 1 }, { on: false, ents: [] }); }
+    G.raidDone = true; RA.spawn(G.raid);
+  }
   function updatePlayer(dt, inp) {
     const p = G.p;
     p.stT += dt; p.inv = Math.max(0, p.inv - dt); p.flash = Math.max(0, p.flash - dt * 5);
@@ -836,10 +855,13 @@
       if (p.swingQ || btn.atk) { startSwing(); }
     }
   }
-  function hitZombie(z, fa, base = 34, ranged) {
-    const sneak = (z.st === 'sleep' || z.st === 'idle' || z.st === 'search') && z.kind !== 'turkey';
+  // by: 0.15 - a raider (raiders.js) hitting a zombie: no sneak bonus, no xp or kill count for her
+  function hitZombie(z, fa, base = 34, ranged, by) {
+    const sneak = !by && (z.st === 'sleep' || z.st === 'idle' || z.st === 'search' || (z.raider && (z.st === 'loot' || z.st === 'goto') && !z.aggro)) && z.kind !== 'turkey';
     let dmg = Math.round(base * (sneak ? (job() === 'hunter' ? 1.6 : 1.45) : 1) + Math.random() * 4);
-    if (ranged && z.st !== 'chase') alertZombie(z, G.p.x, G.p.y, true);
+    if (z.raider) { RA.damage(z, dmg, fa, by || null, sneak); return; }
+    if (by) { z.foe = by; if (z.st === 'idle' || z.st === 'investigate' || z.st === 'search' || z.st === 'sleep') { z.st = 'chase'; z.stT = 0; z.lostT = 0; } }
+    else if (ranged && z.st !== 'chase') alertZombie(z, G.p.x, G.p.y, true);
     let plate = false;
     if (z.armor > 0 && !ranged) { // 0.13 armored: riot gear soaks most of a melee hit until it cracks; arrows find the gaps
       const soak = Math.min(z.armor, Math.round(dmg * .65)); z.armor -= soak; dmg -= soak; plate = true;
@@ -855,7 +877,9 @@
     puff(z.x, z.y, 44, 5, P.CRM, 90, .25, 2.2);
     SFX.play(z.hp <= 0 ? 'kill' : 'hit');
     if (z.hp <= 0) {
-      z.dead = true; z.st = 'dead'; z.stT = 0; z.fallDir = z.hurtDir; G.stats.kills++;
+      z.dead = true; z.st = 'dead'; z.stT = 0; z.fallDir = z.hurtDir;
+      if (by) { if (z.kind === 'bloater') burst(z); return; }   // a raider got it: not her kill
+      G.stats.kills++;
       if (DM.Game && DM.Game.onKill) DM.Game.onKill(z);
       // 0.13: kills teach too (special infected and bosses more)
       const kx = K ? K.xp : z.kind === 'wboss' ? 0 : z.boss || EVS.isBoss(z) ? 15 : 2;
@@ -900,12 +924,18 @@
     return losClear(z.x, z.y - 30, p.x, p.y - 30);
   }
   function updateZombie(z, dt) {
+    if (z.raider) { RA.update(z, dt); return; }        // 0.15: raiders (raiders.js)
     if (opts.zupdate && opts.zupdate(z, dt)) return;   // the weekly boss (boss.js) runs its own brain
     z.stT += dt; z.flash = Math.max(0, z.flash - dt * 6); z.alertT = Math.max(0, z.alertT - dt); z.cd = Math.max(0, z.cd - dt);
     const p = G.p;
     const [zx, zy] = cellOf(z); z.roomNow = roomAt(zx, zy);
     let vx = 0, vy = 0, spd = 0;
-    const dxp = p.x - z.x, dyp = p.y - z.y, dp = Math.hypot(dxp, dyp);
+    // 0.15: a zombie can be after a raider instead of her (z.foe); while it is, the chase/lunge below aim at the raider
+    if (z.foe && (z.foe.dead || z.foe.gone)) { z.foe = null; if (z.st === 'chase' && !canSee(z)) { z.st = 'idle'; z.stT = 0; } }
+    const foe = z.foe && (z.st === 'chase' || z.st === 'windup' || z.st === 'lunge' || z.st === 'recover' || z.st === 'hurt') ? z.foe : null;
+    if (foe && z.st === 'chase' && z.sightT <= 0 && canSee(z) && Math.hypot(p.x - z.x, p.y - z.y) < Math.hypot(foe.x - z.x, foe.y - z.y)) { z.foe = null; return updateZombie(z, 0); }
+    const tg = foe || p;
+    const dxp = tg.x - z.x, dyp = tg.y - z.y, dp = Math.hypot(dxp, dyp);
     z.sightT -= dt;
     const look = () => { if (z.sightT <= 0) { z.sightT = .2; if (canSee(z)) { alertZombie(z, p.x, p.y, true); return true; } } return false; };
     const face = (x) => { if (Math.abs(x) > .15) { z.fx = Math.sign(x); z.flip = x > 0; } };
@@ -953,14 +983,15 @@
         if (z.stT > 3) { z.st = 'idle'; z.stT = 0; }
         break;
       case 'chase': {
-        if (p.st === 'down') { z.st = 'idle'; break; }
+        if (p.st === 'down' && !foe) { z.st = 'idle'; break; }
         z.groanT -= dt; if (z.groanT <= 0) { z.groanT = 3 + Math.random() * 4; SFX.play(z.kind === 'turkey' ? 'gobble' : 'groan'); }
-        const see = losClear(z.x, z.y - 30, p.x, p.y - 30);
-        if (see) { z.lastSeen = { x: p.x, y: p.y }; z.lostT = 0; } else z.lostT += dt;
-        if (z.lostT > 5) { z.st = 'investigate'; z.target = z.lastSeen; z.path = null; z.stT = 0; break; }
+        const see = losClear(z.x, z.y - 30, tg.x, tg.y - 30);
+        if (see) { z.lastSeen = { x: tg.x, y: tg.y }; z.lostT = 0; } else z.lostT += dt;
+        if (z.lostT > 5) { z.foe = null; z.st = 'investigate'; z.target = z.lastSeen; z.path = null; z.stT = 0; break; }
         if (dp < (z.kind === 'turkey' ? 1 : 1.2) * T && see && z.cd <= 0) { z.st = 'windup'; z.stT = 0; face(dxp); SFX.play(z.kind === 'turkey' ? 'gobble' : 'alert'); break; }
         let tgt;
-        if (see && dp < 3.2 * T) tgt = { x: p.x, y: p.y };
+        if (see && dp < 3.2 * T) tgt = { x: tg.x, y: tg.y };
+        else if (foe) { const [fx, fy] = cellOf(foe), key = fy * MW + fx; if (!z.fpath || z.fpathKey !== key) { z.fpath = bfs(fx, fy); z.fpathKey = key; } const st = nextStep(z, z.fpath); tgt = st.same ? { x: tg.x, y: tg.y } : st; }
         else { const st = nextStep(z, playerField()); tgt = st.same ? { x: p.x, y: p.y } : st; }
         const dx = tgt.x - z.x, dy = tgt.y - z.y, dd = Math.hypot(dx, dy) || 1;
         spd = ((z.special ? INF.KINDS[z.kind].spd : 1.85) + .25 * Math.sin(G.t * 2 + z.id * 9)) * T;   // 0.13: runners sprint, armored plod
@@ -979,7 +1010,10 @@
         break;
       case 'lunge': {
         const L = z.lunge; spd = 4.8 * T * Math.max(0, 1 - z.stT / .24); vx = L.x; vy = L.y;
-        if (!L.hit && p.inv <= 0 && p.st !== 'down') {
+        if (!L.hit && z.foe && !z.foe.dead && !z.foe.gone) { // 0.15: biting a raider
+          const f = z.foe, d = Math.hypot(f.x - z.x, (f.y - z.y) * 1.2);
+          if (d < .9 * T) { L.hit = true; RA.damage(f, (14 + Math.round(Math.random() * 6)) * (z.dmgMul || 1), Math.atan2(L.y, L.x), z); }
+        } else if (!L.hit && p.inv <= 0 && p.st !== 'down') {
           const d = Math.hypot(p.x - z.x, (p.y - z.y) * 1.2);
           if (d < (z.kind === 'turkey' ? .75 : .85) * T) { L.hit = true; hurtPlayer(z.kind === 'turkey' ? 9 + Math.round(Math.random() * 4) : 16 + Math.round(Math.random() * 6), L.x, L.y, z); }
         }
@@ -1071,6 +1105,7 @@
       }
     }
     updateArrows(dt);
+    if (RA) RA.updateShots(dt);
     updateClouds(dt);
     // the third zombie wanders in from the street
     if (!G.z3 && L.wanderer !== false && (G.t > (L.wandererT || 70) || (G.stats.searched >= 9 && G.t > 35))) {
@@ -1288,6 +1323,7 @@
     }
     ctx.globalAlpha = 1;
     drawArrows();
+    if (RA) RA.drawShots(ctx);
     drawClouds();
     // candle glow in hidden stashes
     for (const f of G.furn) if (f.art === 'crate' && f.secretLoot && (G.visited[f.room] || G.secretOpen)) { const gx = f.x + f.w - 12, gy = f.y + 10; const cg = ctx.createRadialGradient(gx, gy, 2, gx, gy, T * 2.5); cg.addColorStop(0, 'rgba(255,190,110,.22)'); cg.addColorStop(1, 'rgba(255,190,110,0)'); ctx.fillStyle = cg; ctx.fillRect(gx - 2.5 * T, gy - 2.5 * T, 5 * T, 5 * T); }
@@ -1539,6 +1575,7 @@
   const infRigP = {};
   function ensureInfRig(k) { if (infRigP[k] || !INF_ART[k]) return; infRigP[k] = ART.buildRig('zombie', E.rigRes || 1.4, INF_ART[k].recolor, 'zombie_' + k).catch(() => { delete infRigP[k]; }); }
   function drawZombie(z) {
+    if (z.raider) { RA.draw(ctx, z); return; }   // 0.15
     if (z.kind === 'turkey') { drawTurkey(z); return; }
     const dir = z.flip ? 1 : -1; // facing direction (+1 = right)
     const parts = {}; let rot = 0, yo = 0, alpha = z.alpha, sy = 1;
@@ -1666,7 +1703,7 @@
       ART.drawRig(fc, key, ps[0], ps[1], ps[2], ps[3], ps[4]);
     };
     cut(G.p, 'survivor');
-    for (const z of G.zs) if (z.st !== 'sleep') cut(z, 'zombie');
+    for (const z of G.zs) if (z.st !== 'sleep') cut(z, z._rig || 'zombie');
     fc.globalCompositeOperation = 'source-over';
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(fogLayer, 0, 0, cv.width, cv.height); ctx.restore();
   }
@@ -1752,6 +1789,7 @@
     }
     // zombie overlays: z's, !, hp bars
     for (const z of G.zs) {
+      if (z.raider) { RA.drawOver(ctx, z); continue; }   // 0.15
       const rm = z.roomNow || streetRoom(); if ((G.fog[rm] || 0) > .7 && z.st !== 'chase') continue;
       if (z.st === 'sleep') {
         for (let i = 0; i < 3; i++) { const k = ((G.t * .5 + i / 3) % 1); ctx.globalAlpha = Math.sin(k * Math.PI) * .9; ctx.fillStyle = P.CRM; ctx.font = `900 ${9 + i * 3}px system-ui,sans-serif`; const zx = z.sleep ? (z.sleep.draw.x - 1.45) * T : z.x, zy = z.sleep ? (z.sleep.draw.y + .08) * T : z.y - 40; ctx.fillText('z', zx + k * 18 + i * 6, zy - 20 - k * 30); }
@@ -1872,6 +1910,7 @@
       else if (isWall(x, y)) { let v = false; for (let dy = -1; dy <= 1 && !v; dy++) for (let dx = -1; dx <= 1; dx++) { const r2 = roomAt(x + dx, y + dy); if (r2 && G.visited[r2] && r2 !== streetRoom()) { v = true; break; } } if (v) { mctx.fillStyle = '#f6e3bb'; mctx.globalAlpha = .55; mctx.fillRect(x * s, y * s, s, s); mctx.globalAlpha = 1; } }
     }
     for (const f of G.furn) if (f.lootable && !f.searched && G.visited[f.room]) { mctx.fillStyle = '#c95f2c'; mctx.fillRect(f.tx * s + 1, f.ty * s + 1, 2, 2); }
+    for (const z of G.zs) if (z.raider && !z.dead && z.seen) { mctx.fillStyle = '#ff5a48'; mctx.beginPath(); mctx.arc(z.x / T * s, z.y / T * s, 2.6, 0, 6.3); mctx.fill(); }   // 0.15: raiders she has seen
     mctx.fillStyle = '#f07b3c'; mctx.beginPath(); mctx.arc(G.p.x / T * s, G.p.y / T * s, 3.2, 0, 6.3); mctx.fill();
   }
 
@@ -1899,10 +1938,12 @@
     return n - left;
   }
   DM.addToPack = addToPack;
+  // 0.15: every card shows the item's kind (data.js D.cat); event / quest items keep their own note
+  const ctag = (k, it) => { const c = D.cat(k); return it.tag && (c === 'event' || c === 'quest') ? `<small class="tag">${it.tag}</small>` : `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
   function itemCard(e, onTap, extra = '', cls = '') {
     const it = ITEMS[e.k], el = document.createElement('button');
     el.className = 'slot' + (it.rare ? ' rare' : '') + cls;
-    el.innerHTML = `<img alt="" src="${ART.iconURL[it.i]}"><span>${it.n}</span>${it.tag ? `<small class="tag">${it.tag}</small>` : ''}${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${e.d != null && it.w ? `<i class="dur"><i style="width:${Math.max(4, e.d / WEAPONS[it.w].dur * 100)}%"></i></i>` : ''}${extra}`;
+    el.innerHTML = `<img alt="" src="${ART.iconURL[it.i]}"><span>${it.n}</span>${ctag(e.k, it)}${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${e.d != null && it.w ? `<i class="dur"><i style="width:${Math.max(4, e.d / WEAPONS[it.w].dur * 100)}%"></i></i>` : ''}${extra}`;
     el.addEventListener('click', ev => { ev.stopPropagation(); onTap(el); });
     return el;
   }
@@ -2156,6 +2197,7 @@
       <h2>Back on the street</h2>
       <div class="stats"><div><b>${seen}/${rooms.length}</b>rooms</div><div><b>${G.furn.filter(f => f.lootable && !f.secretLoot && f.searched).length}/${total}</b>searched</div><div><b>${G.stats.kills}</b>zombies</div><div><b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b>time</div></div>
       <div class="found${nf ? '' : ' dim'}">Secrets found: ${nf} of ${nm}</div>
+      ${G.raid && G.raid.on ? `<div class="found raidl">Raiders: ${G.raid.killed || 0} of ${G.raid.n} down${G.raid.away ? ` · ${G.raid.away} got away` : ''}${G.raid.stolen ? ` · they took ${G.raid.stolen} thing${G.raid.stolen === 1 ? '' : 's'}` : ''}</div>` : ''}
       <div class="sum">${packSummaryHTML(G.pack)}</div>
       ${G.drops.length ? `<div class="lost">Left behind: ${G.drops.map(d => ITEMS[d.k].n + (d.n > 1 ? ' x' + d.n : '')).join(', ')}</div>` : ''}
       ${skillLine()}
@@ -2266,14 +2308,14 @@
     }
   }
 
-  function zombieCount() { const zs = G.zs.filter(z => !EVS.isBoss(z)); return { dead: zs.filter(z => z.dead).length, total: zs.length }; }
+  function zombieCount() { const zs = G.zs.filter(z => !EVS.isBoss(z) && !z.raider); return { dead: zs.filter(z => z.dead).length, total: zs.length }; }
   // ---------------------------------------------------------------- finishing a run
   function finishRun(kind) {
     S().hp = Math.max(kind === 'down' ? 20 : 1, Math.round(G.p.hp));
     const res = {
       kind, address: L.address, type: L.type, id: L.id,
       kills: G.stats.kills, searched: G.furn.filter(f => f.lootable && f.searched).length,
-      secrets: G.sec.filter(s => s.found).length, secretsTotal: G.sec.length, zombies: zombieCount(), left: G.drops.map(d => ({ k: d.k, n: d.n })),
+      secrets: G.sec.filter(s => s.found).length, secretsTotal: G.sec.length, zombies: zombieCount(), raid: G.raid && G.raid.on ? { n: G.raid.n, killed: G.raid.killed || 0, away: G.raid.away || 0 } : null, left: G.drops.map(d => ({ k: d.k, n: d.n })),
     };
     G.drops = []; G.over = true; LP.on = false; lpEl.classList.remove('on');
     closeSheet(true); hideCards();
@@ -2337,6 +2379,13 @@
     exit(kind) { if (G && !G.over || kind) finishRun(kind || 'leave'); },
     get opts() { return opts; },
   };
+  // 0.15: raiders.js gets the runtime it needs
+  if (RA) RA.bind({
+    G: () => G, L: () => L, T, MW: () => MW, MH: () => MH, SFX, toast,
+    move: (e, dx, dy) => moveEnt(e, dx, dy), hit: (e, x, y) => overlapsSolid(e, x, y), bfs, nextStep, cellOf, los: losClear, roomAt, street: streetRoom,
+    mk: mkZombie, hurtPlayer, hitZombie: (z, fa, dmg, by) => hitZombie(z, fa, dmg, false, by), noise: emitNoise, puff, splat, num: dmgNum, banner,
+    xp: (n, x, y) => gainXP(n, x, y), sightMul: () => SK.sightMul(),
+  });
   // debug / test hooks
   Object.assign(DM, {
     gateOpen: () => gateOpen(), LP, EVENT, openPack, dropItem, swapWeapon, openSwap,
@@ -2344,6 +2393,7 @@
     face(x, y) { G.p.fx = x; G.p.fy = y; if (x) G.p.flip = x < 0; },
     target() { const t = findTarget(); return t ? { act: t.act, name: t.name } : null; },
     use() { btn.use = true; }, attack() { btn.atkPressed = true; },
+    raidNow() { if (G && !G.over && !(G.raid && G.raid.on)) startRaid(); return G && G.raid; },   // 0.15 dev: start the raid now
     furn(name) { return G.furn.find(f => f.name === name); },
     // 0.9 walkability tests: collision as the player feels it, and the wall pieces as drawn
     coll: { hit: (x, y, e) => overlapsSolid(e || G.p, x, y), walls: () => wallRects, leaves: () => doorLeaves, rebuild() { buildWalls(); buildSolid(); }, size: () => [MW, MH], ch, collRect },

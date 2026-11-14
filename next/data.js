@@ -117,6 +117,41 @@ window.DM = window.DM || {};
     prybar: { out: ['prybar', 1], in: { scrap: 5, tape: 1 }, n: 'Pry bar (quiet prying)' },
   };
   D.BASIC = ['bandage', 'lockpick'];
+  // ---------------------------------------------------------------- 0.15: item categories (shown on pack / stash / loot cards)
+  // owner: "inventory items should tell us 'materials' like for crafting or should be 'sold' - there's a lot of random shit like paperbacks"
+  D.CATS = {
+    food: { n: 'Food', c: '#a9c46a' }, drink: { n: 'Drink', c: '#7ec0ee' }, med: { n: 'Medical', c: '#ff8a7a' }, weapon: { n: 'Weapon', c: '#f07b3c' },
+    ammo: { n: 'Ammo', c: '#e0b94a' }, tool: { n: 'Tool', c: '#9fe0e6' }, gear: { n: 'Gear', c: '#b98cf0' }, mat: { n: 'Material', c: '#d9a46a' },
+    sell: { n: 'Sell', c: '#ffd27a' }, key: { n: 'Key', c: '#e0b94a' }, seed: { n: 'Seed', c: '#93c45a' }, decor: { n: 'Decor', c: '#f07aa8' },
+    event: { n: 'Event', c: '#e8609a' }, bp: { n: 'Blueprint', c: '#9fe0e6' }, quest: { n: 'Quest', c: '#ffd27a' }, note: { n: 'Note', c: '#cfc4ec' }, cos: { n: 'Cosmetic', c: '#f07aa8' },
+  };
+  D.CAT_ORDER = ['weapon', 'ammo', 'med', 'food', 'drink', 'tool', 'gear', 'key', 'bp', 'mat', 'seed', 'decor', 'event', 'quest', 'note', 'sell', 'cos'];
+  D.cat = function (k) {
+    const it = D.ITEMS[k]; if (!it) return 'sell';
+    if (it.cos) return 'cos'; if (it.decor) return 'decor'; if (it.seed) return 'seed'; if (it.quest) return 'quest'; if (k === 'key') return 'key';
+    if (it.bp) return 'bp'; if (it.w) return 'weapon'; if (k === 'ammo' || k === 'arrow') return 'ammo'; if (it.gift || k === 'hat') return 'event';
+    if (it.use === 'Drink') return 'drink'; if (it.use === 'Eat') return 'food'; if (it.hp) return 'med'; if (k === 'note') return 'note';
+    if (it.slots || k === 'shoes' || k === 'lockset') return 'gear'; if (k === 'lockpick' || k === 'pole') return 'tool';
+    return D.uses(k).length ? 'mat' : 'sell';
+  };
+  // what a material goes into: workbench recipes, then base building (base.js PIECES, if loaded)
+  D.uses = function (k) {
+    const out = [];
+    for (const r in D.RECIPES) if (D.RECIPES[r].in[k]) out.push(D.RECIPES[r].n.replace(/ \(.*\)/, '').toLowerCase());
+    const PC = DM.Base && DM.Base.PIECES;
+    if (PC) for (const p in PC) if (PC[p].tiers.some(t => t.m[k])) out.push(PC[p].n.toLowerCase());
+    return out;
+  };
+  // the one-line label: "Material · arrows, spiked bat", "Sell to Dot · 25 caps"
+  D.catLine = function (k, d) {
+    const c = D.cat(k), C = D.CATS[c];
+    if (c === 'mat') { const u = D.uses(k); return C.n + ' · ' + u.slice(0, 3).join(', ') + (u.length > 3 ? ' +' + (u.length - 3) : ''); }
+    if (c === 'sell') return 'Sell to Dot · ' + Math.max(1, Math.floor(D.valueOf(k, d))) + ' caps';
+    if (k === 'ammo') return 'Ammo · no gun for it yet, Dot buys it';
+    if (k === 'arrow') return 'Ammo · for the bow (fill the quiver)';
+    if (c === 'tool') return C.n + (k === 'lockpick' ? ' · picks locks, and a material' : ' · opens attic hatches');
+    return C.n;
+  };
   for (const k in D.RECIPES) if (!D.BASIC.includes(k)) D.ITEMS['bp_' + k] = { n: 'Blueprint: ' + D.RECIPES[k].n.replace(/ \(.*\)/, ''), i: 'blueprint', use: 'Learn', bp: k, rare: 1 };
   // ---------------------------------------------------------------- cosmetics (phase 5): earned, never in the pack
   // Looting one unlocks it straight into the Wardrobe (game.js unlockCos). src says where it comes from (the hint on a locked one):

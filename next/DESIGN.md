@@ -255,6 +255,35 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Base build steps fill at 50% of steps walked and every piece costs 2x the steps (so ~4x the walking per piece).
   Walls tier 1 = 6,000 build steps (~12k walked), generator 16,000 (~32k walked). Materials unchanged. Existing pools kept.
 
+## Done in 0.15 (raiders, a tidier Gear tab, item kinds, Dot moves on)
+- Raiders (raiders.js; owner: "other survivors coming to raid the house we're in and we have to fight them. Rare of course").
+  Only normal house runs (never the tutorial, the base, watch shifts or the weekly boss), at most once a run. Chance by danger:
+  3% (1), 4% (2), 6% (3), 8% (4+) - about 1 run in 25-30 overall. Seeded per house (seed + type), so a resumed run gets the same plan.
+  2 raiders, 3 in danger 3+ about 45% of the time; one has a pistol 40% of raids (70% at danger 3+). They come up the stoop
+  45-120 s after she goes in, or once ~40% of the house is searched (not before 20 s in): banner "RAIDERS!", toast "Voices at the
+  front door... raiders!", knocking + creak. Raider: masked survivor rig (red bandana / gas mask, dark muted coats), always-on red
+  HP bar with a RAIDER tag, red dots on the minimap once seen. Brute 90 HP, walks 2.0 / chases 2.45 tiles/s (she walks 2.75, sprints 4.5),
+  melee 12-16 after a 0.45 s windup; gunner 70 HP, keeps 3-6 tiles away, aims 1.05 s (red line tracks her, locks for the last 0.45 s),
+  slow bullet (9 tiles/s, 16-20 dmg, dodge i-frames work), 2.4 s between shots, pistol-whips 8-11 up close. Sight 7.5 tiles (her Stealth
+  ranks shrink it); her loud noises make them come for her. They loot the nearest unsearched, unlocked container (3.5-5 s, noisy:
+  it draws zombies), take what is inside (never keys, notes, the hook pole or Dot's parcels - those stay in the container), 3-5
+  containers each, then walk out. At 30% HP they run for the door. Zombies and raiders fight: zombies that see a raider go for it
+  (z.foe), raiders hit zombies within reach, gunshots draw the whole house. Kill: 14 XP (16 the gunner); the body holds ~60% of what it
+  stole + ammo, a bandage or painkillers, sometimes food, its melee weapon (40%), a lockpick (30%), a cosmetic (7%). Ones that get
+  away are gone. Summary shows "Raiders: N of M down · K got away · they took X things". Resume: the run save records that a raid
+  happened (never fires again); the raiders are gone, the containers they emptied stay empty (FKEEP 'raided'). Dev: DM.raidNow(),
+  DM.Raid.force = true.
+- Gear tab (was "Pack & stash", which wrapped onto two lines): sub-tabs Equipped (weapon, quiver, pack size, wardrobe; keyring and worn
+  gear as rows; skills and eat & drink links) / Backpack n/12 (grid, Sort, Stash all) / Stash n/40 (grid, Sort, Sell junk). The base's
+  stash chest shows just Backpack / Stash. Main tabs no longer wrap.
+- Item kinds (data.js D.cat / D.catLine, owner: "should tell us 'materials' like for crafting or should be 'sold'"): Food, Drink,
+  Medical, Weapon, Ammo, Tool, Gear, Material (anything a workbench recipe or a base piece uses; tapping it says what for), Sell
+  (junk only worth caps: paperback, pocket watch, gold ring, rusty wrench), Key, Seed, Decor, Event, Blueprint, Quest, Note, Cosmetic.
+  Shown on pack/stash/loot cards. Sell junk (Stash tab) sells every Sell item to Dot after a confirm; it counts as a visit.
+- Dot moves on (owner: "the trader shouldn't be infinite"): after each visit (opening her shop, or Sell junk) she is away until
+  3,000 more steps are walked (SV.walked: phone/watch steps, typed at half - the same total quest distances use). Her card shows
+  "Dot's back in N steps" and a bar. Jobs keep progressing while she is away; turn-ins happen on the next visit. Old saves start with
+  her in (SV.trader.away unset).
 ## Done in 0.16 (real-world map, owner: "Make the map match the layout of my actual art style. It's terrible." / "Idk what map even does LOL" / "Map takes a long time to load.")
 - map.js rewritten without Leaflet or raster tiles (no CDN at all). The map is drawn on a canvas from OpenStreetMap vector data in
   the Spooky flat style: dark streets with ink edges, lighter curbs and dashed centre lines on avenues, street names along the
