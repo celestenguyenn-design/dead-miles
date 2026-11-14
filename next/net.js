@@ -20,7 +20,11 @@
     cfg: { timeout: 12000, saveDelay: 4000, publishDelay: 15000, pollMs: 5 * 60000, typedCap: 4000,
       // Players whose phone cannot sync and who type their steps instead. The owner's call:
       // their typed totals count exactly like phone steps. Handles, lower case.
-      trustedTyped: ['isa'] },
+      trustedTyped: ['isa'],
+      // One-time step corrections the owner asked for. Posts for day d sent before
+      // 'before' (ms) are ignored, and the day is lowered to 'to' once.
+      // celeste 2026-11-13: Oura + iPhone were both counted until the Shortcut got its Source filter.
+      fixes: [{ id: 'c1113', h: 'celeste', d: '2026-11-13', before: Date.parse('2026-11-14T01:11:00Z'), to: 3064 }] },
     onConflict: null,   // ({local, remote}) => 'local' | 'remote' | Promise of either
     onChange: null      // () => void, any status change (panel uses it)
   };
@@ -246,8 +250,22 @@
     const L = ledger();
     if (other.since && (!L.since || other.since < L.since)) L.since = other.since;
     for (const d in other.days) {
-      const a = dayRec(d), b = other.days[d] || {};
-      for (const f of ['phone', 'typed', 'ap', 'at']) a[f] = Math.max(a[f] || 0, +b[f] || 0);
+      const a = dayRec(d), b = other.days[d] || {}, fx = fixFor(d);
+      for (const f of ['phone', 'typed', 'ap', 'at']) { let v = +b[f] || 0; if (fx && (f === 'phone' || f === 'ap') && L.fixed && L.fixed[fx.id]) v = Math.min(v, fx.to); a[f] = Math.max(a[f] || 0, v); }
+    }
+    saveLedger();
+  }
+  function fixFor(d) { const h = String(NET.handle || '').toLowerCase(); return (NET.cfg.fixes || []).find(f => f.h === h && f.d === d) || null; }
+  // Apply each correction once per device: lower the ledger and tell the game how many steps to take back.
+  function applyFixes() {
+    const L = ledger(); L.fixed = L.fixed || {};
+    for (const fx of NET.cfg.fixes || []) {
+      if (L.fixed[fx.id] || fx.h !== String(NET.handle || '').toLowerCase() || !L.days[fx.d]) continue;
+      if (typeof NET.onFix !== 'function') return;
+      const r = L.days[fx.d]; const back = Math.max(0, (r.ap || 0) - fx.to);
+      r.phone = Math.min(r.phone || 0, fx.to); r.ap = Math.min(r.ap || 0, fx.to);
+      try { if (back > 0) NET.onFix(fx.d, back, fx.id); } catch (e) { console.warn('NET.onFix threw', e); }
+      L.fixed[fx.id] = 1;
     }
     saveLedger();
   }
@@ -309,8 +327,10 @@
     const old = oldSave(); const testAt = old && old.online && old.online.testAt;
     const t0 = dayStr(), y0 = ydStr();
     // get_steps returns posted_at in UTC; bucket by THIS device's local date.
+    applyFixes();
     const real = rows.filter(r => r && typeof r.steps === 'number' && r.steps > 0 && !isTestPost(r, testAt))
-      .map(r => ({ n: r.steps, at: new Date(r.posted_at).getTime() })).filter(r => !isNaN(r.at));
+      .map(r => ({ n: r.steps, at: new Date(r.posted_at).getTime() })).filter(r => !isNaN(r.at))
+      .filter(r => { const fx = fixFor(dayStr(new Date(r.at))); return !fx || r.at >= fx.before; });
     const bucket = d => real.filter(r => dayStr(new Date(r.at)) === d);
     const today = bucket(t0), yest = bucket(y0);
     // Every post is a running total for its day, so the day is the HIGHEST post, never the sum.
