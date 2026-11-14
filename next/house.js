@@ -457,14 +457,32 @@
       if (d <= eff) alertZombie(z, x, y, false);
     }
   }
+  // 0.20: a zombie's voice, placed where it is (engine.js SFX.groan): louder the closer it is (heard within ~9 tiles), panned
+  // left/right by where it stands, muffled through a wall, its own pitch and favourite groan. how: idle | inv | chase | rise |
+  // snarl (it just saw her). Each zombie waits ~3.5 s between groans (a snarl only waits for the last snarl); the engine
+  // allows 2 at once. far: the wanderer on the stoop is heard faintly even from the street.
+  function groanZ(z, how, far) {
+    if (!z || z.raider || z.dead || !G || !G.p) return false;
+    const p = G.p, dx = (z.x - p.x) / T, dy = (z.y - p.y) / T; let d = Math.hypot(dx, dy);
+    if (d > 9) { if (!far) return false; d = 8.6; }
+    const snarl = how === 'snarl';
+    if (snarl ? G.t < (z.snarlCd || 0) : G.t < (z.gCd || 0)) return false;
+    if (z.vox == null) { z.vox = .86 + Math.random() * .28; z.gv = Math.floor(Math.random() * 4); }
+    const k = Math.max(0, 1 - (d - 1.5) / 7.5), gain = .06 + .94 * Math.pow(Math.min(1, k), 1.6);
+    const v = Math.random() < .7 ? z.gv : Math.floor(Math.random() * 4);
+    const ok = SFX.groan({ kind: z.kind, boss: !!z.boss, v, snarl, gain, pan: Math.max(-1, Math.min(1, dx / 5)) * .9,
+      rate: z.vox * (how === 'chase' ? 1.08 : 1), muffle: !losClear(p.x, p.y - 20, z.x, z.y - 20) });
+    if (ok) { z.gCd = G.t + 3.5 + Math.random(); if (snarl) z.snarlCd = G.t + 4; }
+    return ok;
+  }
   function alertZombie(z, x, y, seen) {
     if (z.raider) return;   // raiders run their own brain (raiders.js)
     if (seen && z.kind === 'screamer' && !z.shrieked && z.st !== 'shriek' && z.st !== 'sleep' && z.st !== 'rise') { // 0.13: it stops and shrieks first
       z.st = 'shriek'; z.stT = 0; z.shriekT = 0; z.alertT = 1.2; SFX.play('alert'); toast('A screamer! Kill it before it finishes', 1.6); return;
     }
-    if (z.st === 'sleep') { z.st = 'rise'; z.stT = 0; z.alertT = 1; SFX.play('groan'); z.target = { x, y }; return; }
-    if (seen) { if (z.st !== 'chase') { z.alertT = .9; SFX.play('groan'); SFX.play('alert'); if (opts.onAlert) opts.onAlert(z); } z.st = 'chase'; z.stT = 0; z.lostT = 0; return; }
-    if (z.st !== 'investigate') { z.alertT = .7; if (Math.random() < .6) SFX.play('groan'); }
+    if (z.st === 'sleep') { z.st = 'rise'; z.stT = 0; z.alertT = 1; groanZ(z, 'rise'); z.target = { x, y }; return; }
+    if (seen) { if (z.st !== 'chase') { z.alertT = .9; if (z.kind === 'turkey') groanZ(z, 'idle'); else groanZ(z, 'snarl'); SFX.play('alert'); if (opts.onAlert) opts.onAlert(z); } z.st = 'chase'; z.stT = 0; z.lostT = 0; return; }
+    if (z.st !== 'investigate') { z.alertT = .7; z.groanT = 2 + Math.random() * 2; if (Math.random() < .7) groanZ(z, 'inv'); }
     z.st = 'investigate'; z.target = { x, y }; z.path = null; z.stT = 0;
   }
 
@@ -935,7 +953,7 @@
       return;
     }
     if (z.kind === 'screamer' && z.st === 'shriek') { z.shriekT = (z.shriekT || 0) + .35; return; }   // a hit pushes the shriek back, it does not stop it
-    if (z.st === 'sleep') { z.st = 'rise'; z.stT = .25; z.alertT = 1; SFX.play('groan'); }
+    if (z.st === 'sleep') { z.st = 'rise'; z.stT = .25; z.alertT = 1; groanZ(z, 'rise'); }
     else if (z.kind === 'turkey' && (z.st === 'windup' || z.st === 'lunge')) { z.kbx *= .3; z.kby *= .3; } // it does not flinch mid-peck
     else if (z.armor > 0 && (z.st === 'windup' || z.st === 'lunge' || z.st === 'chase')) { if (z.st === 'chase') z.cd = Math.max(z.cd, .2); } // 0.13: riot gear: no flinch while the armour holds
     else if (z.st !== 'rise') { z.st = 'hurt'; z.stT = z.kind === 'turkey' ? .17 : 0; z.lunge = null; }
@@ -1011,12 +1029,13 @@
         z.wanderT -= dt;
         if (z.wanderT <= 0) { z.wanderT = 2.5 + Math.random() * 3; z.wtx = z.x + (Math.random() - .5) * 2.2 * T; z.wty = z.y + (Math.random() - .5) * 1.4 * T; }
         if (z.wtx != null) { const dx = z.wtx - z.x, dy = z.wty - z.y, d = Math.hypot(dx, dy); if (d > 4) { spd = .45 * T; vx = dx / d; vy = dy / d; face(vx); } }
-        if (z.groanT -= dt, z.groanT <= 0) { z.groanT = 6 + Math.random() * 8; if (Math.hypot(dxp, dyp) < 9 * T) SFX.play(z.kind === 'turkey' ? 'gobble' : 'groan'); }
+        if (z.groanT -= dt, z.groanT <= 0) { const dn = Math.hypot(p.x - z.x, p.y - z.y) / T; z.groanT = dn < 5 ? 3 + Math.random() * 3 : 5 + Math.random() * 6; if (dn < 9) groanZ(z, 'idle'); }   // 0.20: more often when she is near
         look();
         break;
       }
       case 'investigate': {
         if (look()) break;
+        if (z.groanT -= dt, z.groanT <= 0) { z.groanT = 2.5 + Math.random() * 2.5; groanZ(z, 'inv'); }   // 0.20: it mutters while it comes to look
         if (!z.target) { z.st = 'idle'; break; }
         const d = Math.hypot(z.target.x - z.x, z.target.y - z.y);
         if (d < T * .7) {
@@ -1040,7 +1059,7 @@
         break;
       case 'chase': {
         if (p.st === 'down' && !foe) { z.st = 'idle'; break; }
-        z.groanT -= dt; if (z.groanT <= 0) { z.groanT = 3 + Math.random() * 4; SFX.play(z.kind === 'turkey' ? 'gobble' : 'groan'); }
+        z.groanT -= dt; if (z.groanT <= 0) { z.groanT = 3 + Math.random() * 4; groanZ(z, 'chase'); }
         const see = losClear(z.x, z.y - 30, tg.x, tg.y - 30);
         if (see) { z.lastSeen = { x: tg.x, y: tg.y }; z.lostT = 0; } else z.lostT += dt;
         if (z.lostT > 5) { z.foe = null; z.st = 'investigate'; z.target = z.lastSeen; z.path = null; z.stT = 0; break; }
@@ -1085,7 +1104,7 @@
         if (z.stT >= 1.3 + (z.shriekT || 0)) {
           z.shrieked = 1; z.st = 'chase'; z.stT = 0; z.lostT = 0; G.noiseLvl = 1;
           for (const o of G.zs) if (o !== z && !o.dead && !o.boss && o.st !== 'chase' && o.st !== 'windup' && o.st !== 'lunge' && o.st !== 'rise' && o.st !== 'recover') { alertZombie(o, p.x, p.y, false); o.hunter = true; }
-          banner('THE HOUSE HEARD THAT', 'everything is coming'); SFX.play('groan');
+          banner('THE HOUSE HEARD THAT', 'everything is coming'); groanZ(z, 'snarl');
         }
         break;
       }
@@ -1166,7 +1185,7 @@
     // the third zombie wanders in from the street
     if (!G.z3 && L.wanderer !== false && (G.t > (L.wandererT || 70) || (G.stats.searched >= 9 && G.t > 35))) {
       G.z3 = true; const z = mkZombie(1.5 * T, (L.streetY + 1.4) * T, 'investigate', streetRoom()); z.target = { x: L.stoop.x * T, y: (L.streetY - 3) * T }; z.hunter = true; if (L.wanderHp) z.hp = z.maxHp = L.wanderHp; gsZombie(z); G.zs.push(z);
-      toast('Something is shuffling up the stoop...', 3); SFX.play('groan');
+      toast('Something is shuffling up the stoop...', 3); groanZ(z, 'inv', true);
     }
     // camera
     const p = G.p;
@@ -2444,6 +2463,7 @@
     fogOf: r => (G && r != null && G.fog[r] != null ? G.fog[r] : 0),
     pause: on => { if (G) G.paused = !!on; },
     exit(kind) { if (G && !G.over || kind) finishRun(kind || 'leave'); },
+    groan: (z, how, far) => groanZ(z, how, far),   // 0.20: a placed zombie voice (tests, boss.js could use it)
     get opts() { return opts; },
   };
   // 0.15: raiders.js gets the runtime it needs

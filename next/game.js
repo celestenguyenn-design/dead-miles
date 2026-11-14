@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.19';
+const NEXT_VERSION = '0.20';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1397,10 +1397,14 @@ const NEXT_VERSION = '0.19';
   // ---- settings: export / import / reset
   function sheetOpen(html) { const el = $('#msheet'); el.innerHTML = `<div class="mcard">${html}</div>`; el.classList.add('on'); el.onclick = e => { if (e.target === el) el.classList.remove('on'); }; }
   const sheetClose = () => $('#msheet').classList.remove('on');
+  // 0.20: the music picker (music.js) - a short hint after each track's name
+  const TRACK_NOTE = { lantern: 'home', rust: 'map', brown: 'looting', radio: 'base', horde: 'fights', carol: 'winter', eerie: 'live, speeds up with danger' };
   function openSettings() {
     const MC = DM.Music ? DM.Music.cfg() : null;
     sheetOpen(`<div class="kick">Settings</div><button class="mbtn" id="mHow">How to play</button>
-      ${MC ? `<h3 class="sndh">Sound</h3><div class="btnrow tipsrow"><span>Music <small>· eerie, speeds up with danger</small></span><button class="mbtn sm${MC.music ? '' : ' ghost'}" id="mMus">${MC.music ? 'On' : 'Off'}</button></div>
+      ${MC ? `<h3 class="sndh">Sound</h3><div class="btnrow tipsrow"><span>Music <small>· ${MC.track === 'auto' ? 'changes with where you are' : 'one track everywhere'}</small></span><button class="mbtn sm${MC.music ? '' : ' ghost'}" id="mMus">${MC.music ? 'On' : 'Off'}</button></div>
+      <label class="volrow"><span>Track</span><select id="mTrack"${MC.music ? '' : ' disabled'}><option value="auto"${MC.track === 'auto' ? ' selected' : ''}>Auto (by area)</option>${DM.Music.ORDER.map(k => `<option value="${k}"${MC.track === k ? ' selected' : ''}>${esc(DM.Music.TRACKS[k].n)}${TRACK_NOTE[k] ? ' · ' + TRACK_NOTE[k] : ''}</option>`).join('')}</select></label>
+      ${MC.music && DM.Music.nowName() ? `<div class="mp dim nowmus">Now playing: ${esc(DM.Music.nowName())}</div>` : ''}
       <label class="volrow"><span>Music volume</span><input type="range" id="mMvol" min="0" max="100" value="${Math.round(MC.mvol * 100)}"${MC.music ? '' : ' disabled'}></label>
       <label class="volrow"><span>Sound effects</span><input type="range" id="mSfx" min="0" max="100" value="${Math.round(MC.sfx * 100)}"></label>` : ''}
       <div class="btnrow tipsrow"><span>First-time tips</span><button class="mbtn sm ghost" id="mTips">${SV.tips.off ? 'Turn on' : 'Turn off'}</button></div><h3>Save</h3>
@@ -1414,6 +1418,7 @@ const NEXT_VERSION = '0.19';
     $('#mAcc').onclick = () => { sheetClose(); openAccount(); };
     if ($('#mMus')) {
       $('#mMus').onclick = () => { DM.Music.set('music', !DM.Music.cfg().music); SFX.play('ui'); openSettings(); };
+      $('#mTrack').onchange = e => { DM.Music.set('track', e.target.value); SFX.play('ui'); setTimeout(() => { if ($('#mTrack')) openSettings(); }, 150); };
       $('#mMvol').oninput = e => DM.Music.set('mvol', e.target.value / 100);
       $('#mSfx').oninput = e => DM.Music.set('sfx', e.target.value / 100);
       $('#mSfx').onchange = () => SFX.play('pick');
