@@ -215,7 +215,7 @@ window.DM = window.DM || {};
       const dh = Math.round(sv.hp - hp0);
       res = { kick: 'Safehouse', title: 'A quiet night', t: `You bar the door, eat something warm and sleep. ${dh > 0 ? `+${dh} HP` : 'HP already full'}, +15 hunger, +20 thirst.${inf}${swap}` };
     } else if (nd.k === 'dot') {
-      v.trader.away = null; if (DM.Game.dotBonus) DM.Game.dotBonus();   // 0.24.6: also one visit past the daily limit
+      v.trader.away = null; if (v.trader.ready != null && v.trader.ready > (v.walked || 0)) v.trader.ready = v.walked || 0; if (DM.Game.dotBonus) DM.Game.dotBonus();   // 0.24.6: also one visit past the daily limit
       res = { kick: 'Dot', title: 'Dot\'s cart', t: `"Fancy meeting you here." Dot is open for you now.${swap}`, dot: 1 };
     } else if (nd.k === 'supply' || nd.k === 'cache') {
       const rnd = D.mulberry32(nd.sd ^ 0x2545f491);

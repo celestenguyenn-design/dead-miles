@@ -608,6 +608,12 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   ~90 places per square, 123 KB record. Tiles blocked -> the 0.19.2 Overpass path runs as before (checked).
 - Credit line: "OpenFreeMap (c) OpenMapTiles - (c) OpenStreetMap contributors".
 
+## Done in 0.25.1 (Isabel types ~12k steps in one go; Dot then left after one visit and stayed away)
+- Dot's return is now trader.ready (the step total when she is next back; old saves: away + 3,000). On a visit:
+  ready = max(old ready, walked - 6,000) + 3,000, so steps she did not need carry to her next returns (up to 6,000 = two
+  returns). 12k at once -> visit, visit, visit (then the 3-a-day cap). Same for everyone; no visit without steps.
+  A route Dot stop sets ready to now.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

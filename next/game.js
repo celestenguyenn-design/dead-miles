@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.25.0';
+const NEXT_VERSION = '0.25.1';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -799,14 +799,19 @@ const NEXT_VERSION = '0.25.0';
   // her shop opens (so closing the app inside it still counts) or when junk is sold to her from the stash.
   const DOT_AWAY = 3000;
   const fmtN = n => Math.round(n).toLocaleString('en-US');
-  function dotLeft() { const T = SV && SV.trader; if (!T || T.away == null) return 0; const left = T.away + DOT_AWAY - (SV.walked || 0); if (left <= 0) { T.away = null; return 0; } return Math.ceil(left); }
+  // 0.24.7 (Isabel types her ~12k steps in one go, then Dot left and stayed gone): T.ready = the step total at which Dot is
+  // next back (stays set after she is back). Steps she did not need carry over to her next returns, up to DOT_BANK, so
+  // 12k counted at once still gives the day's 3 visits - the same for a phone that syncs a long walk in one batch.
+  const DOT_BANK = 6000;
+  function dotReady(T) { if (T.ready == null && T.away != null) { T.ready = T.away + DOT_AWAY; T.away = null; } return T.ready; }   // pre-0.24.7 saves
+  function dotLeft() { const T = SV && SV.trader; if (!T) return 0; const rd = dotReady(T); if (rd == null) return 0; return Math.max(0, Math.ceil(rd - (SV.walked || 0))); }
   // 0.24.6 (owner: typing 3k steps, selling, typing again ... looped forever): at most DOT_DAY visits a day, the same for
   // everyone (no rule that only hits typed steps). A visit = her shop opening or junk sold from the stash, as before.
   // A Dot stop on the daily route gives one extra visit (Game.dotBonus).
   const DOT_DAY = 3;
   const dotVisits = () => { const T = SV.trader; return T.vday === today() ? T.vn || 0 : 0; };
   const dotDone = () => dotVisits() >= DOT_DAY;
-  function dotVisit() { const T = SV.trader; T.away = SV.walked || 0; T.vn = dotVisits() + 1; T.vday = today(); }
+  function dotVisit() { const T = SV.trader, w = SV.walked || 0, rd = dotReady(T); T.ready = (rd == null ? w : Math.max(rd, w - DOT_BANK)) + DOT_AWAY; T.vn = dotVisits() + 1; T.vday = today(); }
   Game.dotLeft = dotLeft;
   Game.dotBonus = () => { const T = SV.trader; if (T.vday === today() && T.vn > 0) T.vn--; };
   const DOT_SHUT = `Dot's closed up for today (${DOT_DAY} visits a day) - back tomorrow`;
@@ -1581,7 +1586,7 @@ const NEXT_VERSION = '0.25.0';
     ['Crew', 'About 1 house in 25 has a survivor hiding in a closet or a secret room (more in mansions and police stations). Talk to them: with a free bunk they move into your base (2 bunks, build up to 4). Each has a role - Scavenger (crew searches bring back more), Guard (horde-night defence), Medic (heals you each morning), Gardener (waters a plant a day), Tinkerer (cheaper repairs) - and levels up slowly. Each eats 1 food a day from your STASH; three hungry days and they leave a note (they never take anything). The more crew you have, the more a Crew search brings back.'],
     ['Strays', 'Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Move slowly near them (a small push on the joystick) until they trust you, then tap to coax them out - or offer food from your pack. One pet comes along on runs and at the base; up to 4 live with you. Dogs bark when a zombie spots you and sometimes sniff out a container with something good; cats make you quieter and bring little presents some mornings. Pets level from your steps. They never die: a zombie scare sends them running home, back the next day.'],
     ['Weekly boss', 'Every week (Monday to Sunday, New York time) a named boss holes up in a special house on everyone\'s list. Walk 5,000 steps that week to reach it, then fight it up to 2 times a day (90 seconds each). Red markers on the floor show where the next attack lands: a charge line, a slam ring, walkers being called. Its health is shared by your whole party for the whole week; when it falls, everyone who hit it gets a good item, caps and a chance at a boss cosmetic. Going down in a boss fight costs you nothing but the fight.'],
-    ['Trader', 'Auntie Dot (top of the Houses list) is a safe zone. Take up to 2 jobs from her board, turn them in for caps and a reward you choose. Every 20 jobs raises her trader level: harder jobs, better stock, more cosmetics. Sell her spare loot (or use Sell junk in the Stash tab). She does not stay put: after each visit she moves on and is back once you have walked about 3,000 more steps (her card counts down), up to 3 visits a day (a Dot stop on the daily route gives one more). Jobs you took keep counting while she is away; you turn them in on your next visit.'],
+    ['Trader', 'Auntie Dot (top of the Houses list) is a safe zone. Take up to 2 jobs from her board, turn them in for caps and a reward you choose. Every 20 jobs raises her trader level: harder jobs, better stock, more cosmetics. Sell her spare loot (or use Sell junk in the Stash tab). She does not stay put: after each visit she moves on and is back once you have walked about 3,000 more steps (her card counts down; steps she did not need, up to 6,000, count toward her next returns, so a big batch of steps synced at once still works), up to 3 visits a day (a Dot stop on the daily route gives one more). Jobs you took keep counting while she is away; you turn them in on your next visit.'],
   ];
   function openHowTo() {
     sheetOpen(`<div class="kick">Dead Miles</div><h3>How to play</h3>
