@@ -147,6 +147,10 @@ const ART = (() => {
     prybar(c) { c.save(); c.translate(23, -79); c.rotate(-.5); c.lineCap = 'round'; c.lineJoin = 'round';
       c.strokeStyle = P.INK; c.lineWidth = 9; c.beginPath(); c.moveTo(0, -10); c.lineTo(0, 56); c.lineTo(8, 62); c.stroke();
       c.strokeStyle = '#9aa0b4'; c.lineWidth = 4.5; c.stroke(); c.restore(); },
+    pistol(c) { c.save(); c.translate(23, -79); c.rotate(-.5); c.lineJoin = 'round';   // 0.15: raiders only (she has no gun)
+      c.fillStyle = '#3a3848'; c.strokeStyle = P.INK; c.lineWidth = 3.2; c.beginPath(); c.rect(-5, -4, 10, 18); c.fill(); c.stroke();
+      c.fillStyle = '#5c5a6e'; c.beginPath(); c.rect(-6, 12, 12, 30); c.fill(); c.stroke();
+      c.fillStyle = '#c9cede'; c.fillRect(-3, 16, 2.4, 22); c.restore(); },
     bow(c) { c.save(); c.translate(26, -82); c.lineCap = 'round';
       c.strokeStyle = P.INK; c.lineWidth = 9; c.beginPath(); c.moveTo(-6, -46); c.quadraticCurveTo(22, 0, -6, 46); c.stroke();
       c.strokeStyle = '#b07a45'; c.lineWidth = 5; c.stroke();
