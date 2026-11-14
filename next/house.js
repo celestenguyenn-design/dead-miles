@@ -10,6 +10,7 @@
   const { ITEMS, stackMax, toStacks, rollLoot, LOCKS, EVENT, WEAPONS } = D;
   const EVS = DM.Events, EVA = D.EV;   // the running seasonal event (events.js) or null
   const F = DM.Food;                   // 0.8: hunger + thirst (food.js)
+  const SK = DM.Skills, INF = DM.Inf;  // 0.13: skill trees (skills.js), special infected (infected.js)
 
   // ---------------------------------------------------------------- layout
   let L = null, ROWS = [], MW = 0, MH = 0, opts = {};
@@ -32,20 +33,19 @@
   const S = () => DM.S;                 // the survivor object (pack, hp, xp, job, weapon)
   const job = () => (S() && S().job) || 'scavenger';
   const scavLvl = () => D.scavLvl(S() ? S().xp : 0);
-  const XPCUM = D.XPCUM, PERKS = D.PERKS;
-  const searchMul = () => 1.5 * (1 - .06 * (scavLvl() - 1)) * (job() === 'scavenger' ? .85 : 1) * F.searchMul();   // slow at first, faster with skill; thirsty = slower
-  const extraChance = () => .04 * (scavLvl() - 1) + (job() === 'scavenger' ? .1 : 0);
-  const packSlots = () => 12 + (S().packBonus || 0) + (scavLvl() >= 9 ? 2 : 0);
+  const searchMul = () => 1.5 * (1 - .06 * (scavLvl() - 1)) * (job() === 'scavenger' ? .85 : 1) * F.searchMul() * SK.searchMul();   // slow at first, faster with skill; thirsty = slower
+  const extraChance = () => .04 * (scavLvl() - 1) + (job() === 'scavenger' ? .1 : 0) + SK.extraFind();
+  const packSlots = () => 12 + (S().packBonus || 0) + SK.packBonus();   // 0.13: Pack rat is a Scavenging rank
+  const keen = () => SK.keen();                                         // 0.13: Keen eye is a Scavenging rank
   const gatePct = () => job() === 'scavenger' ? .65 : .75;
-  const LOCK_EASE = () => (job() === 'thief' ? 1.6 : 1) * (S().lockset ? 1.25 : 1);   // the Thief job widens sweet spots
-  const SNAP_T = () => (job() === 'thief' ? 2.4 : 1.2) * (S().lockset ? 1.5 : 1);    // ... and picks break half as often
+  const LOCK_EASE = () => (job() === 'thief' ? 1.6 : 1) * (S().lockset ? 1.25 : 1) * SK.lockWide();   // the Thief job widens sweet spots
+  const SNAP_T = () => (job() === 'thief' ? 2.4 : 1.2) * (S().lockset ? 1.5 : 1) * SK.snapMul();    // ... and picks break half as often
   const maxHp = () => D.maxHp(S());
   function gainXP(n, x, y) {
     n += F.xpBonus(n);   // well fed + hydrated: +10%
-    const before = scavLvl(); S().xp += n; DM.Game && DM.Game.save();
+    const up = SK.addXP(n, { quiet: true }); DM.Game && DM.Game.save();   // 0.13: the survivor level (1 skill point a level)
     G.nums.push({ x: x + 16, y: y - 112, v: '+' + n + ' xp', t: 0, col: P.GRN, small: 1 });
-    const after = scavLvl();
-    if (after > before) { levelUp(after); if (DM.Game && DM.Game.onLevel) DM.Game.onLevel(after); }
+    if (up > 0) levelUp(SK.level(), up);
   }
   const weaponKey = () => (S().hands && S().hands.k) ? D.ITEMS[S().hands.k].w : 'fists';
   const weapon = () => WEAPONS[weaponKey()];
@@ -65,7 +65,7 @@
         hp: Math.min(S().hp, maxHp()), sta: F.staMax(), staDelay: 0, st: 'free', stT: 0, inv: 0, ph: 0, stepAcc: 0, kbx: 0, kby: 0,
         swingQ: false, search: null, flash: 0, swingHit: false, downRot: 0,
       },
-      zs: [], furn: [], pack: S().pack, drops: [], arrows: [], parts: [], rings: [], nums: [], decals: [], banners: [],
+      zs: [], clouds: [], furn: [], pack: S().pack, drops: [], arrows: [], parts: [], rings: [], nums: [], decals: [], banners: [],
       sec: (L.secrets || []).map(s => Object.assign({ st: 0, found: false }, JSON.parse(JSON.stringify(s)))),
       fog: {}, visited: {}, room: streetRoom(), noiseLvl: 0, cam: { x: st.x * T, y: st.y * T - 120 }, z3: false,
       stats: { searched: 0, kills: 0, start: performance.now() }, entered: false, lastNoise: null, field: null, fieldT: 0, fieldCell: -1,
@@ -91,17 +91,20 @@
     for (let i = elig.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [elig[i], elig[j]] = [elig[j], elig[i]]; }
     elig.slice(0, Math.round(elig.length * (L.emptyPct == null ? .2 : L.emptyPct))).forEach(f => f.empty = true);
     for (const f of G.furn) if (f.lootable) { f.pre = f.empty ? [] : rollLoot(f.loot); if (f.jack) f.pre.push(...D.rollJack(f.jack).filter(Boolean)); if (f.extra) f.pre.push(...f.extra); } // rolled up front so Keen eye can sense rares
+    const houseZs = [];
     for (const zd of L.zombies || []) {
       const z = mkZombie(zd.x * T, zd.y * T, zd.st || 'idle', null);
       if (zd.hp) z.hp = z.maxHp = zd.hp; if (zd.dmg) z.dmgMul = zd.dmg; if (zd.kind) z.kind = zd.kind;
       if (zd.sleep) { z.sleep = zd.sleep; const sf = G.furn.find(f => f.fid === zd.sleep.furn); if (sf) sf.bedOf = z; }
-      G.zs.push(z);
+      G.zs.push(z); houseZs.push(z);
     }
     // the event mini-boss (zombie turkey, Krampus walker) in about 1 in 3 yards / kitchens
     const bs = EVS && !opts.noBoss ? EVS.bossFor(L) : null;
     if (bs) { const bz = mkZombie(bs.x * T, bs.y * T, 'idle', bs.where === 'yard' ? streetRoom() : null); Object.assign(bz, { kind: bs.kind, hp: bs.hp, maxHp: bs.hp, boss: 1 }, bs.props); G.zs.push(bz); }
     if (opts.resume) restoreRun(opts.resume);
     buildWalls(); buildSolid();
+    spawnInfected(houseZs);
+    for (const z of G.zs) if (z.special) ensureInfRig(z.kind);
     G.p.flip = false;
     hideCards(); closeSheet(true);
     buildStatic();
@@ -147,6 +150,70 @@
   function hudChips() {
     const ev = $('#evchip');
     if (ev) { ev.style.display = EVA ? '' : 'none'; if (EVA) { ev.innerHTML = EVS.glyph(EVA.id) + '<span>' + EVA.ev.short + '</span>'; ev.style.background = EVA.ev.accent.c; } }
+  }
+  // 0.13: danger 3+ houses get a couple more zombies and some special infected (infected.js). Seeded from the house,
+  // so a resumed run has the same ones. Extra zombies stand on reachable open floor away from the front door.
+  function spawnInfected(houseZs) {
+    if (!INF || opts.noInfected) return;
+    const plan = INF.plan(L); if (!plan.kinds.length) return;
+    if (plan.extra) {
+      const st = L.start, dist = bfs(Math.floor(st.x), Math.floor(st.y)), cells = [];
+      for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+        const r = roomAt(x, y), R = r && L.rooms[r];
+        if (!R || r === streetRoom() || R.hidden || R.isolated || ch(x, y) === '+' || dist[y * MW + x] < 8) continue;
+        if (solidCell[y * MW + x] || solidCell[(y + 1) * MW + x] || houseZs.some(z => Math.hypot(z.x / T - x - .5, z.y / T - y - .6) < 2.5)) continue;
+        cells.push([x, y]);
+      }
+      const rnd = D.mulberry32((D.hashStr(String(L.seed) + ':extra') >>> 0));
+      for (let j = 0; j < plan.extra && cells.length; j++) {
+        const [x, y] = cells.splice(Math.floor(rnd() * cells.length), 1)[0];
+        const z = mkZombie((x + .5) * T, (y + .6) * T, 'idle', null); G.zs.push(z); houseZs.push(z);
+        for (let k = cells.length - 1; k >= 0; k--) if (Math.hypot(cells[k][0] - x, cells[k][1] - y) < 2.5) cells.splice(k, 1);
+      }
+    }
+    houseZs.forEach((z, i) => { const k = plan.kinds[i]; if (k) makeSpecial(z, k); });
+  }
+  function makeSpecial(z, k) {
+    const K = INF.KINDS[k]; if (!K) return z;
+    Object.assign(z, { kind: k, special: 1, hp: K.hp, maxHp: K.hp, dmgMul: K.dmg });
+    if (K.armor) z.armor = z.armor0 = K.armor;
+    if (k === 'bloater') z.hw = 15;
+    return z;
+  }
+  // 0.13 bloater: bursts into a toxic cloud. Standing in it costs HP (no knockback, never a stagger); dodge out.
+  function burst(z) {
+    G.clouds.push({ x: z.x, y: z.y, r: 1.75 * T, t: 0, life: 6, tick: .15, seed: z.id * 100 });
+    puff(z.x, z.y, 40, 26, '#9bc23c', 190, .9, 5, 1); G.shake = Math.max(G.shake, 9); SFX.play('kill'); SFX.play('thunk');
+    if (SFX.ac) SFX.noise(.35, 'lowpass', 600, 200, .12);
+    toast('It burst - get out of the cloud!', 1.6);
+  }
+  function inCloud(c, x, y) { const k = Math.min(1, c.t / .5) * (c.t > c.life - 1 ? c.life - c.t : 1); return Math.hypot(x - c.x, (y - c.y) * 1.5) < c.r * (.6 + .4 * k); }
+  function updateClouds(dt) {
+    const p = G.p;
+    for (const c of G.clouds) {
+      c.t += dt; c.tick -= dt;
+      if (c.tick <= 0) {
+        c.tick = .5;
+        if (p.st !== 'down' && !G.over && inCloud(c, p.x, p.y)) {
+          const d = 5; p.hp = Math.max(0, p.hp - d); p.flash = .4; G.redFlash = Math.max(G.redFlash, .45); dmgNum(p.x, p.y - 90, d, '#c6e05a'); SFX.play('hurt'); cancelSearch();
+          if (p.hp <= 0) { p.st = 'down'; p.stT = 0; closeSheet(true); }
+        }
+      }
+      if (Math.random() < dt * 10) puff(c.x + (Math.random() - .5) * c.r * 1.4, c.y + (Math.random() - .5) * c.r * .7, 6, 1, 'rgba(170,210,80,.6)', 18, 1.2, 4);
+    }
+    G.clouds = G.clouds.filter(c => c.t < c.life);
+  }
+  function drawClouds() {
+    for (const c of G.clouds) {
+      const k = Math.min(1, c.t / .5) * Math.min(1, c.life - c.t), R0 = c.r;
+      for (let i = 0; i < 7; i++) {
+        const a = i * .9 + c.seed, wob = Math.sin(G.t * 1.3 + i) * 6;
+        const x = c.x + Math.cos(a) * R0 * .5, y = c.y - 10 + Math.sin(a) * R0 * .28, r = R0 * (.42 + .1 * Math.sin(i * 2.3)) + wob;
+        ctx.globalAlpha = .34 * k; ctx.fillStyle = i % 2 ? '#8fb83a' : '#a9cf4a'; ctx.beginPath(); ctx.ellipse(x, y, r, r * .62, 0, 0, 6.28); ctx.fill();
+        ctx.globalAlpha = .5 * k; ctx.strokeStyle = '#3c5a1e'; ctx.lineWidth = 2; ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
   }
   function mkZombie(x, y, st, room) {
     return {
@@ -337,11 +404,14 @@
       if (z.dead || z.st === 'chase' || z.st === 'windup' || z.st === 'lunge' || z.st === 'rise') continue;
       const d = Math.hypot(z.x - x, z.y - y) / T;
       let eff = rad * (losClear(z.x, z.y - 20, x, y - 20) ? 1 : .65);
-      if (z.st === 'sleep') eff *= .55;
+      if (z.st === 'sleep') eff *= .55 * SK.sleeperMul();
       if (d <= eff) alertZombie(z, x, y, false);
     }
   }
   function alertZombie(z, x, y, seen) {
+    if (seen && z.kind === 'screamer' && !z.shrieked && z.st !== 'shriek' && z.st !== 'sleep' && z.st !== 'rise') { // 0.13: it stops and shrieks first
+      z.st = 'shriek'; z.stT = 0; z.shriekT = 0; z.alertT = 1.2; SFX.play('alert'); toast('A screamer! Kill it before it finishes', 1.6); return;
+    }
     if (z.st === 'sleep') { z.st = 'rise'; z.stT = 0; z.alertT = 1; SFX.play('groan'); z.target = { x, y }; return; }
     if (seen) { if (z.st !== 'chase') { z.alertT = .9; SFX.play('groan'); SFX.play('alert'); if (opts.onAlert) opts.onAlert(z); } z.st = 'chase'; z.stT = 0; z.lostT = 0; return; }
     if (z.st !== 'investigate') { z.alertT = .7; if (Math.random() < .6) SFX.play('groan'); }
@@ -463,7 +533,7 @@
     for (const z of G.zs) {
       if (!z.dead || z.rot === 0) continue;
       let act = !z.searched ? 'Search' : (z.loot0 && z.loot0.length ? 'Open' : null);
-      if (act) out.push({ obj: z, act, rect: z.kind === 'turkey' ? { x: z.x - 24, y: z.y - 14, w: 48, h: 26 } : { x: z.x + (z.fallDir || 1) * 34 - 38, y: z.y - 14, w: 76, h: 26 }, name: EVS.isBoss(z) ? EVS.bossName(z.kind) : 'Zombie', noise: 1.5, corpse: true });
+      if (act) out.push({ obj: z, act, rect: z.kind === 'turkey' ? { x: z.x - 24, y: z.y - 14, w: 48, h: 26 } : { x: z.x + (z.fallDir || 1) * 34 - 38, y: z.y - 14, w: 76, h: 26 }, name: EVS.isBoss(z) ? EVS.bossName(z.kind) : z.special ? INF.KINDS[z.kind].n.toLowerCase() + ' zombie' : 'Zombie', noise: 1.5, corpse: true });
     }
     return out;
   }
@@ -504,12 +574,12 @@
       return;
     }
     o.searched = true; G.stats.searched++;
-    const keys = it.corpse ? (EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse')) : o.pre.slice();
+    const keys = it.corpse ? (EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse').concat(o.special ? INF.loot(o.kind) : [])) : o.pre.slice();   // 0.13: special infected carry more
     if (keys.length && Math.random() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot); if (more.length) keys.push(more[0]); }
     o.loot0 = toStacks(keys);
     // A torn note remembers the house it came from, so reading it somewhere else is not misleading.
     for (const e of o.loot0) if (e.k === 'note') e.d = { addr: L.address, text: L.note || '' };
-    if (it.pry && o.loot0.length && Math.random() < .25) { const i = Math.floor(Math.random() * o.loot0.length), sm = o.loot0[i]; sm.n--; if (!sm.n) o.loot0.splice(i, 1); toast('Smashed: ' + ITEMS[sm.k].n.toLowerCase(), 1.8); }
+    if (it.pry && !SK.noSmash() && o.loot0.length && Math.random() < .25) { const i = Math.floor(Math.random() * o.loot0.length), sm = o.loot0[i]; sm.n--; if (!sm.n) o.loot0.splice(i, 1); toast('Smashed: ' + ITEMS[sm.k].n.toLowerCase(), 1.8); }
     // xp: bigger containers teach more, the hidden stash a lot
     gainXP(it.corpse ? 2 : 2 + (o.time >= 2.2 ? 1 : 0) + (o.rare ? 6 : 0), G.p.x, G.p.y);
     o._key = null;
@@ -646,12 +716,12 @@
 
     if (LP.on) { p.vx *= .8; p.vy *= .8; inp = { x: 0, y: 0, m: 0, run: false }; }
     if (p.st === 'free' && !LP.on) {
-      if (btn.dodge && p.sta >= 25) { startDodge(inp); }
+      if (btn.dodge && p.sta >= 25 * SK.dodgeCost()) { startDodge(inp); }
       else if ((btn.atkPressed || btn.atk) && p.sta >= 4) startSwing();
       else if (btn.use) { const it = findTarget(); if (it) startSearch(it); }
     } else if (p.st === 'swing') {
       if (btn.atkPressed) p.swingQ = true;
-      if (btn.dodge && p.sta >= 25 && p.stT > .15) startDodge(inp);
+      if (btn.dodge && p.sta >= 25 * SK.dodgeCost() && p.stT > .15) startDodge(inp);
     } else if (p.st === 'search') {
       if (inp.m > .25 || btn.atkPressed || btn.dodge) { cancelSearch(); if (inp.m > .25) toast('Search interrupted', 1); }
     }
@@ -659,7 +729,7 @@
     if (p.st === 'free' || p.st === 'swing') {
       running = inp.run && inp.m > .5 && p.sta > 1 && !p.winded && p.st === 'free';
       spd = (running ? 4.5 : 2.75) * T * inp.m * (p.st === 'swing' ? .35 : 1);
-      if (running) { p.sta = Math.max(0, p.sta - 24 * dt); p.staDelay = .7; }
+      if (running) { p.sta = Math.max(0, p.sta - 24 * SK.sprintMul() * dt); p.staDelay = .7; }
       if (!G.over) F.runDrain(dt, running, G);   // a run makes you hungry and thirsty a little faster
       const tvx = inp.x * spd, tvy = inp.y * spd;
       const k = 1 - Math.exp(-(inp.m ? 16 : 22) * dt);
@@ -670,7 +740,7 @@
       const s = p.search; s.t += dt;
       const o = s.it.obj, r = s.it.rect;
       s.nextNoise -= dt; s.nextFx -= dt;
-      if (s.nextNoise <= 0) { s.nextNoise = .75; emitNoise(r.x + r.w / 2, r.y + r.h / 2, s.it.act === 'Push' ? 5 : s.it.noise * (scavLvl() >= 3 ? .75 : 1) * (s.it.pry && job() === 'mechanic' ? .5 : 1)); }
+      if (s.nextNoise <= 0) { s.nextNoise = .75; emitNoise(r.x + r.w / 2, r.y + r.h / 2, s.it.act === 'Push' ? 5 : s.it.noise * (s.it.pry ? SK.pryNoise() : SK.searchNoise()) * (s.it.pry && job() === 'mechanic' ? .5 : 1)); }
       if (s.nextFx <= 0) {
         s.nextFx = .16; SFX.play(s.it.act === 'Push' ? 'whoosh' : 'rummage');
         const fx0 = r.x + r.w / 2 + (Math.random() - .5) * r.w * .6, fy0 = r.y + r.h;
@@ -678,8 +748,8 @@
       }
       if (s.t >= s.dur) finishSearch();
     } else if (p.st === 'dodge') {
-      const k = Math.max(0, 1 - p.stT / .3);
-      p.vx = p.dodx * 9.5 * T * k; p.vy = p.dody * 9.5 * T * k;
+      const k = Math.max(0, 1 - p.stT / .3), dd = SK.dodgeDist();   // 0.13: Quick feet goes further
+      p.vx = p.dodx * 9.5 * dd * T * k; p.vy = p.dody * 9.5 * dd * T * k;
       if (p.stT > .32) p.st = 'free';
     } else if (p.st === 'hurt') {
       p.vx *= Math.exp(-8 * dt); p.vy *= Math.exp(-8 * dt);
@@ -697,7 +767,7 @@
     const stepLen = running ? T * .72 : T * .58;
     if (p.stepAcc > stepLen) {
       p.stepAcc = 0; SFX.play(running ? 'run' : 'step');
-      const qn = (job() === 'thief' ? .6 : job() === 'hunter' ? .8 : 1) * (S().shoes ? .7 : 1) * (opts.quiet ? opts.quiet() : 1); if (running) emitNoise(p.x, p.y, 3 * qn, false); else emitNoise(p.x, p.y, 1.1 * qn, false);
+      const qn = (job() === 'thief' ? .6 : job() === 'hunter' ? .8 : 1) * (S().shoes ? .7 : 1) * (opts.quiet ? opts.quiet() : 1) * SK.stepNoise(); if (running) emitNoise(p.x, p.y, 3 * qn, false); else emitNoise(p.x, p.y, 1.1 * qn, false);
       if (running) puff(p.x, p.y, 2, 2, 'rgba(157,144,191,.6)', 30, .4, 3);
     }
     if (moved < .05 && p.st === 'free') p.ph = lerp(p.ph, Math.round(p.ph / Math.PI) * Math.PI, .2);
@@ -723,7 +793,7 @@
 
   function startDodge(inp) {
     const p = G.p;
-    p.st = 'dodge'; p.stT = 0; p.sta -= 25; p.staDelay = .7; p.inv = .42;
+    p.st = 'dodge'; p.stT = 0; p.sta -= 25 * SK.dodgeCost(); p.staDelay = .7; p.inv = .42 * (SK.dodgeDist() > 1 ? 1.12 : 1);
     const dx = inp.m ? inp.x : p.fx, dy = inp.m ? inp.y : p.fy;
     const d = Math.hypot(dx, dy) || 1; p.dodx = dx / d; p.dody = dy / d;
     if (Math.abs(p.dodx) > .2) p.flip = p.dodx < 0;
@@ -755,10 +825,10 @@
           const dx = z.x - p.x, dy = (z.y - p.y) * 1.15, d = Math.hypot(dx, dy);
           if (d > W.reach * T) continue;
           if (d > 18 && Math.abs(angDiff(Math.atan2(dy, dx), fa)) > 1.35) continue;
-          hitZombie(z, fa, W.dmg * (job() === 'brawler' ? 1.3 : 1)); any = true;
+          hitZombie(z, fa, W.dmg * (job() === 'brawler' ? 1.3 : 1) * SK.meleeMul()); any = true;
         }
         if (any) { G.hitstop = .055; G.shake = Math.max(G.shake, 5); wearWeapon(); }
-        emitNoise(p.x, p.y, any ? W.noise : 1.5, any);
+        emitNoise(p.x, p.y, (any ? W.noise : 1.5) * SK.allNoise(), any);
       }
     }
     if (p.stT >= SW_WIND + SW_STRIKE + SW_REC) {
@@ -768,22 +838,35 @@
   }
   function hitZombie(z, fa, base = 34, ranged) {
     const sneak = (z.st === 'sleep' || z.st === 'idle' || z.st === 'search') && z.kind !== 'turkey';
-    const dmg = Math.round(base * (sneak ? (job() === 'hunter' ? 1.6 : 1.45) : 1) + Math.random() * 4);
+    let dmg = Math.round(base * (sneak ? (job() === 'hunter' ? 1.6 : 1.45) : 1) + Math.random() * 4);
     if (ranged && z.st !== 'chase') alertZombie(z, G.p.x, G.p.y, true);
+    let plate = false;
+    if (z.armor > 0 && !ranged) { // 0.13 armored: riot gear soaks most of a melee hit until it cracks; arrows find the gaps
+      const soak = Math.min(z.armor, Math.round(dmg * .65)); z.armor -= soak; dmg -= soak; plate = true;
+      puff(z.x, z.y, 70, 6, '#b9bdcc', 110, .3, 2.4); SFX.play('thunk');
+      if (z.armor <= 0) { z.armor = 0; toast('The riot armour cracks!', 1.4); puff(z.x, z.y, 80, 14, '#7d86a8', 160, .6, 3.4); }
+    }
     z.hp -= dmg; z.flash = 1; z.hurtDir = Math.cos(fa) >= 0 ? 1 : -1;
     z.kbx = Math.cos(fa) * 5.5 * T; z.kby = Math.sin(fa) * 5.5 * T * .8;
     if (z.kind === 'krampus') { z.kbx *= .45; z.kby *= .45; }   // heavy: barely budges
-    dmgNum(z.x + 20 * (Math.random() < .5 ? -1 : 1), z.y - 104, dmg, sneak ? P.ORA : P.CRM);
+    const K = z.special && INF.KINDS[z.kind]; if (K) { z.kbx *= K.kb; z.kby *= K.kb; }
+    dmgNum(z.x + 20 * (Math.random() < .5 ? -1 : 1), z.y - 104, dmg, plate ? '#b9bdcc' : sneak ? P.ORA : P.CRM);
     splat(z.x, z.y, fa, z.hp <= 0);
     puff(z.x, z.y, 44, 5, P.CRM, 90, .25, 2.2);
     SFX.play(z.hp <= 0 ? 'kill' : 'hit');
     if (z.hp <= 0) {
       z.dead = true; z.st = 'dead'; z.stT = 0; z.fallDir = z.hurtDir; G.stats.kills++;
       if (DM.Game && DM.Game.onKill) DM.Game.onKill(z);
+      // 0.13: kills teach too (special infected and bosses more)
+      const kx = K ? K.xp : z.kind === 'wboss' ? 0 : z.boss || EVS.isBoss(z) ? 15 : 2;
+      if (kx && !opts.noKillXP) gainXP(kx, z.x, z.y);
+      if (z.kind === 'bloater') burst(z);
       return;
     }
+    if (z.kind === 'screamer' && z.st === 'shriek') { z.shriekT = (z.shriekT || 0) + .35; return; }   // a hit pushes the shriek back, it does not stop it
     if (z.st === 'sleep') { z.st = 'rise'; z.stT = .25; z.alertT = 1; SFX.play('groan'); }
     else if (z.kind === 'turkey' && (z.st === 'windup' || z.st === 'lunge')) { z.kbx *= .3; z.kby *= .3; } // it does not flinch mid-peck
+    else if (z.armor > 0 && (z.st === 'windup' || z.st === 'lunge' || z.st === 'chase')) { if (z.st === 'chase') z.cd = Math.max(z.cd, .2); } // 0.13: riot gear: no flinch while the armour holds
     else if (z.st !== 'rise') { z.st = 'hurt'; z.stT = z.kind === 'turkey' ? .17 : 0; z.lunge = null; }
   }
   function hurtPlayer(dmg, dx, dy, z) {
@@ -810,7 +893,7 @@
   function canSee(z) {
     const p = G.p; if (p.st === 'down') return false;
     const dx = p.x - z.x, dy = p.y - z.y, d = Math.hypot(dx, dy) / T;
-    if (d > 7) return false;
+    if (d > (z.sight || 7) * SK.sightMul()) return false;   // 0.13: Stealth ranks shrink how far they spot her
     const facing = (dx < 0) === (z.fx < 0);
     if (d > 2.6 && !facing) return false;
     if (d > 4 && !p.running && G.room !== z.roomNow && Math.random() < .5) return false;
@@ -828,7 +911,7 @@
     const face = (x) => { if (Math.abs(x) > .15) { z.fx = Math.sign(x); z.flip = x > 0; } };
     switch (z.st) {
       case 'sleep':
-        if ((dp < .7 * T || (dp < 1.6 * T && p.running)) && p.st !== 'down') alertZombie(z, p.x, p.y, false);
+        if ((dp < .7 * T || (dp < 1.6 * T * SK.sleeperMul() && p.running)) && p.st !== 'down') alertZombie(z, p.x, p.y, false);
         break;
       case 'rise': {
         z.rot = lerp(-Math.PI / 2, 0, Math.min(1, z.stT / .9));
@@ -859,7 +942,7 @@
         const st = nextStep(z, z.path);
         const tgt = st.same ? z.target : st;
         const dx = tgt.x - z.x, dy = tgt.y - z.y, dd = Math.hypot(dx, dy) || 1;
-        spd = (z.hunter ? 1.5 : 1.25) * T; vx = dx / dd; vy = dy / dd; face(vx);
+        spd = (z.hunter ? 1.5 : 1.25) * (z.kind === 'runner' ? 1.5 : z.kind === 'armored' || z.kind === 'bloater' ? .85 : 1) * T; vx = dx / dd; vy = dy / dd; face(vx);
         if (z.stT > 14 && !z.hunter) { z.st = 'idle'; z.target = null; }
         if (z.hunter && z.stT > 6) { z.target = { x: G.p.x, y: G.p.y }; z.path = null; z.stT = 0; }
         break;
@@ -880,7 +963,7 @@
         if (see && dp < 3.2 * T) tgt = { x: p.x, y: p.y };
         else { const st = nextStep(z, playerField()); tgt = st.same ? { x: p.x, y: p.y } : st; }
         const dx = tgt.x - z.x, dy = tgt.y - z.y, dd = Math.hypot(dx, dy) || 1;
-        spd = (1.85 + .25 * Math.sin(G.t * 2 + z.id * 9)) * T;
+        spd = ((z.special ? INF.KINDS[z.kind].spd : 1.85) + .25 * Math.sin(G.t * 2 + z.id * 9)) * T;   // 0.13: runners sprint, armored plod
         if (dp < .75 * T) spd = 0;
         vx = dx / dd; vy = dy / dd; face(dxp);
         if (z.kind === 'turkey') { // fast and erratic: darting zig-zags
@@ -892,7 +975,7 @@
       case 'windup':
         face(dxp);
         if (z.stT < .5) { const d = dp || 1; vx = -dxp / d; vy = -dyp / d; spd = .25 * T; }
-        if (z.stT >= (z.kind === 'turkey' ? .48 : .62)) { const d = dp || 1; z.lunge = { x: dxp / d, y: dyp / d, hit: false }; z.st = 'lunge'; z.stT = 0; SFX.play('whoosh'); }
+        if (z.stT >= (z.kind === 'turkey' ? .48 : z.kind === 'runner' ? .42 : z.kind === 'armored' ? .72 : .62)) { const d = dp || 1; z.lunge = { x: dxp / d, y: dyp / d, hit: false }; z.st = 'lunge'; z.stT = 0; SFX.play('whoosh'); }
         break;
       case 'lunge': {
         const L = z.lunge; spd = 4.8 * T * Math.max(0, 1 - z.stT / .24); vx = L.x; vy = L.y;
@@ -906,6 +989,16 @@
       case 'recover':
         if (z.stT > (z.kind === 'turkey' ? .45 : .75)) { z.st = 'chase'; z.stT = 0; z.cd = z.kind === 'turkey' ? .15 : .35; }
         break;
+      case 'shriek': { // 0.13 screamer: rooted, mouth open, rings going out; when it finishes the whole house comes
+        face(dxp); z.alertT = 1;
+        z.ringT = (z.ringT || 0) - dt; if (z.ringT <= 0) { z.ringT = .28; G.rings.push({ x: z.x, y: z.y - 40, r: (2.5 + z.stT * 4) * T, t: 0, scream: 1 }); G.shake = Math.max(G.shake, 2); if (SFX.ac) SFX.tone('sawtooth', 900 + Math.random() * 400, 1500, .22, .04); }
+        if (z.stT >= 1.3 + (z.shriekT || 0)) {
+          z.shrieked = 1; z.st = 'chase'; z.stT = 0; z.lostT = 0; G.noiseLvl = 1;
+          for (const o of G.zs) if (o !== z && !o.dead && !o.boss && o.st !== 'chase' && o.st !== 'windup' && o.st !== 'lunge' && o.st !== 'rise' && o.st !== 'recover') { alertZombie(o, p.x, p.y, false); o.hunter = true; }
+          banner('THE HOUSE HEARD THAT', 'everything is coming'); SFX.play('groan');
+        }
+        break;
+      }
       case 'hurt':
         if (z.stT > .32) { z.st = 'chase'; z.stT = 0; z.cd = .25; z.lostT = 0; }
         break;
@@ -969,7 +1062,7 @@
         G.shake = Math.max(G.shake, 1.5);
         if (sh.slide >= 1) { sh.slideState = 'open'; G.secretOpen = true; foundSecret(s); buildWalls(); buildSolid(); }
       }
-      if (scavLvl() >= 6 && !G.secretOpen && G.room === sh.room && Math.hypot(G.p.x - sh.x, G.p.y - sh.y) < 5 * T) { // Keen eye only, and subtle
+      if (keen() && !G.secretOpen && G.room === sh.room && Math.hypot(G.p.x - sh.x, G.p.y - sh.y) < 5 * T) { // Keen eye only, and subtle
       G.secretHint -= dt;
       if (G.secretHint <= 0) {
         G.secretHint = .45;
@@ -978,6 +1071,7 @@
       }
     }
     updateArrows(dt);
+    updateClouds(dt);
     // the third zombie wanders in from the street
     if (!G.z3 && L.wanderer !== false && (G.t > (L.wandererT || 70) || (G.stats.searched >= 9 && G.t > 35))) {
       G.z3 = true; const z = mkZombie(1.5 * T, (L.streetY + 1.4) * T, 'investigate', streetRoom()); z.target = { x: L.stoop.x * T, y: (L.streetY - 3) * T }; z.hunter = true; if (L.wanderHp) z.hp = z.maxHp = L.wanderHp; G.zs.push(z);
@@ -1194,6 +1288,7 @@
     }
     ctx.globalAlpha = 1;
     drawArrows();
+    drawClouds();
     // candle glow in hidden stashes
     for (const f of G.furn) if (f.art === 'crate' && f.secretLoot && (G.visited[f.room] || G.secretOpen)) { const gx = f.x + f.w - 12, gy = f.y + 10; const cg = ctx.createRadialGradient(gx, gy, 2, gx, gy, T * 2.5); cg.addColorStop(0, 'rgba(255,190,110,.22)'); cg.addColorStop(1, 'rgba(255,190,110,0)'); ctx.fillStyle = cg; ctx.fillRect(gx - 2.5 * T, gy - 2.5 * T, 5 * T, 5 * T); }
 
@@ -1266,7 +1361,7 @@
     for (const s of G.sec) {
       if (s.type === 'rug') drawRug(s);
       else if (s.type === 'attic' && G.visited[s.room]) { const O = { x: s.hole.x * T, y: s.hole.y * T }; ART.blk(ctx, O.x - 18, O.y - 10, 36, 20, '#0c0816', 2, 2.4); drawLadder(true, O.x, O.y + 2); }
-      else if (s.type === 'shelf' && scavLvl() >= 6 && !G.secretOpen) { const sh = G.furn[s.furn]; ctx.strokeStyle = 'rgba(234,210,164,.09)'; ctx.lineWidth = 1.4; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(sh.x + 6, sh.y + .9 * T, T * (1.05 + i * .12), -.02, .7); ctx.stroke(); } }
+      else if (s.type === 'shelf' && keen() && !G.secretOpen) { const sh = G.furn[s.furn]; ctx.strokeStyle = 'rgba(234,210,164,.09)'; ctx.lineWidth = 1.4; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(sh.x + 6, sh.y + .9 * T, T * (1.05 + i * .12), -.02, .7); ctx.stroke(); } }
     }
   }
   function drawRug(r) {
@@ -1395,6 +1490,54 @@
     c.fillStyle = '#e9e3d6'; c.fill(); c.stroke();
     c.beginPath(); c.arc(38, -168, 8, 0, 6.29); c.fill(); c.stroke();
   }
+  // ---- 0.13 special infected art (zombie rig coordinates: feet at 0,0, facing left, head about x -65..-6, y -177..-91)
+  const INK = P.INK;
+  function blob(c, path, fill, lw = 4) { c.lineJoin = 'round'; c.lineCap = 'round'; c.fillStyle = fill; c.strokeStyle = INK; c.lineWidth = lw; c.beginPath(); path(c); c.fill(); c.stroke(); }
+  const INF_ART = {
+    armored: { scale: 1.07, recolor: { '#6e5f98': '#2e3d70', '#4a3c70': '#1f2a54' },
+      body(c, z) { // riot vest with a reflective band; dents show as the armour wears down
+        blob(c, q => { q.moveTo(-28, -118); q.quadraticCurveTo(-6, -126, 18, -118); q.lineTo(20, -66); q.quadraticCurveTo(-4, -60, -28, -66); q.closePath(); }, '#1b2240');
+        blob(c, q => { q.rect(-26, -100, 44, 9); }, z.armor > 0 ? '#c9cede' : '#7d86a8', 2.6);
+        blob(c, q => { q.moveTo(-31, -120); q.quadraticCurveTo(-24, -130, -12, -124); q.lineTo(-14, -112); q.quadraticCurveTo(-24, -114, -31, -110); q.closePath(); }, '#2b345c', 3);
+        if (z.armor0 && z.armor < z.armor0 * .6) { c.strokeStyle = '#c9cede'; c.lineWidth = 2; c.beginPath(); c.moveTo(-14, -112); c.lineTo(-8, -104); c.lineTo(-12, -96); c.moveTo(6, -84); c.lineTo(12, -76); c.stroke(); }
+        if (z.armor <= 0) { c.strokeStyle = INK; c.lineWidth = 2.4; c.beginPath(); c.moveTo(-20, -114); c.lineTo(-6, -92); c.lineTo(-16, -72); c.stroke(); }
+      },
+      over(c, z) { // riot helmet + visor (the visor is gone once the armour cracks)
+        blob(c, q => { q.moveTo(-74, -138); q.quadraticCurveTo(-72, -194, -34, -196); q.quadraticCurveTo(2, -194, 2, -146); q.quadraticCurveTo(-36, -156, -74, -138); q.closePath(); }, '#26305a');
+        c.fillStyle = 'rgba(255,255,255,.18)'; c.beginPath(); c.ellipse(-44, -182, 14, 5, -.2, 0, 6.28); c.fill();
+        blob(c, q => { q.rect(-62, -194, 30, 7); }, '#c9cede', 2.4);
+        if (z.armor > 0) { c.lineWidth = 3; c.strokeStyle = INK; c.fillStyle = 'rgba(170,200,240,.38)'; c.beginPath(); c.moveTo(-78, -150); c.quadraticCurveTo(-50, -158, -18, -150); c.lineTo(-20, -112); c.quadraticCurveTo(-50, -106, -78, -116); c.closePath(); c.fill(); c.stroke();
+          c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 2; c.beginPath(); c.moveTo(-70, -146); c.lineTo(-62, -122); c.stroke(); }
+      } },
+    runner: { scale: .96, recolor: { '#6e5f98': '#b0453a', '#4a3c70': '#7e2c28', '#93a86c': '#a7b27c' },
+      over(c, z) { // a torn hood pulled up, and glowing eyes
+        blob(c, q => { q.moveTo(-70, -128); q.quadraticCurveTo(-74, -184, -34, -186); q.quadraticCurveTo(-2, -186, 0, -140); q.lineTo(4, -112); q.lineTo(-8, -118); q.quadraticCurveTo(-8, -170, -36, -170); q.quadraticCurveTo(-60, -170, -62, -132); q.closePath(); }, '#b0453a');
+        if (!z.dead) for (const [ex, ey] of [[-51, -136], [-29, -137]]) { const g = c.createRadialGradient(ex, ey, 0, ex, ey, 9); g.addColorStop(0, 'rgba(255,120,80,.85)'); g.addColorStop(1, 'rgba(255,120,80,0)'); c.fillStyle = g; c.fillRect(ex - 9, ey - 9, 18, 18); c.fillStyle = '#ffd0a0'; c.beginPath(); c.arc(ex, ey, 2.4, 0, 6.28); c.fill(); }
+      } },
+    bloater: { scale: 1.04, sx: 1.12, recolor: { '#93a86c': '#a9c443', '#6c8050': '#7f9a2a', '#4d5c3c': '#55701c', '#6e5f98': '#cbbd8e', '#4a3c70': '#a29267' },
+      body(c, z) { // the swollen belly: pustules, stretch marks, a faint green glow
+        const pulse = z.dead ? 0 : Math.sin(G.t * 3 + z.id * 7) * 1.5;
+        const g = c.createRadialGradient(-6, -86, 10, -6, -86, 48); g.addColorStop(0, 'rgba(190,230,90,.28)'); g.addColorStop(1, 'rgba(190,230,90,0)'); c.fillStyle = g; c.fillRect(-56, -136, 100, 100);
+        blob(c, q => q.ellipse(-6, -84, 31 + pulse, 27 + pulse * .6, 0, 0, 6.28), '#a9c443');
+        c.fillStyle = '#7f9a2a'; c.beginPath(); c.ellipse(-2, -74, 24, 13, 0, 0, Math.PI); c.fill();
+        c.strokeStyle = '#55701c'; c.lineWidth = 1.8; c.beginPath(); c.moveTo(-22, -96); c.quadraticCurveTo(-18, -88, -22, -80); c.moveTo(12, -98); c.quadraticCurveTo(16, -90, 12, -82); c.stroke();
+        for (const [px, py, r] of [[-18, -92, 4.5], [4, -100, 3.4], [10, -78, 5], [-10, -72, 3]]) { blob(c, q => q.arc(px, py, r, 0, 6.28), '#d9e88a', 2); c.fillStyle = 'rgba(255,255,255,.6)'; c.beginPath(); c.arc(px - r * .3, py - r * .3, r * .3, 0, 6.28); c.fill(); }
+      },
+      over(c, z) { blob(c, q => { q.moveTo(-56, -112); q.quadraticCurveTo(-40, -104, -24, -110); q.quadraticCurveTo(-30, -98, -44, -98); q.quadraticCurveTo(-54, -100, -56, -112); q.closePath(); }, '#7f9a2a', 2.6); if (!z.dead) { c.fillStyle = '#c6e05a'; c.beginPath(); c.ellipse(-40, -96 + Math.sin(G.t * 4) * 2, 3, 5, 0, 0, 6.28); c.fill(); } } },
+    screamer: { scale: 1, recolor: { '#6e5f98': '#c99a3e', '#4a3c70': '#94702a' },
+      over(c, z) { // stringy hair and a jaw that hangs open (wide open while it shrieks)
+        c.strokeStyle = INK; c.lineCap = 'round'; c.lineWidth = 5; c.beginPath();
+        for (let i = 0; i < 6; i++) { const x0 = -48 + i * 8; c.moveTo(x0, -180); c.quadraticCurveTo(x0 + 14 + i * 2, -168, x0 + 18 + i * 3, -118 + (i % 2) * 8); } c.stroke();
+        c.strokeStyle = '#3a2a40'; c.lineWidth = 2.6; c.stroke();
+        const open = z.st === 'shriek' ? 1 : .45, h = 10 + 16 * open;
+        blob(c, q => q.ellipse(-40, -106 + h * .3, 15 + 4 * open, h, 0, 0, 6.28), '#1a1020', 3.2);
+        c.fillStyle = '#a8323a'; c.beginPath(); c.ellipse(-40, -106 + h * .9, 9, h * .3, 0, 0, 6.28); c.fill();
+        c.fillStyle = '#f6e3bb'; for (let i = 0; i < 5; i++) { const tx = -52 + i * 6; c.beginPath(); c.moveTo(tx, -106 - h * .65); c.lineTo(tx + 5, -106 - h * .65); c.lineTo(tx + 2.5, -106 - h * .65 + 6); c.closePath(); c.fill(); }
+        if (z.st === 'shriek') { c.strokeStyle = 'rgba(232,240,160,.8)'; c.lineWidth = 3; for (let i = 0; i < 3; i++) { const r = 14 + ((G.t * 60 + i * 12) % 36); c.beginPath(); c.arc(-50, -106, r, 2.4, 3.9); c.stroke(); } }
+      } },
+  };
+  const infRigP = {};
+  function ensureInfRig(k) { if (infRigP[k] || !INF_ART[k]) return; infRigP[k] = ART.buildRig('zombie', E.rigRes || 1.4, INF_ART[k].recolor, 'zombie_' + k).catch(() => { delete infRigP[k]; }); }
   function drawZombie(z) {
     if (z.kind === 'turkey') { drawTurkey(z); return; }
     const dir = z.flip ? 1 : -1; // facing direction (+1 = right)
@@ -1434,9 +1577,17 @@
     if (z.st === 'dead') { // corpse lies along the floor
       y = z.y + 6;
     }
-    const zs = z.kind === 'krampus' ? ZSCALE * 1.18 : ZSCALE * (z.scale || 1), over = z.kind === 'krampus' ? santaHat : z.over || null;   // z.scale / z.over: the weekly boss
-    z._pose = [x, y + yo, zs, z.flip, { rot, sy, parts, alpha: 1, over }];
-    ART.drawRig(ctx, 'zombie', x, y + yo, zs, z.flip, { rot, sy, parts, flash: z.flash, alpha, over });
+    let zs = z.kind === 'krampus' ? ZSCALE * 1.18 : ZSCALE * (z.scale || 1), over = z.kind === 'krampus' ? santaHat : z.over || null;   // z.scale / z.over: the weekly boss
+    let rig = 'zombie', body = null, sx = 1;
+    if (z.special) { // 0.13 special infected: own colours (a rig per kind, built on first sight) + worn bits + their own lean
+      const A = INF_ART[z.kind]; if (ART.rigs['zombie_' + z.kind]) rig = 'zombie_' + z.kind; else ensureInfRig(z.kind);
+      zs *= A.scale; sx = A.sx || 1; body = A.body ? c => A.body(c, z) : null; over = A.over ? c => A.over(c, z) : null;
+      if (z.kind === 'runner' && !z.dead && z.st !== 'sleep' && z.st !== 'rise') { rot += -(z.flip ? -1 : 1) * (.22 + .2 * sp); parts.head = { r: (parts.head ? parts.head.r : 0) + .18 }; parts.armF = { r: (parts.armF ? parts.armF.r : 0) - .5 * sp }; parts.armB = { r: (parts.armB ? parts.armB.r : 0) + .45 * sp }; sy *= .93; }
+      if (z.kind === 'screamer' && z.st === 'shriek') { const q = Math.min(1, z.stT / .25); rot = (z.flip ? 1 : -1) * -.12 * q; parts.head = { r: .32 * q }; parts.armF = { r: -.9 * q }; parts.armB = { r: -.8 * q }; x += (Math.random() - .5) * 2.5; }
+      if (z.kind === 'armored' && z.st === 'hurt' && z.armor > 0) rot *= .3;
+    }
+    z._pose = [x, y + yo, zs, z.flip, { rot, sx, sy, parts, alpha: 1, over, body }];
+    ART.drawRig(ctx, rig, x, y + yo, zs, z.flip, { rot, sx, sy, parts, flash: z.flash, alpha, over, body });
   }
 
   // Fog is sampled on a fine grid (4 per tile) that knows what is *drawn* there: wall faces
@@ -1525,7 +1676,7 @@
     const p = G.p;
     // noise rings
     for (const r of G.rings) {
-      const k = r.t / .9; ctx.globalAlpha = (1 - k) * .5; ctx.strokeStyle = P.ORA; ctx.lineWidth = 2.5 * (1 - k) + .5;
+      const k = r.t / .9; ctx.globalAlpha = (1 - k) * (r.scream ? .8 : .5); ctx.strokeStyle = r.scream ? '#e8f0a0' : P.ORA; ctx.lineWidth = 2.5 * (1 - k) + .5;
       ctx.beginPath(); ctx.ellipse(r.x, r.y, r.r * k, r.r * k * .62, 0, 0, 6.28); ctx.stroke();
     }
     ctx.globalAlpha = 1;
@@ -1549,7 +1700,7 @@
       ctx.restore(); ctx.globalAlpha = 1;
     }
     // Keen eye: rare loot sparkles
-    if (scavLvl() >= 6) for (const f of G.furn) {
+    if (keen()) for (const f of G.furn) {
       if (!f.lootable || f.searched || !f.pre || !f.pre.some(k => ITEMS[k].rare) || G.fog[f.room] > .6) continue;
       const g = ART.geo(f), sx = f.x + f.w * .78 + (f.slide || 0) * T, sy = (f.wall ? f.y + f.h - 50 : g.ty0 + 8), tw = (Math.sin(G.t * 5 + f.fid) + 1) / 2;
       ctx.save(); ctx.translate(sx, sy); ctx.rotate(G.t * .8); ctx.globalAlpha = .5 + tw * .5; ctx.fillStyle = '#ffe2a8';
@@ -1648,7 +1799,7 @@
   let lastHud = '', lastQ = null;
   function hud() {
     const p = G.p;
-    hpFill.style.width = (p.hp / maxHp() * 100) + '%'; stFill.style.width = p.sta + '%';
+    hpFill.style.width = (p.hp / maxHp() * 100) + '%'; stFill.style.width = Math.min(100, p.sta / Math.max(100, F.staMax()) * 100) + '%';
     needsHud(p);
     const hudKey = [Math.round(p.hp), G.pack.length, packCount('lockpick'), G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5), S().xp, S().hands ? S().hands.k + S().hands.d : '-', arrowsLeft()].join('|');
     if (hudKey !== lastHud) {
@@ -1656,9 +1807,9 @@
       hpVal.textContent = Math.ceil(p.hp);
       packEl.textContent = G.pack.length + '/' + packSlots();
       $('#pack').classList.toggle('full', G.pack.length >= packSlots());
-      const L = scavLvl();
-      $('#skLv').textContent = L;
-      $('#skXp').style.width = (L >= 10 ? 100 : (S().xp - XPCUM(L)) / (XPCUM(L + 1) - XPCUM(L)) * 100) + '%';
+      const xl = SK.xpLine();   // 0.13: the survivor level
+      $('#skLv').textContent = xl.L;
+      $('#skXp').style.width = xl.pct + '%';
       const h = S().hands, wk = weaponKey();
       $('#wpn img').src = ART.iconURL[h ? ITEMS[h.k].i : 'scrap'] || ''; $('#wpn').classList.toggle('fists', !h);
       $('#wpn i').style.width = (h && h.d != null ? Math.max(0, h.d / WEAPONS[wk].dur) * 100 : 0) + '%';
@@ -1826,7 +1977,7 @@
       const here = nd.addr === L.address;
       $('#shActs').innerHTML = `<div class="note">${nd.text || '"...the rest is torn away."'}<br><small>Found at <b>${nd.addr || 'a house'}</b>${here ? ' - this house.' : ' - not this house. The clue is about that place.'}</small></div>`;
       SFX.play('pick'); return; }
-    if (it.hp) p.hp = Math.min(maxHp(), p.hp + it.hp);
+    if (it.hp) p.hp = Math.min(maxHp(), p.hp + SK.heal(it.hp));   // 0.13: Field medic heals more
     const fed = F.isFood(e.k) ? F.eat(S(), e.k) : '';
     if (it.sta) p.sta = Math.min(F.staMax(), p.sta + it.sta);
     e.n--; if (!e.n) G.pack.splice(i, 1);
@@ -1871,7 +2022,7 @@
   function startPry(it) {
     const p = G.p, o = it.obj;
     p.st = 'search'; p.stT = 0;
-    p.search = { it: { obj: o, act: 'Pry', name: o.name, rect: it.rect, noise: 7.5 * (hasItem('prybar') && !hasItem('crowbar') ? .6 : 1), pry: true, done: () => { o.locked = null; o.pried = true; o._key = null; SFX.play('kill'); G.shake = 8; emitNoise(o.x + o.w / 2, o.y + o.h, 9 * (hasItem('prybar') && !hasItem('crowbar') ? .6 : 1) * (job() === 'mechanic' ? .5 : 1)); finishPry(it); } }, t: 0, dur: 2.6 + (o.time > 2.5 ? 1 : .4), nextNoise: .2, nextFx: 0 };
+    p.search = { it: { obj: o, act: 'Pry', name: o.name, rect: it.rect, noise: 7.5 * (hasItem('prybar') && !hasItem('crowbar') ? .6 : 1), pry: true, done: () => { o.locked = null; o.pried = true; o._key = null; SFX.play('kill'); G.shake = 8; emitNoise(o.x + o.w / 2, o.y + o.h, 9 * (hasItem('prybar') && !hasItem('crowbar') ? .6 : 1) * (job() === 'mechanic' ? .5 : 1) * SK.pryNoise()); finishPry(it); } }, t: 0, dur: 2.6 + (o.time > 2.5 ? 1 : .4), nextNoise: .2, nextFx: 0 };
     SFX.play('scrape');
   }
   function finishPry(it) { // pried open: the normal search happens straight away (with a chance to smash something)
@@ -1976,13 +2127,13 @@
 
   // ---- level up popup
   let lvlTimer = 0;
-  function levelUp(L) {
-    const perk = PERKS[L];
-    $('#lvlBody').innerHTML = `<div class="kick">Scavenging</div><div class="lv">Level ${L}</div>
-      <div class="lvsub">Searches 6% faster · +4% extra-loot chance</div>
-      ${perk ? `<div class="perk"><b>Perk unlocked: ${perk[0]}</b>${perk[1]}</div>` : ''}`;
+  function levelUp(L, up = 1) {
+    const pts = SK.points();
+    $('#lvlBody').innerHTML = `<div class="kick">Survivor</div><div class="lv">Level ${L}</div>
+      <div class="lvsub">${L <= 10 ? 'Searches 6% faster · +4% extra-loot chance' : 'Tougher every day'}</div>
+      <div class="perk"><b>+${up} skill point${up > 1 ? 's' : ''}</b>${pts} to spend · Skills on the home card</div>`;
     const el = $('#lvlup'); el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
-    clearTimeout(lvlTimer); lvlTimer = setTimeout(() => el.classList.remove('on'), perk ? 3600 : 2600);
+    clearTimeout(lvlTimer); lvlTimer = setTimeout(() => el.classList.remove('on'), 3200);
     if (SFX.ac) [523, 659, 784, 1046].forEach((f, i) => SFX.tone('triangle', f, f * 1.01, .25, .07, i * .09));
     puff(G.p.x, G.p.y, 30, 18, '#ffe2a8', 140, .9, 3);
   }
@@ -1993,7 +2144,7 @@
     const counts = {}; list.forEach(e => counts[e.k] = (counts[e.k] || 0) + e.n);
     return Object.keys(counts).map(k => `<div class="sum-item${ITEMS[k].rare ? ' rare' : ''}"><img alt="" src="${ART.iconURL[ITEMS[k].i]}"><span>${ITEMS[k].n}</span>${counts[k] > 1 ? `<b>x${counts[k]}</b>` : ''}</div>`).join('');
   }
-  const skillLine = () => { const Lv = scavLvl(); return `<div class="skline">Scavenging Lv ${Lv}${Lv < 10 ? ` · ${S().xp - XPCUM(Lv)}/${XPCUM(Lv + 1) - XPCUM(Lv)} xp` : ' · max'}</div>`; };
+  const skillLine = () => { const xl = SK.xpLine(), pts = SK.points(); return `<div class="skline">Survivor Lv ${xl.L} · ${xl.cur}/${xl.need} xp${pts ? ` · <b>${pts} skill point${pts > 1 ? 's' : ''}</b>` : ''}</div>`; };
   function showSummary() {
     G.over = true; G.paused = true; closeSheet(true);
     const rooms = Object.keys(L.rooms).filter(k => k !== streetRoom() && !L.rooms[k].hidden && !L.rooms[k].isolated), seen = rooms.filter(k => G.visited[k]).length;
@@ -2082,7 +2233,7 @@
     if (best) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; ax = dx / d; ay = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; p.fx = ax; p.fy = ay; }
     const sp = 15 * T;
     G.arrows.push({ x: p.x + ax * 16, y: p.y + ay * 10, vx: ax * sp, vy: ay * sp, z: 36, life: 1.1 });
-    SFX.play('bow'); emitNoise(p.x, p.y, WEAPONS.bow.noise, false); wearWeapon();
+    SFX.play('bow'); emitNoise(p.x, p.y, WEAPONS.bow.noise * SK.allNoise(), false); wearWeapon();
     return true;
   }
   function landArrow(x, y) {
@@ -2096,7 +2247,7 @@
       for (let i = 0; i < steps && a.life > 0; i++) {
         a.x += a.vx * dt / steps; a.y += a.vy * dt / steps;
         const hitZ = G.zs.find(z => !z.dead && Math.hypot(z.x - a.x, (z.y - a.y) * 1.3) < 22);
-        if (hitZ) { hitZombie(hitZ, Math.atan2(a.vy, a.vx), WEAPONS.bow.dmg, true); a.life = 0; landArrow(hitZ.x + (Math.random() - .5) * 20, hitZ.y + 8); break; }
+        if (hitZ) { hitZombie(hitZ, Math.atan2(a.vy, a.vx), WEAPONS.bow.dmg * SK.bowMul(), true); a.life = 0; landArrow(hitZ.x + (Math.random() - .5) * 20, hitZ.y + 8); break; }
         if (overlapsSolid({ hw: 2, hh: 2 }, a.x, a.y)) { a.life = 0; SFX.play('thunk'); landArrow(a.x - a.vx * .012, a.y - a.vy * .012); break; }
       }
       a.life -= dt;

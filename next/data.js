@@ -306,12 +306,14 @@ window.DM = window.DM || {};
     return out;
   };
 
-  D.maxHp = s => s && s.job === 'brawler' ? 130 : 100;
+  D.maxHp = s => (s && s.job === 'brawler' ? 130 : 100) + (DM.Skills && s ? DM.Skills.hpBonus(s) : 0);   // 0.13: Combat ranks add HP
 
   // ---------------------------------------------------------------- scavenging skill
   D.XPCUM = L => L <= 1 ? 0 : Math.round(14 * Math.pow(L - 1, 1.75) + (L > 5 ? 30 * (L - 5) * (L - 5) : 0));
   D.PERKS = { 3: ['Quiet hands', 'Searches make 25% less noise'], 6: ['Keen eye', 'Hidden clues glow, rare loot sparkles'], 9: ['Pack rat', '+2 pack slots'] };
-  D.scavLvl = xp => { let L = 1; while (L < 10 && xp >= D.XPCUM(L + 1)) L++; return L; };
+  D.scavLvl = xp => { let L = 1; while (L < 10 && xp >= D.XPCUM(L + 1)) L++; return L; };   // the passive search bonus stops at 10
+  // 0.13: the survivor level keeps going on the same curve (1 skill point per level, skills.js)
+  D.survLvl = xp => { let L = 1; while (L < 99 && xp >= D.XPCUM(L + 1)) L++; return L; };
 
   // ---------------------------------------------------------------- jobs
   D.JOBS = {

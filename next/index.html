@@ -292,6 +292,38 @@
   .pick { display: block; width: 100%; text-align: left; margin: 8px 0; padding: 12px 14px; border-radius: 16px; background: var(--plum); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); color: var(--crm); }
   .pick b { display: block; font-size: 17px; font-weight: 900; color: var(--ora); } .pick span { font-size: 12px; font-weight: 700; color: var(--crm); }
   .picons img { width: 22px; height: 22px; vertical-align: -6px; margin: 0 2px 0 6px; }
+  /* 0.13: skills */
+  .skbtn { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; width: 100%; text-align: left; padding: 0; background: none; border: 0; color: var(--grn); font: inherit; font-size: 11px; font-weight: 800; }
+  .skbtn span { flex: 1; min-width: 0; } .skbtn .mbar { flex: 1 1 100%; margin-top: 0; }
+  .skbtn span b { color: var(--ora); } .skbtn em { flex: none; font-style: normal; font-size: 10px; font-weight: 900; letter-spacing: .04em; padding: 2px 7px; border-radius: 8px; background: var(--plum); color: var(--crm); border: 2px solid var(--ink); }
+  .skbtn.pts em { background: var(--ora); color: var(--ink); animation: skpulse 1.6s infinite; }
+  @keyframes skpulse { 50% { box-shadow: 0 0 0 4px rgba(240,123,60,.35); } }
+  .skcard { max-width: 380px; }
+  .skhead { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .skpts { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 78px; height: 62px; border-radius: 16px; background: var(--ink); border: 3px solid var(--plum); }
+  .skpts b { font-size: 28px; font-weight: 900; line-height: 1; color: var(--mute); } .skpts span { font-size: 9px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+  .skpts.on { border-color: var(--ink); background: var(--ora); box-shadow: 0 3px 0 var(--ink); } .skpts.on b, .skpts.on span { color: var(--ink); }
+  .skxp { flex: 1; min-width: 0; font-size: 11px; font-weight: 800; color: var(--grn); }
+  .sktabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-bottom: 10px; }
+  .sktab { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 1px 5px; border-radius: 12px; background: rgba(17,20,47,.6); border: 2.5px solid var(--plum); color: var(--mute); }
+  .sktab b { font-size: 8.5px; font-weight: 900; letter-spacing: .02em; text-transform: uppercase; } .sktab i { font-style: normal; font-size: 10px; font-weight: 900; color: var(--tc); }
+  .sktab.on { background: var(--crm); border-color: var(--ink); color: var(--ink); box-shadow: 0 3px 0 var(--tc); } .sktab.on i { color: var(--ink); }
+  .skblurb { display: flex; gap: 8px; align-items: center; padding: 8px 10px; margin-bottom: 8px; border-radius: 14px; background: var(--ink); border-left: 5px solid var(--tc); font-size: 12px; font-weight: 700; color: var(--mute); line-height: 1.35; }
+  .skblurb b { display: block; font-size: 15px; font-weight: 900; color: var(--crm); } .skblurb em { font-style: normal; color: var(--tc); }
+  .skranks { display: flex; flex-direction: column; gap: 6px; }
+  .skrow { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 8px 9px; border-radius: 14px; background: #241a44; border: 2.5px solid var(--ink); box-shadow: 0 3px 0 var(--plum); color: var(--crm); }
+  .sknum { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 13px; font-weight: 900; background: var(--plum); color: var(--mute); border: 2px solid var(--ink); }
+  .sktxt { flex: 1; min-width: 0; font-size: 11.5px; font-weight: 700; color: var(--mute); line-height: 1.3; } .sktxt b { display: block; font-size: 14px; font-weight: 900; color: var(--crm); } .sktxt small { display: block; font-size: 10px; font-weight: 800; color: #ff8a7a; }
+  .sktag { flex: none; font-style: normal; font-size: 10px; font-weight: 900; padding: 3px 7px; border-radius: 8px; background: var(--plum); color: var(--mute); border: 2px solid var(--ink); white-space: nowrap; }
+  .sktag.can { background: var(--ora); color: var(--ink); } .sktag.got { background: var(--tc); color: var(--ink); } .sktag.free { background: var(--crm); color: var(--ink); max-width: 84px; white-space: normal; text-align: center; line-height: 1.15; }
+  .skrow.got { background: #2a2350; box-shadow: 0 3px 0 var(--tc); } .skrow.got .sknum { background: var(--tc); color: var(--ink); }
+  .skrow.can { border-color: var(--ora); } .skrow.can .sknum { background: var(--ora); color: var(--ink); }
+  .skrow.lock { opacity: .62; } .skrow.sel { background: #3a2a5a; }
+  .skconf { margin: -2px 0 2px; padding: 8px 10px; border-radius: 12px; background: var(--ink); border: 2px solid var(--ora); font-size: 12px; font-weight: 700; color: var(--crm); line-height: 1.35; } .skconf b { color: var(--ora); }
+  .skconf .btnrow { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; } .skconf .btnrow button { height: 38px; font-size: 14px; }
+  .skg { flex: none; }
+  .inftag { color: #c6e05a; white-space: nowrap; }
+  .skline b { color: var(--ora); }
   .hcard.trader { box-shadow: 0 4px 0 var(--grn); border-color: var(--ink); background: #1f2a2a; }
   .hcard.quest { box-shadow: 0 4px 0 var(--ora); }
   .hcard .hot { color: var(--ora); }
@@ -593,7 +625,7 @@
         <div id="noise"><span></span><span></span><span></span><span></span><span></span></div>
         <button id="pack" aria-label="Pack"><svg viewBox="0 0 24 24" fill="none" stroke="#f6e3bb" stroke-width="2.4" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M9 4.5V3h6v1.5M9 14h6"/></svg><b>0/12</b></button>
       </div>
-      <div id="skill"><span>SCAVENGING <b>Lv <i id="skLv">1</i></b></span><div class="xp"><i id="skXp"></i></div></div>
+      <div id="skill"><span>LEVEL <b><i id="skLv">1</i></b></span><div class="xp"><i id="skXp"></i></div></div>
       <canvas id="mini" width="144" height="180"></canvas>
       <div id="qchip"></div>
     </div>
@@ -631,23 +663,25 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.11.1"></script>
-<script src="art.js?v=0.11.1"></script>
-<script src="net.js?v=0.11.1"></script>
-<script src="netpanel.js?v=0.11.1"></script>
-<script src="syncguide.js?v=0.11.1"></script>
-<script src="events.js?v=0.11.1"></script>
-<script src="data.js?v=0.11.1"></script>
-<script src="food.js?v=0.11.1"></script>
-<script src="engine.js?v=0.11.1"></script>
-<script src="music.js?v=0.11.1"></script>
-<script src="gen.js?v=0.11.1"></script>
-<script src="house.js?v=0.11.1"></script>
-<script src="horde.js?v=0.11.1"></script>
-<script src="base.js?v=0.11.1"></script>
-<script src="crew.js?v=0.11.1"></script>
-<script src="boss.js?v=0.11.1"></script>
-<script src="game.js?v=0.11.1"></script>
-<script src="map.js?v=0.11.1"></script>
+<script src="s2art.js?v=0.13"></script>
+<script src="art.js?v=0.13"></script>
+<script src="net.js?v=0.13"></script>
+<script src="netpanel.js?v=0.13"></script>
+<script src="syncguide.js?v=0.13"></script>
+<script src="events.js?v=0.13"></script>
+<script src="data.js?v=0.13"></script>
+<script src="food.js?v=0.13"></script>
+<script src="skills.js?v=0.13"></script>
+<script src="infected.js?v=0.13"></script>
+<script src="engine.js?v=0.13"></script>
+<script src="music.js?v=0.13"></script>
+<script src="gen.js?v=0.13"></script>
+<script src="house.js?v=0.13"></script>
+<script src="horde.js?v=0.13"></script>
+<script src="base.js?v=0.13"></script>
+<script src="crew.js?v=0.13"></script>
+<script src="boss.js?v=0.13"></script>
+<script src="game.js?v=0.13"></script>
+<script src="map.js?v=0.13"></script>
 </body>
 </html>

@@ -206,3 +206,25 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   wallpaper colour + pattern, front brick, and 12 rug colourways x 4 patterns. The secret rug uses the same set, so it
   no longer stands out as "the red rug". Visual only. Base and tutorial keep the default look.
 - Second step correction for celeste on 2026-11-13 (c1113b): an older duplicate shortcut posted phone + ring until 23:51.
+
+## Done in 0.13 (skill points, special infected)
+- Survivor level (D.survLvl, uncapped, same curve as the old Scavenging level: Lv 2 at 14 xp, 6 at 264, 10 at 1,405, 20 at
+  9,171, 30 at 23,824, 46 at ~61k). 1 skill point per level. The passive "6% faster / +4% extra loot per level" stops at 10.
+  XP: searches 2-3 (+6 rare), corpses 2, kills 2 (special infected 8-12, event bosses 15), secrets 8, locks 4-12, keys 3-4,
+  crew search 3, crafting 2, Dot's jobs tier x 8, watch shift 8 (4 if down), weekly boss fight 6-20 (+20 for the last hit).
+- skills.js: five trees, 5 ranks each, costs 1/1/2/2/3 (45 points for everything). Rank N needs N-1. The job's tree gives
+  rank 1 free (Scavenger: Scavenging, Hunter: Stealth, Brawler: Combat, Mechanic: Survival, Thief: Lockwork).
+  Scavenging: Quick hands (searches -10%), Keen eye, Lucky find (+8% extra find), Pack rat (+2 slots), Treasure nose (-10%, +7%).
+  Stealth: Soft steps (steps -20%), Quiet hands (search noise -25%), Low profile (sight -15%), Hush (all noise -15%), Ghost (sight -15%, sleepers).
+  Combat: Heavy hands (melee +12%), Steady aim (bow +15%), Quick feet (dodge +25% further, -20% stamina), Tough (+15 HP), Veteran (+10% both, +10 HP).
+  Survival: Light eater (drain -15%), Field medic (heals +40%), Second wind (+15 stamina, regen +20%), Iron stomach (drain -15%), Marathoner (sprint -25%, regen +20%).
+  Lockwork: Steady pick (sweet spot +20%), Soft touch (snaps -35%), Quiet pry (-35%), Locksmith (+20%), Master (-35%, no smashing).
+  Migration: saves without s.skills get every point their level earned, plus Quiet hands (Lv 3), Keen eye (Lv 6) and Pack rat
+  (Lv 9) as free ranks. Skills screen from the level line on the home card; one reset a week for 150 caps.
+- infected.js: danger 3+ houses get +0-1 zombies (danger 4: +1, sometimes 2) and special infected (24% of zombies at 3, 40% at 4,
+  at least one at 4; never gen's 'tough' ones; one screamer max). Kinds are rolled in house.js at spawn from (seed, index), so
+  resumed runs match; extras stand on reachable open floor 8+ tiles from the door. House list shows "☣ N special infected".
+  Armored (police): 150 HP + 80 armour soaking 65% of melee, arrows ignore it, slow 1.4, hits x1.25, no flinch; drops ammo, police cosmetic 15%.
+  Runner (school/mansion): 60 HP, chases at 3.05 tiles/s, quick windup, hits x0.75; drops food/drink, lockpick 30%.
+  Bloater (pharmacy): 110 HP, slow; bursts into a toxic cloud (6 s, 5 HP per 0.5 s inside); drops meds/bandages.
+  Screamer (school/mansion): 75 HP; when it sees you it shrieks for 1.3 s (hits delay it) then every zombie in the house hunts you; kill it first.
