@@ -36,10 +36,12 @@ window.DM = window.DM || {};
     const f = s.food, real = (now - f.at) / DAY;
     if (!(real > 0)) { if (real < 0) f.at = now; return hp; }   // clock went backwards: just restart from now
     const days = real * SKM(s);   // 0.13: Survival ranks slow the drain (starving HP loss runs on the same slowed clock)
-    const rh = F.RATE.h * (DM.Infect ? DM.Infect.hungerMul(s) : 1);   // 0.18: infected = hunger drains 15% faster (infection.js)
-    const empty = Math.min(f.h / rh, f.t / F.RATE.t);      // days until the first bar hits 0
+    const wx = DM.Weather ? DM.Weather.drain() : { h: 1, t: 1 };   // 0.22: snow = thirst slower, hunger faster; heat = thirst faster (weather.js)
+    const rh = F.RATE.h * (DM.Infect ? DM.Infect.hungerMul(s) : 1) * wx.h;   // 0.18: infected = hunger drains 15% faster (infection.js)
+    const rt = F.RATE.t * wx.t;
+    const empty = Math.min(f.h / rh, f.t / rt);      // days until the first bar hits 0
     f.h = Math.max(0, f.h - rh * days);
-    f.t = Math.max(0, f.t - F.RATE.t * days);
+    f.t = Math.max(0, f.t - rt * days);
     f.at = now;
     const starving = Math.max(0, days - empty);
     if (starving > 0) {

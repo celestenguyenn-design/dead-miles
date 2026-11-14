@@ -101,6 +101,9 @@
     if (!n) { w.d = t; return w; }
     if (b.broken.barrel) { w.d = t; w.n = Math.min(w.n, cap); return w; }
     if (t > w.d) { w.n = Math.min(cap, w.n + (t - w.d) * n); w.d = t; }
+    // 0.22: a rainy day (weather.js) fills the barrels faster: +1 charge, once per day (w.rd = the day it was given; no location in the save)
+    const rb = DM.Weather ? DM.Weather.barrelBonus() : 0;
+    if (rb && w.rd !== t) { w.rd = t; w.n = Math.min(cap, w.n + rb); }
     return w;
   }
   B.plantState = function (p, t = dayNo()) {

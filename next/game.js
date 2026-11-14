@@ -6,6 +6,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 (function () {
   try {
     const q = new URLSearchParams(location.search); if (!q.has('synced')) return;
+    window.DM_SYNCED = 1;   // 0.22: the title screen (title.js) is skipped on this quick return
     const err = q.has('err'); history.replaceState(null, '', location.pathname + location.hash);
     setTimeout(async () => {
       try { if (window.NET && NET.pullSteps) await NET.pullSteps(); } catch (e) { /* offline */ }
@@ -15,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.19';
+const NEXT_VERSION = '0.22';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1028,6 +1029,7 @@ const NEXT_VERSION = '0.19';
   // ---- home
   function renderHome() {
     if (!SV || !SV.survivor || DM.scene) return;
+    if (DM.Title && DM.Title.up) return;   // 0.22: the title screen is still up; its tap boots the home (no tips under it)
     rollDay();
     foodTick();
     const s = SV.survivor, d = SV.day, J = D.JOBS[s.job], xl = DM.Skills.xpLine(s), pts = DM.Skills.points(s);
@@ -1036,7 +1038,7 @@ const NEXT_VERSION = '0.19';
     const hands = s.hands ? `${icon(s.hands.k)}<span style="color:${D.qOf(s.hands) > 2 ? D.QUAL[D.qOf(s.hands)].c : 'inherit'}">${D.ITEMS[s.hands.k].n}<i class="dur"><i style="width:${Math.max(3, Math.min(100, s.hands.d / D.wMax(s.hands) * 100))}%"></i></i></span>` : '<span>Fists</span>';   // 0.19: tier colour
     $('#mbody').innerHTML = `
       <div class="mtop"><div class="logo">DEAD MILES</div><button id="mver" class="ver">${VERSION}</button><button id="mnet" class="gear" aria-label="Account and friends"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.8 19.5c.6-3.6 3.2-5.6 6.2-5.6s5.6 2 6.2 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16.5 13.6c2.6.1 4.4 1.8 4.9 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><button id="mset" class="gear" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 4.6.1-1.1-.1-1.1 2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.9-1.1L15.8 3h-4l-.4 2.6a8 8 0 0 0-1.9 1.1l-2.4-1-2 3.4 2 1.6-.1 1.1.1 1.1-2 1.6 2 3.4 2.4-1c.6.5 1.2.8 1.9 1.1l.4 2.6h4l.4-2.6a8 8 0 0 0 1.9-1.1l2.4 1 2-3.4z" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></button></div>
-      ${eventBanner()}
+      ${DM.Weather ? DM.Weather.chipHTML() : ''}${eventBanner()}
       <div class="scard">
         <div class="portwrap"><canvas id="mPort" width="150" height="190"></canvas><div class="lookbtns"><button class="editlook" id="mLook">Edit look</button><button class="editlook ward" id="mWard">Wardrobe${newCos() ? `<i class="nbadge">${newCos()}</i>` : ''}</button></div></div>
         <div class="sinfo">
@@ -1072,6 +1074,7 @@ const NEXT_VERSION = '0.19';
     DM.Boss.bind($('#mbody')); DM.Crew.bindCard(() => renderHome());
     if (DM.Deep) DM.Deep.bind($('#mbody'));   // 0.17 deep runs (deep.js)
     if ($('#evBan')) $('#evBan').onclick = () => { SFX.play('ui'); openEvent(); };
+    if (DM.Weather) DM.Weather.bind($('#mbody'), sheetOpen, sheetClose);   // 0.22: the weather chip + its sheet (weather.js)
     // iPhone: run the player's own "Dead Miles Steps" Shortcut and come straight back here
     // (x-callback-url), so a manual sync is one tap instead of a trip to the Shortcuts app.
     if ($('#mSyncNow')) $('#mSyncNow').onclick = () => {
@@ -1403,6 +1406,7 @@ const NEXT_VERSION = '0.19';
       ${MC ? `<h3 class="sndh">Sound</h3><div class="btnrow tipsrow"><span>Music <small>· eerie, speeds up with danger</small></span><button class="mbtn sm${MC.music ? '' : ' ghost'}" id="mMus">${MC.music ? 'On' : 'Off'}</button></div>
       <label class="volrow"><span>Music volume</span><input type="range" id="mMvol" min="0" max="100" value="${Math.round(MC.mvol * 100)}"${MC.music ? '' : ' disabled'}></label>
       <label class="volrow"><span>Sound effects</span><input type="range" id="mSfx" min="0" max="100" value="${Math.round(MC.sfx * 100)}"></label>` : ''}
+      ${DM.Weather ? DM.Weather.settingsHTML() : ''}
       <div class="btnrow tipsrow"><span>First-time tips</span><button class="mbtn sm ghost" id="mTips">${SV.tips.off ? 'Turn on' : 'Turn off'}</button></div><h3>Save</h3>
       <p class="mp">Your survivor, stash and today's houses are saved on this phone. Copy the text below to keep a backup, or paste one to restore.</p>
       <textarea id="mExp" readonly>${esc(JSON.stringify(SV))}</textarea>
@@ -1419,6 +1423,7 @@ const NEXT_VERSION = '0.19';
       $('#mSfx').onchange = () => SFX.play('pick');
     }
     $('#mHow').onclick = () => { SFX.play('ui'); openHowTo(); };
+    if (DM.Weather) DM.Weather.bindSettings($('#msheet'));   // 0.22: weather area
     $('#mTips').onclick = () => { if (SV.tips.off) { SV.tips = {}; toast('Tips back on - you will see each one again', 1.8); } else { SV.tips.off = 1; toast('Tips off', 1.2); } Game.save(); openSettings(); };
     $('#mCopy').onclick = () => { const t = $('#mExp'); t.select(); try { navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand('copy'); } toast('Copied', 1); };
     $('#mLoad').onclick = () => {
@@ -1435,6 +1440,7 @@ const NEXT_VERSION = '0.19';
     ['Gamestage', 'Your gamestage (Gear tab and the Skills screen) is how tough the world is for you: your level, plus a point for every 3 days played (up to 20), plus 3 for each quality tier your best weapon is above Worn. Up to gamestage 10 nothing changes. Above that, zombies get a little more health and bite (up to +25% at gamestage 60, the cap), special infected turn up more often (and from about 25, now and then in danger 2 places too), and weapons you find lean a bit better, with a slightly better shot at rare finds. It is yours alone: a friend who mostly walks meets the zombies they are ready for. The gamestage is fixed when you go into a house, so coming back to a run meets the same zombies.'],
     ['Special infected', 'Danger 3+ places (pharmacies, schools, police stations, mansions; look for the ☣ tag on the house list) have a couple more zombies and some special infected. Armored (riot gear, police stations): slow and hits hard; melee barely dents it until the armour cracks, arrows do full damage. Runner: fast and fragile, sprints the moment it sees you - you can only outrun it at a sprint. Bloater (green and swollen, pharmacies): bursts into a toxic cloud when it dies - shoot it, or dodge straight out. Screamer (gaping mouth, schools and mansions): if it sees you it stops and shrieks, and when it finishes every zombie in the house comes for you - kill it fast or stay out of sight. They carry better loot (ammo and police cosmetics, meds, lockpicks) and give much more XP.'],
     ['Daily challenge', 'Every day one special house sits at the top of the Houses list: the same house for everyone (same layout, same zombies, same loot in every container), no scouting needed. A new one at midnight New York time. Only your first run counts: the score is loot value taken x4, 60 per secret, 15 per zombie (40 per special infected), up to 150 for speed if you searched at least 60% of the containers, and -150 if you go down (and the loot score is halved). Today\'s scores from everyone show on the card and after your run (sign in to post yours; offline your score waits on the phone). You can go back in for fun - the house stays as you left it.'],
+    ['Weather', 'The game uses the real weather where you are (your Map area rounded to about 10 km, if you have used the Map; otherwise the weather area in Settings, New York by default). The chip on the home screen shows it - tap it for details. Rain and storms: zombies and raiders hear 20% less, and rain barrels collect an extra charge. Wind: they hear 10% less. Fog: they spot you from 25% less far, and your view is foggier. Snow: you move 8% slower, thirst drains 15% slower and hunger 10% faster. Heat over 30°C / 86°F: thirst drains 25% faster. Thunderstorms: lightning lights up the whole house for a moment. The daily challenge house only looks like the weather (same fair run for everyone); deep runs feel it on floor 1 only. Your location never goes into your save.'],
     ['Infection', 'About 1 in 10 zombie hits that land infects you (a bit more from special infected; Field medic halves it). Raiders and bosses do not. While infected your max HP is 5 lower, then 5 more each day, never more than 25 - it never kills you - and you get hungry a little faster. Antibiotics cure it at once: rare in pharmacies, nurse offices and medicine cabinets, and Dot sells them from trader level 2. Left alone it clears after about 5 days.'],
     ['Raiders', 'Rarely (about 1 run in 25-30, more in danger 3+ places) other survivors raid the house you are in: 2 or 3 masked raiders come up the stoop after you have been inside a while. They go for containers you have not searched and empty them, fight you on sight (one may have a pistol: a red line aims at you, then locks - dodge out of it) and fight zombies too, and run for the door when badly hurt. Kill them for part of what they stole plus ammo, meds and sometimes a weapon or a cosmetic. Any that get away are gone with their loot. They never take keys, notes, the hook pole or Dot\'s parcels.'],
     ['Pack, stash & item kinds', 'The Gear tab has three parts: Equipped (weapon, quiver, keyring, pack size, wardrobe, skills, eat & drink), Backpack (what you carry into houses) and Stash (the chest at your base). Every item shows its kind: Food, Drink, Medical, Weapon, Ammo, Tool, Gear, Material (used at the workbench or for base building - tap it to see what for), Sell (junk worth caps and nothing else, like paperbacks and watches), Key, Seed, Decor, Blueprint. Sort tidies a list by kind. Sell junk in the Stash tab sells every Sell item to Dot in one go when she is around.'],
@@ -1474,6 +1480,8 @@ const NEXT_VERSION = '0.19';
       <button class="mbtn sm" data-d="hres">Horde: resolve now</button><button class="mbtn sm" data-d="cos">+cosmetic</button><button class="mbtn sm" data-d="wpn">+machete (stash)</button><button class="mbtn sm" data-d="crew">+crew member</button><button class="mbtn sm" data-d="pet">+stray</button>
       <button class="mbtn sm" data-d="hide">Next house: survivor + stray</button><button class="mbtn sm" data-d="boss">Boss: steps + fights</button><button class="mbtn sm" data-d="bhurt">Boss: -4,000 HP</button>
       <button class="mbtn sm" data-d="f10">Hunger+thirst 10</button><button class="mbtn sm" data-d="f100">Hunger+thirst 100</button><button class="mbtn sm" data-d="f12">+12 hours (drain)</button><button class="mbtn sm ghost" data-d="reset">Reset save</button></div>
+      ${DM.Weather ? `<div class="kick sect">Weather (0.22) · now: ${esc(DM.Weather.label(DM.Weather.now()))}</div>
+      <div class="chips devev">${['real', 'clear', 'cloudy', 'wind', 'fog', 'rain', 'storm', 'snow', 'heat'].map(v => `<button class="chip" data-wx="${v}">${v}</button>`).join('')}</div>` : ''}
       <div class="kick sect">Event (reloads) · now: ${EVA ? esc(EVA.ev.name) + (EVA.forced ? ' (forced)' : '') : 'none'}</div>
       <div class="chips devev">${['auto', ...EVS.ORDER, 'none'].map(v => `<button class="chip${EVS.dev.choice() === v ? ' on' : ''}" data-ev="${v}">${v === 'auto' ? 'Auto (calendar)' : v === 'none' ? 'None' : esc(EVS.get(v).name)}</button>`).join('')}</div>
       <div class="btnrow"><button class="mbtn sm ghost" id="mClose">Close</button></div>`);
@@ -1482,6 +1490,7 @@ const NEXT_VERSION = '0.19';
       const q = new URLSearchParams(location.search); q.delete('event'); const qs = q.toString();
       location.replace(location.pathname + (qs ? '?' + qs : ''));
     });
+    $('#msheet').querySelectorAll('[data-wx]').forEach(b => b.onclick = () => { const v = b.dataset.wx; DM.Weather.force(v === 'real' ? null : v === 'heat' ? 'clear' : v, v === 'heat' ? 34 : undefined); sheetClose(); renderHome(); toast('Weather: ' + v, 1.2); });   // 0.22
     $('#msheet').querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
       const k = b.dataset.d;
       if (k === 's1') DM.addSteps(1000, 'phone'); if (k === 's5') DM.addSteps(5000, 'phone');
@@ -1513,6 +1522,7 @@ const NEXT_VERSION = '0.19';
 
   // ---------------------------------------------------------------- boot
   function boot2() {
+    if (DM.Title && DM.Title.up) return;   // 0.22: the title's tap calls boot2 (a cloud save adopted meanwhile is picked up then)
     rollDay();
     if (!SV.survivor) { cre = { name: '', look: ART.LOOK.random(), job: 'scavenger' }; creEdit = false; E.buildSurvivor(cre.look).then(renderCreate); return; }
     DM.S = SV.survivor;
@@ -1597,6 +1607,7 @@ const NEXT_VERSION = '0.19';
       if (!/^[0-9][0-9.]*$/.test(v) || v === NEXT_VERSION || DM.scene) return;
       if (sessionStorage.getItem('dm-next-reloaded') === v) return;
       sessionStorage.setItem('dm-next-reloaded', v);
+      if (!(DM.Title && DM.Title.up)) sessionStorage.setItem('dm-title-skip', '1');   // 0.22: she is already past the title - do not show it again
       Game.save(); try { window.NET && await NET.flush(); } catch (e) { /* offline */ }
       location.reload();
     } catch (e) { /* offline or blocked */ }
@@ -1606,9 +1617,16 @@ const NEXT_VERSION = '0.19';
   let bossTick = 0;
   Game.boot = async function () {
     SV = load(); DM.S = SV.survivor;
+    // 0.22: the title screen (title.js) on every launch, up before the engine finishes loading; boot2 waits for her tap.
+    // Skipped on ?synced=1 (back from the step Shortcut) and on the reload after an auto-update.
+    if (DM.Weather) DM.Weather.init();
+    let engineReady; const engine = new Promise(r => { engineReady = r; });
+    const titled = !!(DM.Title && DM.Title.wanted());
+    if (titled) DM.Title.show({ survivor: SV.survivor, isNew: !SV.survivor, version: VERSION, onStart: () => engine.then(boot2), settings: () => openSettings(), howto: () => openHowTo() });
     await E.start();
     if (EVA) { const b = document.body, A = EVA.ev.accent; b.classList.add('event', 'ev-' + EVA.id); b.style.setProperty('--evc', A.c); b.style.setProperty('--evc2', A.c2); b.style.setProperty('--evbg', A.bg); }
-    boot2();
+    if (!titled) boot2();
+    engineReady();
     $('#loading').remove();
     netStart();
     setInterval(() => { if (SV.day.key !== today()) { rollDay(); Game.save(); renderHome(); } resolveHorde(); if (++bossTick % 3 === 0) DM.Boss.sync().then(() => { if (!DM.scene && !$('#msheet').classList.contains('on')) renderHome(); }).catch(() => { }); const c = document.getElementById('hCount'), n = DM.Horde.next(); if (c && n) c.textContent = (DM.Horde.windowOpen() ? 'Watch shift open · hits in ' : 'in ') + DM.Base.until(n.at); }, 60000);

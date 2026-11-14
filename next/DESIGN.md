@@ -414,3 +414,40 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   infected.js and house.js read, and reuses it on resume (tested: same zombies after her gamestage jumped 24 -> 60). A run saved before
   0.19 resumes at gamestage 0 (its original zombies). h.gs is cleared when the run ends. The house list's special tag uses the current
   gamestage. Tutorial, base, watch shifts and the weekly boss ignore the gamestage.
+
+## Done in 0.22 (title screen + real weather; owner: "a home screen added to start the game that says Dead Miles. Animated, with zombies walking around and lightning flashes" / "I do want weather in the game as well")
+- Title screen (title.js): on every app launch, before the home screen and before character creation. Hand-built block letters
+  (SVG paths, no font needed) with a wobble filter, cream fill, thick ink outline, an orange extrusion and orange drips (3 drips
+  slowly stretch). Behind it, a canvas night scene: plum sky, stars, the moon behind drifting clouds, the Manhattan skyline and
+  the Brooklyn Bridge far off, a row of brownstones with stoops and a few warm windows (one boarded), a flickering street lamp,
+  zombies (the game's own rig) shambling along the sidewalk (tinted back for depth) and the street, her own survivor in front
+  with a flashlight if she has one. Rain by default (a drizzle; heavier in real rain, a downpour in storms), or the real snow
+  or fog. Lightning every ~6-14 s (3.5-8.5 s in a real storm): the sky lights up, a jagged bolt, the street lit for a frame or
+  two, then procedural thunder (weather.js W.thunder: a crack for close strikes, a long low rumble and a second roll; plays only
+  once audio is unlocked by a tap). "TAP TO START" ("TAP TO BEGIN" for a new player) pulses; small Settings and How to play
+  links open their sheets over the title. The tap unlocks audio, sets off one close strike with thunder and fades into the game.
+- Cost: the sky and the buildings are drawn once per resize; a frame is ~3 big drawImages, 6-7 rigs and one rain path, at ~30 fps,
+  stopped while the app is hidden. Reduced motion: a still picture redrawn once a second, no flashes or bolts, no pulse.
+- Boot (game.js): the title goes up before the engine finishes loading; boot2 (home / character creation / a deep-run resume)
+  waits for the tap, and renderHome is held while it is up (no tips or popups under it). The cloud-save picker (#msheet) sits
+  above the title and the tap is refused while a sheet is open. Skipped: the ?synced=1 return from the step Shortcut, the
+  reload after an auto-update (sessionStorage 'dm-title-skip', set only if she was already past the title), and ?notitle (tests).
+- Weather (weather.js): Open-Meteo (free, no key), current weather_code / temperature / precipitation / wind / is_day, cached
+  45 minutes in this phone's localStorage; offline = the last known weather for up to a day, then clear. WMO codes -> clear,
+  cloudy, fog (45/48), rain (drizzle, rain, freezing rain, showers), storm (heavy rain 65/82 and thunderstorms 95-99; lightning
+  only with thunder), snow, wind (clear/cloudy with wind >= 38 km/h); heat = above 30 C.
+- Privacy: only a 0.1-degree position (~10 km) is ever sent. It comes from the Map only if she already used it: map.js leaves the
+  rounded area on the phone on its first GPS fix ('dm-next-wxloc'), and for older map users DM.Map.lastArea() rounds the last
+  ~700 m square it showed. Otherwise the weather area in Settings (Auto, New York, Atlanta, Savannah, Augusta, Philadelphia,
+  Boston, Chicago, Miami, Los Angeles, London), default New York. Nothing about weather or location is in the save (tested);
+  the only save change is base.water.rd, the day number the rain bonus was given.
+- Effects (one table, weather.js W.FX): rain and storm: zombies and raiders hear 20% less (noise radius x0.8), rain barrels +1
+  charge that day. Wind: hear 10% less. Fog: zombies and raiders spot her from 25% less far (7 -> 5.25 tiles), plus a lilac haze
+  closing in around her. Snow: she moves 8% slower; thirst drains 15% slower, hunger 10% faster. Heat: thirst 25% faster.
+  Thunderstorm: a flash every 9-26 s lifts the fog of war over the whole house for about half a second (no bolt in the top-down
+  view; the light through the windows is the flash). Drain multipliers apply to the real-time hunger/thirst catch-up (food.js).
+- Where: house runs, the base and watch shifts (outdoors: full rain), boss fights. The daily challenge house is visual only
+  (hear/sight/move 1, no fog reveal, a lighter haze in fog). Deep runs: floor 1 only; floors 2+ have no weather. The run takes
+  the weather once when it starts. The weather chip on the home card ("Rain · 48°F · zombies hear less", °F on US phones)
+  opens a sheet with every effect in plain words and the area picker; How to play has a Weather entry; the test panel can
+  force any weather.
