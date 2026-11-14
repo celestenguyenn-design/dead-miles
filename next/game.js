@@ -257,8 +257,11 @@ const NEXT_VERSION = '0.8';
     hideMenu();
     const hide = DM.Crew.forHouse(h, L);   // phase 5b: a survivor hiding in a closet, a stray under the furniture (rare)
     DM.House.start(L, DM.Crew.wrap({
-      hint: h.type === 'tutorial' ? 'Joystick to move  ·  SEARCH near furniture' : `${L.name} · ${L.address}`,
+      hint: h.type === 'tutorial' ? (SV.tutorialRun ? 'Back at 14 Halsey St - picking up where you left off' : 'Joystick to move  ·  SEARCH near furniture') : (h.run ? `Back at ${L.address} - picking up where you left off` : `${L.name} · ${L.address}`),
+      resume: (h.type === 'tutorial' ? SV.tutorialRun : h.run) || null,   // the tutorial card is rebuilt each render, so its progress lives on SV
+      onState: st => { if (h.type === 'tutorial') SV.tutorialRun = st; else h.run = st; Game.save(); },
       onExit: res => {
+        delete h.run; delete SV.tutorialRun;
         h.status = q && !q.done ? 'new' : 'looted'; if (h.type === 'tutorial') SV.tutorialDone = true;
         SV.stats.kills += res.kills; SV.stats.secrets += res.secrets; if (res.kind === 'down') SV.stats.downs++;
         if (q && q.type === 'clear' && res.zombies.total && res.zombies.dead >= res.zombies.total) questDone(q);

@@ -99,6 +99,7 @@
     // the event mini-boss (zombie turkey, Krampus walker) in about 1 in 3 yards / kitchens
     const bs = EVS && !opts.noBoss ? EVS.bossFor(L) : null;
     if (bs) { const bz = mkZombie(bs.x * T, bs.y * T, 'idle', bs.where === 'yard' ? streetRoom() : null); Object.assign(bz, { kind: bs.kind, hp: bs.hp, maxHp: bs.hp, boss: 1 }, bs.props); G.zs.push(bz); }
+    if (opts.resume) restoreRun(opts.resume);
     buildWalls(); buildSolid();
     G.p.flip = false;
     hideCards(); closeSheet(true);
@@ -111,6 +112,33 @@
     hudChips();
   }
   // top-left chip: the running event
+  /* RUN PROGRESS SURVIVES CLOSING THE APP. The pack is saved after every search, but the house
+     itself was not - so closing the game mid-run gave back a fresh house to loot again. Now what was
+     searched, what was left in it, what was unlocked and how far each secret got is saved as you go
+     (opts.onState) and put back (opts.resume) if the house is entered again. */
+  const FKEEP = ['searched', 'loot0', 'locked', 'keyLock', 'opened', 'slideState', 'slide', 'swing', 'solid', 'pre', 'empty'];
+  function snapRun() {
+    const f = {}, sec = G.sec.map(x => ({ st: x.st || 0, found: !!x.found, loot0: x.loot0 || null, hintAt: 0 }));
+    G.furn.forEach((x, i) => {
+      if (i >= (L.furn || []).length) return;   // only the house's own furniture (not drops/bodies)
+      const d = L.furn[i], ch = x.searched || (d.lock && !x.locked) || (d.keyLock && !x.keyLock) || x.opened || x.slideState || x.swing;
+      if (!ch) return; const o = {}; for (const k of FKEEP) if (x[k] != null) o[k] = x[k]; f[i] = o;
+    });
+    return { f, sec, so: !!G.secretOpen };
+  }
+  function restoreRun(r) {
+    try {
+      for (const i of Object.keys(r.f || {})) { const x = G.furn[+i]; if (x) Object.assign(x, JSON.parse(JSON.stringify(r.f[i]))); }
+      (r.sec || []).forEach((v, i) => { if (G.sec[i]) Object.assign(G.sec[i], v); });
+      if (r.so) G.secretOpen = true;
+      for (const x of G.furn) if (x.keyDoor && x.swing) x.swing = 1;
+    } catch (e) { console.warn('resume', e); }
+  }
+  let lastSnap = '', snapT = 0;
+  function saveRunState(dt) {
+    if (!opts.onState || G.over) return; snapT -= dt; if (snapT > 0) return; snapT = 1;
+    const s = JSON.stringify(snapRun()); if (s === lastSnap) return; lastSnap = s; opts.onState(JSON.parse(s));
+  }
   function hudChips() {
     const ev = $('#evchip');
     if (ev) { ev.style.display = EVA ? '' : 'none'; if (EVA) { ev.innerHTML = EVS.glyph(EVA.id) + '<span>' + EVA.ev.short + '</span>'; ev.style.background = EVA.ev.accent.c; } }
@@ -541,6 +569,7 @@
     if (G.tapMark) { G.tapMark.t += dt; if (G.tapMark.t > .7) G.tapMark = null; }
     updateLock(dt);
     updatePlayer(dt, inp);
+    saveRunState(dt);
     for (const z of G.zs) updateZombie(z, dt);
     separate();
     updateWorld(dt);
