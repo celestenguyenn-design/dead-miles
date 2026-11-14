@@ -318,10 +318,12 @@
     h += step(7, 'Run it once', '<p>Tap <b>Done</b>, then tap the Shortcut once to run it.</p>'
       + '<p>The first time, iPhone asks to read Health and to connect. Tap <b>Allow</b> (turn on <b>Steps</b>) and <b>Always Allow</b>.</p>'
       + '<p class="help">Nothing opens. That is normal: it sends your steps quietly.</p>');
-    h += '<div class="card"><h3>Wear an Oura ring (or another watch)?</h3><p>Let it count your steps too:</p>'
+    h += '<div class="card"><h3>Wear an Oura ring (or another watch)?</h3>'
       + '<p><b>1.</b> Oura app &rarr; your profile &rarr; <b>Data sharing</b> &rarr; <b>Apple Health</b> &rarr; turn on and allow <b>Steps</b>.</p>'
-      + '<p><b>2.</b> Health app &rarr; <b>Browse</b> &rarr; <b>Activity</b> &rarr; <b>Steps</b> &rarr; <b>Data Sources &amp; Access</b> &rarr; make sure <b>Oura</b> is on, tap <b>Edit</b> and drag Oura to the <b>top</b>.</p>'
-      + '<p class="help">Health then counts the ring&rsquo;s steps when your phone is not on you, without counting anything twice. Your Shortcut already reads the Health total, so nothing else changes.</p></div>';
+      + '<p><b>2. Important:</b> the Shortcut adds up steps from <b>every</b> source, so your phone and your ring would count the same walk twice. Make it count only one: copy this into the <b>Shortcuts AI</b> while editing <b>' + SC_NAME + '</b>.</p>'
+      + '<textarea readonly id="sg-v-oura">' + esc((VALUES.oura = 'Edit my shortcut "' + SC_NAME + '". Change only this, nothing else:\n\nIn BOTH "Find Health Samples" actions (the one for today and the one for yesterday), add one more filter:\n   Source is "Oura"\nKeep all the existing filters (Type is Steps, the Start Date filters) exactly as they are. Do not change any other action, the URL, the triggers or the variables.')) + '</textarea>'
+      + btn('copy:oura', 'Copy "count only my ring" prompt', 'g') + msg('copy:oura')
+      + '<p class="help">Forget the ring a lot? Use <b>"iPhone"</b> instead of "Oura" to count only your phone. Apple Watch: use your watch&rsquo;s name.</p></div>';
     h += step(8, 'Test it', testBlock('iphone'));
     h += '<h3 style="margin:18px 4px 10px">Make it run by itself</h3>';
     h += step(9, 'Open the Automation tab', '<p>In Shortcuts, tap <b>Automation</b> at the bottom, then <b>+</b> (or <b>New Automation</b>). Pick <b>Time of Day</b>.</p>');
