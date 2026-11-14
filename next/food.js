@@ -8,13 +8,13 @@ window.DM = window.DM || {};
   const D = DM.D;
   const F = DM.Food = {};
   const DAY = 864e5;
-  F.RATE = { h: 45, t: 70 };   // points per real day: about one meal and two drinks
+  F.RATE = { h: 60, t: 85 };   // points per real day (0.13.1: up from 45/70 - food has to matter): about 1.5 meals and 2-3 drinks
   F.LOW = 30;                   // below this: Hungry / Thirsty
   F.FULL = 80;                  // both above this: well fed (+10% scavenging XP)
   F.START = 80;                 // existing survivors (pre-0.8 saves) start here
   F.NEW = 90;                   // a brand-new survivor
   F.FLOOR = 10;                 // starvation alone never takes HP below this
-  F.RUNCAP = 5;                 // the extra drain from one run never costs more than this per bar
+  F.RUNCAP = 8;                 // the extra drain from one run never costs more than this per bar
 
   const num = (v, d) => (typeof v === 'number' && isFinite(v) ? v : d);
   F.norm = function (s, fresh) {
