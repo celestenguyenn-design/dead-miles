@@ -311,3 +311,106 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   itself a car-speed jump from the last one cannot claim (it used to be able to, before the 3-reading lock kicked in).
 - Privacy unchanged: position only in memory while the map is open; the save holds no coordinates or OSM ids. The phone now
   also keeps which ~700 m square was shown last (a square, never a point), next to the cached squares, outside the save.
+## Done in 0.17 (deep runs, owner: loved the idea "but I can't walk 10k a day")
+- deep.js (new). Passes come from CUMULATIVE walking: every 8,000 steps of SV.walked (phone/watch steps, typed at half - the
+  same total quests and Dot use) earns a Deep Run pass, any days. Hold 2; while full, steps do not bank. Existing saves get
+  their first pass free. Home card "Deep run" (after the base card): 2 pass pips, a progress bar, "Next pass in 3,120 steps ·
+  1 pass ready", the last run's result, Go deep / How it works.
+- Spending a pass: pick a building. Each floor is a normal generated house (DM.Gen.generate, existing types, seed per floor,
+  GV 4; gen.js untouched) with a light theme on top (room + furniture names):
+  - The Fulton Arms (apartment tower, 5 floors: apt, rowS, apt, rowL, rowL; leans runners/screamers; boss The Super, a
+    screamer with 380 HP).
+  - Kings Mercy Hospital (teaching hospital, 4: pharmacy, school, pharmacy, school - classrooms are lecture rooms, the nurse
+    office the nurses' station...; leans bloaters; boss Patient Zero, a bloater with 520 HP).
+  - Checkpoint Bravo (army checkpoint, 3: garage, police, police - motor pool, command post, barracks, mess...; leans
+    armored; boss The Sergeant, armored, 420 HP + 240 armour).
+  Floor 1 starts on the street; floors 2+ start on a "Stairwell landing" (the street strip restyled, no road, street cars
+  become crates, lamp posts radiators; the house number reads as the unit number).
+- Harder each floor (d = 0 on floor 1 .. 1 on the last): +f extra zombies (x0.75 in schools/police), special infected on
+  every floor via infected.js L.deepInf (chance 20% -> 65%, at least 1 from floor 2, 2 on the last floor, building mix).
+  Typical totals: tower 3 -> 8.5 zombies (0.7 -> 4.8 specials), hospital 4.8 -> 8.8, checkpoint 4.3 -> 8.9 (+ the boss).
+  Better loot: empty containers 20% -> 5%; each container has a 10% -> 40% chance of a bonus roll from D.LOOT.deep1/2/3
+  (meds/ammo/lockpicks, then blueprints/cosmetics/decor/pack upgrades/machetes, then backpacks/locksets/axes).
+- One twist per floor, on the start banner and the floor chip: Power's out (a flashlight pool, the rest near black),
+  Nest (twice the floor's zombies), Gas leak (all her noise x1.75, a green haze; house.js opts.noiseMul), Looted (60%
+  empty but one container holds a jackpot from D.JACK.stash), Quiet (every zombie asleep). Never the same twist twice in a
+  row; the boss floor only gets Power's out / Gas leak / Looted.
+- The stairwell: a stairwell with a green EXIT sign in the farthest reachable room (BFS over the layout: walls, unopened
+  secret doors, key-locked doors and solid furniture block; never next to a door, never in hidden rooms). "Take the
+  stairs" opens the choice: what is below (floor name, twist), HP/hunger/thirst, all the run loot so far, Get out / Go
+  deeper, or "Not yet - keep looting this floor". Floor 1's front door works as a way out too ("Leave the building?").
+  Reaching each stairwell: +8 xp x floor. Getting out: +6 xp per floor cleared (+20 with the boss down). Boss kill +40 xp
+  (plus the special's own).
+- Last floor: the boss stands next to a Supply chest (deepchest table: 5-6 items, a blueprint and a cosmetic guaranteed,
+  plus a D.JACK.stash prize). The chest cannot be searched until the boss is down. The stairwell there is the fire exit
+  (Get out only). The floor chip shows the boss's health once its room is seen.
+- Loot ownership: run.own = what she brought (pack + hands), kept as a running minimum so things she used up are not given
+  back. Anything above that is run loot. Go deeper: run loot that is not food/drink/meds/tools is bagged (run.haul) so the
+  pack has room on the next floor. Cosmetics found wait in run.cos. Packs, blueprints, shoes and locksets found in the run
+  cannot be fitted/learned until she is out. Get out: everything goes to the stash, then the pack; whatever still does not
+  fit waits on the home card ("Claim"). A found weapon she is fighting with stays in her hands. Downed: all run loot is
+  lost, her own gear stays (no half-pack spill), HP 20, her own weapon goes back in her hand. Quiver and keyring are never
+  spilled (as always).
+- Rules: HP, hunger/thirst, pack, quiver and keyring carry between floors (no healing in between). No raiders (noRaid),
+  no event mini-boss in deep runs. The crew pet comes along.
+- Closing the app mid-run: the safest option is to resume. On the next start the game drops her straight back in - no home
+  screen in between, so nothing can be moved to the stash - on the same floor with its saved progress (house.js
+  snapRun/restoreRun via opts.onState/opts.resume), with her HP as it was when she left (saved as it changes, not the
+  floor-start HP), or at the stairwell choice if that card was open. Zombies come back to their spots (as in any resumed
+  house). If she was already down when the app closed she comes back home, down, run loot gone.
+- Save: SV.deep = { passes, mark, seq, stats, run, last, held } (made on first use). Small hooks only: game.js (card,
+  boot resume), house.js (opts.noiseMul in emitNoise), infected.js (L.deepInf).
+
+## Done in 0.18 (daily challenge house, light infection)
+- Daily challenge (daily.js): one special house a day, the same for everyone. Type and seed come only from the New York
+  date (types weighted: rowhouse L, bodega, pharmacy 3 · auto shop 2.5 · apartment, school 2 · laundromat, police 1.5 ·
+  mansion 1), generator pinned to GV 4. house.js seeds every loot roll from the house seed when opts.lootSeed is set:
+  the empty containers, each container's pre-roll (its own stream per furniture id), the extra-find and pry-smash rolls,
+  corpses (per zombie index) and the secret caches, so search order never changes what is inside. No raid, no event
+  mini-boss, no hiding survivor or stray in it. Zombie AI wander is still random; skills (extra find, pack size) still apply.
+- It sits at the top of the Houses tab (gold card): "Daily challenge · Pharmacy · 3 h left", address, danger, tags,
+  your score / rank and the top 3. No scouting, no Crew button. Scores button: the whole board (top 50) and the rules.
+- One scored attempt: the FIRST exit (leaving or going down) is scored. Going back in is for fun: the house keeps what was
+  searched and who was killed (run state kept on exit, dead zombies stay dead on resume), so it cannot be farmed.
+  Closing the app mid-run keeps the tally (G.dly rides in the run save).
+- Score: loot value taken (D.valueOf, from containers / corpses / caches, not floor pick-ups) x4, halved if downed
+  + 60 a secret + 15 a zombie (40 a special infected) + time bonus (540 - seconds inside) / 2, capped 0..150, only with
+  60%+ of the containers searched - 150 if downed. Never below 0. The summary sheet shows the breakdown and the top 10.
+- Backend: NET.dailySubmit / NET.dailyBoard -> next_daily_submit / next_daily_board (SQL in next/daily.sql, NOT applied:
+  the owner applies it). Submitted once; offline / signed out the score waits on the phone ("Scores need sign-in /
+  offline") and is sent when possible (yesterday's too). The last board is cached for offline.
+- Light infection (infection.js; owner: "infection seems cool but don't do too much of it"): 10% of zombie hits that land
+  infect (15% special infected; never raiders, the weekly boss or event bosses; Field medic halves it). While infected max
+  HP is -5, then -5 more each real day, down to -25; it never kills and HP is only clamped to the new max. Hunger drains
+  15% faster. Antibiotics (new item, Medical): rare in medicine cabinets (~4.5%), pharmacy shelves, nurse offices, pharmacy
+  cages (~6%), vanities; Dot sells one at trader level 2+ (about every other day, 45 caps). Taking them cures it at once.
+  Left alone it clears after 5 days. Shown on the home card ("Infected · -10 max HP", tap for details), the eat & drink
+  sheet and a green chip in the run HUD; a first-time tip explains it. Old saves are simply healthy.
+
+## Done in 0.19 (weapon quality tiers + per-player gamestage)
+- Weapon quality (data.js D.QUAL): 1 Rusty, 2 Worn, 3 Solid, 4 Fine, 5 Masterwork. Each tier above Rusty is +8% damage and +15% max
+  durability (Masterwork: +32% / +60%; e.g. bat 34/60 -> 45/96, bow 46/120 -> 61/192). Every weapon, bows and the crowbar / pry bar too
+  (the lockpick set is not a weapon and has no quality). Stored on the entry: { k, n: 1, d, q }; it travels through pack, stash, hands,
+  drops, swaps, stash moves and Dot's shelf. Helpers: D.qOf(e) (missing q = Worn), D.wDmg(e), D.wMax(e), D.mkWeapon(k, q, f).
+- Old saves: weapons without q become Worn (+8% damage on what they did before); their durability is scaled x1.15 with the new max, so
+  the bar shows the same %. Never lower. A weapon given without a quality (quest/event rewards, base, crew) is Worn at full durability.
+- Where quality comes from: D.rollQuality(base, bonus, rnd) - weights e^(-1.6 x |tier - (base + bonus)|), Masterwork cut to 1/10 unless
+  base >= 3.5. Bases: normal houses 1.5 (about 45/44/9/2/0 %), danger 3: 2.1, danger 4+: 2.5, locked containers 2.0, hidden stashes 2.3,
+  special infected 2.6, raiders 2.7, key-locked rooms / trunks 2.8, horde crates 2.2, weekly boss 3.8 (~12% Masterwork). Deep runs can call
+  D.rollQuality(3.5, bonus, rnd) (~8% Masterwork). Crafting (game.js craftQuality): never Rusty, mean 2 + level x .02 (max +.5) + .03 per
+  Combat/Scavenging rank; mostly Worn-Solid; never below the weapon it was made from (spiked bat from a bat). Dot sells Worn, sometimes
+  Solid from trader level 3 (+30% price). Special infected now drop a weapon 10% of the time (rolled at their higher base).
+- Display: tier-coloured border + name and "★★★ SOLID" on weapon cards (loot sheet, swap sheet, backpack, stash, Equipped weapon slot,
+  crew-search results, Dot's shelf, boss reward); damage shown includes quality; loot cards show "NN dmg" against what she holds;
+  the run's weapon chip is tinted from Solid up. Weapons sell for 25% more per tier above Worn.
+- Gamestage (per player; data.js D.gamestage / D.gsFx, game.js Game.gamestage): level + days played / 3 (max +20) + 3 per tier of the
+  best weapon owned above Worn, 1-60. Days played = one per day the game is opened (s.gsDays; old saves start at the days since the save
+  was made). t = (gs - 10) / 50, 0..1: gamestage <= 10 is exactly the old game. Zombie HP and hits x(1 + .25t) (never bosses or raiders;
+  armour too); special-infected share +12t points at danger 3-4 (same seeded roll, higher bar); from gamestage 25 a few specials at
+  danger 2 (up to 15% at 60, no screamers, separate seeded stream); weapon quality roll +0.4t; rare-find chance +6t % per search.
+  Examples: Lv 1 fresh = 1; Lv 8, 30 days, Worn = 18 (+4%); Lv 16, 45 days, Fine = 37 (+13.5%); Lv 32, 120 days, Masterwork = 60 (cap).
+  Shown on the Gear tab (Equipped > You) and the Skills screen with a one-line explanation; How to play has both systems.
+- Determinism: game.js loot() snapshots the gamestage onto the house (h.gs) when a run starts, puts it on the layout copy (L.gs) that
+  infected.js and house.js read, and reuses it on resume (tested: same zombies after her gamestage jumped 24 -> 60). A run saved before
+  0.19 resumes at gamestage 0 (its original zombies). h.gs is cleared when the run ends. The house list's special tag uses the current
+  gamestage. Tutorial, base, watch shifts and the weekly boss ignore the gamestage.

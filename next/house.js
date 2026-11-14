@@ -12,6 +12,7 @@
   const F = DM.Food;                   // 0.8: hunger + thirst (food.js)
   const SK = DM.Skills, INF = DM.Inf;  // 0.13: skill trees (skills.js), special infected (infected.js)
   const RA = DM.Raid;                  // 0.15: raiders (raiders.js)
+  const IFX = DM.Infect;               // 0.18: light infection (infection.js)
 
   // ---------------------------------------------------------------- layout
   let L = null, ROWS = [], MW = 0, MH = 0, opts = {};
@@ -50,6 +51,19 @@
   }
   const weaponKey = () => (S().hands && S().hands.k) ? D.ITEMS[S().hands.k].w : 'fists';
   const weapon = () => WEAPONS[weaponKey()];
+  // 0.19: weapon quality (data.js D.QUAL) and the gamestage this run was started with (L.gs, snapshotted by game.js loot())
+  const qMul = () => S().hands ? D.qDmgMul(D.qOf(S().hands)) : 1;
+  const gsFx = () => D.gsFx((L && L.gs) || 0);
+  const qTag = e => { if (!e || !ITEMS[e.k] || !ITEMS[e.k].w) return ''; const q = D.qOf(e); return `<small class="qtag q${q}" style="--qc:${D.QUAL[q].c}">${D.qStars(q)} ${D.QUAL[q].n}</small>`; };
+  // where a weapon was found decides how good it tends to be (data.js D.rollQuality)
+  function qualFor(o, it) {
+    let b = D.qBaseFor(L.danger || (D.BTYPES[L.type] || {}).danger || 1);
+    if (it && it.corpse) b = Math.max(b, o.raider ? 2.7 : o.special || EVS.isBoss(o) ? 2.6 : b);
+    else if (o.jack || o.keyRoom || o.keyDoor) b = Math.max(b, 2.8);   // key-locked room / trunk jackpots
+    else if (o.secretLoot) b = Math.max(b, 2.3);
+    else if (o.lock) b = Math.max(b, 2);
+    return { base: b, bonus: gsFx().qBonus };
+  }
 
   // ---------------------------------------------------------------- state
   let G;
@@ -59,6 +73,7 @@
     ROWS = L.rows; MW = ROWS[0].length; MH = ROWS.length;
     const st = L.start;
     if (S() && S().food) S().hp = F.tick(S(), S().hp);   // hunger/thirst catch up before she goes in
+    if (IFX && S()) { const m = IFX.tick(S()); if (m) setTimeout(() => toast(m, 2.6), 3400); }   // 0.18: infection catches up too
     G = {
       t: 0, secretOpen: false, paused: false, over: false, hitstop: 0, shake: 0, redFlash: 0,
       p: {
@@ -72,6 +87,11 @@
       stats: { searched: 0, kills: 0, start: performance.now() }, entered: false, lastNoise: null, field: null, fieldT: 0, fieldCell: -1,
       secretHint: 0, sheet: null, food: { h: 0, t: 0 }, foodT: 0, shots: [], raid: null, raidDone: false,
     };
+    // 0.18 DAILY CHALLENGE (daily.js): opts.daily = { scored } marks the daily house. G.dly is the score tally
+    // (loot value taken, kills, special kills, seconds inside). It rides along in the run save, so closing the app
+    // mid-run keeps the tally; dead zombies stay dead on resume (opts.resume.zd).
+    G.dly = opts.daily ? { v: 0, n: 0, k: 0, sp: 0, t: 0 } : null;
+    if (G.dly && opts.resume && opts.resume.dly) Object.assign(G.dly, opts.resume.dly);
     // 0.15: a rare raid (raiders.js) - seeded from the house; only normal house runs ask for one (opts.raid)
     const rp = RA && !opts.noRaid ? RA.plan(L, opts) : null;
     if (rp) { G.raid = Object.assign(rp, { on: false, ents: [] }); RA.ensureRigs(rp); }
@@ -92,9 +112,10 @@
     }
     // some containers turn out empty - never the fridge, secret stashes, or ones the generator marked
     const elig = G.furn.filter(f => f.lootable && !f.noEmpty && f.art !== 'fridge' && !f.secretLoot && !f.lock && !(f.extra && f.extra.length));
-    for (let i = elig.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [elig[i], elig[j]] = [elig[j], elig[i]]; }
+    const er = LR('empty');   // 0.18: seeded for the daily house (everyone gets the same rolls), Math.random otherwise
+    for (let i = elig.length - 1; i > 0; i--) { const j = Math.floor(er() * (i + 1)); [elig[i], elig[j]] = [elig[j], elig[i]]; }
     elig.slice(0, Math.round(elig.length * (L.emptyPct == null ? .2 : L.emptyPct))).forEach(f => f.empty = true);
-    for (const f of G.furn) if (f.lootable) { f.pre = f.empty ? [] : rollLoot(f.loot); if (f.jack) f.pre.push(...D.rollJack(f.jack).filter(Boolean)); if (f.extra) f.pre.push(...f.extra); } // rolled up front so Keen eye can sense rares
+    for (const f of G.furn) if (f.lootable) { const r = LR('f' + f.fid); f.pre = f.empty ? [] : rollLoot(f.loot, r); if (f.jack) f.pre.push(...D.rollJack(f.jack, r).filter(Boolean)); if (f.extra) f.pre.push(...f.extra); } // rolled up front so Keen eye can sense rares
     const houseZs = [];
     for (const zd of L.zombies || []) {
       const z = mkZombie(zd.x * T, zd.y * T, zd.st || 'idle', null);
@@ -108,6 +129,9 @@
     if (opts.resume) restoreRun(opts.resume);
     buildWalls(); buildSolid();
     spawnInfected(houseZs);
+    houseZs.forEach((z, i) => { z.zi = i; });   // 0.18: a stable index (seeded corpse loot, dead-on-resume for the daily house)
+    if (G.dly && opts.resume && Array.isArray(opts.resume.zd)) G.zs = G.zs.filter(z => z.zi == null || !opts.resume.zd.includes(z.zi));
+    for (const z of G.zs) if (!z.boss) gsZombie(z);   // 0.19: gamestage (L.gs) - zombie HP and hits, up to +25%
     for (const z of G.zs) if (z.special) ensureInfRig(z.kind);
     G.p.flip = false;
     hideCards(); closeSheet(true);
@@ -119,6 +143,11 @@
     toast(opts.hint || 'Joystick to move  ·  SEARCH near furniture', 3.2);
     hudChips();
   }
+  // 0.18: loot rolls. Daily house (opts.lootSeed): every container, corpse and secret cache gets its own stream from
+  // (seed, tag), so the order she searches in does not change what is inside. Anything else: plain Math.random.
+  function LR(tag) { return opts.lootSeed != null ? D.mulberry32(D.hashStr(opts.lootSeed + ':' + tag)) : Math.random; }
+  // 0.18: the daily score tally - what she takes from containers, corpses and caches (not floor pick-ups)
+  function tally(k, n, d) { if (G.dly && n > 0) { G.dly.v += D.valueOf(k, d) * n; G.dly.n += n; } }
   // top-left chip: the running event
   /* RUN PROGRESS SURVIVES CLOSING THE APP. The pack is saved after every search, but the house
      itself was not - so closing the game mid-run gave back a fresh house to loot again. Now what was
@@ -132,7 +161,9 @@
       const d = L.furn[i], ch = x.searched || (d.lock && !x.locked) || (d.keyLock && !x.keyLock) || x.opened || x.slideState || x.swing;
       if (!ch) return; const o = {}; for (const k of FKEEP) if (x[k] != null) o[k] = x[k]; f[i] = o;
     });
-    return { f, sec, so: !!G.secretOpen, fp: runPrint(), raid: G.raidDone || !!(G.raid && G.raid.on) ? 1 : 0 };   // 0.15: a raid happened (it never fires twice)
+    const o = { f, sec, so: !!G.secretOpen, fp: runPrint(), raid: G.raidDone || !!(G.raid && G.raid.on) ? 1 : 0 };   // 0.15: a raid happened (it never fires twice)
+    if (G.dly) { o.dly = { v: G.dly.v, n: G.dly.n, k: G.dly.k, sp: G.dly.sp, t: Math.round(G.dly.t) }; o.zd = G.zs.filter(z => z.dead && z.zi != null).map(z => z.zi).concat((opts.resume && opts.resume.zd) || []).filter((v, i, a) => a.indexOf(v) === i); }   // 0.18 daily
+    return o;
   }
   // 0.9: a fingerprint of the house's furniture, so saved progress is never laid onto a different layout
   const runPrint = () => (L.furn || []).length + ':' + (L.furn || []).map(d => d.art[0] + d.at.join('')).join('').length + ':' + (L.furn || []).reduce((a, d, i) => (a * 31 + d.at[0] * 7 + d.at[1] + i) % 1000003, 7);
@@ -155,6 +186,9 @@
   function hudChips() {
     const ev = $('#evchip');
     if (ev) { ev.style.display = EVA ? '' : 'none'; if (EVA) { ev.innerHTML = EVS.glyph(EVA.id) + '<span>' + EVA.ev.short + '</span>'; ev.style.background = EVA.ev.accent.c; } }
+    const ic = $('#infchip');   // 0.18: infected (infection.js) / the daily challenge run
+    if (ic) { const on = IFX && IFX.is(S()); ic.style.display = on ? '' : 'none'; if (on) ic.innerHTML = '<span>☣ ' + IFX.label(S()) + '</span>'; }
+    const dc = $('#dlychip'); if (dc) { dc.style.display = opts.daily ? '' : 'none'; if (opts.daily) dc.innerHTML = '<span>' + (opts.daily.scored ? 'Daily · for fun' : 'Daily challenge · scored') + '</span>'; }
   }
   // 0.13: danger 3+ houses get a couple more zombies and some special infected (infected.js). Seeded from the house,
   // so a resumed run has the same ones. Extra zombies stand on reachable open floor away from the front door.
@@ -177,6 +211,13 @@
       }
     }
     houseZs.forEach((z, i) => { const k = plan.kinds[i]; if (k) makeSpecial(z, k); });
+  }
+  // 0.19: gamestage scaling for one zombie (never the event or weekly bosses, never raiders). Gamestage <= 10: no change.
+  function gsZombie(z) {
+    const fx = gsFx(); if (fx.hp === 1 || z.boss || z.raider || z.gsx) return z;
+    z.gsx = 1; z.hp = z.maxHp = Math.round((z.maxHp || z.hp || 100) * fx.hp); z.dmgMul = (z.dmgMul || 1) * fx.dmg;
+    if (z.armor) z.armor = z.armor0 = Math.round(z.armor * fx.hp);
+    return z;
   }
   function makeSpecial(z, k) {
     const K = INF.KINDS[k]; if (!K) return z;
@@ -402,6 +443,7 @@
   }
   function banner(text, sub) { G.banners.push({ text, sub, t: 0 }); }
   function emitNoise(x, y, rad, show = true, byRaider) {
+    if (opts.noiseMul && !byRaider) rad *= opts.noiseMul;   // 0.17 deep runs (deep.js): the "Gas leak" floor makes every sound carry further
     if (!byRaider) G.noiseLvl = Math.max(G.noiseLvl, Math.min(1, rad / 6));
     if (show && rad >= 1.8) G.rings.push({ x, y, r: rad * T, t: 0 });
     if (!byRaider) G.lastNoise = { x, y, t: G.t };
@@ -503,13 +545,13 @@
   function moveRug(s) { s.st = 1; SFX.play('whoosh'); const R = rugRect(s); puff(R.x + R.w * .8, R.y + R.h * .7, 2, 8, 'rgba(234,210,164,.5)', 50, .7, 3); }
   function pryBoard(s) {
     s.st = 2; SFX.play('hit'); s.name = 'Floor cache'; s.room = s.room || G.room;
-    s.loot0 = toStacks(rollLoot('cache'));
+    { const r = LR('s' + G.sec.indexOf(s)); s.loot0 = toStacks(rollLoot('cache', r), r); }
     foundSecret(s);
     openLoot(s, { act: 'Open', name: 'Floor cache' });
   }
   function pryPanel(s, f) {
     f.opened = true; f._key = null; SFX.play('break'); emitNoise(f.x + f.w / 2, f.y + f.h, 4.5);
-    f.loot0 = toStacks(rollLoot('wallcache')); f.name = 'Wall cache';
+    { const r = LR('s' + G.sec.indexOf(s)); f.loot0 = toStacks(rollLoot('wallcache', r), r); } f.name = 'Wall cache';
     foundSecret(s);
     openLoot(f, { act: 'Open', name: 'Wall cache' });
   }
@@ -582,12 +624,15 @@
       return;
     }
     o.searched = true; G.stats.searched++;
-    const keys = it.corpse ? (o.raider ? o.drop.slice() : EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse').concat(o.special ? INF.loot(o.kind) : [])) : o.pre.slice();   // 0.13: special infected carry more
-    if (keys.length && Math.random() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot); if (more.length) keys.push(more[0]); }
-    o.loot0 = toStacks(keys);
+    const lr = LR(it.corpse ? 'z' + (o.zi != null ? o.zi : 'x') : 'x' + o.fid);   // 0.18: seeded for the daily house
+    const keys = it.corpse ? (o.raider ? o.drop.slice() : EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse', lr).concat(o.special ? INF.loot(o.kind, lr) : [])) : o.pre.slice();   // 0.13: special infected carry more
+    if (keys.length && lr() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot, lr); if (more.length) keys.push(more[0]); }
+    // 0.19: a higher gamestage finds a rare thing a little more often (up to +6%: one rare item from the same table) - not in the daily house (fair scores)
+    if (!G.dly && !it.corpse && o.loot && D.LOOT[o.loot] && Math.random() < gsFx().rare) for (let i = 0; i < 4; i++) { const r = rollLoot(o.loot).find(k => ITEMS[k] && ITEMS[k].rare); if (r) { keys.push(r); break; } }
+    o.loot0 = toStacks(keys, lr, qualFor(o, it));   // 0.19: weapon quality by place
     // A torn note remembers the house it came from, so reading it somewhere else is not misleading.
     for (const e of o.loot0) if (e.k === 'note') e.d = { addr: L.address, text: L.note || '' };
-    if (it.pry && !SK.noSmash() && o.loot0.length && Math.random() < .25) { const i = Math.floor(Math.random() * o.loot0.length), sm = o.loot0[i]; sm.n--; if (!sm.n) o.loot0.splice(i, 1); toast('Smashed: ' + ITEMS[sm.k].n.toLowerCase(), 1.8); }
+    if (it.pry && !SK.noSmash() && o.loot0.length && lr() < .25) { const i = Math.floor(lr() * o.loot0.length), sm = o.loot0[i]; sm.n--; if (!sm.n) o.loot0.splice(i, 1); toast('Smashed: ' + ITEMS[sm.k].n.toLowerCase(), 1.8); }
     // xp: bigger containers teach more, the hidden stash a lot
     gainXP(it.corpse ? 2 : 2 + (o.time >= 2.2 ? 1 : 0) + (o.rare ? 6 : 0), G.p.x, G.p.y);
     o._key = null;
@@ -690,6 +735,7 @@
     G.shake = Math.max(0, G.shake - dt * 30);
     if (G.hitstop > 0) { G.hitstop -= dt; return; }
     if (G.paused) return;
+    if (G.dly && !G.over && G.entered !== false) G.dly.t += dt;   // 0.18: daily score clock (time inside)
 
     let inp = E.moveInput();
     if (G.p.auto) {
@@ -844,7 +890,7 @@
           const dx = z.x - p.x, dy = (z.y - p.y) * 1.15, d = Math.hypot(dx, dy);
           if (d > W.reach * T) continue;
           if (d > 18 && Math.abs(angDiff(Math.atan2(dy, dx), fa)) > 1.35) continue;
-          hitZombie(z, fa, W.dmg * (job() === 'brawler' ? 1.3 : 1) * SK.meleeMul()); any = true;
+          hitZombie(z, fa, W.dmg * qMul() * (job() === 'brawler' ? 1.3 : 1) * SK.meleeMul()); any = true;   // 0.19: qMul = weapon quality
         }
         if (any) { G.hitstop = .055; G.shake = Math.max(G.shake, 5); wearWeapon(); }
         emitNoise(p.x, p.y, (any ? W.noise : 1.5) * SK.allNoise(), any);
@@ -880,6 +926,7 @@
       z.dead = true; z.st = 'dead'; z.stT = 0; z.fallDir = z.hurtDir;
       if (by) { if (z.kind === 'bloater') burst(z); return; }   // a raider got it: not her kill
       G.stats.kills++;
+      if (G.dly) { G.dly.k++; if (z.special) G.dly.sp++; }   // 0.18 daily score
       if (DM.Game && DM.Game.onKill) DM.Game.onKill(z);
       // 0.13: kills teach too (special infected and bosses more)
       const kx = K ? K.xp : z.kind === 'wboss' ? 0 : z.boss || EVS.isBoss(z) ? 15 : 2;
@@ -906,6 +953,15 @@
     dmgNum(p.x, p.y - 90, dmg, '#ff6b5a');
     splat(p.x, p.y, Math.atan2(dy, dx), false);
     if (p.hp <= 0) { p.st = 'down'; p.stT = 0; closeSheet(true); }
+    else if (z && !opts.noInfect && IFX && IFX.bite(z, S())) infectedNow();   // 0.18: some bites infect (infection.js)
+  }
+  // 0.18: light infection - say so once, clamp HP to the lower max, show the HUD chip
+  function infectedNow() {
+    const s = S(); G.p.hp = Math.min(G.p.hp, maxHp());
+    banner('INFECTED', 'max HP -' + IFX.hpLoss(s)); SFX.play('alert');
+    if (IFX.firstNote(s)) setTimeout(() => { if (G && !G.over) toast(IFX.NOTE[1], 7); }, 900);
+    else toast('Infected - antibiotics will cure it', 2.4);
+    hudChips(); lastHud = ''; DM.Game && DM.Game.save();
   }
 
   // ---------------------------------------------------------------- zombies
@@ -1109,7 +1165,7 @@
     updateClouds(dt);
     // the third zombie wanders in from the street
     if (!G.z3 && L.wanderer !== false && (G.t > (L.wandererT || 70) || (G.stats.searched >= 9 && G.t > 35))) {
-      G.z3 = true; const z = mkZombie(1.5 * T, (L.streetY + 1.4) * T, 'investigate', streetRoom()); z.target = { x: L.stoop.x * T, y: (L.streetY - 3) * T }; z.hunter = true; if (L.wanderHp) z.hp = z.maxHp = L.wanderHp; G.zs.push(z);
+      G.z3 = true; const z = mkZombie(1.5 * T, (L.streetY + 1.4) * T, 'investigate', streetRoom()); z.target = { x: L.stoop.x * T, y: (L.streetY - 3) * T }; z.hunter = true; if (L.wanderHp) z.hp = z.maxHp = L.wanderHp; gsZombie(z); G.zs.push(z);
       toast('Something is shuffling up the stoop...', 3); SFX.play('groan');
     }
     // camera
@@ -1850,7 +1906,8 @@
       $('#skXp').style.width = xl.pct + '%';
       const h = S().hands, wk = weaponKey();
       $('#wpn img').src = ART.iconURL[h ? ITEMS[h.k].i : 'scrap'] || ''; $('#wpn').classList.toggle('fists', !h);
-      $('#wpn i').style.width = (h && h.d != null ? Math.max(0, h.d / WEAPONS[wk].dur) * 100 : 0) + '%';
+      $('#wpn i').style.width = (h && h.d != null ? Math.max(0, Math.min(1, h.d / D.wMax(h))) * 100 : 0) + '%';   // 0.19: max durability by quality
+      if (h && D.qOf(h) >= 3) $('#wpn').style.setProperty('--qc', D.QUAL[D.qOf(h)].c); else $('#wpn').style.removeProperty('--qc');   // 0.19: Solid+ tint the chip
       $('#wpn b').textContent = wk === 'bow' ? arrowsLeft() : '';   // the quiver (plus any spare arrows in the pack)
       const n = Math.round(G.noiseLvl * 5);
       noiseBars.forEach((b, i) => b.classList.toggle('on', i < n));
@@ -1928,13 +1985,13 @@
     for (const e of G.pack) if (e.k === k) room += m - e.n;
     return room + (packSlots() - G.pack.length) * m;
   }
-  function addToPack(k, n, d) { // tops up existing stacks first, then new slots; returns how many fit
+  function addToPack(k, n, d, q) { // tops up existing stacks first, then new slots; returns how many fit (0.19: q = weapon quality)
     if (isCos(k)) { if (DM.Game && DM.Game.unlockCos) DM.Game.unlockCos(k); return n; }
     if (k === 'key') { ring().keys += n; return n; }   // straight onto the keyring
     const m = stackMax(k); let left = n;
     if (k === 'arrow') { const q = quiver(), t = Math.min(left, Math.max(0, D.QUIVER - q.n)); q.n += t; left -= t; }
     for (const e of G.pack) if (e.k === k && e.n < m && left) { const t = Math.min(left, m - e.n); e.n += t; left -= t; }
-    while (left && G.pack.length < packSlots()) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; G.pack.push(e); left -= t; }
+    while (left && G.pack.length < packSlots()) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; if (q != null) e.q = q; G.pack.push(e); left -= t; }
     return n - left;
   }
   DM.addToPack = addToPack;
@@ -1942,8 +1999,9 @@
   const ctag = (k, it) => { const c = D.cat(k); return it.tag && (c === 'event' || c === 'quest') ? `<small class="tag">${it.tag}</small>` : `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
   function itemCard(e, onTap, extra = '', cls = '') {
     const it = ITEMS[e.k], el = document.createElement('button');
-    el.className = 'slot' + (it.rare ? ' rare' : '') + cls;
-    el.innerHTML = `<img alt="" src="${ART.iconURL[it.i]}"><span>${it.n}</span>${ctag(e.k, it)}${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${e.d != null && it.w ? `<i class="dur"><i style="width:${Math.max(4, e.d / WEAPONS[it.w].dur * 100)}%"></i></i>` : ''}${extra}`;
+    el.className = 'slot' + (it.rare ? ' rare' : '') + (it.w ? ' wq q' + D.qOf(e) : '') + cls;   // 0.19: tier colour on weapons
+    if (it.w) el.style.setProperty('--qc', D.QUAL[D.qOf(e)].c);
+    el.innerHTML = `<img alt="" src="${ART.iconURL[it.i]}"><span>${it.n}</span>${it.w ? qTag(e) : ctag(e.k, it)}${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${e.d != null && it.w ? `<i class="dur"><i style="width:${Math.max(4, Math.min(100, e.d / D.wMax(e) * 100))}%"></i></i>` : ''}${extra}`;
     el.addEventListener('click', ev => { ev.stopPropagation(); onTap(el); });
     return el;
   }
@@ -1962,7 +2020,9 @@
     $('#shActs').innerHTML = '';
     const items = o.loot0 || [];
     if (!items.length) grid.innerHTML = `<div class="empty">${s.it.corpse ? 'Nothing useful on it.' : 'Nothing useful.'}</div>`;
-    items.forEach((e, i) => { const fits = roomFor(e.k) > 0; grid.appendChild(itemCard(e, () => takeItem(i), fits ? '' : '<em class="nofit">won\'t fit</em>', fits ? '' : ' full')); });
+    const hd = S().hands ? D.wDmg(S().hands) : WEAPONS.fists.dmg;   // 0.19: weapons show their damage (with quality) against what she holds
+    items.forEach((e, i) => { const fits = roomFor(e.k) > 0, w = ITEMS[e.k].w, dm = w ? D.wDmg(e) : 0;
+      grid.appendChild(itemCard(e, () => takeItem(i), !fits ? '<em class="nofit">won\'t fit</em>' : w ? `<em class="wdmg${dm > hd ? ' up' : dm < hd ? ' down' : ''}">${dm} dmg</em>` : '', fits ? '' : ' full')); });
     $('#shCap').textContent = note || `Pack ${G.pack.length}/${packSlots()}`;
     const can = items.some(e => roomFor(e.k) > 0);
     $('#shTake').style.display = can ? '' : 'none';
@@ -1970,22 +2030,23 @@
   }
   function takeItem(i) {
     const o = G.sheet.o, e = o.loot0[i];
-    const got = addToPack(e.k, e.n, e.d);
+    const got = addToPack(e.k, e.n, e.d, e.q);
     if (!got) { toast(`No room for ${ITEMS[e.k].n.toLowerCase()}`, 1.4); $('#shCap').classList.add('shake'); setTimeout(() => $('#shCap').classList.remove('shake'), 400); return; }
+    tally(e.k, got, e.d);   // 0.18 daily score
     e.n -= got; if (!e.n) o.loot0.splice(i, 1);
-    SFX.play('pick'); lootedWeapon(e.k);
+    SFX.play('pick'); lootedWeapon(e.k, e.q);
     if (e.k === 'ammo' || e.k === 'key') toast(ITEMS[e.k].n + (got > 1 ? ' x' + got : '') + '!', 1.2);
     renderLoot(e.n ? `Only ${got} fit - ${e.n} left here` : null); o._key = null;
   }
   function takeAll() {
     const o = G.sheet && G.sheet.o; if (!o || G.sheet.kind !== 'loot') return;
     let took = 0;
-    for (const e of o.loot0) { const got = addToPack(e.k, e.n, e.d); e.n -= got; took += got; if (got) lootedWeapon(e.k); }
+    for (const e of o.loot0) { const got = addToPack(e.k, e.n, e.d, e.q); tally(e.k, got, e.d); e.n -= got; took += got; if (got) lootedWeapon(e.k, e.q); }
     o.loot0 = o.loot0.filter(e => e.n > 0);
     if (took) SFX.play('pick');
     if (o.loot0.length) { const left = o.loot0.reduce((a, e) => a + e.n, 0); toast(`Pack full - left ${left} item${left > 1 ? 's' : ''} here`, 1.8); renderLoot(); } else closeSheet();
   }
-  function lootedWeapon(k) { if (D.isWeapon(k) && DM.Game && DM.Game.onWeaponLoot) DM.Game.onWeaponLoot(k, true); }
+  function lootedWeapon(k, q) { if (D.isWeapon(k) && DM.Game && DM.Game.onWeaponLoot) DM.Game.onWeaponLoot(k, true, q); }
   function closeSheet(silent) { sheet.classList.remove('on'); if (G) G.sheet = null; }
   function openPack(sel = -1) {
     if (G.over) return;
@@ -2018,6 +2079,10 @@
       const here = nd.addr === L.address;
       $('#shActs').innerHTML = `<div class="note">${nd.text || '"...the rest is torn away."'}<br><small>Found at <b>${nd.addr || 'a house'}</b>${here ? ' - this house.' : ' - not this house. The clue is about that place.'}</small></div>`;
       SFX.play('pick'); return; }
+    if (it.cure && IFX) {   // 0.18: antibiotics cure the infection (only used when infected)
+      if (!IFX.is(S())) { toast('You are not infected - save them for a bite', 1.8); return; }
+      const m = IFX.cure(S()); e.n--; if (!e.n) G.pack.splice(i, 1); SFX.play('pick'); toast(m, 2.4); hudChips(); lastHud = ''; DM.Game && DM.Game.save(); openPack(); return;
+    }
     if (it.hp) p.hp = Math.min(maxHp(), p.hp + SK.heal(it.hp));   // 0.13: Field medic heals more
     const fed = F.isFood(e.k) ? F.eat(S(), e.k) : '';
     if (it.sta) p.sta = Math.min(F.staMax(), p.sta + it.sta);
@@ -2029,12 +2094,12 @@
   function dropItem(i) {
     const e = G.pack.splice(i, 1)[0], p = G.p;
     const a = G.drops.length * 2.1; // nudge so several drops do not sit exactly on top of each other
-    G.drops.push({ k: e.k, n: e.n, d: e.d, x: p.x + (p.flip ? -18 : 18) + Math.cos(a) * 6, y: p.y + 6 + Math.sin(a) * 5, t: 0 });
+    G.drops.push({ k: e.k, n: e.n, d: e.d, q: e.q, x: p.x + (p.flip ? -18 : 18) + Math.cos(a) * 6, y: p.y + 6 + Math.sin(a) * 5, t: 0 });
     SFX.play('open'); toast('Dropped - it stays here until you leave', 1.6);
     closeSheet(); // let her see it land
   }
   function pickUp(d) {
-    const got = addToPack(d.k, d.n, d.d);
+    const got = addToPack(d.k, d.n, d.d, d.q);
     if (!got) { toast('Your pack is full', 1.3); return; }
     d.n -= got; if (!d.n) G.drops.splice(G.drops.indexOf(d), 1);
     SFX.play('pick'); toast(`Picked up ${ITEMS[d.k].n.toLowerCase()}${got > 1 ? ' x' + got : ''}`, 1.1);
@@ -2231,8 +2296,8 @@
     const ws = G.pack.map((e, i) => [e, i]).filter(([e]) => D.isWeapon(e.k));
     if (!ws.length) { toast(S().hands ? 'No other weapon in your pack' : 'No weapon - fists it is', 1.4); return; }
     const [e, i] = ws[0], cur = S().hands;
-    S().hands = { k: e.k, d: e.d == null ? WEAPONS[ITEMS[e.k].w].dur : e.d };
-    if (cur) G.pack[i] = { k: cur.k, n: 1, d: cur.d }; else G.pack.splice(i, 1);
+    S().hands = { k: e.k, d: e.d == null ? D.wMax(e) : e.d, q: D.qOf(e) };   // 0.19: quality goes with it
+    if (cur) G.pack[i] = { k: cur.k, n: 1, d: cur.d, q: D.qOf(cur) }; else G.pack.splice(i, 1);
     // rotate so repeated taps cycle through every weapon
     if (cur) { const moved = G.pack.splice(i, 1)[0]; G.pack.push(moved); }
     SFX.play('pick'); toast('Equipped ' + ITEMS[e.k].n.toLowerCase(), 1); lastHud = '';
@@ -2240,14 +2305,14 @@
   // the weapon chip: a list of every weapon in the pack, tap one to fight with it
   function openSwap() {
     if (G.over) return;
-    const h = S().hands, cur = h ? WEAPONS[ITEMS[h.k].w].dmg : WEAPONS.fists.dmg;
+    const h = S().hands, cur = h ? D.wDmg(h) : WEAPONS.fists.dmg;   // 0.19: damage with quality
     const ws = G.pack.map((e, i) => [e, i]).filter(([e]) => D.isWeapon(e.k));
     G.sheet = { kind: 'swap' };
     $('#shKick').textContent = 'Swap weapon · holding ' + (h ? ITEMS[h.k].n.toLowerCase() : 'nothing') + ', ' + cur + ' dmg';
     $('#shTitle').textContent = ws.length ? 'Weapons in your pack' : 'No other weapons';
     const grid = $('#shGrid'); grid.innerHTML = ''; $('#shActs').innerHTML = '';
     if (!ws.length) grid.innerHTML = '<div class="empty">Weapons you loot go in your pack. Come back here to swap to one mid-run.</div>';
-    ws.forEach(([e, i]) => { const dm = WEAPONS[ITEMS[e.k].w].dmg, df = dm - cur;
+    ws.forEach(([e, i]) => { const dm = D.wDmg(e), df = dm - cur;
       grid.appendChild(itemCard(e, () => { equipFromPack(i); closeSheet(); }, `<em class="wdmg${df > 0 ? ' up' : df < 0 ? ' down' : ''}">${dm} dmg${df ? ` ${df > 0 ? '+' : ''}${df}` : ''}</em>`)); });
     $('#shCap').textContent = ws.length ? 'Tap one to fight with it' : '';
     $('#shTake').style.display = 'none';
@@ -2256,8 +2321,8 @@
   function equipFromPack(i) {
     const e = G.pack[i]; if (!e || !D.isWeapon(e.k)) return;
     const cur = S().hands;
-    S().hands = { k: e.k, d: e.d == null ? WEAPONS[ITEMS[e.k].w].dur : e.d };
-    if (cur) G.pack[i] = { k: cur.k, n: 1, d: cur.d }; else G.pack.splice(i, 1);
+    S().hands = { k: e.k, d: e.d == null ? D.wMax(e) : e.d, q: D.qOf(e) };   // 0.19: quality goes with it
+    if (cur) G.pack[i] = { k: cur.k, n: 1, d: cur.d, q: D.qOf(cur) }; else G.pack.splice(i, 1);
     if (DM.Game && DM.Game.onEquip) DM.Game.onEquip();
     SFX.play('pick'); toast('Equipped ' + ITEMS[e.k].n.toLowerCase(), 1.1); lastHud = '';
   }
@@ -2274,7 +2339,7 @@
     let ax = p.fx, ay = p.fy;
     if (best) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; ax = dx / d; ay = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; p.fx = ax; p.fy = ay; }
     const sp = 15 * T;
-    G.arrows.push({ x: p.x + ax * 16, y: p.y + ay * 10, vx: ax * sp, vy: ay * sp, z: 36, life: 1.1 });
+    G.arrows.push({ x: p.x + ax * 16, y: p.y + ay * 10, vx: ax * sp, vy: ay * sp, z: 36, life: 1.1, qm: qMul() });   // 0.19: the bow's quality
     SFX.play('bow'); emitNoise(p.x, p.y, WEAPONS.bow.noise * SK.allNoise(), false); wearWeapon();
     return true;
   }
@@ -2289,7 +2354,7 @@
       for (let i = 0; i < steps && a.life > 0; i++) {
         a.x += a.vx * dt / steps; a.y += a.vy * dt / steps;
         const hitZ = G.zs.find(z => !z.dead && Math.hypot(z.x - a.x, (z.y - a.y) * 1.3) < 22);
-        if (hitZ) { hitZombie(hitZ, Math.atan2(a.vy, a.vx), WEAPONS.bow.dmg * SK.bowMul(), true); a.life = 0; landArrow(hitZ.x + (Math.random() - .5) * 20, hitZ.y + 8); break; }
+        if (hitZ) { hitZombie(hitZ, Math.atan2(a.vy, a.vx), WEAPONS.bow.dmg * (a.qm || 1) * SK.bowMul(), true); a.life = 0; landArrow(hitZ.x + (Math.random() - .5) * 20, hitZ.y + 8); break; }
         if (overlapsSolid({ hw: 2, hh: 2 }, a.x, a.y)) { a.life = 0; SFX.play('thunk'); landArrow(a.x - a.vx * .012, a.y - a.vy * .012); break; }
       }
       a.life -= dt;
@@ -2315,8 +2380,10 @@
     const res = {
       kind, address: L.address, type: L.type, id: L.id,
       kills: G.stats.kills, searched: G.furn.filter(f => f.lootable && f.searched).length,
-      secrets: G.sec.filter(s => s.found).length, secretsTotal: G.sec.length, zombies: zombieCount(), raid: G.raid && G.raid.on ? { n: G.raid.n, killed: G.raid.killed || 0, away: G.raid.away || 0 } : null, left: G.drops.map(d => ({ k: d.k, n: d.n })),
+      secrets: G.sec.filter(s => s.found).length, secretsTotal: G.sec.length, zombies: zombieCount(),
+      daily: G.dly ? Object.assign({}, G.dly, { t: Math.round(G.dly.t), searched: G.furn.filter((f, i) => i < (L.furn || []).length && f.lootable && !f.secretLoot && f.searched).length, total: G.furn.filter((f, i) => i < (L.furn || []).length && f.lootable && !f.secretLoot).length }) : null,   // 0.18 raid: G.raid && G.raid.on ? { n: G.raid.n, killed: G.raid.killed || 0, away: G.raid.away || 0 } : null, left: G.drops.map(d => ({ k: d.k, n: d.n })),
     };
+    if (G.dly && opts.onState) opts.onState(snapRun());   // 0.18: the daily house keeps its state for re-entry (for fun)
     G.drops = []; G.over = true; LP.on = false; lpEl.classList.remove('on');
     closeSheet(true); hideCards();
     DM.scene = null; document.body.classList.remove('inrun');

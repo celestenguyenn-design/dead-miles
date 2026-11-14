@@ -117,10 +117,11 @@
     const pool = [['axe', 1], ['machete', 1], ['spikedbat', 1], ['lockset', 1], ['meds', 3], ['ammo', 20], ['backpack', 1], ['prybar', 1]].concat(SV().survivor.job === 'hunter' ? [['bow', 1], ['arrow', 18]] : []);
     const [k, n] = pool[Math.floor(rnd() * pool.length)], kb = st.killed_by === me;
     const caps = 40 + (kb ? 15 : 0);
-    const left = G().give(k, n, D.isWeapon(k) ? D.WEAPONS[D.ITEMS[k].w].dur : undefined);
+    const q = D.isWeapon(k) ? D.rollQuality(3.8, 0, rnd) : undefined;   // 0.19: boss weapons are Solid-Masterwork (~12% Masterwork)
+    const left = G().give(k, n, undefined, q);
     SV().trader.caps += caps; b.wins++;
     let cos = null; if (rnd() < .35) { cos = boss.cos; G().unlockCos('cos_' + cos); }
-    b.reward = { week, boss: boss.name, k, n, left, caps, cos, kb, seen: false };
+    b.reward = { week, boss: boss.name, k, n, q, left, caps, cos, kb, seen: false };
     return true;
   }
   function checkReward() {
@@ -139,7 +140,7 @@
     const el = $('#msheet');
     el.innerHTML = `<div class="mcard bosswin"><div class="kick">Weekly boss · down!</div><h3>${esc(r.boss)} is finished</h3>
       <p class="mp">${r.kb ? 'You landed the killing blow.' : 'Your crew of survivors finished it off.'} Everyone who hit it this week gets a share.</p>
-      <div class="bwrow">${icon(r.k)}<b>${D.ITEMS[r.k].n}${r.n > 1 ? ' x' + r.n : ''}</b></div>
+      <div class="bwrow">${icon(r.k)}<b>${r.q && G().qTag ? D.QUAL[r.q].n + ' ' : ''}${D.ITEMS[r.k].n}${r.n > 1 ? ' x' + r.n : ''}</b>${r.q && G().qTag ? G().qTag({ q: r.q }) : ''}</div>
       <div class="bwrow">${icon('caps')}<b>${r.caps} caps</b>${r.kb ? '<em>+15 for the last hit</em>' : ''}</div>
       ${r.cos ? `<div class="bwrow cos"><img alt="" src="${ART.iconURL['cos_' + r.cos]}"><b>${esc(D.COS[r.cos].n)}</b><em>boss cosmetic!</em></div>` : ''}
       ${r.left ? '<p class="mp warn">Pack and stash are full: some of it could not be carried.</p>' : ''}

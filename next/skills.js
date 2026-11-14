@@ -37,7 +37,7 @@ window.DM = window.DM || {};
     ] },
     { id: 'surv', n: 'Survival', col: '#93a86c', job: 'mechanic', blurb: 'Hunger, thirst, healing and stamina.', ranks: [
       { n: 'Light eater', d: 'Hunger and thirst drain 15% slower.', c: 1 },
-      { n: 'Field medic', d: 'Food, bandages and meds heal 40% more HP.', c: 1 },
+      { n: 'Field medic', d: 'Food, bandages and meds heal 40% more HP. Zombie bites infect half as often.', c: 1 },
       { n: 'Second wind', d: '+15 max stamina, and it refills 20% faster.', c: 2 },
       { n: 'Iron stomach', d: 'Hunger and thirst drain another 15% slower.', c: 2 },
       { n: 'Marathoner', d: 'Sprinting costs 25% less stamina; it refills another 20% faster.', c: 3 },
@@ -175,12 +175,14 @@ window.DM = window.DM || {};
       const conf = pend === r ? `<div class="skconf"><span>Learn <b>${esc(R.n)}</b> for ${R.c} point${R.c > 1 ? 's' : ''}? You can't take it back (except with the weekly reset).</span><div class="btnrow"><button class="mbtn sm ghost" data-skno>Cancel</button><button class="mbtn sm" data-skyes="${r}">Learn</button></div></div>` : '';
       return `<button class="skrow${got ? ' got' : can ? ' can' : ' lock'}${pend === r ? ' sel' : ''}" data-r="${r}" style="--tc:${T.col}"><i class="sknum">${r}</i><span class="sktxt"><b>${esc(R.n)}</b><span>${esc(R.d)}</span>${!got && why && why !== 'learned' ? `<small>${esc(why)}</small>` : ''}</span>${tag}</button>${conf}`;
     }).join('');
-    el.innerHTML = `<div class="mcard skcard"><div class="kick">Survivor level ${xl.L}</div><h3>Skills</h3>
+    const gs = DM.Game && DM.Game.gamestage ? DM.Game.gamestage() : null;   // 0.19: gamestage (game.js)
+    el.innerHTML = `<div class="mcard skcard"><div class="kick">Survivor level ${xl.L}${gs ? ` · gamestage ${gs.gs}` : ''}</div><h3>Skills</h3>
       <div class="skhead"><div class="skpts${pts ? ' on' : ''}"><b>${pts}</b><span>point${pts === 1 ? '' : 's'}</span></div>
         <div class="skxp"><span>${xl.cur.toLocaleString('en-US')} / ${xl.need.toLocaleString('en-US')} xp to Lv ${xl.L + 1}</span><div class="mbar xp"><i style="width:${xl.pct}%"></i></div></div></div>
       <div class="sktabs">${SK.TREES.map(t => `<button class="sktab${t.id === cur ? ' on' : ''}" data-t="${t.id}" style="--tc:${t.col}">${SK.glyph(t.id, 20)}<b>${esc(t.n)}</b><i>${SK.rank(t.id, s)}/${t.ranks.length}</i></button>`).join('')}</div>
       <div class="skblurb" style="--tc:${T.col}">${SK.glyph(T.id, 26)}<span><b>${esc(T.n)}</b>${esc(T.blurb)}${T.job === s.job ? ` <em>${esc(J.n)}s get rank 1 free.</em>` : ''}</span></div>
       <div class="skranks">${rows}</div>
+      ${gs ? `<p class="mp dim gsline"><b>Gamestage ${gs.gs}</b> · ${esc(gs.line)}</p>` : ''}
       <p class="mp dim">Every level is 1 skill point. XP comes from searching, kills (special infected more), secrets, locks, Dot's jobs, horde shifts and boss fights. Each rank needs the one before it.</p>
       <div class="btnrow">${SK.canReset(s) ? `<button class="mbtn sm ghost" id="skReset">Reset · ${SK.RESET_CAPS} caps</button>` : ''}<button class="mbtn sm" id="skClose">Done</button></div></div>`;
     el.classList.add('on');
