@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.24.4';
+const NEXT_VERSION = '0.24.5';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -24,7 +24,7 @@ const NEXT_VERSION = '0.24.4';
 (() => {
   const D = DM.D, E = DM.E, $ = E.$, SFX = E.SFX, toast = E.toast;
   const KEY = 'dm-next-save', VER = 1, VERSION = 'next ' + NEXT_VERSION;
-  const STASH_SLOTS = 40;
+  const STASH_BASE = 40, stashSlots = () => STASH_BASE + (DM.Base && DM.Base.stashBonus ? DM.Base.stashBonus() : 0);   // 0.24.5: base Storage adds up to +40
   DM.onlineState = { signedIn: false, name: null, lastSync: null, status: 'offline' };
   const Game = DM.Game = {};
   let SV = null;
@@ -265,7 +265,7 @@ const NEXT_VERSION = '0.24.4';
     },
     toStash(stacks) {   // like the crew's haul: everything to the stash; returns what did not fit
       const lost = [];
-      for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'key') { SV.survivor.keys = (+SV.survivor.keys || 0) + e.n; continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, STASH_SLOTS, e.k, e.n, e.d, e.q); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k, false, e.q); }
+      for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'key') { SV.survivor.keys = (+SV.survivor.keys || 0) + e.n; continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, stashSlots(), e.k, e.n, e.d, e.q); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k, false, e.q); }
       return lost;
     },
     showResult: (...a) => showResult(...a), openTrader: () => openTrader(), maxHp: s => maxHp(s), dayNum: k => dayNum(k),
@@ -303,7 +303,7 @@ const NEXT_VERSION = '0.24.4';
     }
     DM.Crew.onTask('scavenger', 2);
     const stacks = D.toStacks(got, rnd, { base: D.qBaseFor(h.danger || 1), bonus: D.gsFx(gamestage().gs).qBonus }), lost = [];   // 0.19: quality by danger + gamestage
-    for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, STASH_SLOTS, e.k, e.n, e.d, e.q); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k, false, e.q); }
+    for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, stashSlots(), e.k, e.n, e.d, e.q); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k, false, e.q); }
     h.status = 'auto'; SV.stats.auto++;
     DM.Skills.addXP(3);
     Game.save();
@@ -395,14 +395,14 @@ const NEXT_VERSION = '0.24.4';
     if (k === 'arrow') { n -= toQuiver(n); if (!n) return 0; }   // arrows: the quiver first
     if (k === 'key') { SV.survivor.keys = (+SV.survivor.keys || 0) + n; return 0; }   // keys: the keyring
     if (D.isWeapon(k)) { if (q == null) q = 2; if (d == null) d = D.wMax({ k, q }); }   // 0.19: a weapon without a quality is Worn
-    let got = addTo(SV.survivor.pack, packSlots(), k, n, d, q); if (got < n) got += addTo(SV.survivor.stash, STASH_SLOTS, k, n - got, d, q);
+    let got = addTo(SV.survivor.pack, packSlots(), k, n, d, q); if (got < n) got += addTo(SV.survivor.stash, stashSlots(), k, n - got, d, q);
     return n - got;
   }
   function canGive(items, remove = []) { // dry run of give() on copies: does everything fit in pack + stash?
     const pk = SV.survivor.pack.map(e => Object.assign({}, e)), st = SV.survivor.stash.map(e => Object.assign({}, e));
     for (let [k, n] of remove) for (const list of [st, pk]) for (let i = list.length - 1; i >= 0 && n > 0; i--) if (list[i].k === k) { const t = Math.min(n, list[i].n); list[i].n -= t; n -= t; if (!list[i].n) list.splice(i, 1); }
     let qroom = Math.max(0, D.QUIVER - ((SV.survivor.quiver || {}).n || 0));
-    for (let [k, n] of items) { if (k === 'key') continue; if (k === 'arrow') { const t = Math.min(n, qroom); qroom -= t; n -= t; if (!n) continue; } let got = addTo(pk, packSlots(), k, n, D.isWeapon(k) ? 1 : undefined); if (got < n) got += addTo(st, STASH_SLOTS, k, n - got, D.isWeapon(k) ? 1 : undefined); if (got < n) return false; }
+    for (let [k, n] of items) { if (k === 'key') continue; if (k === 'arrow') { const t = Math.min(n, qroom); qroom -= t; n -= t; if (!n) continue; } let got = addTo(pk, packSlots(), k, n, D.isWeapon(k) ? 1 : undefined); if (got < n) got += addTo(st, stashSlots(), k, n - got, D.isWeapon(k) ? 1 : undefined); if (got < n) return false; }
     return true;
   }
   Game.canGive = canGive;
@@ -1396,7 +1396,7 @@ const NEXT_VERSION = '0.24.4';
     const empty = n => Array.from({ length: Math.max(0, n) }, () => '<div class="slot ph"></div>').join('');
     const A = from => sel && sel.from === from ? '<div id="sacts"></div>' : '';
     const better = betterBadge() && s.better, bIn = list => better && list.some(e => e.k === s.better) ? '<i class="sbadge">!</i>' : '';
-    const seg = `<div class="seg" id="gtabs">${stashHost ? '' : `<button data-g="gear">Equipped</button>`}<button data-g="pack">Backpack <i>${s.pack.length}/${packSlots()}</i>${bIn(s.pack)}</button><button data-g="stash">Stash <i>${s.stash.length}/${STASH_SLOTS}</i>${bIn(s.stash)}</button></div>`;
+    const seg = `<div class="seg" id="gtabs">${stashHost ? '' : `<button data-g="gear">Equipped</button>`}<button data-g="pack">Backpack <i>${s.pack.length}/${packSlots()}</i>${bIn(s.pack)}</button><button data-g="stash">Stash <i>${s.stash.length}/${stashSlots()}</i>${bIn(s.stash)}</button></div>`;
     let body = '';
     if (gTab === 'gear') {
       const h = s.hands, hw = h && D.ITEMS[h.k], worn = Object.values(s.look.cos || {}).filter(c => D.COS[c]);
@@ -1420,8 +1420,8 @@ const NEXT_VERSION = '0.24.4';
       ${!s.pack.length ? '<div class="ghint">Empty. Whatever you loot goes here; anything that does not fit is left on the floor.</div>' : !sel ? `<div class="ptools"><button class="mbtn sm" id="sAll">Stash all</button></div><div class="ghint">Tap an item to eat, equip, use or move it.</div>` : ''}`;
     } else {
       const junk = junkOf(s), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n)), 0), away = dotLeft();
-      body = `<div class="ghead"><span class="kick">${stashHost ? 'Stash chest' : 'Stash chest · at your base'} · ${s.stash.length}/${STASH_SLOTS}</span>${s.stash.length > 1 ? '<button class="mini" id="sSortS">Sort</button>' : ''}</div>
-      <div class="grid g5">${s.stash.map((e, i) => slot(e, 'stash', i)).join('')}${empty(Math.min(s.stash.length ? (5 - s.stash.length % 5) % 5 + 5 : 10, STASH_SLOTS - s.stash.length))}</div>${A('stash')}
+      body = `<div class="ghead"><span class="kick">${stashHost ? 'Stash chest' : 'Stash chest · at your base'} · ${s.stash.length}/${stashSlots()}</span>${s.stash.length > 1 ? '<button class="mini" id="sSortS">Sort</button>' : ''}</div>
+      <div class="grid g5">${s.stash.map((e, i) => slot(e, 'stash', i)).join('')}${empty(Math.min(s.stash.length ? (5 - s.stash.length % 5) % 5 + 5 : 10, stashSlots() - s.stash.length))}</div>${A('stash')}
       ${!s.stash.length ? '<div class="ghint">Nothing stored yet. Move things here from the Backpack tab so a bad run cannot cost you them.</div>' : ''}
       ${junk.length && !sel ? `<div class="ptools"><button class="mbtn sm${away ? ' ghost' : ''}" id="sJunk"${away ? ' disabled' : ''}>${away ? `Dot is away · sell junk in ${fmtN(away)} steps` : `Sell junk to Dot · ${icon('caps')}${jv}`}</button></div>` : ''}`;
     }
@@ -1434,7 +1434,7 @@ const NEXT_VERSION = '0.24.4';
     el.querySelectorAll('[data-from]').forEach(b => b.onclick = () => { const f = b.dataset.from, i = +b.dataset.i; sel = sel && sel.from === f && sel.i === i ? null : { from: f, i }; SFX.play('ui'); renderStash(); });
     for (const [id, list] of [['#sSortP', s.pack], ['#sSortS', s.stash]]) if (el.querySelector(id)) el.querySelector(id).onclick = () => { sortList(list); sel = null; SFX.play('ui'); Game.save(); renderStash(); toast('Sorted by kind', 1); };
     if (el.querySelector('#sAll')) el.querySelector('#sAll').onclick = () => {
-      for (let i = s.pack.length - 1; i >= 0; i--) { const e = s.pack[i]; const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d); e.n -= n; if (!e.n) s.pack.splice(i, 1); }
+      for (let i = s.pack.length - 1; i >= 0; i--) { const e = s.pack[i]; const n = addTo(s.stash, stashSlots(), e.k, e.n, e.d); e.n -= n; if (!e.n) s.pack.splice(i, 1); }
       SFX.play('ui'); Game.save(); renderStash(); toast(s.pack.length ? 'Stash is full - some things stayed in your pack' : 'Everything is in the stash', 1.8);
     };
     if (el.querySelector('#sJunk')) el.querySelector('#sJunk').onclick = () => { SFX.play('ui'); sellJunk(); };
@@ -1463,7 +1463,7 @@ const NEXT_VERSION = '0.24.4';
     acts.innerHTML = `<div class="sact"><span><b>Quiver</b> ${q.n}/${D.QUIVER} <em>arrows here never use a pack slot and never spill when you go down</em></span></div>`;
     const row = acts.firstChild, add = (t, fn, ghost) => { const b = document.createElement('button'); b.className = 'mbtn sm' + (ghost ? ' ghost' : ''); b.textContent = t; b.onclick = () => { SFX.play('pick'); fn(); }; row.appendChild(b); };
     if (spare && q.n < D.QUIVER) add(`Fill from stash/pack (${Math.min(spare, D.QUIVER - q.n)})`, () => { const want = Math.min(spare, D.QUIVER - q.n); let need = want; for (const list of [s.pack, s.stash]) for (let i = list.length - 1; i >= 0 && need; i--) if (list[i].k === 'arrow') { const t = Math.min(need, list[i].n); list[i].n -= t; need -= t; if (!list[i].n) list.splice(i, 1); } q.n += want; done(`Quiver: ${q.n} arrows`); });
-    if (q.n) add('Put in stash', () => { const n = addTo(s.stash, STASH_SLOTS, 'arrow', q.n); if (!n) return toast('Stash is full', 1.4); q.n -= n; done(`${n} arrows to the stash`); }, !!spare);
+    if (q.n) add('Put in stash', () => { const n = addTo(s.stash, stashSlots(), 'arrow', q.n); if (!n) return toast('Stash is full', 1.4); q.n -= n; done(`${n} arrows to the stash`); }, !!spare);
     if (!q.n && !spare) add('No arrows yet', () => toast('Arrows: Dot\'s shop, gym lockers, or craft them with the arrow blueprint', 2.2), true);
   }
   function stashActions() {
@@ -1473,10 +1473,10 @@ const NEXT_VERSION = '0.24.4';
     if (!e) { sel = null; return; }
     const it = D.ITEMS[e.k], btns = [];
     const done = msg => { sel = null; Game.save(); reHost(); if (msg) toast(msg, 1.4); };
-    if (it.w && sel.from !== 'hands') btns.push(['Equip' + (wDmg(e) > handsDmg() ? ` · +${wDmg(e) - handsDmg()} dmg` : ''), () => { const cur = s.hands; s.hands = { k: e.k, d: e.d, q: D.qOf(e) }; s[sel.from].splice(sel.i, 1); if (cur) addTo(s.pack, packSlots(), cur.k, 1, cur.d, D.qOf(cur)) || addTo(s.stash, STASH_SLOTS, cur.k, 1, cur.d, D.qOf(cur)); Game.onEquip(); done('Equipped ' + it.n.toLowerCase() + ' - it is in your hand now'); }, 'big']);
-    if (sel.from === 'pack') btns.push(['To stash', () => { const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d, e.q); if (!n) return toast('Stash is full', 1.4); e.n -= n; if (!e.n) s.pack.splice(sel.i, 1); done(); }]);
+    if (it.w && sel.from !== 'hands') btns.push(['Equip' + (wDmg(e) > handsDmg() ? ` · +${wDmg(e) - handsDmg()} dmg` : ''), () => { const cur = s.hands; s.hands = { k: e.k, d: e.d, q: D.qOf(e) }; s[sel.from].splice(sel.i, 1); if (cur) addTo(s.pack, packSlots(), cur.k, 1, cur.d, D.qOf(cur)) || addTo(s.stash, stashSlots(), cur.k, 1, cur.d, D.qOf(cur)); Game.onEquip(); done('Equipped ' + it.n.toLowerCase() + ' - it is in your hand now'); }, 'big']);
+    if (sel.from === 'pack') btns.push(['To stash', () => { const n = addTo(s.stash, stashSlots(), e.k, e.n, e.d, e.q); if (!n) return toast('Stash is full', 1.4); e.n -= n; if (!e.n) s.pack.splice(sel.i, 1); done(); }]);
     if (sel.from === 'stash') btns.push(['To pack', () => { const n = addTo(s.pack, packSlots(), e.k, e.n, e.d, e.q); if (!n) return toast('Pack is full', 1.4); e.n -= n; if (!e.n) s.stash.splice(sel.i, 1); done(); }]);
-    if (sel.from === 'hands') btns.push(['Unequip', () => { if (!addTo(s.pack, packSlots(), e.k, 1, e.d, e.q) && !addTo(s.stash, STASH_SLOTS, e.k, 1, e.d, e.q)) return toast('No room', 1.4); s.hands = null; done(); }]);
+    if (sel.from === 'hands') btns.push(['Unequip', () => { if (!addTo(s.pack, packSlots(), e.k, 1, e.d, e.q) && !addTo(s.stash, stashSlots(), e.k, 1, e.d, e.q)) return toast('No room', 1.4); s.hands = null; done(); }]);
     if (it.w) {
       const cost = s.job === 'mechanic' ? 1 : 2, max = D.wMax(e);   // 0.19: max durability by quality
       if (e.d < max) btns.push([`Repair (${cost} scrap)`, () => {
@@ -1498,9 +1498,11 @@ const NEXT_VERSION = '0.24.4';
       for (const x of stacks) { const left = give(x.k, x.n, x.d, x.q); if (left) lost.push({ k: x.k, n: left }); }
       done(); showResult('Gift box', stacks, lost, 'Somebody wrapped this before it all went bad. It went into your pack (the stash if the pack is full).', 'Opened');
     }, 'big']);
+    // 0.24.5 (owner: "make a discard button so we don't have to drop it"): throw it away from the pack or the stash, tap twice
+    if ((sel.from === 'pack' || sel.from === 'stash') && !it.quest) { let sure = false; btns.push([e.n > 1 ? `Discard all ${e.n}` : 'Discard', function () { if (!sure) { sure = true; this.textContent = 'Tap again to throw away'; this.classList.add('warn'); return; } const from = sel.from; s[from].splice(sel.i, 1); done(`Threw away ${it.n.toLowerCase()}${e.n > 1 ? ' x' + e.n : ''}`); }, 'discard']); }
     acts.innerHTML = `<div class="sact"><span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}${it.tag ? ` <em>${it.tag}</em>` : ''}${it.w ? ` <i class="wst">${D.QUAL[D.qOf(e)].n} · ${wDmg(e)} dmg · ${Math.round(Math.min(1, (e.d != null ? e.d : D.wMax(e)) / D.wMax(e)) * 100)}% of ${D.wMax(e)}${sel.from === 'hands' ? ' · in your hand' : ''}</i>` : ''}<small class="cline" style="--cc:${D.CATS[D.cat(e.k)].c}">${esc(D.catLine(e.k, e.d))}</small></span></div>`;
     const row = acts.firstChild;
-    btns.forEach(([t, fn, big], i) => { const b = document.createElement('button'); b.className = big ? 'mbtn eqbig' : 'mbtn sm' + (i ? ' ghost' : ''); b.textContent = t; b.onclick = () => { SFX.play('pick'); fn(); }; row.appendChild(b); });
+    btns.forEach(([t, fn, big], i) => { const b = document.createElement('button'); b.className = big === 'discard' ? 'mbtn sm ghost discard' : big ? 'mbtn eqbig' : 'mbtn sm' + (i ? ' ghost' : ''); b.textContent = t; b.onclick = () => { SFX.play('pick'); fn.call(b); }; row.appendChild(b); });
   }
 
   // ---- settings: export / import / reset
@@ -1610,14 +1612,14 @@ const NEXT_VERSION = '0.24.4';
       if (k === 'heal') { SV.survivor.hp = maxHp(SV.survivor); Game.save(); renderHome(); }
       if (k === 'q20') { SV.trader.completed += 20; refreshTrader(true); Game.save(); renderHome(); toast('Trader level ' + traderLevel(), 1.6); }
       if (k === 'caps') { SV.trader.caps += 100; Game.save(); renderHome(); }
-      if (k === 'mats') { for (const [m, n] of [['scrap', 10], ['cloth', 6], ['tape', 3], ['wood', 4], ['nails', 12]]) addTo(SV.survivor.stash, STASH_SLOTS, m, n); Game.save(); renderHome(); }
+      if (k === 'mats') { for (const [m, n] of [['scrap', 10], ['cloth', 6], ['tape', 3], ['wood', 4], ['nails', 12]]) addTo(SV.survivor.stash, stashSlots(), m, n); Game.save(); renderHome(); }
       if (k === 'pool') { SV.base.pool += 10000; Game.save(); renderHome(); }
-      if (k === 'seeds') { for (const m of ['seed_tomato', 'seed_carrot', 'seed_corn', 'd_sofa', 'd_lamp', 'd_poster', 'd_rug', 'd_gnome', 'd_lights', 'd_plant']) addTo(SV.survivor.stash, STASH_SLOTS, m, D.ITEMS[m].seed ? 3 : 1); Game.save(); renderHome(); }
+      if (k === 'seeds') { for (const m of ['seed_tomato', 'seed_carrot', 'seed_corn', 'd_sofa', 'd_lamp', 'd_poster', 'd_rug', 'd_gnome', 'd_lights', 'd_plant']) addTo(SV.survivor.stash, stashSlots(), m, D.ITEMS[m].seed ? 3 : 1); Game.save(); renderHome(); }
       if (k === 'gday') { DM.Base.devDay(); Game.save(); renderHome(); toast('Garden: a day passed', 1.2); }
       if (k === 'hwin') { const H = DM.Horde; if (H.devOffset) H.devOffset = 0; else { const n = H.next(Date.now()); H.devOffset = n.at - Date.now() - 3 * 36e5; } renderHome(); }
       if (k === 'hres') { const H = DM.Horde, n = H.next(); H.devOffset = (H.devOffset || 0) + (n.at - H.now()) + 60e3; renderHome(); resolveHorde(); }
       if (k === 'cos') { const left = Object.keys(D.COS).filter(c => !SV.survivor.wardrobe.own[c]); if (left.length) { sheetClose(); Game.unlockCos(left[Math.floor(Math.random() * left.length)]); return; } toast('You have them all', 1.2); }
-      if (k === 'wpn') { addTo(SV.survivor.stash, STASH_SLOTS, 'machete', 1, 50); Game.onWeaponLoot('machete'); Game.save(); sheetClose(); renderHome(); return; }
+      if (k === 'wpn') { addTo(SV.survivor.stash, stashSlots(), 'machete', 1, 50); Game.onWeaponLoot('machete'); Game.save(); sheetClose(); renderHome(); return; }
       if (k === 'crew') { const m = DM.Crew.dev.addCrew(); Game.save(); toast(`${m.name} joined (${DM.Crew.ROLES[m.role].n})`, 1.6); }
       if (k === 'pet') { const pt = DM.Crew.dev.addPet(Math.random() < .5 ? 'dog' : 'cat', Math.floor(Math.random() * 4)); Game.save(); toast(`${pt.name} the ${pt.kind} joined`, 1.6); }
       if (k === 'hide') { DM.Crew.forceNpc = DM.Crew.forceStray = !DM.Crew.forceNpc; toast(DM.Crew.forceNpc ? 'Every house: a survivor + a stray' : 'Back to normal odds', 1.6); }
@@ -1625,7 +1627,7 @@ const NEXT_VERSION = '0.24.4';
       if (k === 'bhurt') { DM.Boss.dev.hurt(4000); renderHome(); }
       if (k === 'f10' || k === 'f100') { foodTick(); const f = SV.survivor.food; f.h = f.t = k === 'f10' ? 10 : 100; Game.save(); renderHome(); toast('Hunger + thirst ' + f.h, 1.2); }
       if (k === 'f12') { SV.survivor.food.at -= 12 * 36e5; foodTick(); Game.save(); renderHome(); const f = SV.survivor.food; toast(`12 hours later: hunger ${Math.round(f.h)}, thirst ${Math.round(f.t)}`, 1.8); }
-      if (k === 'gift') { for (const [m, n] of [['gift', 3], ['turkey', 1], ['pie', 3], ['cranberry', 3], ['stuffing', 3]]) addTo(SV.survivor.stash, STASH_SLOTS, m, n); Game.save(); renderHome(); }
+      if (k === 'gift') { for (const [m, n] of [['gift', 3], ['turkey', 1], ['pie', 3], ['cranberry', 3], ['stuffing', 3]]) addTo(SV.survivor.stash, stashSlots(), m, n); Game.save(); renderHome(); }
       if (k === 'reset') { if (b.dataset.sure) { try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } SV = migrate(fresh()); DM.S = null; sheetClose(); boot2(); return; } b.dataset.sure = 1; b.textContent = 'Tap again to wipe'; return; }
       openDev();
     });

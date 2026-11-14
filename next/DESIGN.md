@@ -577,3 +577,8 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Hunters know Arrows from the start, so 0.24.3 already skipped bp_arrow in new rolls - but containers pre-rolled before it
   (a house's cabinets roll when she walks in; today's route was made at midnight) still held them. D.toStacks now swaps any
   blueprint she already knows for one she can use (D.pickBP) at the moment a container opens.
+
+## Done in 0.24.5 (owner: "is there a way to increase our stash space" / "make a discard button")
+- Base piece Storage (3 upgrades): Shelving unit +10, Storage lockers +10, Shipping crate +20 -> stash 40 -> 80 slots.
+  Costs (before the 0.14.1 x2): 1,500 / 3,000 / 6,000 build steps + wood/nails, scrap/nails/tape. Not a horde target.
+- Gear tab: Discard (or "Discard all N") on backpack and stash items, tap twice; quest items can't be discarded.
