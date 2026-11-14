@@ -414,6 +414,47 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   infected.js and house.js read, and reuses it on resume (tested: same zombies after her gamestage jumped 24 -> 60). A run saved before
   0.19 resumes at gamestage 0 (its original zombies). h.gs is cleared when the run ends. The house list's special tag uses the current
   gamestage. Tutorial, base, watch shifts and the weekly boss ignore the gamestage.
+## Done in 0.21 (the daily route map, owner approved as an extra view of the Houses tab)
+- route.js (new). Houses tab gets a "List | Route" toggle (after the tutorial); the list is unchanged. The toggle remembers the
+  last view (SV.route.view); a "!" badge on Route when a row is ready to pick.
+- The map: new every local midnight (SV.day.key, same rollover as rollDay), seeded from seedBase + date (stable all day, same
+  on reload). 6-8 rows (40/40/20%), 2-3 stops a row (row 1 and the last row: 2), each joined to 1-2 stops in the next row;
+  lines never cross and every stop is reachable. Stops:
+  - House: a danger 1-2 building (rowhouses, apartment, bodega, laundromat, auto shop; bigger ones a bit likelier further on).
+  - Danger house ☣ (row 3+, likelier later): pharmacy, school, police (more later), mansion.
+  - Elite (at most one mid-map, and always in the last row): police station or mansion; when the run starts one ordinary
+    container gets a jackpot (f.jack: police gun / mansion safe table, D.JACK) and can't be empty. Crew search never finds it.
+  - Safehouse (at most one random + always one in the row before the last): +30 HP, +15 hunger, +20 thirst, and one day off an
+    infection (infection.js I.rest: survivor.inf.rest counts toward the 5 days; the max-HP loss is unchanged).
+  - Dot (at most one): clears her away timer and offers "Visit Dot" (opening the shop starts the usual 3,000-step away).
+  - Supply drop: 2-3 things (D.LOOT.routedrop) straight to the stash. Last row's Big cache: 3-4 incl. meds, a chance at a
+    blueprint / decor / cosmetic (D.LOOT.routecache), weapon quality base 2.0.
+  - Event (no repeats in a map): A survivor asks for food (give 1 food -> 15-25 caps + 6 xp at your next stop / walk on),
+    open car (60% two car-table finds, else -12 HP bite, can infect, one find), gunshots (55% ammo x2 + maybe a bandage,
+    else -15 HP), chained clinic (lockpick: meds + bandage, 20% antibiotics; crowbar/pry bar: same, 50% -10 HP bite), rain
+    barrel (+30 thirst, 25% -8 HP), stray dog (share 1 food: two car-table finds + 8 xp). Outcomes are seeded per stop, so
+    reloading does not reroll them. HP from events never goes below 10. Options needing an item are greyed out without it.
+- Moving: every 1,500 EFFECTIVE steps today (phone/watch + typed at half: game.js effective(), what scouting uses) opens the
+  next row; Isabel's trusted typed steps count as phone like everywhere else. She picks one stop per row, joined to her last
+  pick (row 1: either), in order. A reached row can be picked any time that day; at midnight the map is replaced. Late steps
+  for yesterday (addLateSteps) do not touch the route. Rows open at 1.5k, 3k, 4.5k ... (last row at 9k / 10.5k / 12k).
+- The rule with scouting (houses per day unchanged): a pick never adds a house. Every pick, of any kind, trades in one of
+  today's scouted houses - the NEWEST one she has not touched (status new, no run, not quest / landmark / daily / route);
+  the details sheet names it before she confirms. A house stop puts its building in that slot (id 'rt…', h.route = kind,
+  "route" / "★ elite · jackpot inside" tag on the list). If she already went into all of today's houses, the pick is owed:
+  the next house walking scouts is skipped instead (route.debt, at most 1 owed; picking again waits until it is paid; an
+  unpaid one carries to tomorrow's first house). Invariant tested: today's houses + non-house stops = scouted + owed.
+  houses >= rows reached at every step count (1.5k: 2 vs 1 ... 12k: 8 vs 8), so normally nothing is ever owed.
+- UI: header card (stops picked, "Next stop in N steps" + bar, or "Pick your next stop"), the map in its own scroll box
+  (opens scrolled to her next row): final row at the top under "THE END OF THE LINE", start (tent) at the bottom. Spooky
+  flat: plum/ink stops with the house-list type icons (TYPEICON via Game.ui.typeInner) and new glyphs (safehouse, Dot's cart,
+  parachute crate, cache chest, "?"), ☣ badge, gold ring + crown for elite, green check on picked stops, dashed paths
+  (orange when taken, animated cream when open), reachable stops pulse, an orange YOU pin, and a step progress line on the
+  left with a tick per row. Tap a stop: details (house: type, address, danger, zombies, locks, keys, specials), what it
+  replaces, "Go this way". Reduced motion turns the animations off.
+- Save: SV.route = { ver, day, R, start, rows, picks, debt, paid, later, view, log } (~2 KB). Old saves: made on first look.
+  devNewDay gives a new map (SV.routeDev salts the seed). Hooks in game.js marked "0.21 route:" (scout debt, renderHouses
+  toggle + tag, loot() elite plant, Game.routeApi, Game.ui.typeInner, devNewDay, How to play "Daily route").
 
 ## Done in 0.19.1 (owner: "make it highlighted when we open a cabinet and it should say quest item")
 - Game.questNeeds(): items active quests still need (supply runs, Dot's lockbox, the event job's gives). On the loot sheet those
