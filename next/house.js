@@ -181,6 +181,9 @@
       if (E) rects.push({ x: cx, y: gy0, w: T / 2, h: WT, k: 'e' });
       if (N) rects.push({ x: cx - WT / 2, y: y * T, w: WT, h: T - WT, k: 'n' });
       wallRects[y * MW + x].push(...rects);
+      // 0.9: an east-west wall blocks over its whole cell - its face is drawn over all of it, so she used
+      // to walk right into the wall picture from the room above it. Only collision changes, not the drawing.
+      if (W || E) wallRects[y * MW + x].push({ x: W ? x * T : cx - WT / 2, y: y * T, w: (E ? (x + 1) * T : cx + WT / 2) - (W ? x * T : cx - WT / 2), h: T - WT, k: 'b' });
       const cell = { x, y, rects, key: gy1, cut: 1, W, E, N, S };
       if (!S && !isVoid(x, y + 1)) {
         cell.face = { x0: W ? x * T : cx - WT / 2, x1: E ? (x + 1) * T : cx + WT / 2, room: roomAt(x, y + 1) || 'h', decor: L.decor[x + ',' + y] };
@@ -205,7 +208,10 @@
     G.fieldCell = -1;
   }
   // 0.8: what she bumps into is the drawn base of the piece, a little inset, so she can squeeze past corners
-  function collRect(f) { const s = (f.slide || 0) * T; return { x: f.x + 4 + s, y: f.y + 3, w: f.w - 8, h: f.h - 8 }; }
+  // 0.9: low, deep pieces (beds, cots, tables, tubs, the car) are drawn starting well below their tile's top
+  // edge, and that strip looked like floor but was solid. Now she bumps into the drawn top edge instead.
+  const collTop = f => Math.max(3, Math.min(f.h - 14, ART.geo(f).ty0 - f.y + 6));
+  function collRect(f) { const s = (f.slide || 0) * T, t = f.cTop == null ? (f.cTop = collTop(f)) : f.cTop; return { x: f.x + 4 + s, y: f.y + t, w: f.w - 8, h: f.h - 5 - t }; }
   function furnRect(f) { const s = (f.slide || 0) * T; return { x: f.x + 2 + s, y: f.y, w: f.w - 4, h: f.h - 5 }; }
   function overlapsSolid(e, x, y) {
     const x0 = x - e.hw, x1 = x + e.hw, y0 = y - e.hh, y1 = y + e.hh;
@@ -226,13 +232,20 @@
     let hit = false;
     if (dx) {
       const nx = e.x + dx; const r = overlapsSolid(e, nx, e.y);
-      if (!r) e.x = nx; else { hit = true; if (!r.edge) e.x = dx > 0 ? Math.min(nx, r.x - e.hw - .01) : Math.max(nx, r.x + r.w + e.hw + .01); if (overlapsSolid(e, e.x, e.y)) e.x -= dx > 0 ? Math.max(0, e.x - (nx - dx)) : Math.min(0, e.x - (nx - dx)); }
+      if (!r) e.x = nx; else { hit = true; if (!r.edge) e.x = dx > 0 ? Math.min(nx, r.x - e.hw - .01) : Math.max(nx, r.x + r.w + e.hw + .01); if (overlapsSolid(e, e.x, e.y)) e.x -= dx > 0 ? Math.max(0, e.x - (nx - dx)) : Math.min(0, e.x - (nx - dx));  if (!r.edge && Math.abs(dy) < Math.abs(dx) * .6) nudge(e, r, 'y', Math.abs(dx)); }
     }
     if (dy) {
       const ny = e.y + dy; const r = overlapsSolid(e, e.x, ny);
-      if (!r) e.y = ny; else { hit = true; if (!r.edge) e.y = dy > 0 ? Math.min(ny, r.y - e.hh - .01) : Math.max(ny, r.y + r.h + e.hh + .01); if (overlapsSolid(e, e.x, e.y)) e.y = ny - dy; }
+      if (!r) e.y = ny; else { hit = true; if (!r.edge) e.y = dy > 0 ? Math.min(ny, r.y - e.hh - .01) : Math.max(ny, r.y + r.h + e.hh + .01); if (overlapsSolid(e, e.x, e.y)) e.y = ny - dy; if (!r.edge && Math.abs(dx) < Math.abs(dy) * .6) nudge(e, r, 'x', Math.abs(dy)); }
     }
     return hit;
+  }
+  // 0.9: clipping a corner by a few pixels slides her round it (doorways, furniture ends) instead of stopping dead
+  function nudge(e, r, ax, spd) {
+    const lo = ax === 'x' ? (e.x + e.hw) - r.x : (e.y + e.hh) - r.y, hi = ax === 'x' ? (r.x + r.w) - (e.x - e.hw) : (r.y + r.h) - (e.y - e.hh);
+    const d = lo < hi ? -lo : hi; if (Math.abs(d) > 12) return;
+    const st = Math.sign(d) * Math.min(Math.abs(d) + .02, Math.max(.6, spd));
+    if (ax === 'x') { if (!overlapsSolid(e, e.x + st, e.y)) e.x += st; } else if (!overlapsSolid(e, e.x, e.y + st)) e.y += st;
   }
   function cellOf(e) {
     let cx = Math.floor(e.x / T), cy = Math.floor(e.y / T);
@@ -963,7 +976,12 @@
       if (!rm && isWall(x, y)) rm = roomAt(x, y - 1) || roomAt(x - 1, y) || roomAt(x + 1, y) || roomAt(x, y + 1);
       if (ch(x, y) === '=') rm = roomAt(x, y + 1);
       if (isWall(x, y) && isVoid(x, y + 1) && y < L.streetY) rm = null; // pockets: nothing below their south wall
-      if (rm) ART.drawFloorTile(c, styleOf(rm), x, y, T);
+      if (!rm) continue;
+      // 0.9: under an outside wall, only the inner half gets floor - no strip of floor outside the house
+      const vw = isWall(x, y) && isVoid(x - 1, y), ve = isWall(x, y) && isVoid(x + 1, y);
+      if (vw || ve) { c.save(); c.beginPath(); const x0 = vw ? x * T + T / 2 - WT / 2 : x * T, x1 = ve ? x * T + T / 2 + WT / 2 : (x + 1) * T; c.rect(x0, y * T, x1 - x0, T); c.clip(); }
+      ART.drawFloorTile(c, styleOf(rm), x, y, T);
+      if (vw || ve) c.restore();
     }
     // street + curb
     const sy = L.streetY;
