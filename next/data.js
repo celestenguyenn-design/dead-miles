@@ -276,6 +276,22 @@ window.DM = window.DM || {};
   D.LOOT.giftbox = [[2, 3], { candy: 3, snack: 2, meds: 1.2, battery: 1, ammo: 1, lockpick: 1, 'decor_*': .8, d_lights: .6, 'bp_*': .35, 'cos_*': .25 }];
   // the Black Friday horde crate: more, better, and a taste of the holiday
   D.LOOT.hordecrate_bf = [[5, 6], { 'decor_*': 1, 'seed_*': 1, ammo: 2, meds: 2.5, bandage: 2, scrap: 1.5, nails: 1.5, wood: 1.5, tape: 1, battery: 1, 'bp_*': 1.2, 'cosH_*': .7, turkey: .5, pie: 1.5, cranberry: 1, lockset: .3, backpack: .15 }, ['meds']];
+  // 0.10: the one guaranteed prize in a key-locked room / car trunk (gen.js jackpots). Each entry: [weight, items].
+  D.JACK = {
+    gun: [[3, ['ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo']], [2, ['machete']], [2, ['spikedbat']], [1, ['axe']], [2, ['cosP_*']], [1, ['lockset']]],
+    meds: [[3, ['meds', 'meds', 'meds', 'bandage', 'bandage']], [2, ['bp_*']], [1, ['backpack']], [1, ['packplus']]],
+    safe: [[3, ['jewelry', 'jewelry', 'watch']], [2, ['cosM_*']], [2, ['decor_*']], [2, ['bp_*']], [1, ['backpack']]],
+    stash: [[2, ['bp_*']], [2, ['cos_*']], [2, ['decor_*']], [1, ['backpack']], [2, ['packplus']], [1, ['machete']], [1, ['lockset']], [1, ['watch', 'jewelry']]],
+    trunk: [[2, ['machete']], [1, ['axe']], [2, ['crowbar']], [2, ['prybar']], [1, ['spikedbat']], [2, ['ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo']], [1, ['lockset']], [2, ['cos_*']]]
+  };
+  D.rollJack = function (theme, rnd = Math.random) {
+    const opts = D.JACK[theme]; if (!opts) return [];
+    let v = rnd() * opts.reduce((a, o) => a + o[0], 0), items = opts[0][1];
+    for (const o of opts) { v -= o[0]; if (v <= 0) { items = o[1]; break; } }
+    return items.map(k => k === 'bp_*' ? (b => b[Math.floor(rnd() * b.length)])(Object.keys(D.ITEMS).filter(x => x.startsWith('bp_')))
+      : k === 'decor_*' ? (b => b[Math.floor(rnd() * b.length)])(Object.keys(D.DECOR))
+      : D.COS_POOL[k] ? D.pickCos(D.COS_POOL[k], rnd) : k);
+  };
   D.rollLoot = function (key, rnd = Math.random) {
     const [[a, b], tab, guaranteed] = D.LOOT[key];
     const out = guaranteed ? guaranteed.slice() : [];
