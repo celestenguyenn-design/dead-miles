@@ -583,6 +583,12 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   Costs (before the 0.14.1 x2): 1,500 / 3,000 / 6,000 build steps + wood/nails, scrap/nails/tape. Not a horde target.
 - Gear tab: Discard (or "Discard all N") on backpack and stash items, tap twice; quest items can't be discarded.
 
+## Done in 0.24.6 (owner: a player typed 3k steps, sold to Dot, typed 3k again ... in a loop)
+- Dot: at most 3 visits a day (trader.vday / trader.vn; a visit = shop opened or junk sold, as before), the same rule for
+  everyone - typed steps are NOT treated differently (only one player types; a typed-only rule would just punish her).
+  After the 3rd she is "closed for today". A Dot stop on the daily route still opens her and gives one extra visit
+  (Game.dotBonus). Rejected: back at midnight (free daily visit), typed steps at half for Dot (unfair to the one typer).
+
 ## NEXT UP (handoff for a new chat, written 2026-11-14)
 ### 1. Real-world map still times out on the owner's phone ("The map servers are busy - timed out")
 - Measured from the dev container against real Overpass (Bed-Stuy square 40.6796,-73.9444,40.6864,-73.9376):
