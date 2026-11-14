@@ -22,10 +22,10 @@
 (() => {
   const $ = s => document.querySelector(s);
   const hasArt = () => typeof ART !== 'undefined' && ART.rigs;
-  const MIRRORS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+  const MIRRORS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];   // 0.19.2: four, raced (hedged)
   const CLAIM_M = 35, MAX_ACC = 60, VEHICLE_MS = 9, SETTLE_MS = 45000, FAST_HITS = 3;
   const CELL = 0.006, PAD = 0.0004, CACHE_V = 2, CACHE_DAYS = 14, MAX_CELLS = 30, HOUSES_SHOWN = 45, HOUSE_BADGES = 24;
-  const ASK_MS = 22000, INTRO_KEY = 'dm-next-mapintro';
+  const ASK_MS = 20000, HEDGE_MS = 3500, INTRO_KEY = 'dm-next-mapintro';
   const ZMIN = 0.7, ZMAX = 5, ZDEF = 2.1;   // css px per metre
   const C = {
     INK: '#11142f', PLUM: '#3d2d61', ORA: '#f07b3c', CRM: '#f6e3bb', WALL: '#2a1f4a', LIL: '#5a4a86', LILD: '#4a3c70', MUTE: '#9d90bf', GRN: '#93a86c',
@@ -145,18 +145,34 @@ way[building]->.b;.b out skel geom qt;
 (way[leisure~"^(park|playground|garden|pitch|dog_park|nature_reserve)$"];way[landuse~"^(grass|recreation_ground|cemetery|forest|meadow|village_green)$"];way[natural~"^(water|wood|scrub)$"];way[waterway=riverbank];rel[leisure=park];rel[natural~"^(water|wood)$"];rel[landuse~"^(cemetery|forest|grass|recreation_ground)$"];);out tags geom qt;
 (${POIQ}way.b[building~${HOUSEQ}];);out tags center qt;`;
   const qLite = bb => `[out:json][timeout:25][bbox:${bb}];(${POIQ}way[building~${HOUSEQ}];);out tags center 600;`;
-  async function ask(q) {
-    let err = 'no answer';
-    for (const url of MIRRORS) {
-      try {
-        const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, t = ctl && setTimeout(() => ctl.abort(), ASK_MS);
-        const r = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl ? ctl.signal : undefined });
-        if (!r.ok) { if (t) clearTimeout(t); err = 'server said ' + r.status; continue; }
-        const j = await r.json(); if (t) clearTimeout(t);
-        return { ok: true, els: (j && j.elements) || [] };
-      } catch (e) { err = e && e.name === 'AbortError' ? 'timed out' : 'offline?'; }
-    }
-    return { ok: false, els: [], err };
+  // 0.19.2: one big query per square timed out on dense Brooklyn blocks ("the map servers are busy"). Now three small ones:
+  // places first (landmarks work at once), then streets + parks, then building footprints in four quarters.
+  const ROADQ = qFull('X').split('\n')[1], AREAQ = qFull('X').split('\n')[3];
+  const qPlaces = bb => `[out:json][timeout:20][bbox:${bb}];(${POIQ}way[building~${HOUSEQ}];);out tags center 800;`;
+  const qStreets = bb => `[out:json][timeout:20][bbox:${bb}];\n${ROADQ}\n${AREAQ}`;
+  const qBuild = bb => `[out:json][timeout:20][bbox:${bb}];way[building];out skel geom qt;`;
+  const quarters = bb => { const [s, w, n, e] = bb.split(',').map(Number), my = (s + n) / 2, mx = (w + e) / 2;
+    return [[s, w, my, mx], [s, mx, my, e], [my, w, n, mx], [my, mx, n, e]].map(q => q.map(v => v.toFixed(5)).join(',')); };
+  // 0.19.2: hedged: ask the first mirror, and if it has not answered in 3.5 s (or fails) ask the next too; the first good
+  // answer wins and the others are cancelled. Gives up after 20 s per question. The mirror that answered goes first next time.
+  let fastest = 0;
+  function ask(q) {
+    return new Promise(done => {
+      const order = MIRRORS.map((_, i) => (i + fastest) % MIRRORS.length), ctls = [];
+      let finished = false, pending = 0, next = 0, err = 'no answer', hedgeT = null;
+      const finish = res => { if (finished) return; finished = true; clearTimeout(hedgeT); clearTimeout(allT); for (const c of ctls) try { c.abort(); } catch (e) { /* ignore */ } done(res); };
+      const allT = setTimeout(() => finish({ ok: false, els: [], err: 'timed out' }), ASK_MS);
+      const launch = () => {
+        if (finished || next >= order.length) return;
+        const mi = order[next++], ctl = typeof AbortController !== 'undefined' ? new AbortController() : null; if (ctl) ctls.push(ctl);
+        pending++; clearTimeout(hedgeT); hedgeT = setTimeout(launch, HEDGE_MS);
+        fetch(MIRRORS[mi], { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl ? ctl.signal : undefined })
+          .then(r => { if (!r.ok) throw new Error('server said ' + r.status); return r.json(); })
+          .then(j => { if (j && j.remark && /timed out|runtime error/i.test(j.remark) && !(j.elements || []).length) throw new Error('timed out'); fastest = mi; finish({ ok: true, els: (j && j.elements) || [] }); })
+          .catch(e => { if (finished) return; err = e && e.name === 'AbortError' ? 'timed out' : (e && e.message) || 'offline?'; pending--; if (next < order.length) launch(); else if (!pending) finish({ ok: false, els: [], err }); });
+      };
+      launch();
+    });
   }
   const RC = { motorway: 0, trunk: 0, primary: 0, motorway_link: 1, trunk_link: 1, primary_link: 1, secondary: 1, secondary_link: 1, tertiary: 1, tertiary_link: 1,
     residential: 2, unclassified: 2, living_street: 2, service: 3, pedestrian: 4, footway: 5, path: 5, cycleway: 5, steps: 5, track: 5 };
@@ -326,12 +342,18 @@ way[building]->.b;.b out skel geom qt;
     const [cy, cx] = k.split(':').map(Number), bb = bboxOf(cy, cx);
     if (typeof navigator.onLine === 'boolean' && !navigator.onLine) { M.offline = true; M.cells[k] = 'fail'; netTrouble('offline'); return; }
     M.busy = true; M.cells[k] = 'busy'; scoutPill();
-    let a = await ask(qFull(bb)), full = true;
-    if (!a.ok) { const b = await ask(qLite(bb)); if (b.ok) { a = b; full = false; } else a.err = a.err || b.err; }
+    // 0.19.2: staged - places, then streets, then buildings by quarter; each stage shows up as soon as it arrives
+    const els = []; let full = true, firstErr = '';
+    const stage = async q => { const a = await ask(q); if (a.ok) { for (const e of a.els) els.push(e); return true; } firstErr = firstErr || a.err; full = false; return false; };
+    const pl = await stage(qPlaces(bb));
+    if (pl) ingest(encode(cy, cx, els, false));
+    const st = await stage(qStreets(bb));
+    if (st) { ingest(encode(cy, cx, els, false)); afterData(); }
+    if (st) for (const qb of quarters(bb)) { if (await stage(qBuild(qb))) ingest(encode(cy, cx, els, false)); }
     M.busy = false;
-    if (!a.ok) { M.cells[k] = 'fail'; M.fails++; netTrouble(a.err); pump(); return; }
+    if (!pl && !st) { M.cells[k] = 'fail'; M.fails++; netTrouble(firstErr); pump(); return; }
     M.fails = 0; M.offline = false;
-    const rec = encode(cy, cx, a.els, full);
+    const rec = encode(cy, cx, els, full);
     // the cache stays on this phone (public map data); it never goes into the save
     idb('cells', 'readwrite', s => s.put(rec)).then(() => touchCell(k));
     ingest(rec); M.cells[k] = full ? 'ok' : 'part';
