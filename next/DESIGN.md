@@ -232,6 +232,28 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 ## Done in 0.13.1 (owner: "so many of them but we barely need it")
 - Food/drink finds cut ~60% (rowhouse ~7 -> ~3 per house, bodega ~16 -> ~9): kitchens give 0-2 items with non-food mixed in,
   snack weights elsewhere lowered. Drain up: 60 hunger / 85 thirst per day (was 45/70), run cap 8 (was 5).
+## Done in 0.14 (floor plans, owner: "The layouts all look the same. It'll get boring quick.")
+- Generator v4 (GV 4, unstarted houses upgrade; a house with a run in progress keeps its layout). gen.js plan4 picks one of
+  several believable floor plans per building type, then mirrors it half the time:
+  - Rowhouses: side hall (kitchen band at the back, or not), centre hall, railroad (walk-through rooms, small rooms off
+    the side), open plan (kitchen + living in one front room, with a cross hall, side hall or rooms straight off it),
+    L-shaped hall, living room at the front with the hall behind. Sometimes a front porch and/or a back strip
+    (sunroom, laundry, pantry...).
+  - Apartments: studio (with or without an entry hall), corridor, walk into the living room, 2-bed with open kitchen,
+    galley kitchen.
+  - Shops: back rooms off a side hall, off a back corridor, straight off the shop floor, or a corner nook in the shop.
+  - School / police: centre spine, cross corridor, twin side halls.
+  - Mansion: central hall, foyer + gallery + two wings, grand foyer with rooms off it, rooms around a courtyard.
+- Rooms are assigned by size and number of doors (baths, closets, pantries never walk-through). New optional rooms
+  reuse existing art and loot tables: Kitchen & living, Studio, Front porch, Mudroom, Pantry, Laundry room, Kids' room,
+  Half bath, Den, Sunroom, Courtyard. Furniture comes in a seeded order with a few optional extras, and about a third of
+  rooms put their wall pieces along any wall, so the same room kind is not furnished the same way.
+- Same 0.9 guarantees (all checked again: 301 houses, nothing unreachable, nothing standing inside solids). Generator
+  v1-3 output is byte-identical. Random rolls are never made inside a sort (engines sort differently).
+
+## Done in 0.14.1 (owner: "I was able to build like 4 things today with just my 4k steps")
+- Base build steps fill at 50% of steps walked and every piece costs 2x the steps (so ~4x the walking per piece).
+  Walls tier 1 = 6,000 build steps (~12k walked), generator 16,000 (~32k walked). Materials unchanged. Existing pools kept.
 
 ## Done in 0.15 (raiders, a tidier Gear tab, item kinds, Dot moves on)
 - Raiders (raiders.js; owner: "other survivors coming to raid the house we're in and we have to fight them. Rare of course").
