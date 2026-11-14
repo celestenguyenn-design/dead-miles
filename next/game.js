@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.9';
+const NEXT_VERSION = '0.10';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -57,6 +57,7 @@ const NEXT_VERSION = '0.9';
     v.tips = v.tips || {};                  // phase 5: first-time tips already shown
     if (v.survivor) migrateCos(v.survivor);
     if (v.survivor) migrateQuiver(v.survivor);
+    if (v.survivor) migrateKeys(v.survivor);
     if (v.survivor) DM.Food.norm(v.survivor);   // 0.8: hunger + thirst (older saves start at 80/80, draining from now)
     DM.Crew.norm(v);                        // phase 5b: crew + strays (SV.crew, SV.pets)
     DM.Boss.norm(v);                        // phase 5b: the weekly boss (SV.boss)
@@ -81,6 +82,11 @@ const NEXT_VERSION = '0.9';
   function migrateQuiver(s) {
     const q = s.quiver = s.quiver && typeof s.quiver === 'object' ? s.quiver : { n: 0 }; q.n = Math.max(0, Math.min(D.QUIVER, +q.n || 0));
     for (let i = s.pack.length - 1; i >= 0 && q.n < D.QUIVER; i--) if (s.pack[i].k === 'arrow') { const t = Math.min(s.pack[i].n, D.QUIVER - q.n); q.n += t; s.pack[i].n -= t; if (!s.pack[i].n) s.pack.splice(i, 1); }
+  }
+  // 0.10: the keyring. Brass keys in the pack or stash move onto it; it has no limit, no slot, and is never spilled.
+  function migrateKeys(s) {
+    s.keys = Math.max(0, +s.keys || 0);
+    for (const list of [s.pack || [], s.stash || []]) for (let i = list.length - 1; i >= 0; i--) if (list[i].k === 'key') { s.keys += list[i].n; list.splice(i, 1); }
   }
   function toQuiver(n) { const q = SV.survivor.quiver = SV.survivor.quiver || { n: 0 }, t = Math.max(0, Math.min(n, D.QUIVER - q.n)); q.n += t; return t; }
   const cosQueue = [];   // unlock popups waiting to be shown
@@ -206,7 +212,7 @@ const NEXT_VERSION = '0.9';
     SV.houses.push({ id: 'h' + seq, type, seed, gv: GV, day: day || SV.day.key, status: 'new', address: L.address, danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies });
   }
   const cache = new Map();
-  const GV = 2;   // 0.9: generator version for newly scouted houses (older houses keep the layout they were scouted with)
+  const GV = 3;   // 0.10: rarer key spots with prizes. 0.9: generator version for newly scouted houses (older houses keep the layout they were scouted with)
   Game.GV = GV;
   function layoutOf(h) {
     const k = h.type + ':' + h.seed + ':' + (h.gv || 1);
@@ -328,16 +334,18 @@ const NEXT_VERSION = '0.9';
   // ---------------------------------------------------------------- trader: Auntie Dot, quests, shop, crafting
   const traderLevel = () => Math.min(5, 1 + Math.floor((SV.trader.completed || 0) / 20));
   const questById = id => SV.trader.active.find(q => q.id === id) || null;
-  const countItem = k => SV.survivor.pack.concat(SV.survivor.stash).filter(e => e.k === k).reduce((a, e) => a + e.n, 0) + (k === 'arrow' && SV.survivor.quiver ? SV.survivor.quiver.n : 0);
+  const countItem = k => SV.survivor.pack.concat(SV.survivor.stash).filter(e => e.k === k).reduce((a, e) => a + e.n, 0) + (k === 'arrow' && SV.survivor.quiver ? SV.survivor.quiver.n : 0) + (k === 'key' ? +SV.survivor.keys || 0 : 0);
   function takeItems(k, n) { // stash first, then pack; returns removed entries (weapons keep durability)
     const out = [];
     for (const list of [SV.survivor.stash, SV.survivor.pack]) for (let i = list.length - 1; i >= 0 && n > 0; i--) if (list[i].k === k) { const t = Math.min(n, list[i].n); list[i].n -= t; n -= t; out.push({ k, n: t, d: list[i].d }); if (!list[i].n) list.splice(i, 1); }
     if (k === 'arrow' && n > 0 && SV.survivor.quiver) { const t = Math.min(n, SV.survivor.quiver.n); SV.survivor.quiver.n -= t; if (t) out.push({ k, n: t }); }
+    if (k === 'key' && n > 0 && SV.survivor.keys > 0) { const t = Math.min(n, SV.survivor.keys); SV.survivor.keys -= t; out.push({ k, n: t }); }
     return out;
   }
   function give(k, n, d) { // into the pack if it fits, the rest to the stash; returns what did not fit anywhere
     if (D.ITEMS[k] && D.ITEMS[k].cos) { Game.unlockCos(k); return 0; }
     if (k === 'arrow') { n -= toQuiver(n); if (!n) return 0; }   // arrows: the quiver first
+    if (k === 'key') { SV.survivor.keys = (+SV.survivor.keys || 0) + n; return 0; }   // keys: the keyring
     let got = addTo(SV.survivor.pack, packSlots(), k, n, d); if (got < n) got += addTo(SV.survivor.stash, STASH_SLOTS, k, n - got, d);
     return n - got;
   }
@@ -345,7 +353,7 @@ const NEXT_VERSION = '0.9';
     const pk = SV.survivor.pack.map(e => Object.assign({}, e)), st = SV.survivor.stash.map(e => Object.assign({}, e));
     for (let [k, n] of remove) for (const list of [st, pk]) for (let i = list.length - 1; i >= 0 && n > 0; i--) if (list[i].k === k) { const t = Math.min(n, list[i].n); list[i].n -= t; n -= t; if (!list[i].n) list.splice(i, 1); }
     let qroom = Math.max(0, D.QUIVER - ((SV.survivor.quiver || {}).n || 0));
-    for (let [k, n] of items) { if (k === 'arrow') { const t = Math.min(n, qroom); qroom -= t; n -= t; if (!n) continue; } let got = addTo(pk, packSlots(), k, n, D.isWeapon(k) ? 1 : undefined); if (got < n) got += addTo(st, STASH_SLOTS, k, n - got, D.isWeapon(k) ? 1 : undefined); if (got < n) return false; }
+    for (let [k, n] of items) { if (k === 'key') continue; if (k === 'arrow') { const t = Math.min(n, qroom); qroom -= t; n -= t; if (!n) continue; } let got = addTo(pk, packSlots(), k, n, D.isWeapon(k) ? 1 : undefined); if (got < n) got += addTo(st, STASH_SLOTS, k, n - got, D.isWeapon(k) ? 1 : undefined); if (got < n) return false; }
     return true;
   }
   Game.canGive = canGive;
@@ -635,7 +643,7 @@ const NEXT_VERSION = '0.9';
     if (it.slots) return `Fit it to your pack: +${it.slots} pack slots for good`;
     if (it.hp || it.sta || it.hu || it.th) return [DM.Food.label(k), it.hp ? `heals ${it.hp} HP` : '', it.sta ? `+${it.sta} stamina` : ''].filter(Boolean).join(' · ').replace(/^./, c => c.toUpperCase());
     return { lockpick: 'Opens locks silently with the lockpick mini-game. Snaps if you force it.', arrow: 'Ammo for the hunting bow. You can pick most of them back up.', shoes: 'Wear them: your footsteps make 30% less noise.',
-      lockset: 'Keep it in your kit: locks feel easier (wider sweet spot, picks last longer).', key: 'Brass key - opens a locked car or a key-locked room. Used up. Carry it in your pack.', prybar: 'A quiet way to pry things open; also a weapon.' }[k] || '';
+      lockset: 'Keep it in your kit: locks feel easier (wider sweet spot, picks last longer).', key: 'Brass key - opens a locked car or a key-locked room. Used up. Lives on your keyring: no pack slot, never lost.', prybar: 'A quiet way to pry things open; also a weapon.' }[k] || '';
   }
   let benchSel = null;
   function benchRows(keys, known) {
@@ -1075,7 +1083,7 @@ const NEXT_VERSION = '0.9';
       const tags = [h.nLocks ? `${h.nLocks} lock${h.nLocks > 1 ? 's' : ''}` : 'no locks', `${h.nZombies} zombie${h.nZombies === 1 ? '' : 's'}`];
       const bs = !done && !far ? EVS.bossFor(layoutOf(h)) : null;   // event mini-boss: scouts spot it from the street
       if (bs) tags.push(`<b class="evtag">${esc(bs.name.toLowerCase())} · ${bs.where}</b>`);
-      if (!done && !far && h.type !== 'tutorial') { const HL = layoutOf(h); if (HL.car) tags.push('parked car'); if (HL.keyRoom) tags.push('key-locked room'); }   // 0.8: brass-key spots
+      if (!done && !far && h.type !== 'tutorial') { const HL = layoutOf(h); if (HL.car) tags.push('<b class="keytag">🔑 locked car</b>'); if (HL.keyRoom) tags.push('<b class="keytag">🔑 locked room</b>'); }   // 0.8: brass-key spots
       return `<div class="hcard${done ? ' done' : ''}${h.type === 'tutorial' ? ' tut' : ''}${q ? ' quest' : ''}">
         ${typeIcon(h.type)}
         <div class="hinfo"><div class="hname">${T.n} <em>${T.size}</em>${h.landmark ? ` <em class="first lmk">${PIN}landmark</em>` : ''}${h.type === 'tutorial' ? ' <em class="first">first house</em>' : ''}${q ? ` <em class="first">quest: ${D.QUESTS[q.type].n.toLowerCase()}</em>` : ''}</div>
@@ -1202,6 +1210,7 @@ const NEXT_VERSION = '0.9';
         <div class="eqslot"><i class="eqk">Backpack</i>${s.packBonus ? icon(s.packBonus >= 4 ? 'backpack' : 'packplus') : `<img class="dim" alt="" src="${ART.iconURL.backpack}">`}<b>${packSlots()} slots</b><span>${s.packBonus ? `+${s.packBonus} from upgrades` : 'No upgrade yet'}</span></div>
         <button class="eqslot cos" id="eqWard"><i class="eqk">Cosmetics</i><span class="eqcos">${worn.length ? worn.slice(0, 4).map(c => `<img alt="" src="${ART.iconURL['cos_' + c]}">`).join('') : '<img alt="" src="' + ART.iconURL.cosS_beanie + '">'}</span><b>Wardrobe →</b><span>${worn.length ? worn.length + ' worn' : 'Nothing worn'}${newCos() ? ` · <em class="newtxt">${newCos()} new</em>` : ''}</span></button>
       </div>
+      <div class="eqgear">🔑 Keyring: <b>${+s.keys || 0} brass key${(+s.keys || 0) === 1 ? '' : 's'}</b> · always with you, no pack slot</div>
       ${gear.length ? `<div class="eqgear">Also wearing: ${gear.join(' · ')}</div>` : ''}${A('hands')}${A('quiver')}
       <div class="kick sect">Backpack · ${s.pack.length}/${packSlots()}</div>
       <div class="grid g4">${s.pack.map((e, i) => slot(e, 'pack', i)).join('')}${empty(packSlots() - s.pack.length)}</div>
@@ -1299,7 +1308,7 @@ const NEXT_VERSION = '0.9';
   const HOWTO = [
     ['Steps & houses', 'All your daily steps count. About every 1,000 steps scouts another house (up to 10 a day; the more you walk, the better the odds of big places like police stations and mansions). Houses wait 3 days. Loot one yourself, or send your Crew - they bring back less and never find secrets.'],
     ['Looting', 'Walk with the joystick (drag anywhere). Stand by furniture and tap the magnifier to search. Searching makes noise. Your pack has 12 slots; things stack. Leave by the front door - anything you dropped stays behind. Your Scavenging level makes searches faster and luckier.'],
-    ['Locks & secrets', 'Locked doors, safes and cages hold the best loot. Lockpicks are silent but snap; a crowbar always works but is loud. Brass keys open the two locks nothing else can: a parked car outside some houses (glove box + trunk) and a key-locked room with a keyhole sign on its door (better loot inside). Carry the key in your pack; it is used up. After you search most of a house, hidden spots can open: a loose floorboard under a rug, a sliding bookshelf, an attic hatch (needs a hook pole), a cracked wall panel. Torn notes give hints.'],
+    ['Locks & secrets', 'Locked doors, safes and cages hold the best loot. Lockpicks are silent but snap; a crowbar always works but is loud. Brass keys open the two locks nothing else can: a locked car outside a few houses (one key opens the glove box and the trunk, and the trunk always holds something good) and a key-locked room (rare; it always holds a prize that fits the building - a gun cabinet at the police station, the back room at a pharmacy, a safe room in a mansion). Look for the 🔑 tag on the house list. Keys live on your keyring (no pack slot, never lost) and are used up. Some locked rooms hide their key somewhere else in the same house. After you search most of a house, hidden spots can open: a loose floorboard under a rug, a sliding bookshelf, an attic hatch (needs a hook pole), a cracked wall panel. Torn notes give hints.'],
     ['Weapons & equipping', 'The weapon in your hand is what you fight with. At home: Pack & stash > tap a weapon > Equip. In a house: tap the Swap button (bottom right) to pick any weapon in your pack. Weapons wear out - repair them with scrap. Zombies hear noise; you can run (push the stick far) and dodge.'],
     ['Cosmetics & wardrobe', 'Cosmetics are earned: rare finds in houses and on zombies, better in mansions and police stations, plus Dot\'s shop and jobs, horde-night crates and events. They unlock straight into your Wardrobe and never use pack space. Wardrobe (home screen) > tap one to wear it. Spares are sold to Dot automatically.'],
     ['Food & water', 'Two bars under your HP: Hunger (drumstick) and Thirst (droplet). They drain with real time, even while the app is closed - about one meal and two drinks a day - and a little faster during runs (sprinting and fighting most). Tap the bars, or a food in Pack & stash, to eat or drink: beans and pie fill Hunger, water and soda fill Thirst, cranberry sauce and tomatoes a bit of both, coffee gives stamina. Garden crops are food, and a rain barrel at the base gives a drink (+50 thirst). Below 30: Hungry means slower stamina and no overnight healing; Thirsty means slower searches and max stamina 80. At 0 you lose 1 HP an hour, but never below 10 from hunger alone. Above 80 on both: +10% scavenging XP. Your crew eats from the stash separately.'],
