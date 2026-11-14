@@ -529,6 +529,16 @@
   /* weapon chip in runs: it opens the swap list */
   #wpn::after { content: "SWAP"; position: absolute; left: 50%; bottom: -17px; transform: translateX(-50%); font-size: 9px; font-weight: 900; letter-spacing: .14em; color: var(--crm); text-shadow: 0 1px 0 var(--ink), 0 0 3px var(--ink); }
   .slot em.wdmg { background: var(--lild); color: var(--crm); } .slot em.wdmg.up { background: var(--grn); color: var(--ink); } .slot em.wdmg.down { background: #6a3a4a; }
+  /* 0.19: weapon quality tiers - coloured border + stars on weapon cards, the equipped slot, the run's weapon chip */
+  .slot.wq { border-color: var(--qc); } .slot.wq.q1 { border-color: var(--ink); } .slot.wq.q4, .slot.wq.q5 { box-shadow: 0 3px 0 var(--ink), inset 0 0 0 2px var(--qc); }
+  .slot.wq.q5 { background: #4a3a2a; }
+  .slot small.qtag, .eqslot small.qtag, .qtag { font-size: 7.5px; font-weight: 900; letter-spacing: .03em; text-transform: uppercase; color: var(--qc); line-height: 1; margin-top: 1px; white-space: nowrap; }
+  .grid.g5 .slot small.qtag { font-size: 6.4px; letter-spacing: 0; }
+  .slot.wq > span, .eqslot.wq b { color: var(--qc); } .slot.wq.q1 > span, .slot.wq.q2 > span, .eqslot.wq.q2 b { color: inherit; }
+  .eqslot.wq { border-color: var(--qc); } .eqslot small.qtag { font-size: 8px; }
+  #wpn { border-color: var(--qc, var(--plum)); }
+  .gsline .gsn { font-size: 11px; font-weight: 900; color: var(--mute); }
+  .shoprow .qtag { display: inline-block; margin-left: 4px; font-size: 9px; }
   @keyframes pulse { to { filter: brightness(1.35); } }
   @keyframes pop { from { transform: scale(.6); opacity: 0; } }
   @keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
@@ -750,29 +760,29 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.18"></script>
-<script src="art.js?v=0.18"></script>
-<script src="net.js?v=0.18"></script>
-<script src="netpanel.js?v=0.18"></script>
-<script src="syncguide.js?v=0.18"></script>
-<script src="events.js?v=0.18"></script>
-<script src="data.js?v=0.18"></script>
-<script src="food.js?v=0.18"></script>
-<script src="skills.js?v=0.18"></script>
-<script src="infection.js?v=0.18"></script>
-<script src="infected.js?v=0.18"></script>
-<script src="engine.js?v=0.18"></script>
-<script src="music.js?v=0.18"></script>
-<script src="gen.js?v=0.18"></script>
-<script src="raiders.js?v=0.18"></script>
-<script src="house.js?v=0.18"></script>
-<script src="horde.js?v=0.18"></script>
-<script src="base.js?v=0.18"></script>
-<script src="crew.js?v=0.18"></script>
-<script src="boss.js?v=0.18"></script>
-<script src="daily.js?v=0.18"></script>
-<script src="deep.js?v=0.18"></script>
-<script src="game.js?v=0.18"></script>
-<script src="map.js?v=0.18"></script>
+<script src="s2art.js?v=0.19"></script>
+<script src="art.js?v=0.19"></script>
+<script src="net.js?v=0.19"></script>
+<script src="netpanel.js?v=0.19"></script>
+<script src="syncguide.js?v=0.19"></script>
+<script src="events.js?v=0.19"></script>
+<script src="data.js?v=0.19"></script>
+<script src="food.js?v=0.19"></script>
+<script src="skills.js?v=0.19"></script>
+<script src="infection.js?v=0.19"></script>
+<script src="infected.js?v=0.19"></script>
+<script src="engine.js?v=0.19"></script>
+<script src="music.js?v=0.19"></script>
+<script src="gen.js?v=0.19"></script>
+<script src="raiders.js?v=0.19"></script>
+<script src="house.js?v=0.19"></script>
+<script src="horde.js?v=0.19"></script>
+<script src="base.js?v=0.19"></script>
+<script src="crew.js?v=0.19"></script>
+<script src="boss.js?v=0.19"></script>
+<script src="daily.js?v=0.19"></script>
+<script src="deep.js?v=0.19"></script>
+<script src="game.js?v=0.19"></script>
+<script src="map.js?v=0.19"></script>
 </body>
 </html>

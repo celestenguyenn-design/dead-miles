@@ -209,7 +209,8 @@ window.DM = window.DM || {};
     lockpick: 3, gift: 8, candy: 1, cranberry: 3, stuffing: 3, pie: 4, turkey: 20, hat: 0, pole: 2, watch: 25, jewelry: 20, wood: 1, nails: .25, spikedbat: 20, machete: 22, prybar: 14, packplus: 15, backpack: 40, shoes: 10, lockset: 18, note: 0, parcel: 0, antibio: 12 };
   Object.assign(D.VALUE, { seed_tomato: 2, seed_potato: 2, seed_carrot: 2, seed_corn: 3, seed_herbs: 2, tomato: 2, potato: 2, carrot: 2, corn: 2, herbs: 3, coffee: 2 });
   for (const k in D.DECOR) D.VALUE[k] = D.DECOR[k].v;
-  D.valueOf = (k, d) => { if (k.startsWith('bp_')) return 25; let v = D.VALUE[k] || 1; if (d != null && D.ITEMS[k] && D.ITEMS[k].w) v = Math.max(1, Math.round(v * (.3 + .7 * d / D.WEAPONS[D.ITEMS[k].w].dur))); return v; };
+  // 0.19: q = weapon quality (+25% a tier above Worn, -25% for Rusty)
+  D.valueOf = (k, d, q) => { if (k.startsWith('bp_')) return 25; let v = D.VALUE[k] || 1; if (D.ITEMS[k] && D.ITEMS[k].w) { const e = { k, q }; v *= 1 + .25 * (D.qOf(e) - 2); if (d != null) v = Math.max(1, Math.round(v * (.3 + .7 * Math.min(1, d / D.wMax(e))))); } return v; };
   // how many fit in one slot (anything not listed does not stack)
   D.STACK = { gift: 3, candy: 5, seed_tomato: 10, seed_potato: 10, seed_carrot: 10, seed_corn: 10, seed_herbs: 10, tomato: 3, potato: 3, carrot: 3, corn: 3, herbs: 3, wood: 10, nails: 20, lockpick: 5, arrow: 20, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, coffee: 3, bandage: 5, meds: 5, antibio: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
   D.stackMax = k => D.STACK[k] || 1;
@@ -229,12 +230,55 @@ window.DM = window.DM || {};
   };
   D.isWeapon = k => !!(D.ITEMS[k] && D.ITEMS[k].w);
 
+  // ---------------------------------------------------------------- 0.19: weapon quality tiers
+  // A weapon entry is { k, n: 1, d, q }: d = durability left, q = quality 1-5. Each step above Rusty is +8% damage and
+  // +15% max durability (Masterwork: +32% damage, +60% durability). Entries without q (saves from before 0.19) count as Worn.
+  D.QUAL = [null,
+    { n: 'Rusty', c: '#b08a6e' }, { n: 'Worn', c: '#cfc4ec' }, { n: 'Solid', c: '#8fd16a' },
+    { n: 'Fine', c: '#6ab8f5' }, { n: 'Masterwork', c: '#f5c542' }];
+  D.Q_DMG = .08; D.Q_DUR = .15;
+  D.qOf = e => { const q = e && +e.q; return q >= 1 && q <= 5 ? Math.round(q) : 2; };
+  D.qDmgMul = q => 1 + D.Q_DMG * (q - 1);
+  D.qDurMul = q => 1 + D.Q_DUR * (q - 1);
+  D.wOf = e => (e && D.ITEMS[e.k] && D.ITEMS[e.k].w) ? D.WEAPONS[D.ITEMS[e.k].w] : null;
+  D.wMax = e => { const W = D.wOf(e); return W ? Math.round(W.dur * D.qDurMul(D.qOf(e))) : 0; };   // max durability of this weapon
+  D.wDmg = e => { const W = D.wOf(e); return W ? Math.round(W.dmg * D.qDmgMul(D.qOf(e))) : D.WEAPONS.fists.dmg; };   // damage shown on cards
+  D.qStars = q => '★'.repeat(q);
+  D.qName = e => D.QUAL[D.qOf(e)].n;
+  // Roll a quality. base = the place's mean tier (normal houses 1.5, danger 3: 2.1, danger 4+: 2.5, hidden stashes 2.3,
+  // jackpots / special infected / raiders 2.6-2.8, crafting 2-2.8, deep runs / the weekly boss 3.5+); bonus = gamestage
+  // (0-0.4) or anything else on top. Weights fall off as e^(-1.6 x distance from the mean). Masterwork is cut to 1/10
+  // unless base >= 3.5, so it stays a deep-run / boss thing. Deep runs can call D.rollQuality(3.5, bonus, rnd).
+  D.rollQuality = function (base = 1.5, bonus = 0, rnd = Math.random) {
+    const m = Math.max(1, Math.min(5, base + (bonus || 0))), w = [];
+    for (let q = 1; q <= 5; q++) w.push(Math.exp(-1.6 * Math.abs(q - m)) * (q === 5 && base < 3.5 ? .1 : 1));
+    let v = rnd() * w.reduce((a, b) => a + b, 0);
+    for (let q = 1; q <= 5; q++) { v -= w[q - 1]; if (v <= 0) return q; }
+    return 5;
+  };
+  D.qBaseFor = danger => danger >= 4 ? 2.5 : danger >= 3 ? 2.1 : 1.5;
+  // a fresh weapon entry of quality q with durability f (0-1) of its max
+  D.mkWeapon = (k, q, f = 1) => { const e = { k, n: 1, q }; e.d = Math.max(1, Math.round(D.wMax(e) * f)); return e; };
+
+  // ---------------------------------------------------------------- 0.19: gamestage (per player)
+  // gamestage = survivor level + days played / 3 (max +20) + 3 per step of best weapon quality above Worn; 1-60.
+  // Up to gamestage 10 nothing changes (today's game). From 10 to 60 it ramps (t = 0..1):
+  //   zombie HP and hits +0..25%, special-infected share +0..12 points at danger 3-4, from gamestage 25 some specials
+  //   at danger 2 (up to 15% of zombies at 60), weapon quality roll +0..0.4, rare-find chance +0..6%.
+  D.GS_MAX = 60;
+  D.gamestage = (lvl, days, bestQ) => Math.max(1, Math.min(D.GS_MAX, Math.round((lvl || 1) + Math.min(20, (days || 0) / 3) + 3 * Math.max(0, (bestQ || 2) - 2))));
+  D.gsFx = function (gs) {
+    const t = Math.max(0, Math.min(1, ((gs || 0) - 10) / 50)), t2 = Math.max(0, Math.min(1, ((gs || 0) - 25) / 35));
+    return { t, hp: 1 + .25 * t, dmg: 1 + .25 * t, spAdd: .12 * t, sp2: .15 * t2, qBonus: .4 * t, rare: .06 * t };
+  };
+
   // merge rolled item keys into stacks; ammo/arrows come in handfuls; weapons carry durability
-  D.toStacks = function (keys, rnd = Math.random) {
+  // 0.19: qa = { base, bonus } for the weapon quality roll (default: normal house loot, base 1.5, no bonus)
+  D.toStacks = function (keys, rnd = Math.random, qa) {
     const out = [];
     for (const k of keys) {
       const n = k === 'ammo' ? 4 + Math.floor(rnd() * 9) : k === 'arrow' ? 3 + Math.floor(rnd() * 5) : k === 'nails' ? 3 + Math.floor(rnd() * 6) : D.ITEMS[k] && D.ITEMS[k].seed ? 2 + Math.floor(rnd() * 3) : 1;
-      if (D.isWeapon(k)) { const W = D.WEAPONS[D.ITEMS[k].w]; out.push({ k, n: 1, d: Math.round(W.dur * (.45 + rnd() * .5)) }); continue; }
+      if (D.isWeapon(k)) { const f = .45 + rnd() * .5; out.push(D.mkWeapon(k, D.rollQuality(qa ? qa.base : 1.5, qa ? qa.bonus : 0, rnd), f)); continue; }   // 0.19: quality
       const e = out.find(e => e.k === k && D.STACK[k]);
       if (e) e.n += n; else out.push({ k, n });
     }

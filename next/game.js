@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.18';
+const NEXT_VERSION = '0.19';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -58,6 +58,7 @@ const NEXT_VERSION = '0.18';
     if (v.survivor) migrateCos(v.survivor);
     if (v.survivor) migrateQuiver(v.survivor);
     if (v.survivor) migrateKeys(v.survivor);
+    if (v.survivor) migrateQuality(v.survivor, v);   // 0.19: weapon quality + days played for the gamestage
     if (v.survivor && !v.run0111) { dropNotes(v.survivor); v.run0111 = 1; }   // notes carried home before 0.11.1
     if (v.survivor) DM.Food.norm(v.survivor);   // 0.8: hunger + thirst (older saves start at 80/80, draining from now)
     if (v.survivor) DM.Skills.norm(v.survivor); // 0.13: skill points; old Lv 3/6/9 perks stay as free ranks
@@ -90,6 +91,14 @@ const NEXT_VERSION = '0.18';
     s.keys = Math.max(0, +s.keys || 0);
     for (const list of [s.pack || [], s.stash || []]) for (let i = list.length - 1; i >= 0; i--) if (list[i].k === 'key') { s.keys += list[i].n; list.splice(i, 1); }
   }
+  // 0.19: weapons from before quality tiers become Worn (quality 2: +8% damage on what they did before, never less).
+  // Their max durability grows 15%, so durability left grows with it and the bar shows the same %.
+  // The gamestage's "days played" starts at the days since the save was made (capped where it stops counting anyway).
+  function migrateQuality(s, v) {
+    const fix = e => { if (!e || !D.isWeapon(e.k) || e.q != null) return; e.q = 2; if (e.d != null) e.d = Math.max(1, Math.round(e.d * D.qDurMul(2))); };
+    fix(s.hands); for (const list of [s.pack || [], s.stash || []]) list.forEach(fix);
+    if (s.gsDays == null) s.gsDays = Math.min(60, Math.max(0, Math.floor((Date.now() - (+v.created || Date.now())) / 864e5)));
+  }
   function dropNotes(s) { if (!s) return; for (const k of ['pack', 'stash']) if (Array.isArray(s[k])) s[k] = s[k].filter(e => e.k !== 'note'); }
   function toQuiver(n) { const q = SV.survivor.quiver = SV.survivor.quiver || { n: 0 }, t = Math.max(0, Math.min(n, D.QUIVER - q.n)); q.n += t; return t; }
   const cosQueue = [];   // unlock popups waiting to be shown
@@ -109,19 +118,19 @@ const NEXT_VERSION = '0.18';
   function createSurvivor(name, look, job) {
     const J = D.JOBS[job];
     let xp = 0; try { const v = JSON.parse(localStorage.getItem('dm-next-skills') || '{}'); if (v.scav) xp = +v.scav.xp || 0; } catch (e) { /* none */ }
-    const s = { name: name || 'Survivor', look, job, hp: 0, xp, pack: [], stash: [], hands: null, quiver: { n: 0 }, packBonus: 0, known: D.BASIC.concat(job === 'hunter' ? ['arrow'] : []), wardrobe: { own: {}, seen: {} } };
+    const s = { name: name || 'Survivor', look, job, hp: 0, xp, gsDays: 0, pack: [], stash: [], hands: null, quiver: { n: 0 }, packBonus: 0, known: D.BASIC.concat(job === 'hunter' ? ['arrow'] : []), wardrobe: { own: {}, seen: {} } };
     DM.Skills.norm(s); s.hp = maxHp(s); DM.Food.norm(s, true);
     for (const [k, n] of J.kit) {
-      if (k === J.hands) { s.hands = { k, d: D.WEAPONS[D.ITEMS[k].w].dur }; continue; }
+      if (k === J.hands) { s.hands = { k, d: D.wMax({ k, q: 2 }), q: 2 }; continue; }   // 0.19: the starting kit is Worn
       if (k === 'arrow') { s.quiver = { n: Math.min(D.QUIVER, n) }; continue; }
-      addTo(s.pack, 12, k, n, D.isWeapon(k) ? D.WEAPONS[D.ITEMS[k].w].dur : undefined);
+      addTo(s.pack, 12, k, n, D.isWeapon(k) ? D.wMax({ k, q: 2 }) : undefined, D.isWeapon(k) ? 2 : undefined);
     }
     return s;
   }
-  function addTo(list, slots, k, n, d) {
+  function addTo(list, slots, k, n, d, q) {   // 0.19: q = weapon quality
     const m = D.stackMax(k); let left = n;
     for (const e of list) if (e.k === k && e.n < m && left) { const t = Math.min(left, m - e.n); e.n += t; left -= t; }
-    while (left && list.length < slots) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; list.push(e); left -= t; }
+    while (left && list.length < slots) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; if (q != null) e.q = q; list.push(e); left -= t; }
     return n - left;
   }
   const packSlots = () => 12 + (SV.survivor.packBonus || 0) + DM.Skills.packBonus(SV.survivor);   // 0.13: Pack rat is a Scavenging rank
@@ -253,6 +262,7 @@ const NEXT_VERSION = '0.18';
     if (s && s.food) s.hp = DM.Food.tick(s, s.hp);   // catch hunger/thirst up to now first
     if (s && !DM.Food.hungry(s)) s.hp = Math.min(maxHp(s), s.hp + 25 * days); // rest heals a little each day (not on an empty stomach)
     SV.prevDay = days === 1 ? SV.day : null;
+    if (s) s.gsDays = (+s.gsDays || 0) + 1;   // 0.19: days played (one per day the game is opened, not per day away) for the gamestage
     SV.day = { key: t, phone: 0, typed: 0, walk: 0, scouted: 0 };
     // unlooted houses last 3 days; finished ones are cleared from the list; quest houses stay while the quest is open
     SV.houses = SV.houses.filter(h => h.quest ? questById(h.quest) && h.status !== 'looted' : h.status === 'new' && dayNum(t) - dayNum(h.day) < 3);
@@ -275,8 +285,8 @@ const NEXT_VERSION = '0.18';
       for (const k of D.rollLoot(f.loot, rnd)) if (rnd() < share) got.push(k);
     }
     DM.Crew.onTask('scavenger', 2);
-    const stacks = D.toStacks(got, rnd), lost = [];
-    for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, STASH_SLOTS, e.k, e.n, e.d); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k); }
+    const stacks = D.toStacks(got, rnd, { base: D.qBaseFor(h.danger || 1), bonus: D.gsFx(gamestage().gs).qBonus }), lost = [];   // 0.19: quality by danger + gamestage
+    for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, STASH_SLOTS, e.k, e.n, e.d, e.q); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k, false, e.q); }
     h.status = 'auto'; SV.stats.auto++;
     DM.Skills.addXP(3);
     Game.save();
@@ -309,6 +319,12 @@ const NEXT_VERSION = '0.18';
         L.furn = L.furn.slice(); L.furn[i] = Object.assign({}, f, { extra: (f.extra || []).concat(D.pickCos([h.type], rnd)), noEmpty: 1 });
       }
     }
+    // 0.19: the gamestage is snapshotted on the house when the run starts and reused on resume, so a resumed run meets the
+    // same zombies. A run started before 0.19 has none: it resumes at gamestage 0 (exactly the zombies it had). Tutorial: none.
+    if (h.type === 'tutorial') h.gs = 0;
+    else if (h.run && h.gs == null) h.gs = 0;
+    else if (!h.run || h.gs == null) h.gs = gamestage().gs;
+    L.gs = h.gs;
     SV.stats.runs++; Game.save();
     hideMenu();
     const hide = h.daily ? {} : DM.Crew.forHouse(h, L);   // phase 5b: a survivor hiding in a closet, a stray under the furniture (rare). 0.18: never in the daily house
@@ -326,7 +342,7 @@ const NEXT_VERSION = '0.18';
           Game.save(); publish(); showMenu(); tab('houses'); renderHome();
           DM.Daily.onExit(h, res); return;
         }
-        delete h.run; delete SV.tutorialRun;
+        delete h.run; delete SV.tutorialRun; delete h.gs;   // 0.19: the next run takes a fresh gamestage
         dropNotes(SV.survivor);   // 0.11.1: a torn note only makes sense inside its house - it is gone once she leaves
         h.status = q && !q.done ? 'new' : 'looted'; if (h.type === 'tutorial') SV.tutorialDone = true;
         SV.stats.kills += res.kills; SV.stats.secrets += res.secrets; if (res.kind === 'down') SV.stats.downs++;
@@ -351,16 +367,17 @@ const NEXT_VERSION = '0.18';
   const countItem = k => SV.survivor.pack.concat(SV.survivor.stash).filter(e => e.k === k).reduce((a, e) => a + e.n, 0) + (k === 'arrow' && SV.survivor.quiver ? SV.survivor.quiver.n : 0) + (k === 'key' ? +SV.survivor.keys || 0 : 0);
   function takeItems(k, n) { // stash first, then pack; returns removed entries (weapons keep durability)
     const out = [];
-    for (const list of [SV.survivor.stash, SV.survivor.pack]) for (let i = list.length - 1; i >= 0 && n > 0; i--) if (list[i].k === k) { const t = Math.min(n, list[i].n); list[i].n -= t; n -= t; out.push({ k, n: t, d: list[i].d }); if (!list[i].n) list.splice(i, 1); }
+    for (const list of [SV.survivor.stash, SV.survivor.pack]) for (let i = list.length - 1; i >= 0 && n > 0; i--) if (list[i].k === k) { const t = Math.min(n, list[i].n); list[i].n -= t; n -= t; out.push({ k, n: t, d: list[i].d, q: list[i].q }); if (!list[i].n) list.splice(i, 1); }
     if (k === 'arrow' && n > 0 && SV.survivor.quiver) { const t = Math.min(n, SV.survivor.quiver.n); SV.survivor.quiver.n -= t; if (t) out.push({ k, n: t }); }
     if (k === 'key' && n > 0 && SV.survivor.keys > 0) { const t = Math.min(n, SV.survivor.keys); SV.survivor.keys -= t; out.push({ k, n: t }); }
     return out;
   }
-  function give(k, n, d) { // into the pack if it fits, the rest to the stash; returns what did not fit anywhere
+  function give(k, n, d, q) { // into the pack if it fits, the rest to the stash; returns what did not fit anywhere (0.19: q = weapon quality)
     if (D.ITEMS[k] && D.ITEMS[k].cos) { Game.unlockCos(k); return 0; }
     if (k === 'arrow') { n -= toQuiver(n); if (!n) return 0; }   // arrows: the quiver first
     if (k === 'key') { SV.survivor.keys = (+SV.survivor.keys || 0) + n; return 0; }   // keys: the keyring
-    let got = addTo(SV.survivor.pack, packSlots(), k, n, d); if (got < n) got += addTo(SV.survivor.stash, STASH_SLOTS, k, n - got, d);
+    if (D.isWeapon(k)) { if (q == null) q = 2; if (d == null) d = D.wMax({ k, q }); }   // 0.19: a weapon without a quality is Worn
+    let got = addTo(SV.survivor.pack, packSlots(), k, n, d, q); if (got < n) got += addTo(SV.survivor.stash, STASH_SLOTS, k, n - got, d, q);
     return n - got;
   }
   function canGive(items, remove = []) { // dry run of give() on copies: does everything fit in pack + stash?
@@ -371,7 +388,7 @@ const NEXT_VERSION = '0.18';
     return true;
   }
   Game.canGive = canGive;
-  Object.assign(Game, { countItem: k => countItem(k), takeItems: (k, n) => takeItems(k, n), give: (k, n, d) => give(k, n, d) });
+  Object.assign(Game, { countItem: k => countItem(k), takeItems: (k, n) => takeItems(k, n), give: (k, n, d, q) => give(k, n, d, q) });
   function refreshTrader(force) {
     const T = SV.trader, day = SV.day.key;
     if (T.day === day && !force) return;
@@ -389,7 +406,8 @@ const NEXT_VERSION = '0.18';
       if (k0 === 'backpack' && T.boughtPack) continue;
       let k = k0;
       if (k0 === 'bp_*') { if (!unknown.length) continue; k = unknown.splice(Math.floor(rnd() * unknown.length), 1)[0]; }
-      T.stock.push({ k, n, price: Math.max(1, Math.round(price * (1 - .04 * (L - 1)))), left: k0 === 'backpack' || k.startsWith('bp_') || D.isWeapon(k) ? 1 : 2 });
+      const sq = D.isWeapon(k) ? (L >= 3 && rnd() < .4 ? 3 : 2) : null;   // 0.19: Dot's weapons are Worn, sometimes Solid from trader level 3
+      T.stock.push({ k, n, price: Math.max(1, Math.round(price * (1 - .04 * (L - 1)) * (sq === 3 ? 1.3 : 1))), left: k0 === 'backpack' || k.startsWith('bp_') || D.isWeapon(k) ? 1 : 2, ...(sq ? { q: sq } : {}) });
     }
     // cosmetics on the back shelf: Dot's own line unlocks with trader level, plus now and then something she found
     const own = SV.survivor ? SV.survivor.wardrobe.own : {}, mine = Object.keys(D.COS).filter(c => D.COS[c].src === 'trader' && D.COS[c].lv <= L && !own[c]);
@@ -471,7 +489,7 @@ const NEXT_VERSION = '0.18';
     const T = SV.trader;
     if (q.type === 'supply') takeItems(q.item, q.need);
     if (q.type === 'fetch') takeItems('parcel', 1);
-    for (const [k, n] of opt.items) { const d = D.isWeapon(k) ? D.WEAPONS[D.ITEMS[k].w].dur : undefined; give(k, n, d); }
+    for (const [k, n] of opt.items) give(k, n);   // 0.19: give() makes weapons Worn at full durability
     if (opt.cos) Game.unlockCos('cos_' + opt.cos);
     T.caps += q.reward.caps; DM.Skills.addXP(q.reward.xp);
     T.active = T.active.filter(x => x !== q);
@@ -502,7 +520,7 @@ const NEXT_VERSION = '0.18';
     const items = q.items || [], take = q.give || [];
     if (!canGive(items, take)) { toast('Make room in your pack or stash first', 1.8); return; }
     for (const [k, n] of take) takeItems(k, n);
-    for (const [k, n] of items) give(k, n, D.isWeapon(k) ? D.WEAPONS[D.ITEMS[k].w].dur : undefined);
+    for (const [k, n] of items) give(k, n);   // 0.19: weapons Worn, full durability
     const T = SV.trader, lv0 = traderLevel();
     T.caps += q.caps; T.completed++; st.step++; st.base = st.kills;
     SFX.play('pick');
@@ -572,20 +590,42 @@ const NEXT_VERSION = '0.18';
   const newCos = () => { const w = SV.survivor.wardrobe; return Object.keys(w.own).filter(k => !w.seen[k] && D.COS[k]).length; };
 
   // ---------------------------------------------------------------- weapons: "better weapon found"
-  const wDmg = k => k && D.ITEMS[k] && D.ITEMS[k].w ? D.WEAPONS[D.ITEMS[k].w].dmg : D.WEAPONS.fists.dmg;
-  const handsDmg = () => wDmg(SV.survivor.hands && SV.survivor.hands.k);
+  // 0.19: wDmg takes a key (Worn, as before 0.19) or an entry { k, q }; damage includes quality
+  const wDmg = k => k && typeof k === 'object' ? D.wDmg(k) : k && D.ITEMS[k] && D.ITEMS[k].w ? D.wDmg({ k }) : D.WEAPONS.fists.dmg;
+  const handsDmg = () => SV.survivor.hands ? D.wDmg(SV.survivor.hands) : D.WEAPONS.fists.dmg;
   const usable = k => D.ITEMS[k].w !== 'bow' || SV.survivor.job === 'hunter' || countItem('arrow') > 0 || (DM.G && DM.G.pack && DM.G.pack.some(e => e.k === 'arrow'));
-  Game.onWeaponLoot = function (k, inRun) {
+  // s.better: the key of the best unequipped weapon found (s.betterQ its quality, 0.19)
+  const betterE = s => s.better ? { k: s.better, q: s.betterQ || 2 } : null;
+  Game.onWeaponLoot = function (k, inRun, q) {
     if (!SV || !SV.survivor || !D.isWeapon(k)) return;
-    const s = SV.survivor;
-    if (wDmg(k) > handsDmg() && usable(k) && (!s.better || wDmg(k) > wDmg(s.better))) {
-      s.better = k;
-      toast(`Better weapon found: ${D.ITEMS[k].n} - ${inRun ? 'tap Swap, or ' : ''}equip it in Gear`, 3);
+    const s = SV.survivor, e = { k, q: q || 2 };
+    if (wDmg(e) > handsDmg() && usable(k) && (!s.better || wDmg(e) > wDmg(betterE(s)))) {
+      s.better = k; s.betterQ = e.q;
+      toast(`Better weapon found: ${D.QUAL[e.q].n.toLowerCase()} ${D.ITEMS[k].n.toLowerCase()} - ${inRun ? 'tap Swap, or ' : ''}equip it in Gear`, 3);
     }
     tip('weapon');
   };
-  Game.onEquip = () => { const s = SV && SV.survivor; if (s && s.better && handsDmg() >= wDmg(s.better)) s.better = null; };
-  const betterBadge = () => { const s = SV.survivor; return !!(s.better && wDmg(s.better) > handsDmg() && (countItem(s.better) > 0)); };
+  Game.onEquip = () => { const s = SV && SV.survivor; if (s && s.better && handsDmg() >= wDmg(betterE(s))) s.better = null; };
+  const betterBadge = () => { const s = SV.survivor; return !!(s.better && wDmg(betterE(s)) > handsDmg() && (countItem(s.better) > 0)); };
+  // 0.19: quality label for a weapon entry (stars + tier name, in the tier's colour)
+  const qTag = e => { const q = D.qOf(e); return `<small class="qtag q${q}" style="--qc:${D.QUAL[q].c}">${D.qStars(q)} ${D.QUAL[q].n}</small>`; };
+  Game.qTag = qTag;
+  // 0.19: crafted weapon quality - survivor level and the Combat / Scavenging trees push it up; mostly Worn-Solid, never Rusty
+  function craftQuality(rnd = Math.random) {
+    const s = SV.survivor, SK = DM.Skills, b = 2 + Math.min(.5, (SK.level(s) - 1) * .02) + .06 * (SK.rank('combat', s) + SK.rank('scav', s)) / 2;
+    return Math.max(2, D.rollQuality(Math.min(3.2, b), 0, rnd));
+  }
+  Game.craftQuality = craftQuality;
+  // ---------------------------------------------------------------- 0.19: gamestage (data.js D.gamestage / D.gsFx)
+  function bestQ() { const s = SV && SV.survivor; if (!s) return 2; let b = s.hands ? D.qOf(s.hands) : 1; for (const e of (s.pack || []).concat(s.stash || [])) if (D.isWeapon(e.k)) b = Math.max(b, D.qOf(e)); return b; }
+  function gamestage() {
+    const s = SV && SV.survivor; if (!s) return { gs: 1, lvl: 1, days: 0, bq: 2, fx: D.gsFx(1), line: '' };
+    const lvl = DM.Skills.level(s), days = +s.gsDays || 0, bq = bestQ(), gs = D.gamestage(lvl, days, bq), fx = D.gsFx(gs);
+    const line = fx.t <= 0 ? 'how tough the world is for you, from your level, days played and best weapon. Low for now: zombies as they always were.'
+      : `zombies +${Math.round((fx.hp - 1) * 100)}% health and bite, more special infected, slightly better weapon finds. From level ${lvl}, ${days} day${days === 1 ? '' : 's'} played and your best weapon (max ${D.GS_MAX}).`;
+    return { gs, lvl, days, bq, fx, line };
+  }
+  Game.gamestage = gamestage;
 
   // ---------------------------------------------------------------- first-time tips (each once; stored in the save)
   const TIPS = {
@@ -625,11 +665,11 @@ const NEXT_VERSION = '0.18';
   function craft(key) {
     const r = D.RECIPES[key];
     if (!canCraft(r)) { toast('Missing materials', 1.4); return; }
-    for (const k in r.in) takeItems(k, r.in[k]);
-    const [k, n] = r.out, d = D.isWeapon(k) ? D.WEAPONS[D.ITEMS[k].w].dur : undefined;
-    const lost = give(k, n, d);
+    let usedQ = 0; for (const k in r.in) for (const x of takeItems(k, r.in[k])) if (D.isWeapon(x.k)) usedQ = Math.max(usedQ, D.qOf(x));
+    const [k, n] = r.out, q = D.isWeapon(k) ? Math.max(usedQ, craftQuality()) : undefined;   // 0.19: crafted quality (never below the weapon it was made from)
+    const lost = give(k, n, undefined, q);
     DM.Skills.addXP(2); Game.save(); SFX.play('open');
-    toast(lost ? `Crafted ${D.ITEMS[k].n} - no room for ${lost}` : `Crafted ${D.ITEMS[k].n}${n > 1 ? ' x' + n : ''}`, 1.8);
+    toast(lost ? `Crafted ${D.ITEMS[k].n} - no room for ${lost}` : `Crafted ${q ? D.QUAL[q].n.toLowerCase() + ' ' : ''}${D.ITEMS[k].n}${n > 1 ? ' x' + n : ''}`, 1.8);
     if (!benchHost) benchSel = null;
     reHost();
   }
@@ -654,7 +694,7 @@ const NEXT_VERSION = '0.18';
   }
   function whatItDoes(k) {
     const it = D.ITEMS[k]; if (!it) return '';
-    if (it.w) { const W = D.WEAPONS[it.w]; return W.ranged ? `Ranged weapon · ${W.dmg} damage · lasts ${W.dur} shots · needs arrows` : `Melee weapon · ${W.dmg} damage · reach ${W.reach} · lasts ${W.dur} hits · ${W.noise >= 4 ? 'loud' : W.noise >= 3 ? 'a bit loud' : 'quiet'}`; }
+    if (it.w) { const W = D.WEAPONS[it.w], e2 = { k, q: 2 }, dm = D.wDmg(e2), du = D.wMax(e2); return (W.ranged ? `Ranged weapon · ${dm} damage · lasts ${du} shots · needs arrows` : `Melee weapon · ${dm} damage · reach ${W.reach} · lasts ${du} hits · ${W.noise >= 4 ? 'loud' : W.noise >= 3 ? 'a bit loud' : 'quiet'}`) + ' (Worn; each quality tier +8% damage, +15% durability)'; }   // 0.19
     if (it.slots) return `Fit it to your pack: +${it.slots} pack slots for good`;
     if (it.hp || it.sta || it.hu || it.th) return [DM.Food.label(k), it.hp ? `heals ${it.hp} HP` : '', it.sta ? `+${it.sta} stamina` : ''].filter(Boolean).join(' · ').replace(/^./, c => c.toUpperCase());
     return { lockpick: 'Opens locks silently with the lockpick mini-game. Snaps if you force it.', arrow: 'Ammo for the hunting bow. You can pick most of them back up.', shoes: 'Wear them: your footsteps make 30% less noise.',
@@ -785,7 +825,7 @@ const NEXT_VERSION = '0.18';
   function tShop() {
     const T = SV.trader, el = $('#tpane');
     const cosRow = e => { const c = D.ITEMS[e.k].cos, C = D.COS[c]; return `<span><em class="rtag" style="--rc:${RCOL[C.r]}">${D.RARITY[C.r].n}</em> cosmetic · ${Game.hasCos(c) ? 'you have it' : 'for your wardrobe'}</span>`; };
-    const row = (e, i) => { const cos = D.ITEMS[e.k].cos, left = e.left && !(cos && Game.hasCos(cos)); return `<div class="shoprow${left ? '' : ' gone'}${cos ? ' cosrow' : ''}">${icon(e.k)}<div><b>${D.ITEMS[e.k].n}${e.n > 1 ? ' x' + e.n : ''}</b>${cos ? cosRow(e) : `<span>${e.left ? e.left + ' left' : 'sold out'}</span>`}</div>
+    const row = (e, i) => { const cos = D.ITEMS[e.k].cos, left = e.left && !(cos && Game.hasCos(cos)); return `<div class="shoprow${left ? '' : ' gone'}${cos ? ' cosrow' : ''}">${icon(e.k)}<div><b>${D.ITEMS[e.k].n}${e.n > 1 ? ' x' + e.n : ''}${D.isWeapon(e.k) ? qTag(e) : ''}</b>${cos ? cosRow(e) : `<span>${e.left ? e.left + ' left' : 'sold out'}</span>`}</div>
       <button class="mbtn sm${T.caps >= e.price && left ? '' : ' ghost'}" data-buy="${i}"${left ? '' : ' disabled'}>${icon('caps')}${e.price}</button></div>`; };
     const cosI = T.stock.map((e, i) => i).filter(i => D.ITEMS[T.stock[i].k].cos), goodI = T.stock.map((e, i) => i).filter(i => !D.ITEMS[T.stock[i].k].cos);
     el.innerHTML = (cosI.length ? `<div class="kick sect">Back shelf · cosmetics</div>` + cosI.map(i => row(T.stock[i], i)).join('') : '') +
@@ -794,9 +834,8 @@ const NEXT_VERSION = '0.18';
       const e = T.stock[+b.dataset.buy];
       if (T.caps < e.price) { toast('Not enough caps, sugar', 1.4); return; }
       if (D.ITEMS[e.k].cos) { T.caps -= e.price; e.left = 0; SFX.play('pick'); Game.unlockCos(e.k); Game.save(); renderTrader(); return; }
-      const d = D.isWeapon(e.k) ? D.WEAPONS[D.ITEMS[e.k].w].dur : undefined;
       if (!canGive([[e.k, e.n]])) { toast('No room in pack or stash for all of it', 1.6); return; }
-      give(e.k, e.n, d);
+      give(e.k, e.n, undefined, D.isWeapon(e.k) ? D.qOf(e) : undefined);   // 0.19: full durability at the shelf's quality
       T.caps -= e.price; e.left--; if (e.k === 'backpack') T.boughtPack = true;
       SFX.play('pick'); Game.save(); renderTrader();
     });
@@ -804,7 +843,7 @@ const NEXT_VERSION = '0.18';
   function tSell() {
     const s = SV.survivor, el = $('#tpane');
     const rows = [];
-    for (const [from, list] of [['pack', s.pack], ['stash', s.stash]]) list.forEach((e, i) => { const v = D.valueOf(e.k, e.d); if (D.VALUE[e.k] === 0 || D.ITEMS[e.k].quest) return; rows.push({ from, i, e, v }); });
+    for (const [from, list] of [['pack', s.pack], ['stash', s.stash]]) list.forEach((e, i) => { const v = D.valueOf(e.k, e.d, e.q); if (D.VALUE[e.k] === 0 || D.ITEMS[e.k].quest) return; rows.push({ from, i, e, v }); });
     el.innerHTML = `<div class="kick sect">Sell to Dot · she pays low</div>` + (rows.length ? rows.map((r, j) => `<div class="shoprow">${icon(r.e.k)}<div><b>${D.ITEMS[r.e.k].n}${r.e.n > 1 ? ' x' + r.e.n : ''}</b><span>${r.from} · ${icon('caps')}${Math.max(1, Math.floor(r.v))} each</span></div>
       <button class="mbtn sm" data-sell="${j}">Sell ${r.e.n > 1 ? 'all' : ''} ${icon('caps')}${Math.max(1, Math.floor(r.v * r.e.n))}</button></div>`).join('') : '<div class="empty">Nothing to sell.</div>');
     el.querySelectorAll('[data-sell]').forEach(b => b.onclick = () => {
@@ -836,7 +875,7 @@ const NEXT_VERSION = '0.18';
   function showResult(title, stacks, lost, note, kick) {
     const el = $('#mres');
     el.innerHTML = `<div class="mcard"><div class="kick">${kick || 'Crew search'}</div><h3>${esc(title)}</h3><p class="mp">${esc(note)}</p>
-      <div class="sum">${stacks.length ? stacks.map(e => `<div class="sum-item${D.ITEMS[e.k].rare ? ' rare' : ''}">${icon(e.k)}<span>${D.ITEMS[e.k].n}</span>${e.n > 1 ? `<b>x${e.n}</b>` : ''}</div>`).join('') : '<div class="empty">They came back empty-handed.</div>'}</div>
+      <div class="sum">${stacks.length ? stacks.map(e => `<div class="sum-item${D.ITEMS[e.k].rare ? ' rare' : ''}">${icon(e.k)}<span>${D.ITEMS[e.k].n}</span>${D.isWeapon(e.k) ? qTag(e) : ''}${e.n > 1 ? `<b>x${e.n}</b>` : ''}</div>`).join('') : '<div class="empty">They came back empty-handed.</div>'}</div>
       ${lost.length ? `<div class="lost">No room in the stash for: ${lost.map(e => D.ITEMS[e.k].n + (e.n > 1 ? ' x' + e.n : '')).join(', ')}</div>` : ''}
       <button class="mbtn" id="mresOk">OK</button></div>`;
     el.classList.add('on');
@@ -994,7 +1033,7 @@ const NEXT_VERSION = '0.18';
     const s = SV.survivor, d = SV.day, J = D.JOBS[s.job], xl = DM.Skills.xpLine(s), pts = DM.Skills.points(s);
     const eff = effective(d), nxt = nextHouseAt(d), w = worth(eff);
     $('#menu').className = '';
-    const hands = s.hands ? `${icon(s.hands.k)}<span>${D.ITEMS[s.hands.k].n}<i class="dur"><i style="width:${Math.max(3, s.hands.d / D.WEAPONS[D.ITEMS[s.hands.k].w].dur * 100)}%"></i></i></span>` : '<span>Fists</span>';
+    const hands = s.hands ? `${icon(s.hands.k)}<span style="color:${D.qOf(s.hands) > 2 ? D.QUAL[D.qOf(s.hands)].c : 'inherit'}">${D.ITEMS[s.hands.k].n}<i class="dur"><i style="width:${Math.max(3, Math.min(100, s.hands.d / D.wMax(s.hands) * 100))}%"></i></i></span>` : '<span>Fists</span>';   // 0.19: tier colour
     $('#mbody').innerHTML = `
       <div class="mtop"><div class="logo">DEAD MILES</div><button id="mver" class="ver">${VERSION}</button><button id="mnet" class="gear" aria-label="Account and friends"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.8 19.5c.6-3.6 3.2-5.6 6.2-5.6s5.6 2 6.2 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16.5 13.6c2.6.1 4.4 1.8 4.9 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><button id="mset" class="gear" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 4.6.1-1.1-.1-1.1 2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.9-1.1L15.8 3h-4l-.4 2.6a8 8 0 0 0-1.9 1.1l-2.4-1-2 3.4 2 1.6-.1 1.1.1 1.1-2 1.6 2 3.4 2.4-1c.6.5 1.2.8 1.9 1.1l.4 2.6h4l.4-2.6a8 8 0 0 0 1.9-1.1l2.4 1 2-3.4z" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></button></div>
       ${eventBanner()}
@@ -1114,6 +1153,7 @@ const NEXT_VERSION = '0.18';
     const dailyCard = SV.tutorialDone && DM.Daily ? DM.Daily.cardHTML() : '';   // 0.18: the daily challenge house (daily.js)
     if (!list.length) { el.innerHTML = traderCard + dailyCard + `<div class="empty big">No houses scouted yet.<br>Walk - every ~1,000 steps turns up another door.</div>`; if ($('#hTrader')) $('#hTrader').onclick = openTrader; if (dailyCard) DM.Daily.bind(el); return; }
     const bossCard = SV.tutorialDone ? DM.Boss.cardHTML(true) : '';
+    const gstage = gamestage().gs;   // 0.19: the house list's special-infected tag uses your gamestage
     el.innerHTML = traderCard + dailyCard + bossCard + list.map(h => {
       const T = D.BTYPES[h.type], left = 3 - (dayNum(SV.day.key) - dayNum(h.day)), done = h.status !== 'new' && h.status !== 'far';
       const q = h.quest && questById(h.quest), far = h.status === 'far';
@@ -1121,7 +1161,7 @@ const NEXT_VERSION = '0.18';
       const bs = !done && !far ? EVS.bossFor(layoutOf(h)) : null;   // event mini-boss: scouts spot it from the street
       if (bs) tags.push(`<b class="evtag">${esc(bs.name.toLowerCase())} · ${bs.where}</b>`);
       if (!done && !far && h.type !== 'tutorial') { const HL = layoutOf(h); if (HL.car) tags.push('<b class="keytag">🔑 locked car</b>'); if (HL.keyRoom) tags.push('<b class="keytag">🔑 locked room</b>');   // 0.8: brass-key spots
-        const ip = DM.Inf.plan(HL), ni = ip.kinds.filter(Boolean).length, nz = (HL.zombies || []).length + ip.extra;   // 0.13: special infected (danger 3+)
+        const ip = DM.Inf.plan(HL, h.gs != null ? h.gs : gstage), ni = ip.kinds.filter(Boolean).length, nz = (HL.zombies || []).length + ip.extra;   // 0.13: special infected (danger 3+)
         tags[1] = `${nz} zombie${nz === 1 ? '' : 's'}`; if (ni) tags.push(`<b class="inftag">☣ ${ni} special infected</b>`); }
       return `<div class="hcard${done ? ' done' : ''}${h.type === 'tutorial' ? ' tut' : ''}${q ? ' quest' : ''}">
         ${typeIcon(h.type)}
@@ -1218,7 +1258,7 @@ const NEXT_VERSION = '0.18';
       const rnd = D.mulberry32(D.hashStr((code || 'solo') + ':' + pv.week + ':' + me + ':' + SV.seedBase));
       r.crate = []; r.lost = [];
       const sp = HD.special(pv.week); if (sp.name) r.special = sp.name;   // e.g. the Black Friday horde: a better crate
-      if (r.hold && r.shifted) { const stacks = D.toStacks(D.rollLoot(sp.crate && D.LOOT[sp.crate] ? sp.crate : 'hordecrate', rnd), rnd); for (const e of stacks) { const left = give(e.k, e.n, e.d); if (left < e.n) r.crate.push({ k: e.k, n: e.n - left }); if (left) r.lost.push({ k: e.k, n: left }); } SV.trader.caps += 10 + (sp.caps || 0); }
+      if (r.hold && r.shifted) { const stacks = D.toStacks(D.rollLoot(sp.crate && D.LOOT[sp.crate] ? sp.crate : 'hordecrate', rnd), rnd, { base: 2.2, bonus: 0 }); for (const e of stacks) { const left = give(e.k, e.n, e.d, e.q); if (left < e.n) r.crate.push({ k: e.k, n: e.n - left }); if (left) r.lost.push({ k: e.k, n: left }); } SV.trader.caps += 10 + (sp.caps || 0); }
       if (!r.hold) r.dmg = BS.hordeDamage(rnd);
       r.at = Date.now(); r.code = code; delete r.members;
       st.resolved[pv.week] = r; DM.Crew.onTask('guard', 3); Game.save(); renderHome();
@@ -1241,8 +1281,8 @@ const NEXT_VERSION = '0.18';
     if (stashHost && gTab === 'gear') gTab = 'stash';   // the stash chest at the base: just the pack and the chest
     const hd = handsDmg();
     const slot = (e, from, i) => {
-      const it = D.ITEMS[e.k], on = sel && sel.from === from && sel.i === i, up = it.w && from !== 'hands' ? wDmg(e.k) - hd : 0;
-      return `<button class="slot${it.rare ? ' rare' : ''}${on ? ' sel' : ''}" data-from="${from}" data-i="${i}">${icon(e.k)}<span>${it.n}</span>${catTag(e.k)}${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${up > 0 ? `<em class="up">+${up} dmg</em>` : ''}${e.d != null && it.w ? `<i class="dur"><i style="width:${Math.max(4, e.d / D.WEAPONS[it.w].dur * 100)}%"></i></i>` : ''}</button>`;
+      const it = D.ITEMS[e.k], on = sel && sel.from === from && sel.i === i, up = it.w && from !== 'hands' ? wDmg(e) - hd : 0, q = it.w ? D.qOf(e) : 0;   // 0.19: quality
+      return `<button class="slot${it.rare ? ' rare' : ''}${q ? ' wq q' + q : ''}${on ? ' sel' : ''}" data-from="${from}" data-i="${i}"${q ? ` style="--qc:${D.QUAL[q].c}"` : ''}>${icon(e.k)}<span>${it.n}</span>${q ? qTag(e) : catTag(e.k)}${e.n > 1 ? `<i class="cnt">x${e.n}</i>` : ''}${up > 0 ? `<em class="up">+${up} dmg</em>` : ''}${e.d != null && it.w ? `<i class="dur"><i style="width:${Math.max(4, Math.min(100, e.d / D.wMax(e) * 100))}%"></i></i>` : ''}</button>`;
     };
     const empty = n => Array.from({ length: Math.max(0, n) }, () => '<div class="slot ph"></div>').join('');
     const A = from => sel && sel.from === from ? '<div id="sacts"></div>' : '';
@@ -1253,7 +1293,7 @@ const NEXT_VERSION = '0.18';
       const h = s.hands, hw = h && D.ITEMS[h.k], worn = Object.values(s.look.cos || {}).filter(c => D.COS[c]);
       const gear = [s.shoes && 'Quiet shoes', s.lockset && 'Lockpick set'].filter(Boolean), xl = DM.Skills.xpLine(s), pts = DM.Skills.points(s), f = s.food || { h: 0, t: 0 };
       body = `<div class="eqrow">
-        <button class="eqslot${sel && sel.from === 'hands' ? ' sel' : ''}" ${h ? 'data-from="hands" data-i="0"' : 'id="eqFists"'}><i class="eqk">Weapon · hand</i>${h ? icon(h.k) : '<span class="eqnone">✊</span>'}<b>${h ? esc(hw.n) : 'Fists'}</b><span>${hd} dmg${h && h.d != null ? ` · ${Math.round(h.d / D.WEAPONS[hw.w].dur * 100)}%` : ''}</span>${h && h.d != null ? `<i class="dur"><i style="width:${Math.max(4, h.d / D.WEAPONS[hw.w].dur * 100)}%"></i></i>` : ''}</button>
+        <button class="eqslot${h ? ' wq q' + D.qOf(h) : ''}${sel && sel.from === 'hands' ? ' sel' : ''}" ${h ? `data-from="hands" data-i="0" style="--qc:${D.QUAL[D.qOf(h)].c}"` : 'id="eqFists"'}><i class="eqk">Weapon · hand</i>${h ? icon(h.k) : '<span class="eqnone">✊</span>'}<b>${h ? esc(hw.n) : 'Fists'}</b>${h ? qTag(h) : ''}<span>${hd} dmg${h && h.d != null ? ` · ${Math.round(Math.min(1, h.d / D.wMax(h)) * 100)}%` : ''}</span>${h && h.d != null ? `<i class="dur"><i style="width:${Math.max(4, Math.min(100, h.d / D.wMax(h) * 100))}%"></i></i>` : ''}</button>
         <button class="eqslot quiv${sel && sel.from === 'quiver' ? ' sel' : ''}" data-from="quiver" data-i="0"><i class="eqk">Quiver</i>${(s.quiver || {}).n ? icon('arrow') : `<img class="dim" alt="" src="${ART.iconURL.arrow}">`}<b>${(s.quiver || {}).n || 0} arrow${(s.quiver || {}).n === 1 ? '' : 's'}</b><span>max ${D.QUIVER} · no pack slot</span></button>
         <div class="eqslot"><i class="eqk">Backpack</i>${s.packBonus ? icon(s.packBonus >= 4 ? 'backpack' : 'packplus') : `<img class="dim" alt="" src="${ART.iconURL.backpack}">`}<b>${packSlots()} slots</b><span>${s.packBonus ? `+${s.packBonus} from upgrades` : 'No upgrade yet'}</span></div>
         <button class="eqslot cos" id="eqWard"><i class="eqk">Cosmetics</i><span class="eqcos">${worn.length ? worn.slice(0, 4).map(c => `<img alt="" src="${ART.iconURL['cos_' + c]}">`).join('') : '<img alt="" src="' + ART.iconURL.cosS_beanie + '">'}</span><b>Wardrobe →</b><span>${worn.length ? worn.length + ' worn' : 'Nothing worn'}${newCos() ? ` · <em class="newtxt">${newCos()} new</em>` : ''}</span></button>
@@ -1263,6 +1303,7 @@ const NEXT_VERSION = '0.18';
       ${gear.length ? `<div class="gline"><span class="gi">👟</span><div><b>${gear.join(' · ')}</b><span>${[s.shoes && 'footsteps -30%', s.lockset && 'wider sweet spots, picks snap less'].filter(Boolean).join(' · ')}</span></div></div>` : ''}
       <div class="kick sect">You</div>
       <button class="gline tap${pts ? ' hot' : ''}" id="gSkills"><span class="gi">★</span><div><b>Level ${xl.L} · skills</b><span>${pts ? `${pts} skill point${pts > 1 ? 's' : ''} to spend` : 'Five skill trees · 1 point a level'}</span></div><em>›</em></button>
+      ${(g => `<div class="gline gsline"><span class="gi">☣</span><div><b>Gamestage ${g.gs}</b><span>${esc(g.fx.t > 0 ? `Zombies +${Math.round((g.fx.hp - 1) * 100)}% tougher, specials more common, better weapon finds` : 'Low: zombies as tough as ever. Grows with level, days played and your best weapon')}</span></div></div>`)(gamestage())}
       <button class="gline tap" id="gFood"><span class="gi">🍗</span><div><b>Eat &amp; drink</b><span>Hunger ${Math.round(f.h)} · Thirst ${Math.round(f.t)}</span></div><em>›</em></button>`;
     } else if (gTab === 'pack') {
       body = `<div class="ghead"><span class="kick">Backpack · ${s.pack.length}/${packSlots()} slots</span>${s.pack.length > 1 ? '<button class="mini" id="sSortP">Sort</button>' : ''}</div>
@@ -1319,16 +1360,16 @@ const NEXT_VERSION = '0.18';
   function stashActions() {
     const s = SV.survivor, acts = (stashHost || $('#mpane')).querySelector('#sacts');
     if (sel.from === 'quiver') { quiverActions(s, acts); return; }
-    const e = sel.from === 'hands' ? { k: s.hands.k, n: 1, d: s.hands.d } : s[sel.from][sel.i];
+    const e = sel.from === 'hands' ? { k: s.hands.k, n: 1, d: s.hands.d, q: D.qOf(s.hands) } : s[sel.from][sel.i];
     if (!e) { sel = null; return; }
     const it = D.ITEMS[e.k], btns = [];
     const done = msg => { sel = null; Game.save(); reHost(); if (msg) toast(msg, 1.4); };
-    if (it.w && sel.from !== 'hands') btns.push(['Equip' + (wDmg(e.k) > handsDmg() ? ` · +${wDmg(e.k) - handsDmg()} dmg` : ''), () => { const cur = s.hands; s.hands = { k: e.k, d: e.d }; s[sel.from].splice(sel.i, 1); if (cur) addTo(s.pack, packSlots(), cur.k, 1, cur.d) || addTo(s.stash, STASH_SLOTS, cur.k, 1, cur.d); Game.onEquip(); done('Equipped ' + it.n.toLowerCase() + ' - it is in your hand now'); }, 'big']);
-    if (sel.from === 'pack') btns.push(['To stash', () => { const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d); if (!n) return toast('Stash is full', 1.4); e.n -= n; if (!e.n) s.pack.splice(sel.i, 1); done(); }]);
-    if (sel.from === 'stash') btns.push(['To pack', () => { const n = addTo(s.pack, packSlots(), e.k, e.n, e.d); if (!n) return toast('Pack is full', 1.4); e.n -= n; if (!e.n) s.stash.splice(sel.i, 1); done(); }]);
-    if (sel.from === 'hands') btns.push(['Unequip', () => { if (!addTo(s.pack, packSlots(), e.k, 1, e.d) && !addTo(s.stash, STASH_SLOTS, e.k, 1, e.d)) return toast('No room', 1.4); s.hands = null; done(); }]);
+    if (it.w && sel.from !== 'hands') btns.push(['Equip' + (wDmg(e) > handsDmg() ? ` · +${wDmg(e) - handsDmg()} dmg` : ''), () => { const cur = s.hands; s.hands = { k: e.k, d: e.d, q: D.qOf(e) }; s[sel.from].splice(sel.i, 1); if (cur) addTo(s.pack, packSlots(), cur.k, 1, cur.d, D.qOf(cur)) || addTo(s.stash, STASH_SLOTS, cur.k, 1, cur.d, D.qOf(cur)); Game.onEquip(); done('Equipped ' + it.n.toLowerCase() + ' - it is in your hand now'); }, 'big']);
+    if (sel.from === 'pack') btns.push(['To stash', () => { const n = addTo(s.stash, STASH_SLOTS, e.k, e.n, e.d, e.q); if (!n) return toast('Stash is full', 1.4); e.n -= n; if (!e.n) s.pack.splice(sel.i, 1); done(); }]);
+    if (sel.from === 'stash') btns.push(['To pack', () => { const n = addTo(s.pack, packSlots(), e.k, e.n, e.d, e.q); if (!n) return toast('Pack is full', 1.4); e.n -= n; if (!e.n) s.stash.splice(sel.i, 1); done(); }]);
+    if (sel.from === 'hands') btns.push(['Unequip', () => { if (!addTo(s.pack, packSlots(), e.k, 1, e.d, e.q) && !addTo(s.stash, STASH_SLOTS, e.k, 1, e.d, e.q)) return toast('No room', 1.4); s.hands = null; done(); }]);
     if (it.w) {
-      const cost = s.job === 'mechanic' ? 1 : 2, max = D.WEAPONS[it.w].dur;
+      const cost = s.job === 'mechanic' ? 1 : 2, max = D.wMax(e);   // 0.19: max durability by quality
       if (e.d < max) btns.push([`Repair (${cost} scrap)`, () => {
         const have = s.pack.concat(s.stash).filter(x => x.k === 'scrap').reduce((a, x) => a + x.n, 0);
         if (have < cost) return toast(`Needs ${cost} scrap metal`, 1.6);
@@ -1345,10 +1386,10 @@ const NEXT_VERSION = '0.18';
     if (it.gift) btns.push(['Open', () => {
       e.n--; if (!e.n) s[sel.from].splice(sel.i, 1);
       const stacks = D.toStacks(D.rollLoot('giftbox')), lost = [];
-      for (const x of stacks) { const left = give(x.k, x.n, x.d); if (left) lost.push({ k: x.k, n: left }); }
+      for (const x of stacks) { const left = give(x.k, x.n, x.d, x.q); if (left) lost.push({ k: x.k, n: left }); }
       done(); showResult('Gift box', stacks, lost, 'Somebody wrapped this before it all went bad. It went into your pack (the stash if the pack is full).', 'Opened');
     }, 'big']);
-    acts.innerHTML = `<div class="sact"><span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}${it.tag ? ` <em>${it.tag}</em>` : ''}${it.w ? ` <i class="wst">${wDmg(e.k)} dmg${sel.from === 'hands' ? ' · in your hand' : ''}</i>` : ''}<small class="cline" style="--cc:${D.CATS[D.cat(e.k)].c}">${esc(D.catLine(e.k, e.d))}</small></span></div>`;
+    acts.innerHTML = `<div class="sact"><span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}${it.tag ? ` <em>${it.tag}</em>` : ''}${it.w ? ` <i class="wst">${D.QUAL[D.qOf(e)].n} · ${wDmg(e)} dmg · ${Math.round(Math.min(1, (e.d != null ? e.d : D.wMax(e)) / D.wMax(e)) * 100)}% of ${D.wMax(e)}${sel.from === 'hands' ? ' · in your hand' : ''}</i>` : ''}<small class="cline" style="--cc:${D.CATS[D.cat(e.k)].c}">${esc(D.catLine(e.k, e.d))}</small></span></div>`;
     const row = acts.firstChild;
     btns.forEach(([t, fn, big], i) => { const b = document.createElement('button'); b.className = big ? 'mbtn eqbig' : 'mbtn sm' + (i ? ' ghost' : ''); b.textContent = t; b.onclick = () => { SFX.play('pick'); fn(); }; row.appendChild(b); });
   }
@@ -1390,6 +1431,8 @@ const NEXT_VERSION = '0.18';
     ['Steps & houses', 'All your daily steps count. About every 1,000 steps scouts another house (up to 10 a day; the more you walk, the better the odds of big places like police stations and mansions). Houses wait 3 days. Loot one yourself, or send your Crew - they bring back less and never find secrets.'],
     ['Looting', 'Walk with the joystick (drag anywhere). Stand by furniture and tap the magnifier to search. Searching makes noise. Your pack has 12 slots; things stack. Leave by the front door - anything you dropped stays behind. Your level makes searches a little faster and luckier (up to level 10).'],
     ['Levels & skills', 'Everything you do earns XP: searching, kills (special infected more), secrets, locks and keys, Dot\'s jobs, horde watch shifts and boss fights. Every level gives 1 skill point - early levels come every few houses, later ones slower. Tap Skills on the home card to spend them in five trees, 5 ranks each: Scavenging (faster searches, extra finds, Keen eye, Pack rat), Stealth (quieter steps and searches, zombies spot you later), Combat (melee and bow damage, longer dodge, more HP), Survival (slower hunger and thirst, better healing, more stamina) and Lockwork (wider sweet spots, picks last longer, quieter crowbar). Each rank needs the one before it; later ranks cost 2-3 points. Your job gives rank 1 of its tree free (Scavenger: Scavenging, Hunter: Stealth, Brawler: Combat, Mechanic: Survival, Thief: Lockwork). Survivors from before 0.13 kept Quiet hands, Keen eye and Pack rat for free and got every point their level earned. Once a week you can reset your skills for 150 caps.'],
+    ['Weapon quality', 'Every weapon (bows and crowbars too) has a quality: Rusty, Worn, Solid, Fine or Masterwork, shown as stars and a coloured name and border on its card. Each tier above Rusty adds about 8% damage and 15% durability, so a Masterwork hits about a third harder and lasts 60% longer than a Rusty one - nice, never game-breaking. Most house finds are Rusty or Worn; danger 3+ buildings, hidden stashes, key-locked rooms and car trunks, special infected and raiders carry better ones. Crafted weapons come out Worn or Solid (better with your level and the Combat and Scavenging trees). Dot sells Worn, sometimes Solid. Masterwork is very rare: the weekly boss and the deepest places. Weapons from before 0.19 are Worn.'],
+    ['Gamestage', 'Your gamestage (Gear tab and the Skills screen) is how tough the world is for you: your level, plus a point for every 3 days played (up to 20), plus 3 for each quality tier your best weapon is above Worn. Up to gamestage 10 nothing changes. Above that, zombies get a little more health and bite (up to +25% at gamestage 60, the cap), special infected turn up more often (and from about 25, now and then in danger 2 places too), and weapons you find lean a bit better, with a slightly better shot at rare finds. It is yours alone: a friend who mostly walks meets the zombies they are ready for. The gamestage is fixed when you go into a house, so coming back to a run meets the same zombies.'],
     ['Special infected', 'Danger 3+ places (pharmacies, schools, police stations, mansions; look for the ☣ tag on the house list) have a couple more zombies and some special infected. Armored (riot gear, police stations): slow and hits hard; melee barely dents it until the armour cracks, arrows do full damage. Runner: fast and fragile, sprints the moment it sees you - you can only outrun it at a sprint. Bloater (green and swollen, pharmacies): bursts into a toxic cloud when it dies - shoot it, or dodge straight out. Screamer (gaping mouth, schools and mansions): if it sees you it stops and shrieks, and when it finishes every zombie in the house comes for you - kill it fast or stay out of sight. They carry better loot (ammo and police cosmetics, meds, lockpicks) and give much more XP.'],
     ['Daily challenge', 'Every day one special house sits at the top of the Houses list: the same house for everyone (same layout, same zombies, same loot in every container), no scouting needed. A new one at midnight New York time. Only your first run counts: the score is loot value taken x4, 60 per secret, 15 per zombie (40 per special infected), up to 150 for speed if you searched at least 60% of the containers, and -150 if you go down (and the loot score is halved). Today\'s scores from everyone show on the card and after your run (sign in to post yours; offline your score waits on the phone). You can go back in for fun - the house stays as you left it.'],
     ['Infection', 'About 1 in 10 zombie hits that land infects you (a bit more from special infected; Field medic halves it). Raiders and bosses do not. While infected your max HP is 5 lower, then 5 more each day, never more than 25 - it never kills you - and you get hungry a little faster. Antibiotics cure it at once: rare in pharmacies, nurse offices and medicine cabinets, and Dot sells them from trader level 2. Left alone it clears after about 5 days.'],

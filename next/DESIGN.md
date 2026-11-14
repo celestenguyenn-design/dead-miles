@@ -386,3 +386,31 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   cages (~6%), vanities; Dot sells one at trader level 2+ (about every other day, 45 caps). Taking them cures it at once.
   Left alone it clears after 5 days. Shown on the home card ("Infected · -10 max HP", tap for details), the eat & drink
   sheet and a green chip in the run HUD; a first-time tip explains it. Old saves are simply healthy.
+
+## Done in 0.19 (weapon quality tiers + per-player gamestage)
+- Weapon quality (data.js D.QUAL): 1 Rusty, 2 Worn, 3 Solid, 4 Fine, 5 Masterwork. Each tier above Rusty is +8% damage and +15% max
+  durability (Masterwork: +32% / +60%; e.g. bat 34/60 -> 45/96, bow 46/120 -> 61/192). Every weapon, bows and the crowbar / pry bar too
+  (the lockpick set is not a weapon and has no quality). Stored on the entry: { k, n: 1, d, q }; it travels through pack, stash, hands,
+  drops, swaps, stash moves and Dot's shelf. Helpers: D.qOf(e) (missing q = Worn), D.wDmg(e), D.wMax(e), D.mkWeapon(k, q, f).
+- Old saves: weapons without q become Worn (+8% damage on what they did before); their durability is scaled x1.15 with the new max, so
+  the bar shows the same %. Never lower. A weapon given without a quality (quest/event rewards, base, crew) is Worn at full durability.
+- Where quality comes from: D.rollQuality(base, bonus, rnd) - weights e^(-1.6 x |tier - (base + bonus)|), Masterwork cut to 1/10 unless
+  base >= 3.5. Bases: normal houses 1.5 (about 45/44/9/2/0 %), danger 3: 2.1, danger 4+: 2.5, locked containers 2.0, hidden stashes 2.3,
+  special infected 2.6, raiders 2.7, key-locked rooms / trunks 2.8, horde crates 2.2, weekly boss 3.8 (~12% Masterwork). Deep runs can call
+  D.rollQuality(3.5, bonus, rnd) (~8% Masterwork). Crafting (game.js craftQuality): never Rusty, mean 2 + level x .02 (max +.5) + .03 per
+  Combat/Scavenging rank; mostly Worn-Solid; never below the weapon it was made from (spiked bat from a bat). Dot sells Worn, sometimes
+  Solid from trader level 3 (+30% price). Special infected now drop a weapon 10% of the time (rolled at their higher base).
+- Display: tier-coloured border + name and "★★★ SOLID" on weapon cards (loot sheet, swap sheet, backpack, stash, Equipped weapon slot,
+  crew-search results, Dot's shelf, boss reward); damage shown includes quality; loot cards show "NN dmg" against what she holds;
+  the run's weapon chip is tinted from Solid up. Weapons sell for 25% more per tier above Worn.
+- Gamestage (per player; data.js D.gamestage / D.gsFx, game.js Game.gamestage): level + days played / 3 (max +20) + 3 per tier of the
+  best weapon owned above Worn, 1-60. Days played = one per day the game is opened (s.gsDays; old saves start at the days since the save
+  was made). t = (gs - 10) / 50, 0..1: gamestage <= 10 is exactly the old game. Zombie HP and hits x(1 + .25t) (never bosses or raiders;
+  armour too); special-infected share +12t points at danger 3-4 (same seeded roll, higher bar); from gamestage 25 a few specials at
+  danger 2 (up to 15% at 60, no screamers, separate seeded stream); weapon quality roll +0.4t; rare-find chance +6t % per search.
+  Examples: Lv 1 fresh = 1; Lv 8, 30 days, Worn = 18 (+4%); Lv 16, 45 days, Fine = 37 (+13.5%); Lv 32, 120 days, Masterwork = 60 (cap).
+  Shown on the Gear tab (Equipped > You) and the Skills screen with a one-line explanation; How to play has both systems.
+- Determinism: game.js loot() snapshots the gamestage onto the house (h.gs) when a run starts, puts it on the layout copy (L.gs) that
+  infected.js and house.js read, and reuses it on resume (tested: same zombies after her gamestage jumped 24 -> 60). A run saved before
+  0.19 resumes at gamestage 0 (its original zombies). h.gs is cleared when the run ends. The house list's special tag uses the current
+  gamestage. Tutorial, base, watch shifts and the weekly boss ignore the gamestage.
