@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.24.5';
+const NEXT_VERSION = '0.24.6';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -800,11 +800,20 @@ const NEXT_VERSION = '0.24.5';
   const DOT_AWAY = 3000;
   const fmtN = n => Math.round(n).toLocaleString('en-US');
   function dotLeft() { const T = SV && SV.trader; if (!T || T.away == null) return 0; const left = T.away + DOT_AWAY - (SV.walked || 0); if (left <= 0) { T.away = null; return 0; } return Math.ceil(left); }
-  function dotVisit() { SV.trader.away = SV.walked || 0; }
+  // 0.24.6 (owner: typing 3k steps, selling, typing again ... looped forever): at most DOT_DAY visits a day, the same for
+  // everyone (no rule that only hits typed steps). A visit = her shop opening or junk sold from the stash, as before.
+  // A Dot stop on the daily route gives one extra visit (Game.dotBonus).
+  const DOT_DAY = 3;
+  const dotVisits = () => { const T = SV.trader; return T.vday === today() ? T.vn || 0 : 0; };
+  const dotDone = () => dotVisits() >= DOT_DAY;
+  function dotVisit() { const T = SV.trader; T.away = SV.walked || 0; T.vn = dotVisits() + 1; T.vday = today(); }
   Game.dotLeft = dotLeft;
+  Game.dotBonus = () => { const T = SV.trader; if (T.vday === today() && T.vn > 0) T.vn--; };
+  const DOT_SHUT = `Dot's closed up for today (${DOT_DAY} visits a day) - back tomorrow`;
   function openTrader() {
     const left = dotLeft();
     if (left) { toast(`Dot's on the road - back in ${fmtN(left)} steps`, 2); SFX.play('alert'); return; }
+    if (dotDone()) { toast(DOT_SHUT, 2.4); SFX.play('alert'); return; }
     refreshTrader(); dotVisit(); Game.save(); tTab = 'quests'; tSel = null; renderTrader();
   }
   function renderTrader() {
@@ -818,7 +827,7 @@ const NEXT_VERSION = '0.24.5';
         <div class="tlvl">Trader level ${L}${L < 5 ? ` · ${T.completed % 20}/20 quests to level ${L + 1}` : ' · max'}</div><div class="mbar xp"><i style="width:${L < 5 ? (T.completed % 20) / 20 * 100 : 100}%"></i></div></div></div>
       <div id="mtabs"><button data-t="quests">Quests</button><button data-t="shop">Shop</button><button data-t="sell">Sell</button></div>
       <div id="tpane"></div>`;
-    $('#tBack').onclick = () => { $('#menu').className = ''; renderHome(); toast(`Dot packs up her cart. Back in about ${fmtN(DOT_AWAY)} steps`, 2.4); };
+    $('#tBack').onclick = () => { $('#menu').className = ''; renderHome(); toast(dotDone() ? `Dot packs up her cart. That's all for today - back tomorrow` : `Dot packs up her cart. Back in about ${fmtN(DOT_AWAY)} steps`, 2.4); };
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === tTab); b.onclick = () => { tTab = b.dataset.t; tSel = null; SFX.play('ui'); renderTrader(); }; });
     ({ quests: tQuests, shop: tShop, sell: tSell })[tTab]();
   }
@@ -1189,13 +1198,14 @@ const NEXT_VERSION = '0.24.5';
     const rseg = SV.tutorialDone && DM.Route ? DM.Route.segHTML() : '';
     if (rseg && DM.Route.view() === 'route') { el.innerHTML = rseg + DM.Route.html(); DM.Route.bind(el, () => renderHome()); return; }
     refreshTrader();
-    const T = SV.trader, ready = T.active.filter(q => q.done || supplyReady(q)).length, away = dotLeft();
-    const traderCard = SV.tutorialDone ? `<div class="hcard trader${away ? ' away' : ''}"><div class="bicon dotmini">${DOT_SVG}</div>
-      <div class="hinfo"><div class="hname">${D.TRADER.name} <em>trader</em></div><div class="haddr">${away ? 'On the road · her cart is somewhere out there' : D.TRADER.place}</div>
+    const T = SV.trader, ready = T.active.filter(q => q.done || supplyReady(q)).length, away = dotLeft(), shut = !away && dotDone();
+    const traderCard = SV.tutorialDone ? `<div class="hcard trader${away || shut ? ' away' : ''}"><div class="bicon dotmini">${DOT_SVG}</div>
+      <div class="hinfo"><div class="hname">${D.TRADER.name} <em>trader</em></div><div class="haddr">${away || shut ? 'On the road · her cart is somewhere out there' : D.TRADER.place}</div>
       <div class="hmeta"><span>Level ${traderLevel()} · ${T.active.length}/2 jobs${ready ? ` · <b class="hot">${ready} ready to turn in</b>` : ''}</span></div>
       ${away ? `<div class="hdays">Dot's back in ${fmtN(away)} steps</div><div class="mbar dotbar"><i style="width:${Math.max(3, (1 - away / DOT_AWAY) * 100)}%"></i></div>`
-        : `<div class="hdays">Safe zone · ${icon('caps')} ${T.caps} caps</div>`}</div>
-      <div class="hbtns"><button class="mbtn${away ? ' ghost' : ''}" id="hTrader">${away ? 'Away' : 'Visit'}</button></div></div>` : '';
+        : shut ? `<div class="hdays">Closed for today · back tomorrow (${DOT_DAY} visits a day)</div>`
+        : `<div class="hdays">Safe zone · ${icon('caps')} ${T.caps} caps${dotVisits() ? ` · visit ${dotVisits() + 1} of ${DOT_DAY} today` : ''}</div>`}</div>
+      <div class="hbtns"><button class="mbtn${away || shut ? ' ghost' : ''}" id="hTrader">${away || shut ? 'Away' : 'Visit'}</button></div></div>` : '';
     const dailyCard = SV.tutorialDone && DM.Daily ? DM.Daily.cardHTML() : '';   // 0.18: the daily challenge house (daily.js)
     if (!list.length) { el.innerHTML = rseg + traderCard + dailyCard + `<div class="empty big">No houses scouted yet.<br>Walk - every ~1,000 steps turns up another door.</div>`; if ($('#hTrader')) $('#hTrader').onclick = openTrader; if (dailyCard) DM.Daily.bind(el); if (rseg) DM.Route.bind(el, () => renderHome()); return; }
     const bossCard = '';   // 0.23 ui: the weekly boss lives on its home tile only (was shown twice)
@@ -1419,11 +1429,11 @@ const NEXT_VERSION = '0.24.5';
       <div class="grid g4">${s.pack.map((e, i) => slot(e, 'pack', i)).join('')}${empty(packSlots() - s.pack.length)}</div>${A('pack')}
       ${!s.pack.length ? '<div class="ghint">Empty. Whatever you loot goes here; anything that does not fit is left on the floor.</div>' : !sel ? `<div class="ptools"><button class="mbtn sm" id="sAll">Stash all</button></div><div class="ghint">Tap an item to eat, equip, use or move it.</div>` : ''}`;
     } else {
-      const junk = junkOf(s), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n)), 0), away = dotLeft();
+      const junk = junkOf(s), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n)), 0), away = dotLeft(), shut = !away && dotDone();
       body = `<div class="ghead"><span class="kick">${stashHost ? 'Stash chest' : 'Stash chest · at your base'} · ${s.stash.length}/${stashSlots()}</span>${s.stash.length > 1 ? '<button class="mini" id="sSortS">Sort</button>' : ''}</div>
       <div class="grid g5">${s.stash.map((e, i) => slot(e, 'stash', i)).join('')}${empty(Math.min(s.stash.length ? (5 - s.stash.length % 5) % 5 + 5 : 10, stashSlots() - s.stash.length))}</div>${A('stash')}
       ${!s.stash.length ? '<div class="ghint">Nothing stored yet. Move things here from the Backpack tab so a bad run cannot cost you them.</div>' : ''}
-      ${junk.length && !sel ? `<div class="ptools"><button class="mbtn sm${away ? ' ghost' : ''}" id="sJunk"${away ? ' disabled' : ''}>${away ? `Dot is away · sell junk in ${fmtN(away)} steps` : `Sell junk to Dot · ${icon('caps')}${jv}`}</button></div>` : ''}`;
+      ${junk.length && !sel ? `<div class="ptools"><button class="mbtn sm${away || shut ? ' ghost' : ''}" id="sJunk"${away || shut ? ' disabled' : ''}>${away ? `Dot is away · sell junk in ${fmtN(away)} steps` : shut ? 'Dot is closed for today' : `Sell junk to Dot · ${icon('caps')}${jv}`}</button></div>` : ''}`;
     }
     el.innerHTML = seg + body;
     el.querySelectorAll('#gtabs button').forEach(b => { b.classList.toggle('on', b.dataset.g === gTab); b.onclick = () => { if (gTab === b.dataset.g) return; gTab = b.dataset.g; sel = null; SFX.play('ui'); renderStash(); }; });
@@ -1445,6 +1455,7 @@ const NEXT_VERSION = '0.24.5';
     const s = SV.survivor, junk = junkOf(s);
     if (!junk.length) return;
     if (dotLeft()) { toast(`Dot is on the road - back in ${fmtN(dotLeft())} steps`, 2); return; }
+    if (dotDone()) { toast(DOT_SHUT, 2.4); return; }
     const val = r => Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n)), tot = junk.reduce((a, r) => a + val(r), 0);
     sheetOpen(`<div class="kick">Auntie Dot · sell junk</div><h3>Sell ${junk.length} thing${junk.length === 1 ? '' : 's'} for ${tot} caps?</h3>
       <div class="jlist">${junk.map(r => `<div class="jrow">${icon(r.e.k)}<span>${esc(D.ITEMS[r.e.k].n)}${r.e.n > 1 ? ' x' + r.e.n : ''}</span><b>${icon('caps')}${val(r)}</b></div>`).join('')}</div>
@@ -1570,7 +1581,7 @@ const NEXT_VERSION = '0.24.5';
     ['Crew', 'About 1 house in 25 has a survivor hiding in a closet or a secret room (more in mansions and police stations). Talk to them: with a free bunk they move into your base (2 bunks, build up to 4). Each has a role - Scavenger (crew searches bring back more), Guard (horde-night defence), Medic (heals you each morning), Gardener (waters a plant a day), Tinkerer (cheaper repairs) - and levels up slowly. Each eats 1 food a day from your STASH; three hungry days and they leave a note (they never take anything). The more crew you have, the more a Crew search brings back.'],
     ['Strays', 'Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Move slowly near them (a small push on the joystick) until they trust you, then tap to coax them out - or offer food from your pack. One pet comes along on runs and at the base; up to 4 live with you. Dogs bark when a zombie spots you and sometimes sniff out a container with something good; cats make you quieter and bring little presents some mornings. Pets level from your steps. They never die: a zombie scare sends them running home, back the next day.'],
     ['Weekly boss', 'Every week (Monday to Sunday, New York time) a named boss holes up in a special house on everyone\'s list. Walk 5,000 steps that week to reach it, then fight it up to 2 times a day (90 seconds each). Red markers on the floor show where the next attack lands: a charge line, a slam ring, walkers being called. Its health is shared by your whole party for the whole week; when it falls, everyone who hit it gets a good item, caps and a chance at a boss cosmetic. Going down in a boss fight costs you nothing but the fight.'],
-    ['Trader', 'Auntie Dot (top of the Houses list) is a safe zone. Take up to 2 jobs from her board, turn them in for caps and a reward you choose. Every 20 jobs raises her trader level: harder jobs, better stock, more cosmetics. Sell her spare loot (or use Sell junk in the Stash tab). She does not stay put: after each visit she moves on and is back once you have walked about 3,000 more steps (her card counts down). Jobs you took keep counting while she is away; you turn them in on your next visit.'],
+    ['Trader', 'Auntie Dot (top of the Houses list) is a safe zone. Take up to 2 jobs from her board, turn them in for caps and a reward you choose. Every 20 jobs raises her trader level: harder jobs, better stock, more cosmetics. Sell her spare loot (or use Sell junk in the Stash tab). She does not stay put: after each visit she moves on and is back once you have walked about 3,000 more steps (her card counts down), up to 3 visits a day (a Dot stop on the daily route gives one more). Jobs you took keep counting while she is away; you turn them in on your next visit.'],
   ];
   function openHowTo() {
     sheetOpen(`<div class="kick">Dead Miles</div><h3>How to play</h3>
