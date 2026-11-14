@@ -254,3 +254,31 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 ## Done in 0.14.1 (owner: "I was able to build like 4 things today with just my 4k steps")
 - Base build steps fill at 50% of steps walked and every piece costs 2x the steps (so ~4x the walking per piece).
   Walls tier 1 = 6,000 build steps (~12k walked), generator 16,000 (~32k walked). Materials unchanged. Existing pools kept.
+
+## Done in 0.16 (real-world map, owner: "Make the map match the layout of my actual art style. It's terrible." / "Idk what map even does LOL" / "Map takes a long time to load.")
+- map.js rewritten without Leaflet or raster tiles (no CDN at all). The map is drawn on a canvas from OpenStreetMap vector data in
+  the Spooky flat style: dark streets with ink edges, lighter curbs and dashed centre lines on avenues, street names along the
+  streets; plum building roofs with ink outlines and a lit bevel, south-facing wall faces hanging below them (3/4 like the house
+  walls, brick or painted, some windows lit orange); teal parks with ink-rimmed trees; deep blue water with ripples; faint ground
+  grit; fog and drifting mist around a warm lamp-light pool. She is her own survivor sprite (walks when she moves). Places are the
+  house-list type icons on round badges (a copy of game.js's TYPEICON lives in map.js - keep them in step). A few zombie
+  silhouettes shuffle along the streets at the edge of the light, for mood only (they stay out of her light, they do nothing).
+- Pan (drag), pinch / wheel / +- zoom, a "back to me" button; dragging the view loads the square under it.
+- Speed: one Overpass query per ~700 m square (roads, building footprints, parks/water, shops + houses), 22 s timeout per mirror,
+  two mirrors; if both fail a light places-only query keeps landmarks working ("Streets did not load - places still work").
+  Squares are stored compactly (micro-degree ints) in IndexedDB (dm-next-map, LRU 30 squares) - not localStorage, so the map can
+  never fill the save's space; 0.9's dm9.osm.* keys are deleted. Squares older than 14 days refetch in the background.
+  The last square looked at opens straight away before any GPS answer; a quick low-accuracy getCurrentPosition (maximumAge
+  10 min) moves the camera and starts the fetch, the precise watch does claims. The streets layer is drawn once into an
+  off-screen canvas bigger than the screen and only redrawn when the view leaves it or the zoom changes. A "Scouting the
+  area..." pill shows while fetching instead of blocking.
+- Explaining it: a first-open explainer card (and the ? button): "This is your real neighbourhood..." with the 35 m / 3 a day /
+  on foot / walk-up / privacy rules. The bottom card: 3 pips + "2 of 3 landmarks found today" and the nearest place to scout
+  with a compass arrow and distance (or why nothing can be claimed: too fast, fuzzy GPS, all 3 found, "right here - walk away
+  and back"). Claimable places glow, near ones pulse, claimed ones get a green check; tapping a badge shows its name and
+  distance. A claim slides in "Added to your houses: Rite Aid · 512 Fulton St" (queued if two land together) with a burst.
+- Rules unchanged (35 m + half the GPS accuracy up to 15 m, 3/day, 60 m accuracy cap, 3-fast-readings drive lock for 45 s,
+  must have been 15 m beyond reach first, places within 700 m, houses nearest 45). One addition: a single reading that is
+  itself a car-speed jump from the last one cannot claim (it used to be able to, before the 3-reading lock kicked in).
+- Privacy unchanged: position only in memory while the map is open; the save holds no coordinates or OSM ids. The phone now
+  also keeps which ~700 m square was shown last (a square, never a point), next to the cached squares, outside the save.
