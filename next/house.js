@@ -89,7 +89,7 @@
     const elig = G.furn.filter(f => f.lootable && !f.noEmpty && f.art !== 'fridge' && !f.secretLoot && !f.lock && !(f.extra && f.extra.length));
     for (let i = elig.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [elig[i], elig[j]] = [elig[j], elig[i]]; }
     elig.slice(0, Math.round(elig.length * (L.emptyPct == null ? .2 : L.emptyPct))).forEach(f => f.empty = true);
-    for (const f of G.furn) if (f.lootable) { f.pre = f.empty ? [] : rollLoot(f.loot); if (f.extra) f.pre.push(...f.extra); } // rolled up front so Keen eye can sense rares
+    for (const f of G.furn) if (f.lootable) { f.pre = f.empty ? [] : rollLoot(f.loot); if (f.jack) f.pre.push(...D.rollJack(f.jack).filter(Boolean)); if (f.extra) f.pre.push(...f.extra); } // rolled up front so Keen eye can sense rares
     for (const zd of L.zombies || []) {
       const z = mkZombie(zd.x * T, zd.y * T, zd.st || 'idle', null);
       if (zd.hp) z.hp = z.maxHp = zd.hp; if (zd.dmg) z.dmgMul = zd.dmg; if (zd.kind) z.kind = zd.kind;
@@ -488,7 +488,7 @@
     if (it.act === 'Open') { openLoot(o, it); return; }
     if (it.drop) { pickUp(o); return; }
     if (it.act === 'Locked') { openLockChoice(it); return; }
-    if (it.act === 'KeyLocked') { toast(it.name === 'car' ? 'Locked - needs a brass key in your pack' : 'Key-locked door - needs a brass key in your pack', 2); SFX.play('alert'); return; }
+    if (it.act === 'KeyLocked') { toast(it.name === 'car' ? 'Locked - needs a brass key on your keyring' : L.keyRoom && L.keyRoom.keyHere ? 'Locked tight. The key has to be around here somewhere...' : 'Key-locked door - needs a brass key on your keyring', 2.4); SFX.play('alert'); return; }
     if (it.act === 'Unlock') { useKey(it); return; }
     const dur = it.dur || (it.act === 'Push' ? 1.7 : (it.corpse ? 1.4 : o.time) * searchMul());
     p.st = 'search'; p.stT = 0; p.search = { it, t: 0, dur, nextNoise: .25, nextFx: 0 };
@@ -515,10 +515,13 @@
     openLoot(o, it);
   }
   // ---- 0.8: brass keys open locked cars and key-locked rooms (nothing else does). The key is used up.
-  const hasKeyNow = () => G.pack.some(e => e.k === 'key');
+  // 0.10: the keyring - brass keys never take a pack slot and are never spilled; any left in the pack still work
+  const ring = () => { const s = S(); s.keys = Math.max(0, +s.keys || 0); return s; };
+  const hasKeyNow = () => ring().keys > 0 || G.pack.some(e => e.k === 'key');
   function useKey(it) {
-    const o = it.obj, i = G.pack.findIndex(e => e.k === 'key'); if (i < 0) return;
-    const e = G.pack[i]; e.n--; if (!e.n) G.pack.splice(i, 1);
+    const o = it.obj;
+    if (ring().keys > 0) S().keys--;
+    else { const i = G.pack.findIndex(e => e.k === 'key'); if (i < 0) return; const e = G.pack[i]; e.n--; if (!e.n) G.pack.splice(i, 1); }
     lastHud = ''; SFX.play('unlock'); DM.Game && DM.Game.save();
     if (o.keyDoor) {
       o.keyLock = null; o.solid = 0; o.swing = .001; o._key = null; buildSolid();
@@ -1714,13 +1717,14 @@
   const arrowsLeft = () => quiver().n + packCount('arrow');
   function useArrow() { if (quiver().n > 0) quiver().n--; else usePack('arrow'); }
   function roomFor(k) { // how many of k the pack can still take
-    if (isCos(k)) return 99;
+    if (isCos(k) || k === 'key') return 99;
     let room = k === 'arrow' ? Math.max(0, D.QUIVER - quiver().n) : 0; const m = stackMax(k);
     for (const e of G.pack) if (e.k === k) room += m - e.n;
     return room + (packSlots() - G.pack.length) * m;
   }
   function addToPack(k, n, d) { // tops up existing stacks first, then new slots; returns how many fit
     if (isCos(k)) { if (DM.Game && DM.Game.unlockCos) DM.Game.unlockCos(k); return n; }
+    if (k === 'key') { ring().keys += n; return n; }   // straight onto the keyring
     const m = stackMax(k); let left = n;
     if (k === 'arrow') { const q = quiver(), t = Math.min(left, Math.max(0, D.QUIVER - q.n)); q.n += t; left -= t; }
     for (const e of G.pack) if (e.k === k && e.n < m && left) { const t = Math.min(left, m - e.n); e.n += t; left -= t; }

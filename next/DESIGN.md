@@ -193,3 +193,10 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Real-world map (map.js): Map tab -> full-screen Leaflet/OSM map (tinted), GPS only while open, Overpass by ~700 m grid
   square (cached on the phone), landmark houses within ~35 m on foot (3/day, speed lockout as in the old street.js, must
   have been walked up to). Save keeps only type, name/street, seed and salted-hash dedupe keys (SV.map).
+
+## Done in 0.10 (brass keys, owner: "it feels useless", "less common")
+- Keyring: survivor.keys, no pack slot, never spilled; old pack/stash keys migrate onto it; give()/addToPack route keys there.
+- Generator v3 (GV 3, unstarted houses upgrade): locked rooms ~half as common (mansion/police 30%, pharmacy 20%, school 15%,
+  else 10% tried), cars 20% tried. Each locked room has one guaranteed prize (D.JACK: gun / meds / safe / stash by building),
+  the trunk too (trunk pool). ~50% of locked rooms hide their key in a container elsewhere in the same house (L.keyRoom.keyHere,
+  door toast hints at it). One key opens the whole car. House list shows a gold "🔑 locked room / car" tag. Keys stay rare.

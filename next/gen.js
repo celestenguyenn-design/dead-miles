@@ -458,10 +458,28 @@
     function keyExtras() {
       const kr = D.mulberry32((seed ^ 0x4b1d5eed) >>> 0);
       const kshuf = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(kr() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-      const pRoom = { mansion: .5, police: .5, school: .3 }[type] || .2, pCar = .42;
+      const V3 = (opts.gv || 1) >= 3;
+      // 0.10: rarer, but each one is worth a key (owner: "less common")
+      const pRoom = V3 ? ({ mansion: .3, police: .3, pharmacy: .2, school: .15 }[type] || .1) : ({ mansion: .5, police: .5, school: .3 }[type] || .2), pCar = V3 ? .2 : .42;
       const wantRoom = kr() < pRoom, wantCar = kr() < pCar;
       if (wantRoom) lockedRoom();
       if (wantCar) parkedCar();
+      if (V3) jackpots();
+      // 0.10: every locked room holds one guaranteed prize that fits the building, the car trunk too;
+      // about half the time the room's key is hidden in a drawer somewhere else in the same house.
+      function jackpots() {
+        if (L.keyRoom) {
+          const inRoom = furn.filter(f => f.keyRoom && f.loot && !f.secretLoot);
+          if (inRoom.length) inRoom[0].jack = { police: 'gun', pharmacy: 'meds', mansion: 'safe' }[type] || 'stash';
+          if (kr() < .5) {
+            const PREF = ['dresser', 'desk', 'night', 'side', 'cabinet', 'hutch', 'coat', 'locker', 'storage', 'shelves'];
+            const outs = furn.filter(f => f.loot && !f.keyRoom && !f.car && !f.secretLoot && !f.secret && !f.pocket && !f.lock && f.room !== 'o' && !f.empty);
+            const pick = kshuf(outs.filter(f => PREF.includes(f.loot)))[0] || kshuf(outs)[0];
+            if (pick) { pick.extra = (pick.extra || []).concat('key'); pick.noEmpty = 1; L.keyRoom.keyHere = 1; }
+          }
+        }
+        if (L.car) { const t = furn.find(f => f.car && f.car.half === 1); if (t) t.jack = 'trunk'; }
+      }
       function roomAtCell(x, y) { return roomOfCh[g[Math.floor(y)] && g[Math.floor(y)][Math.floor(x)]] || null; }
       function lockedRoom() {
         const bad = new Set(secOut.map(s => s.room));
