@@ -43,6 +43,31 @@
     laundry: { n: 'Laundromat', st: 'q', f: [F('washer', 1, 1, 34, { ...L_('washer', 'Washer', 1.4, 2.5), n: [3, 5] }), F('washer', 1, 1, 34, { place: 'c', n: [2, 4] }), F('fridge', 1, 1, 62, L_('cooler', 'Vending machine', 2, 4.5)), F('register', 3, 1, 34, { ...L_('register', 'Attendant counter', 1.6, 2.5), place: 'front', p: .7 })] },
     backroom: { n: 'Back room', st: 'g', f: [F('shelves', 2, 1, 58, L_('storage', 'Supply shelves', 2.4, 4)), F('boxes', 2, 1, 40, { place: 's' })] },
     cellar: { n: 'Wine cellar', st: 'x', f: [F('winerack', 2, 1, 50, { ...L_('wine', 'Wine rack', 2, 3), n: [2, 3] }), F('crate', 2, 1, 30, L_('cellar', 'Old crate', 2.4, 4))] },
+    // 0.14 (generator v4 only): extra rooms for more varied floor plans. Existing art and loot tables only.
+    great: { n: 'Kitchen & living', st: 'k', f: [F('fridge', 1, 1, 62, L_('fridge', 'Fridge', 2.4, 5.5)), F('counter', 2, 1, 32, L_('cabinet', 'Cabinets', 1.8, 2.5)), F('stove', 1, 1, 32), F('sink', 2, 1, 32),
+      F('drawers', 1, 1, 32, { ...L_('kdrawers', 'Kitchen drawers', 1.6, 3.5), p: .8 }), F('pantry', 2, 1, 62, { ...L_('pantry', 'Pantry', 2.6, 4.5), p: .45 }), F('sofa', 3, 1, 26, { sofa: 1, place: 'c' }),
+      F('tvstand', 3, 1, 26, { ...L_('tv', 'TV stand', 1.8, 2.5), place: 'c', p: .8 }), F('coffee', 3, 1, 16, { place: 'c', p: .6 }), F('island', 3, 1, 32, { ...L_('island', 'Island drawers', 1.8, 3), place: 'c', p: .35 }), F('armchair', 1, 1, 22, { place: 'c', p: .4 }), F('plant', 1, 1, 20, { p: .5 })] },
+    studio: { n: 'Studio', st: 'l', f: [F('bed', 2, 3, 18), F('fridge', 1, 1, 62, L_('fridge', 'Fridge', 2.4, 5.5)), F('counter', 2, 1, 32, L_('cabinet', 'Cabinets', 1.8, 2.5)), F('stove', 1, 1, 32), F('sink', 2, 1, 32),
+      F('nightstand', 1, 1, 24, L_('night', 'Nightstand', 1.5, 2)), F('wardrobe', 2, 1, 64, { ...L_('wardrobe', 'Wardrobe', 2.8, 5), lockable: 'easy', p: .8 }), F('sofa', 3, 1, 26, { sofa: 1, place: 'c', p: .6 }),
+      F('tvstand', 3, 1, 26, { ...L_('tv', 'TV stand', 1.8, 2.5), place: 'c', p: .6 }), F('drawers', 1, 1, 32, { ...L_('kdrawers', 'Kitchen drawers', 1.6, 3.5), p: .6 }), F('plant', 1, 1, 20, { p: .4 })] },
+    porch: { n: 'Front porch', st: 'c', f: [F('bench', 2, 1, 20, { p: .6 }), F('plant', 1, 1, 20, { n: [1, 2], p: .7 }), F('coat', 1, 1, 64, { ...L_('coat', 'Porch closet', 2.2, 4), p: .35 }), F('shoerack', 1, 1, 14, { p: .4 })] },
+    mudroom: { n: 'Mudroom', st: 'c', f: [F('coat', 1, 1, 64, L_('coat', 'Coat hooks', 2.2, 4)), F('shoerack', 1, 1, 14, { place: 's' }), F('bench', 2, 1, 20, { p: .6 }), F('shelves', 2, 1, 58, { ...L_('shelves', 'Mudroom shelves', 2.4, 4), p: .5 })] },
+    pantryrm: { n: 'Pantry', st: 'k', f: [F('pantry', 2, 1, 62, L_('pantry', 'Pantry', 2.6, 4.5)), F('shelves', 2, 1, 58, { ...L_('pantry', 'Pantry shelves', 2.4, 4), p: .7 }), F('trash', 1, 1, 26, { p: .3 })] },
+    laundryrm: { n: 'Laundry room', st: 'q', f: [F('washer', 1, 1, 34, { ...L_('washer', 'Washer', 1.4, 2.5), n: [1, 2] }), F('shelves', 2, 1, 58, { ...L_('shelves', 'Laundry shelves', 2.4, 4), p: .7 }), F('heater', 1, 1, 54, { p: .4 })] },
+    nursery: { n: "Kids' room", st: 'r', f: [F('cot', 1, 2, 12), F('dresser', 3, 1, 34, L_('dresser', 'Dresser', 2.4, 3.5)), F('crate', 2, 1, 30, { ...L_('side', 'Toy chest', 1.6, 3), p: .7 }), F('bookshelf', 2, 1, 62, { ...L_('books', 'Bookshelf', 2, 2.5), p: .4 }), F('plant', 1, 1, 20, { p: .3 })] },
+    wc: { n: 'Half bath', st: 'b', f: [F('toilet', 1, 1, 24), F('vanity', 2, 1, 30, L_('vanity', 'Vanity', 1.6, 2.5)), F('medcab', 1, 1, 0, { ...L_('medcab', 'Medicine cabinet', 1.5, 2), place: 'wall', solid: 0, p: .6 })] },
+    den: { n: 'Den', st: 'w', f: [F('bookshelf', 2, 1, 62, { ...L_('books', 'Bookshelf', 2, 2.5), p: .8 }), F('sofa', 3, 1, 26, { sofa: 1, p: .5 }), F('tvstand', 3, 1, 26, { ...L_('tv', 'TV stand', 1.8, 2.5), place: 'c', p: .7 }),
+      F('armchair', 1, 1, 22, { place: 'c', n: [1, 2] }), F('sidetable', 1, 1, 24, { ...L_('side', 'Side table', 1.4, 2), p: .6 }), F('plant', 1, 1, 20, { p: .5 })] },
+    sunroom: { n: 'Sunroom', st: 'l', f: [F('plant', 1, 1, 20, { n: [2, 3] }), F('armchair', 1, 1, 22, { place: 'c', n: [1, 2] }), F('sidetable', 1, 1, 24, { ...L_('side', 'Side table', 1.4, 2), p: .8 }), F('sofa', 3, 1, 26, { sofa: 1, p: .4 }), F('bench', 2, 1, 20, { p: .3 })] },
+    courtyard: { n: 'Courtyard', st: 'Y', f: [F('plant', 1, 1, 20, { n: [2, 3] }), F('bench', 2, 1, 20, { place: 'c', n: [1, 2] }), F('plant', 1, 1, 20, { place: 'c', n: [1, 2] }), F('crate', 2, 1, 30, { ...L_('storage', 'Garden chest', 2.2, 3.5), place: 's', p: .5 })] },
+  };
+  // 0.14 (v4): a few extra optional pieces so rooms of the same kind are not furnished the same way every time
+  const EXTRA4 = {
+    bedroom: [F('bookshelf', 2, 1, 62, { ...L_('books', 'Bookshelf', 2, 2.5), p: .25 }), F('plant', 1, 1, 20, { p: .3 }), F('armchair', 1, 1, 22, { place: 'c', p: .2 })],
+    living: [F('plant', 1, 1, 20, { p: .4 }), F('desk', 2, 1, 30, { ...L_('desk', 'Desk', 2, 2.5), p: .15, desk: 1 })],
+    office: [F('armchair', 1, 1, 22, { place: 'c', p: .3 })],
+    dining: [F('sidetable', 1, 1, 24, { ...L_('side', 'Sideboard', 1.4, 2), p: .4 })],
+    kitchen: [F('plant', 1, 1, 20, { p: .25 })],
   };
 
   // ---------------------------------------------------------------- building recipes
@@ -67,6 +92,355 @@
     any: '"If anything happens, lift the rug. Third board is loose. Don\'t tell your brother."',
   };
   const CHARS = 'ABCDEFGHIJKLMNPQRSTUVWXYZ123456789bcdefghijklmnpqrstuvwxyz';
+  const CHARS4 = 'ABCDEFGHIJKLMNPQRTUVWXY123456789bcdefghijklmnpqrstuvwxyz';   // v4: never 'S' / 'Z' (hidden room, attic)
+
+  // ---------------------------------------------------------------- generator v4 (0.14): floor-plan archetypes
+  // Owner: "The layouts all look the same." v1-3 build every house from one recipe (side hallway + fixed top band).
+  // v4 picks one of several believable plans per building type, mirrors it, and assigns rooms by size and by
+  // how many doors they have (bathrooms / closets are never walk-through rooms). Everything after the floor plan
+  // (furniture, secrets, locks, keys, zombies) is the same code as before.
+  const LEAF4 = new Set(['bath', 'wc', 'closet', 'pantryrm', 'laundryrm', 'cellar', 'armory', 'evidence', 'janitor', 'nurse', 'nursery', 'pharmback', 'storage', 'backroom']);
+  // [min short side, min area]
+  const MIN4 = { kitchen: [3, 15], living: [4, 16], dining: [3, 12], bedroom: [3, 12], study: [3, 12], office: [3, 9], den: [3, 12], sunroom: [3, 9], nursery: [3, 9],
+    bath: [3, 9], wc: [2, 4], closet: [2, 3], pantryrm: [2, 4], laundryrm: [2, 4], mudroom: [2, 6], cellar: [3, 9], great: [5, 35], studio: [6, 42],
+    gym: [5, 36], bullpen: [5, 30], classroom: [4, 16], lockers: [3, 12], breakroom: [3, 15], armory: [3, 6], evidence: [3, 6], storage: [3, 9], backroom: [3, 9], pharmback: [3, 12], nurse: [3, 9], janitor: [2, 4], hall: [2, 2] };
+  const PUBLIC4 = new Set(['living', 'dining', 'kitchen', 'great', 'den', 'sunroom', 'mudroom', 'hall', 'office', 'breakroom', 'bullpen', 'gym', 'study', 'lockers', 'classroom']);
+  const REQ4 = {
+    rowS: { req: ['kitchen', 'living', 'bedroom', 'bath'], opt: ['closet', 'pantryrm', 'laundryrm', 'mudroom', 'nursery', 'wc', 'den', 'office', 'closet'], fill: ['bedroom', 'closet'], must: ['kitchen', 'bedroom', 'bath'] },
+    rowL: { req: ['kitchen', 'living', 'dining', 'bedroom', 'bedroom', 'bath'], opt: ['bath', 'closet', 'office', 'nursery', 'laundryrm', 'pantryrm', 'den', 'sunroom', 'mudroom', 'wc', 'closet'], fill: ['bedroom', 'closet'], must: ['kitchen', 'bedroom', 'bath'] },
+    apt: { req: ['kitchen', 'living', 'bedroom', 'bath'], opt: ['closet', 'wc', 'laundryrm', 'office', 'closet'], fill: ['closet'], must: ['kitchen', 'bedroom', 'bath'] },
+    bodega: { req: ['storage', 'office', 'bath'], opt: ['backroom', 'closet', 'breakroom'], fill: ['storage'], must: [] },
+    laundro: { req: ['backroom', 'office', 'bath'], opt: ['storage', 'closet'], fill: ['backroom'], must: [] },
+    garage: { req: ['office', 'storage', 'bath'], opt: ['closet', 'breakroom', 'storage'], fill: ['storage'], must: [] },
+    pharmacy: { req: ['pharmback', 'office', 'bath', 'storage'], opt: ['closet', 'breakroom'], fill: ['storage'], must: ['pharmback'] },
+    school: { req: ['gym', 'classroom', 'classroom', 'classroom', 'nurse', 'bath', 'janitor', 'office'], opt: ['classroom', 'bath', 'storage', 'breakroom', 'office'], fill: ['classroom', 'storage'], must: ['bath'], tol: 3 },
+    police: { req: ['bullpen', 'armory', 'evidence', 'lockers', 'office', 'bath', 'breakroom'], opt: ['office', 'closet', 'storage', 'bath'], fill: ['office', 'closet'], must: ['armory', 'bath'], tol: 2 },
+    mansion: { req: ['kitchen', 'dining', 'living', 'study', 'bedroom', 'bedroom', 'bath', 'cellar', 'closet', 'bath'], opt: ['bedroom', 'nursery', 'office', 'laundryrm', 'pantryrm', 'sunroom', 'den', 'wc', 'closet'], fill: ['bedroom', 'closet', 'office'], must: ['kitchen', 'bedroom', 'bath'] },
+  };
+  const ARCH4 = {
+    rowS: ['side', 'center', 'rail', 'open', 'lhall', 'front'],
+    rowL: ['side', 'center', 'rail', 'open', 'lhall', 'front'],
+    apt: ['studio', 'corridor', 'through', 'twobed', 'galley'],
+    shop: ['side', 'back', 'direct', 'nook'],
+    big: ['spine', 'cross', 'twin'],
+    mansion: ['central', 'wings', 'grand', 'court'],
+  };
+  GEN.ARCH4 = ARCH4;
+
+  function plan4(type, I, rnd, rc) {
+    const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+    const pick = a => a[Math.floor(rnd() * a.length)];
+    const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const rooms = [], links = [];
+    const bw = b => b.x1 - b.x0 + 1, bh = b => b.y1 - b.y0 + 1, area = b => bw(b) * bh(b);
+    const box = (x0, y0, x1, y1) => ({ x0, y0, x1, y1 });
+    const add = (b, t, o) => { const r = Object.assign({ x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1, t: t || null }, o || {}); rooms.push(r); return r; };
+    const link = (a, b) => { if (a && b && a !== b && !links.some(l => (l[0] === a && l[1] === b) || (l[0] === b && l[1] === a))) links.push([a, b]); };
+    // a strip of n tiles off side s: [strip, rest] (the wall between them is one tile)
+    const take = (b, s, n) => s === 's' ? [box(b.x0, b.y1 - n + 1, b.x1, b.y1), box(b.x0, b.y0, b.x1, b.y1 - n - 1)]
+      : s === 'n' ? [box(b.x0, b.y0, b.x1, b.y0 + n - 1), box(b.x0, b.y0 + n + 1, b.x1, b.y1)]
+      : s === 'w' ? [box(b.x0, b.y0, b.x0 + n - 1, b.y1), box(b.x0 + n + 1, b.y0, b.x1, b.y1)]
+      : [box(b.x1 - n + 1, b.y0, b.x1, b.y1), box(b.x0, b.y0, b.x1 - n - 1, b.y1)];
+    const parts = (total, mn, mx) => { const o = []; let rem = total; while (rem > 0) { let s = ri(mn, mx); if (rem - s - 1 < mn) s = rem; o.push(s); rem -= s + 1; } return o; };
+    const slice = (b, axis, sizes) => { const o = []; let p = axis === 'y' ? b.y0 : b.x0; for (const s of sizes) { o.push(axis === 'y' ? box(b.x0, p, b.x1, p + s - 1) : box(p, b.y0, p + s - 1, b.y1)); p += s + 1; } return o; };
+    const ok = b => b && bw(b) >= 2 && bh(b) >= 2;
+    // highest score wins; scores are rolled once each, in list order (never inside a sort: engines sort differently)
+    const best = (arr, f) => { const sc = arr.map(f); let bi = 0; for (let i = 1; i < sc.length; i++) if (sc[i] > sc[bi]) bi = i; return arr[bi]; };
+    const need = (...bs) => { for (const b of bs) if (!ok(b)) throw 0; };
+    // rooms along a corridor (or any room list): cor is on side `side` of region reg. Deep rooms split into a
+    // near room (on the corridor) and a far room that opens into it; now and then a room opens only into its neighbour.
+    function along(reg, cors, side, mn, mx, o = {}) {
+      need(reg); cors = [].concat(cors);
+      const vert = side === 'w' || side === 'e', out = [];
+      const pcs = slice(reg, vert ? 'y' : 'x', parts(vert ? bh(reg) : bw(reg), mn, mx));
+      let prev = null;
+      for (const p of pcs) {
+        need(p);
+        const depth = vert ? bw(p) : bh(p);
+        let near = p, far = null;
+        const dmin = o.dmin || 3;
+        if (depth >= 2 * dmin + 1 && rnd() < (depth >= 9 ? .65 : .45) * (o.split == null ? 1 : o.split)) {
+          const k = ri(dmin, depth - dmin - 1);
+          [near, far] = take(p, side, k);
+        }
+        const r = add(near, o.t);
+        const c = cors.find(c => shared(r, c));
+        if (prev && rnd() < (o.chain || .12) && shared(r, prev)) link(r, prev);
+        else if (c) link(r, c); else if (prev && shared(r, prev)) link(r, prev); else throw 0;
+        out.push(r);
+        if (far) {
+          const f = add(far); out.push(f);
+          // the far room opens into the near one, or (on wide plans) its neighbour's far room
+          link(f, r);
+        }
+        prev = r;
+      }
+      return out;
+    }
+    // hang a room on whichever neighbour suits it best (a hallway or a public room first)
+    function attach(r, pool) {
+      const c = (pool || rooms).filter(q => q !== r && shared(q, r));
+      if (!c.length) throw 0;
+      const sc = q => (q.t === 'hall' ? 3 : PUBLIC4.has(q.t) ? 2 : q.t ? (LEAF4.has(q.t) ? -5 : 0) : 1) + rnd();
+      const q = best(c, sc); link(r, q); return q;
+    }
+    const bandSplit = (b, kinds) => { // one or two rooms side by side
+      if (kinds.length > 1 && bw(b) >= 9) { const k = ri(Math.floor(bw(b) * .4), Math.ceil(bw(b) * .6) - 1); const [a, c] = take(b, 'w', k); need(a, c); const A = add(a, kinds[0]), C = add(c, kinds[1]); return [A, C]; }
+      return [add(b, kinds[0])];
+    };
+
+    let entry = null, front = null, arch = '';
+    const req = REQ4[type];
+    const why = w => { if (GEN.dbg) GEN.dbg(arch, w); return null; };
+    const drop = new Set();   // required kinds already covered by a combined room
+    let req2 = [];            // extra required kinds for this plan
+    try {
+      if (type === 'rowS' || type === 'rowL') {
+        const big = type === 'rowL';
+        arch = pick(ARCH4[type]);
+        let C = I, porch = null, back = null;
+        if (rnd() < (big ? .3 : .22)) { const [p, rest] = take(C, 's', 2); porch = add(p, 'porch'); C = rest; arch += '+porch'; }
+        if (rnd() < (big ? .35 : .2) && arch.indexOf('lhall') < 0) { const [b, rest] = take(C, 'n', ri(3, 4)); back = b; C = rest; arch += '+back'; }
+        need(C);
+        const hw = big ? ri(2, 3) : 2, rmn = 3, rmx = big ? 6 : 5;
+        const kind = arch.split('+')[0];
+        const kband = (H, p) => { // kitchen (+dining) across the back
+          if (rnd() >= p) return H;
+          const [b, rest] = take(H, 'n', ri(4, big ? 6 : 5)); need(rest);
+          const ks = big && rnd() < .75 ? shuffle(['kitchen', 'dining']) : rnd() < .25 ? ['great'] : ['kitchen'];
+          if (ks[0] === 'great') { if (bh(b) < 5) ks[0] = 'kitchen'; else { drop.add('kitchen'); drop.add('living'); } }
+          H.band = bandSplit(b, ks); return rest;
+        };
+        const linkBand = (band, hubs) => { if (!band) return; for (const b of band) { const h = hubs.find(h => shared(b, h)); if (h) link(b, h); } for (const b of band) if (!links.some(l => l.includes(b))) attach(b, band.concat(hubs)); if (band.length === 2 && rnd() < .5) link(band[0], band[1]); };
+        if (kind === 'side' || kind === 'front') {
+          const H0 = { ...C }; let H = kband(H0, kind === 'front' ? .4 : .6);
+          let fr = null;
+          if (kind === 'front') { const [f, rest] = take(H, 's', ri(4, 5)); need(rest); fr = add(f, rnd() < .8 ? 'living' : null); H = rest; }
+          const [hall, reg] = take(H, 'w', hw); need(hall, reg);
+          const hl = add(hall, 'hall', { spine: 1 });
+          along(reg, hl, 'w', rmn, rmx);
+          linkBand(H0.band, [hl]);
+          if (fr) { link(fr, hl); entry = fr; } else entry = hl;
+        } else if (kind === 'center') {
+          const H0 = { ...C }; const H = kband(H0, .5);
+          const W = bw(H), lw = ri(3, W - hw - 2 - 3);
+          const [l, rest] = take(H, 'w', lw), [hall, r] = take(rest, 'w', hw); need(l, hall, r);
+          const hl = add(hall, 'hall', { spine: 1 });
+          along(l, hl, 'e', rmn, rmx); along(r, hl, 'w', rmn, rmx);
+          linkBand(H0.band, [hl]); entry = hl;
+        } else if (kind === 'rail') { // railroad: a line of walk-through rooms, small rooms off the side
+          const sw = big ? ri(4, 6) : ri(3, 4);
+          const [col, main] = take(C, 'e', sw); need(col, main);
+          const chain = slice(main, 'y', parts(bh(main), big ? 4 : 3, big ? 6 : 5)).reverse().map(b => add(b));
+          for (let i = 1; i < chain.length; i++) link(chain[i], chain[i - 1]);
+          chain[0].t = rnd() < .75 ? 'living' : null;
+          const ki = rnd() < .6 ? chain.length - 1 : ri(1, chain.length - 1); if (chain[ki] && !chain[ki].t && area(chain[ki]) >= 12) chain[ki].t = 'kitchen';
+          for (const b of slice(col, 'y', parts(bh(col), 3, big ? 5 : 4))) { need(b); attach(add(b), chain); }
+          entry = chain[0];
+        } else if (kind === 'open') { // open plan: kitchen + living in one big front room
+          const [g, rest] = take(C, 's', ri(5, big ? 8 : 7)); need(g, rest);
+          const gr = add(g, 'great'); drop.add('kitchen'); drop.add('living'); entry = gr;
+          const v = pick(['cross', 'side', 'none']);
+          if (v === 'cross') { const [h, top] = take(rest, 's', 2); need(h, top); const hl = add(h, 'hall', { spine: 1 }); link(hl, gr); along(top, hl, 's', 3, big ? 6 : 5); }
+          else if (v === 'side') { const [h, reg] = take(rest, 'w', 2); need(h, reg); const hl = add(h, 'hall', { spine: 1 }); link(hl, gr); along(reg, hl, 'w', 3, big ? 6 : 5); }
+          else along(rest, gr, 's', 3, big ? 6 : 5, { chain: .2 });
+          arch += '/' + v;
+        } else { // lhall: the hall runs up one side, then turns across the house
+          const [top, r1] = take(C, 'n', ri(4, big ? 6 : 5)), [hh, r2] = take(r1, 'n', 2), [vh, reg] = take(r2, 'w', 2); need(top, hh, vh, reg);
+          const H1 = add(hh, 'hall', { spine: 1 }), V = add(vh, 'hall'); link(V, H1);
+          along(top, H1, 's', 3, big ? 6 : 5); along(reg, [V, H1], 'w', 3, big ? 6 : 5);
+          entry = V;
+        }
+        if (back) { const bs = bandSplit(back, rnd() < .5 ? [null, null] : [null]); for (const b of bs) { b.opt = 1; attach(b); } }
+        if (porch) { link(porch, entry); entry = porch; }
+      } else if (type === 'apt') {
+        arch = pick(ARCH4.apt);
+        if (arch === 'studio') { // one big room + bath; maybe a tiny entry hall
+          const [col, main] = take(I, 'w', ri(3, 4)); need(col, main);
+          const st = add(main, 'studio'); drop.add('kitchen'); drop.add('living'); drop.add('bedroom');
+          if (rnd() < .55) { const [h, up] = take(col, 's', ri(2, 3)); need(h, up); const hl = add(h, 'hall'); link(hl, st); entry = hl;
+            for (const b of slice(up, 'y', parts(bh(up), 3, 4))) attach(add(b), [hl, st]); }
+          else { entry = st; for (const b of slice(col, 'y', parts(bh(col), 3, 5))) attach(add(b), [st]); }
+        } else if (arch === 'corridor') {
+          const [b, rest] = take(I, 'n', ri(4, 5)); need(b, rest);
+          const ks = rnd() < .3 ? ['great'] : shuffle(['living', 'kitchen']); if (ks[0] === 'great') { drop.add('kitchen'); drop.add('living'); }
+          const band = bandSplit(b, ks);
+          const [h, reg] = take(rest, 'w', 2); need(h, reg); const hl = add(h, 'hall', { spine: 1 });
+          along(reg, hl, 'w', 3, 4, { split: .5 }); for (const x of band) { if (shared(x, hl)) link(x, hl); else attach(x, band); }
+          entry = hl;
+        } else if (arch === 'through') { // walk straight into the living room, everything opens off it
+          const [fb, back] = take(I, 's', ri(5, 6)); need(fb, back);
+          const fr = rnd() < .6 && bw(fb) >= 10 ? bandSplit(fb, shuffle(['living', 'kitchen'])) : [add(fb, 'living')];
+          const lv = fr.find(r => r.t === 'living'); entry = lv; if (fr.length > 1) link(fr[0], fr[1]);
+          along(back, fr, 's', 3, 6, { split: 0, chain: .3 });
+        } else if (arch === 'twobed') {
+          const W = bw(I), lw = ri(5, W - 2 - 2 - 4);
+          const [l, rest] = take(I, 'w', lw), [h, r] = take(rest, 'w', 2); need(l, h, r);
+          const hl = add(h, 'hall', { spine: 1 });
+          const [lb, lt] = take(l, 's', ri(5, 7)); need(lb);
+          const gr = add(lb, 'great'); drop.add('kitchen'); drop.add('living'); link(gr, hl);
+          if (ok(lt)) attach(add(lt), [gr, hl]);
+          along(r, hl, 'w', 4, 5, { split: 0 }); entry = rnd() < .5 ? hl : gr;
+          req2 = ['bedroom'];
+        } else { // galley: a narrow kitchen beside the living room, bedroom + bath behind
+          const [fb, back] = take(I, 's', ri(5, 6)); need(fb, back);
+          const [k, lvb] = take(fb, 'w', 3); need(k, lvb);
+          const K = add(k, 'kitchen'), LV = add(lvb, 'living'); link(K, LV); entry = LV;
+          const [h, top] = take(back, 's', 2);
+          if (rnd() < .5 && bh(back) >= 5) { const hl = add(h, 'hall', { spine: 1 }); link(hl, LV); along(top, hl, 's', 3, 6, { split: 0 }); }
+          else { const tops = slice(box(back.x0, back.y0, back.x1, back.y1), 'x', parts(bw(back), 3, 6)).map(b => add(b)); for (const t of tops) attach(t, [LV, K]); }
+        }
+      } else if (rc.front && (type === 'bodega' || type === 'laundro' || type === 'garage' || type === 'pharmacy')) {
+        arch = pick(ARCH4.shop);
+        const [fb, B] = take(I, 's', ri(rc.front[0], rc.front[1])); need(fb, B);
+        let st;
+        if (arch === 'nook') { const [nk, sb] = take(fb, 'e', ri(3, 4)); need(nk, sb); st = add(sb, rc.front[2]); link(add(nk), st); arch += pick(['/side', '/direct']); }
+        else st = add(fb, rc.front[2]);
+        entry = front = st;
+        const sub = arch.replace('nook/', '');
+        if (sub === 'side') { const [h, reg] = take(B, 'w', 2); need(h, reg); const hl = add(h, 'hall', { spine: 1 }); link(hl, st); along(reg, hl, 'w', 3, 5); }
+        else if (sub === 'back') { const [h, reg] = take(B, 's', 2); need(h, reg); const hl = add(h, 'hall', { spine: 1 }); link(hl, st); along(reg, hl, 's', 3, 6); }
+        else along(B, [st].concat(rooms.filter(r => r !== st)), 's', 3, 6, { chain: .2 });
+      } else if (type === 'school' || type === 'police') {
+        arch = pick(ARCH4.big);
+        const hw = ri(2, 3), topK = type === 'school' ? 'gym' : 'bullpen';
+        const [lb, B] = take(I, 's', ri(4, 5)); need(lb, B);
+        const lob = add(lb, 'lobby'); entry = front = lob;
+        if (arch === 'spine') {
+          const [tb, H] = take(B, 'n', ri(5, 7)); need(tb, H); const T = add(tb, topK);
+          const lw = ri(Math.floor((bw(H) - hw) / 2) - 2, Math.floor((bw(H) - hw) / 2) + 2);
+          const [l, rest] = take(H, 'w', lw), [h, r] = take(rest, 'w', hw); need(l, h, r);
+          const hl = add(h, 'hall', { spine: 1 }); link(hl, lob); link(T, hl);
+          along(l, hl, 'e', 4, 6); along(r, hl, 'w', 4, 6);
+        } else if (arch === 'cross') {
+          const [tp, r1] = take(B, 'n', ri(6, 8)), [xh, low] = take(r1, 'n', hw); need(tp, xh, low);
+          const X = add(xh, 'hall', { spine: 1 });
+          const lw = ri(Math.floor((bw(low) - hw) / 2) - 2, Math.floor((bw(low) - hw) / 2) + 2);
+          const [l, rest] = take(low, 'w', lw), [h, r] = take(rest, 'w', hw); need(l, h, r);
+          const V = add(h, 'hall'); link(V, X); link(V, lob);
+          along(l, V, 'e', 4, 6); along(r, V, 'w', 4, 6);
+          const tops = along(tp, X, 's', 5, 9, { split: 0 });
+          tops.sort((a, b) => area(b) - area(a))[0].t = topK;
+        } else { // twin: a hallway down each side, rooms in the middle, the big room across the back
+          const [tb, H] = take(B, 'n', ri(5, 7)); need(tb, H); const T = add(tb, topK);
+          const [hl0, r] = take(H, 'w', hw), [hr0, mid] = take(r, 'e', hw); need(hl0, hr0, mid);
+          const HL = add(hl0, 'hall', { spine: 1 }), HR = add(hr0, 'hall'); link(HL, lob); link(HR, lob); link(T, HL); if (rnd() < .6) link(T, HR);
+          if (bw(mid) >= 8) { const [ml, mr] = take(mid, 'w', ri(Math.floor(bw(mid) / 2) - 1, Math.floor(bw(mid) / 2))); need(ml, mr); along(ml, HL, 'w', 4, 6, { split: 0 }); along(mr, HR, 'e', 4, 6, { split: 0 }); }
+          else along(mid, HL, 'w', 4, 6, { split: 0 });
+        }
+      } else if (type === 'mansion') {
+        arch = pick(ARCH4.mansion);
+        if (arch === 'central') {
+          const [fb, B] = take(I, 's', ri(4, 5)); const fo = add(fb, 'foyer'); entry = front = fo;
+          const [tb, H] = take(B, 'n', ri(6, 7)); need(tb, H); const band = bandSplit(tb, shuffle(['kitchen', 'dining']));
+          const hw = 3, lw = ri(Math.floor((bw(H) - hw) / 2) - 2, Math.floor((bw(H) - hw) / 2) + 2);
+          const [l, rest] = take(H, 'w', lw), [h, r] = take(rest, 'w', hw); need(l, h, r);
+          const hl = add(h, 'hall', { spine: 1 }); link(hl, fo);
+          along(l, hl, 'e', 4, 6); along(r, hl, 'w', 4, 6);
+          for (const b of band) { if (shared(b, hl)) link(b, hl); } for (const b of band) if (!links.some(l => l.includes(b))) attach(b, band); if (rnd() < .5) link(band[0], band[1]);
+        } else if (arch === 'wings') { // foyer in the middle, a gallery across, a wing hallway on each side
+          const [fb, B] = take(I, 's', ri(5, 6)); need(fb, B);
+          const fw = ri(7, 9), lx = ri(Math.floor((bw(fb) - fw) / 2) - 1, Math.floor((bw(fb) - fw) / 2) + 1);
+          const [fl, r1] = take(fb, 'w', lx - 1), [fm, fr] = take(r1, 'w', fw); need(fl, fm, fr);
+          const fo = add(fm, 'foyer'); entry = front = fo;
+          link(add(fl), fo); link(add(fr), fo);
+          const [gal, up] = take(B, 's', 2); need(gal, up); const G = add(gal, 'hall', { spine: 1 }); link(G, fo);
+          const ww = ri(8, 9);
+          const [lw, r2] = take(up, 'w', ww), [rw, mid] = take(r2, 'e', ww); need(lw, rw, mid);
+          const [lh, lr] = take(lw, 'e', 2), [rh, rr] = take(rw, 'w', 2); need(lh, lr, rh, rr);
+          const LH = add(lh, 'hall'), RH = add(rh, 'hall'); link(LH, G); link(RH, G);
+          along(lr, LH, 'e', 4, 6, { split: 0 }); along(rr, RH, 'w', 4, 6, { split: 0 });
+          const ms = slice(mid, 'y', parts(bh(mid), 5, 7)).reverse().map(b => add(b));
+          ms[0] && link(ms[0], G); for (let i = 1; i < ms.length; i++) { if (rnd() < .5 && shared(ms[i], LH)) link(ms[i], LH); else link(ms[i], ms[i - 1]); }
+          if (ms.length >= 2) { ms[ms.length - 1].t = 'kitchen'; ms[ms.length - 2].t = 'dining'; }
+        } else if (arch === 'grand') { // a grand foyer with the main rooms opening off it
+          const fh = ri(7, 9), [fb, up] = take(I, 's', fh); need(fb, up);
+          const fw = ri(8, 10), lx = ri(Math.floor((bw(fb) - fw) / 2) - 2, Math.floor((bw(fb) - fw) / 2) + 2);
+          const [fl, r1] = take(fb, 'w', lx - 1), [fm, fr] = take(r1, 'w', fw); need(fl, fm, fr);
+          const fo = add(fm, 'foyer'); entry = front = fo;
+          along(fl, fo, 'e', 3, 5, { split: .6 }); along(fr, fo, 'w', 3, 5, { split: .6 });
+          const [xh, top] = take(up, 's', ri(2, 3)); need(xh, top); const X = add(xh, 'hall', { spine: 1 }); link(X, fo);
+          along(top, X, 's', 4, 7, { dmin: 4 });
+        } else { // court: rooms around a courtyard, a ring of hallways
+          const [fb, B] = take(I, 's', ri(4, 5)); need(fb, B); const fo = add(fb, 'foyer'); entry = front = fo;
+          const [tr, r1] = take(B, 'n', ri(5, 6)), [th, r2] = take(r1, 'n', 2); need(tr, th, r2);
+          const ow = ri(5, 6), [lr, r3] = take(r2, 'w', ow), [lh, r4] = take(r3, 'w', 2), [rr, r5] = take(r4, 'e', ow), [rh, ct] = take(r5, 'e', 2); need(lr, lh, rr, rh, ct);
+          const TH = add(box(lh.x0, th.y0, rh.x1, th.y1), 'hall', { spine: 1 });
+          // the top hall only spans between the side halls: the outer top corners join the outer room columns
+          const LH = add(lh, 'hall'), RH = add(rh, 'hall'), CT = add(ct, 'courtyard');
+          link(LH, TH); link(RH, TH); link(LH, fo); link(RH, fo); link(CT, rnd() < .5 ? fo : TH);
+          // corners next to the top hall belong to the side room columns
+          const lcol = box(lr.x0, th.y0, lr.x1, lr.y1), rcol = box(rr.x0, th.y0, rr.x1, rr.y1);
+          const lp = along(lcol, LH, 'e', 4, 6, { split: 0 }), rp = along(rcol, RH, 'w', 4, 6, { split: 0 });
+          along(tr, [TH].concat(lp, rp), 's', 4, 7, { split: 0 });
+          for (const r of rooms) if (!links.some(l => l.includes(r))) attach(r);
+          drop.add('closet');
+        }
+      } else return null;
+    } catch (e) { if (e === 0) return why('geom'); throw e; }
+    if (!entry || entry.y1 !== I.y1) return why('entry');
+    for (const r of rooms) if (!ok(r)) return why('small');
+    // every room linked to the entrance
+    const seen = new Set([entry]), q = [entry];
+    while (q.length) { const a = q.pop(); for (const [x, y] of links) { const b = x === a ? y : y === a ? x : null; if (b && !seen.has(b)) { seen.add(b); q.push(b); } } }
+    if (seen.size !== rooms.length) return why('island');
+
+    // ---- not enough rooms for this building? split the biggest free rooms (the new part opens into the old one)
+    const needN = req.req.filter(t => !drop.has(t)).length + req2.length - rooms.filter(r => r.t && r.t !== 'hall' && r.t !== 'porch').length + (rooms.length > 8 ? 1 : 0);
+    for (let guard = 0; guard < 12 && rooms.filter(r => !r.t).length < needN; guard++) {
+      const c = rooms.filter(r => !r.t && Math.max(bw(r), bh(r)) >= 7).sort((a, b) => area(b) - area(a))[0];
+      if (!c) break;
+      const vert = bw(c) >= bh(c), len = vert ? bw(c) : bh(c), k = ri(3, len - 4);
+      const side = vert ? (rnd() < .5 ? 'w' : 'e') : (rnd() < .5 ? 'n' : 's');
+      if (c === entry && side === 's') continue;
+      const [nb, rest] = take(c, side, k);
+      Object.assign(c, rest);
+      const n = add(nb);
+      for (const l of links) for (let i = 0; i < 2; i++) if (l[i] === c && !shared(c, l[1 - i]) && shared(n, l[1 - i])) l[i] = n;
+      link(n, c);
+    }
+    if (entry.y1 !== I.y1) return why('entry2');
+    // ---- room kinds: required ones by size and number of doors, then optional extras, then fillers
+    const deg =r => links.reduce((n, l) => n + (l[0] === r || l[1] === r ? 1 : 0), 0) + (r === entry ? 1 : 0);
+    const fits = (r, t) => { const m = MIN4[t] || [3, 9]; return Math.min(bw(r), bh(r)) >= m[0] && area(r) >= m[1] && !(LEAF4.has(t) && deg(r) > 1) && !(r === entry && LEAF4.has(t)); };
+    const BIGT = ['great', 'studio', 'gym', 'bullpen', 'living', 'kitchen', 'dining', 'classroom', 'lockers', 'breakroom', 'study', 'bedroom', 'pharmback', 'cellar', 'office', 'storage', 'backroom', 'den'];
+    const need4 = req.req.filter(t => !drop.has(t)).concat(req2);
+    for (const r of rooms) if (r.t && need4.includes(r.t)) need4.splice(need4.indexOf(r.t), 1);
+    const ord = t => (LEAF4.has(t) && !BIGT.includes(t) ? -100 + (MIN4[t] || [3, 9])[1] : 0) + (BIGT.indexOf(t) < 0 ? 99 : BIGT.indexOf(t));   // dead-end-only kinds (bath...) first, then big rooms
+    need4.sort((a, b) => ord(b) < ord(a) ? 1 : ord(b) > ord(a) ? -1 : 0);
+    let missing = [];
+    for (const t of need4) {
+      const c = rooms.filter(r => !r.t && fits(r, t));
+      if (!c.length) { missing.push(t); continue; }
+      const nearEntry = r => r === entry || links.some(l => (l[0] === r && l[1] === entry) || (l[1] === r && l[0] === entry));
+      const sc = r => {
+        let s = (BIGT.includes(t) ? area(r) : -area(r)) * (.7 + rnd() * .6);
+        if (t === 'living' && nearEntry(r)) s += 12;
+        if ((t === 'bedroom' || t === 'study') && r === entry) s -= 40;
+        if (PUBLIC4.has(t) && deg(r) > 1) s += 4;
+        if (t === 'bedroom' && deg(r) > 2) s -= 10;
+        return s;
+      };
+      best(c, sc).t = t;
+    }
+    if (missing.some(t => req.must.includes(t)) || missing.length > (req.tol || (rooms.length > 9 ? 2 : 1)) || !rooms.some(r => r.t === 'classroom' || type !== 'school')) return why('missing:' + missing.join(','));
+    const opt = shuffle(req.opt.slice());
+    for (const r of shuffle(rooms.filter(r => !r.t))) {
+      let t = opt.find(t => fits(r, t));
+      if (t) opt.splice(opt.indexOf(t), 1);
+      else t = shuffle(req.fill.slice()).find(t => fits(r, t)) || (deg(r) > 1 || r === entry ? 'hall' : 'closet');
+      r.t = t;
+    }
+    // ---- mirror half the time (doors are placed afterwards, so they follow)
+    if (rnd() < .5) { for (const r of rooms) { const a = I.x0 + I.x1 - r.x1, b = I.x0 + I.x1 - r.x0; r.x0 = a; r.x1 = b; } arch += '~'; }
+    return { rooms, links, entry, front, arch };
+  }
+  // the wall two rooms share, if any: {v: vertical wall, x|y, lo..hi along it}
+  function shared(a, b) {
+    if (a.x1 + 2 === b.x0 || b.x1 + 2 === a.x0) { const lo = Math.max(a.y0, b.y0), hi = Math.min(a.y1, b.y1); if (lo <= hi) return { v: 1, x: a.x1 + 2 === b.x0 ? a.x1 + 1 : b.x1 + 1, lo, hi }; }
+    if (a.y1 + 2 === b.y0 || b.y1 + 2 === a.y0) { const lo = Math.max(a.x0, b.x0), hi = Math.min(a.x1, b.x1); if (lo <= hi) return { v: 0, y: a.y1 + 2 === b.y0 ? a.y1 + 1 : b.y1 + 1, lo, hi }; }
+    return null;
+  }
 
   // ---------------------------------------------------------------- generator
   GEN.generate = function (type, seed, opts = {}) {
@@ -87,6 +461,7 @@
     // 0.9 (generator v2, houses scouted from 0.9 on): walkways in small rooms, containers open at the front, no sealed-off
     // floor, rugs on open floor. Houses already in a list keep v1, so they (and a saved half-done run) stay exactly the same.
     const V2 = (opts.gv || 1) >= 2;
+    const V4 = (opts.gv || 1) >= 4;   // 0.14: floor-plan archetypes (plan4)
 
     // secrets chosen first: they reserve space around the house
     const nSec = ri(rc.secrets[0], rc.secrets[1]);
@@ -102,12 +477,32 @@
 
     const rooms = [], doors = []; // doors: {x, y, a, b, horiz}
     let ci = 0;
-    const addRoom = (t, x0, y0, x1, y1) => { const r = { t, x0, y0, x1, y1, ch: CHARS[ci++], id: rooms.length }; rooms.push(r); return r; };
+    const addRoom = (t, x0, y0, x1, y1) => { const r = { t, x0, y0, x1, y1, ch: (V4 ? CHARS4 : CHARS)[ci++], id: rooms.length }; rooms.push(r); return r; };
     const door = (x, y, a, b, horiz) => doors.push({ x, y, a, b, horiz });
     let top = yT + 1, bottom = yB - 1;
     const left = 2, right = xR - 1;
 
-    let front = null;
+    let front = null, spine = null, fdx, plan = null, entry4 = null;
+    if (V4) {
+      plan = plan4(type, { x0: left, y0: top, x1: right, y1: bottom }, rnd, rc);
+      if (!plan) return null;
+      const idx = new Map();
+      for (const p of plan.rooms) { const r = addRoom(p.t, p.x0, p.y0, p.x1, p.y1); idx.set(p, r); if (p.spine) r.spine = true; }
+      spine = plan.rooms.filter(p => p.spine).map(p => idx.get(p))[0] || null;
+      front = plan.front ? idx.get(plan.front) : null;
+      const used = new Set(), near = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (used.has((x + dx) + ',' + (y + dy))) return true; return false; };
+      for (const [pa, pb] of plan.links) {
+        const a = idx.get(pa), b = idx.get(pb), w = shared(a, b);
+        if (!w) return null;
+        const cs = shuffle(range(w.lo, w.hi)).filter(v => !(w.v ? near(w.x, v) : near(v, w.y)));
+        if (!cs.length) return null;
+        const v = cs[0], x = w.v ? w.x : v, y = w.v ? v : w.y; used.add(x + ',' + y);
+        door(x, y, a.id, b.id, !w.v);
+      }
+      const en = idx.get(plan.entry), ew = en.x1 - en.x0 + 1;
+      fdx = ew >= 5 ? ri(en.x0 + 1, en.x1 - 1) : ri(en.x0, en.x1);
+      entry4 = en;
+    } else {
     if (rc.front) { const hf = ri(rc.front[0], rc.front[1]); front = addRoom(rc.front[2], left, bottom - hf + 1, right, bottom); bottom = bottom - hf - 1; }
     let bandRooms = [];
     if (rc.top) {
@@ -121,7 +516,7 @@
     let sx;
     if (rc.spine[1] === 'side') sx = rnd() < .5 ? left : right - sw + 1;
     else { const lw = ri(Math.max(3, Math.floor((W - sw) / 2) - 2), Math.min(W - sw - 4, Math.floor((W - sw) / 2) + 2)); sx = left + lw + 1; }
-    const spine = addRoom(rc.front ? 'hall' : 'hall', sx, top, sx + sw - 1, bottom);
+    spine = addRoom(rc.front ? 'hall' : 'hall', sx, top, sx + sw - 1, bottom);
     spine.spine = true;
     const regions = [];
     if (sx - 2 >= left + 2) regions.push({ x0: left, x1: sx - 2, wallX: sx - 1, side: -1 });
@@ -153,7 +548,6 @@
       if (lo <= hi) door(ri(lo, hi), top - 1, br.id, spine.id, true);
     }
     if (bandRooms.length === 2) { const a = bandRooms[0], b = bandRooms[1]; if (!doors.some(d => d.a === a.id || d.b === a.id) || !doors.some(d => d.a === b.id || d.b === b.id)) door(a.x1 + 1, ri(a.y0, a.y1), a.id, b.id, false); else if (rnd() < .5) door(a.x1 + 1, ri(a.y0, a.y1), a.id, b.id, false); }
-    let fdx;
     if (front) { door(ri(sx, sx + sw - 1), bottom + 1, spine.id, front.id, true); fdx = ri(front.x0 + 2, front.x1 - 2); }
     else fdx = ri(sx, sx + sw - 1);
 
@@ -169,13 +563,14 @@
     // a room too small for its type becomes a closet
     for (const r of side) if ((r.x1 - r.x0 + 1) < 3 || (r.y1 - r.y0 + 1) < 3) r.t = 'closet';
     if (rc.front) spine.t = 'hall';
+    }
 
     // paint rooms + doors
     for (const r of rooms) for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) g[y][x] = r.ch;
     const doorMap = {};
     for (const d of doors) { g[d.y][d.x] = '+'; doorMap[d.x + ',' + d.y] = (d.horiz ? rooms[d.a] : rooms[d.a]).ch; }
     const roomOfCh = {}; rooms.forEach(r => roomOfCh[r.ch] = r);
-    const entry = front || spine;
+    const entry = V4 ? entry4 : front || spine;
     g[yB][fdx] = '+'; doorMap[fdx + ',' + yB] = entry.ch;
 
     // occupancy: 1 solid furniture, 2 non-solid, 3 reserved (keep clear)
@@ -259,12 +654,18 @@
       if (spec.place === 's' || spec.place === 'n') for (let y = r.y0 + 1; y <= r.y1 - h + 1; y++) { out.push([r.x0, y]); out.push([r.x1 - w + 1, y]); }
       if (spec.place === 'c' || spec.place === 'front') for (let y = r.y0 + 1; y <= r.y1 - h; y++) for (let x = r.x0 + 1; x <= r.x1 - w; x++) out.push([x, y]);
       // north-wall spots first (furniture faces south), then the rest
+      if (V4 && spec.place === 'n' && r.mix) return shuffle(out);   // 0.14: this room puts its wall pieces along any wall
       const nn = spec.place === 'n' ? shuffle(out.filter(c => c[1] === r.y0)) : [];
       return nn.concat(shuffle(out.filter(c => !(spec.place === 'n' && c[1] === r.y0))));
     }
     function furnish(r) {
       const def = ROOMS[r.t]; if (!def) return;
-      for (const spec of def.f) {
+      let specs = def.f;
+      if (V4) { // 0.14: the first piece keeps its claim on the room, the rest come in a seeded order, plus a few optional extras
+        specs = [specs[0]].concat(shuffle(specs.slice(1).concat(EXTRA4[r.t] || [])));
+        r.mix = rnd() < .35 && !['kitchen', 'great', 'studio', 'breakroom', 'store', 'pharmfloor', 'laundry'].includes(r.t);
+      }
+      for (const spec of specs) {
         if (rnd() > spec.p) continue;
         const n = ri(spec.n[0], spec.n[1]);
         for (let i = 0; i < n; i++) {
@@ -326,6 +727,7 @@
     if (atticSpec) {
       const hallCells = [];
       for (const r of rooms) if (r.spine || r.t === 'hall' || r.t === 'foyer') for (let y = r.y0 + 1; y <= r.y1 - 1; y++) for (let x = r.x0; x <= r.x1; x++) if (!occ[y][x] && !occ[y - 1][x]) hallCells.push([x, y]);
+      if (V4 && !hallCells.length) for (const r of rooms) if (['living', 'great', 'studio', 'den', 'porch', 'mudroom', 'dining', 'lobby', 'office', 'storage', 'backroom'].includes(r.t)) for (let y = r.y0 + 1; y <= r.y1 - 1; y++) for (let x = r.x0; x <= r.x1; x++) if (!occ[y][x] && !occ[y - 1][x]) hallCells.push([x, y]);
       if (hallCells.length) {
         const [hx, hy] = pick(hallCells); occ[hy][hx] = 3;
         const ar = atticSpec.ar;
@@ -353,7 +755,7 @@
         const holders = conts().filter(f => f.room !== t.room && !f.lockable);
         if (!holders.length) continue;
         const holder = pick(holders); (holder.extra = holder.extra || []).push('note'); holder.noEmpty = 1;
-        L.note = t.table && ['kitchen', 'dining', 'breakroom'].includes(r.t) ? NOTES.supper : t.art === 'coffee' ? NOTES.tv : t.desk ? NOTES.desk : NOTES.any;
+        L.note = t.table && ['kitchen', 'dining', 'breakroom', 'great', 'studio'].includes(r.t) ? NOTES.supper : t.art === 'coffee' ? NOTES.tv : t.desk ? NOTES.desk : NOTES.any;
         secOut.push({ type: 'rug', rug: { x: rx0 + .15, y: ry0 + .2, w: rx1 - rx0 + .7, h: ry1 - ry0 + .6 }, board: { x: bx, y: by }, orig: { x: orig[0], y: orig[1] }, room: t.room });
         break;
       }
@@ -415,7 +817,7 @@
       for (let x = r.x0; x <= r.x1; x++) {
         if (g[y][x] !== '#' || L.decor[x + ',' + y] || furn.some(f => f.wall && f.at[0] === x && f.at[1] === y)) continue;
         const above = furn.find(f => f.at[1] === r.y0 && x >= f.at[0] && x < f.at[0] + f.at[2]);
-        if (r.t === 'kitchen' || r.t === 'breakroom') { if (above && ['counter', 'sink', 'drawers', 'stove'].includes(above.art)) L.decor[x + ',' + y] = 'upper'; continue; }
+        if (r.t === 'kitchen' || r.t === 'breakroom' || (V4 && (r.t === 'great' || r.t === 'studio'))) { if (above && ['counter', 'sink', 'drawers', 'stove'].includes(above.art)) L.decor[x + ',' + y] = 'upper'; continue; }
         if (r.t === 'bath' && rnd() < .4 && x < r.x1) { pair(x, y, 'mirror'); continue; }
         if (above && above.H > 50) continue;
         const q = rnd();
@@ -427,7 +829,11 @@
     }
     for (const f of furn) if (f.art === 'coffee') { const r = roomOfCh[f.room]; L.rugs.push([Math.max(r.x0, f.at[0] - .6), Math.max(r.y0, f.at[1] - 1.3), f.at[2] + 1.2, 3, 1]); }
     for (const f of furn) if (f.art === 'bed') { const r = roomOfCh[f.room], rx = f.at[0] + f.at[2] + .3; if (!r || rx + 2.6 <= r.x1 + 1) L.rugs.push([rx, f.at[1] + 1, 2.6, 1.8, 0]); else if (f.at[0] - 2.9 >= r.x0) L.rugs.push([f.at[0] - 2.9, f.at[1] + 1, 2.6, 1.8, 0]); }   // 0.9: never outside the room
-    if (spine.y1 - spine.y0 > 4 && !secOut.some(s => s.type === 'rug' && s.room === spine.ch)) L.rugs.push([spine.x0 + (spine.x1 - spine.x0) / 2 - .5 + .25, spine.y0 + 1, 1.5, spine.y1 - spine.y0 - 1, 2]);
+    if (!V4) { if (spine.y1 - spine.y0 > 4 && !secOut.some(s => s.type === 'rug' && s.room === spine.ch)) L.rugs.push([spine.x0 + (spine.x1 - spine.x0) / 2 - .5 + .25, spine.y0 + 1, 1.5, spine.y1 - spine.y0 - 1, 2]); }
+    else for (const r of rooms) if (r.t === 'hall' && !secOut.some(s => s.type === 'rug' && s.room === r.ch)) {   // 0.14: a runner down every longer hallway, either way round
+      if (r.y1 - r.y0 > 4 && r.y1 - r.y0 >= r.x1 - r.x0) L.rugs.push([r.x0 + (r.x1 - r.x0) / 2 - .5 + .25, r.y0 + 1, 1.5, r.y1 - r.y0 - 1, 2]);
+      else if (r.x1 - r.x0 > 4 && r.x1 - r.x0 > r.y1 - r.y0) L.rugs.push([r.x0 + 1, r.y0 + (r.y1 - r.y0) / 2 - .5 + .25, r.x1 - r.x0 - 1, 1.5, 2]);
+    }
     for (const r of rooms) if (r.t === 'bath') L.rugs.push([r.x0 + .5, r.y1 - .2, 1.6, 1, 3]);
 
     // ---- final check: every room reachable, every container reachable
@@ -440,12 +846,13 @@
     // ---- output
     for (const r of rooms) { const def = ROOMS[r.t]; L.rooms[r.ch] = r.hidden ? { name: 'Hidden room', style: 's', hidden: true } : r.isolated ? { name: 'Attic', style: 'a', isolated: true } : { name: def ? def.n : 'Room', style: def ? def.st : 'h', kind: r.t }; }
     L.rooms.o = { name: front ? 'Sidewalk' : 'Stoop', style: 'o' };
+    if (V4) L.plan = plan.arch;   // 0.14: which floor-plan archetype (debug / tests)
     const num = ri(2, 480), street = pick(D.STREETS);
     rnd();   // 0.4-0.5 rolled the Thanksgiving turkey here: keep the sequence so a seed still makes the same house
     Object.assign(L, {
       type, name: bt.n, size: bt.size, rows: g.map(row => row.join('')), street: 'o', streetY: yB + 1, frontDoor: fdx + ',' + yB,
       stoop: { x: fdx + .5 }, start, houseNum: num, address: num + ' ' + street, secrets: secOut,
-      boss: bossSpots(seed, rooms, zCells, fdx, yB),
+      boss: bossSpots(seed, rooms, zCells, fdx, yB, V4),
       wanderer: rnd() < .55 || type === 'police', wandererT: ri(60, 110), wanderHp: rc.tough ? 150 : 100,
       emptyPct: .2, danger: bt.danger + (nZ > rc.zombies[0] + 1 ? 1 : 0),
       nZombies: L.zombies.length, nLocks: furn.filter(f => f.lock).length,
@@ -488,6 +895,7 @@
         for (const z of L.zombies) { const r = roomAtCell(z.x, z.y); if (r) bad.add(r.ch); }
         if (L.boss && L.boss.kitchen) { const r = roomAtCell(L.boss.kitchen.x, L.boss.kitchen.y); if (r) bad.add(r.ch); }
         const PREF = ['study', 'evidence', 'armory', 'office', 'bedroom', 'storage', 'cellar', 'backroom', 'pharmback', 'lockers', 'closet', 'janitor', 'nurse'];
+        if (V4) PREF.push('den', 'nursery', 'pantryrm', 'laundryrm', 'mudroom');   // 0.14: v4's extra rooms can be locked too
         const cands = kshuf(rooms.filter(r => !r.spine && r !== front && !r.hidden && !r.isolated && PREF.includes(r.t) && !bad.has(r.ch) && doors.filter(d => d.a === r.id || d.b === r.id).length === 1))
           .sort((a, b) => PREF.indexOf(a.t) - PREF.indexOf(b.t));
         for (const r of cands.slice(0, 3)) {
@@ -545,9 +953,9 @@
   }
   // Event mini-boss spots (events.js decides whether one shows up): rolled from their own random stream so the
   // event never changes the house itself. yard = the sidewalk left of the stoop; kitchen = a free kitchen floor tile.
-  function bossSpots(seed, rooms, zCells, fdx, yB) {
+  function bossSpots(seed, rooms, zCells, fdx, yB, v4) {
     const br = D.mulberry32((seed ^ 0x7b3a1f29) >>> 0), roll = br(), roll2 = br();
-    const kc = zCells.filter(c => c[2] && (c[2].t === 'kitchen' || c[2].t === 'breakroom'));
+    const kc = zCells.filter(c => c[2] && (c[2].t === 'kitchen' || c[2].t === 'breakroom' || (v4 && (c[2].t === 'great' || c[2].t === 'studio'))));
     const k = kc.length ? kc[Math.floor(br() * kc.length)] : null;
     return { roll, roll2, yard: { x: Math.max(1.5, fdx - 9), y: yB + 1.95 }, kitchen: k ? { x: k[0] + .5, y: k[1] + .6 } : null };
   }
