@@ -1925,7 +1925,7 @@
       } else { useBtn.classList.remove('on'); useLbl.classList.remove('on'); }
     }
     const q = DM.Game && DM.Game.questChip ? DM.Game.questChip() : '';
-    if (q !== lastQ) { lastQ = q; $('#qchip').innerHTML = q; $('#qchip').classList.toggle('on', !!q); }
+    if (q !== lastQ) { lastQ = q; $('#qchip').innerHTML = q + '<span class="qcaret">▾ quests</span>' + (G.qOpen && DM.Game.questList ? '<div class="qlist">' + DM.Game.questList() + '</div>' : ''); $('#qchip').classList.toggle('on', !!q); $('#qchip').classList.toggle('open', !!G.qOpen); }
     $('#hp').classList.toggle('low', p.hp < maxHp() * .35);
     drawMini();
   }
@@ -1997,6 +1997,8 @@
   DM.addToPack = addToPack;
   // 0.15: every card shows the item's kind (data.js D.cat); event / quest items keep their own note
   const ctag = (k, it) => { const c = D.cat(k); return it.tag && (c === 'event' || c === 'quest') ? `<small class="tag">${it.tag}</small>` : `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
+  // 0.19.1: tap the quest chip in a run to open/close the full quest list
+  document.addEventListener('click', ev => { const c = ev.target.closest && ev.target.closest('#qchip'); if (!c || !G) return; G.qOpen = !G.qOpen; lastQ = ''; SFX.play('pick'); });
   function itemCard(e, onTap, extra = '', cls = '') {
     const it = ITEMS[e.k], el = document.createElement('button');
     el.className = 'slot' + (it.rare ? ' rare' : '') + (it.w ? ' wq q' + D.qOf(e) : '') + cls;   // 0.19: tier colour on weapons
@@ -2006,6 +2008,7 @@
     return el;
   }
   function openLoot(o, it) {
+    try { const qn = DM.Game && DM.Game.questNeeds ? DM.Game.questNeeds() : {}; const hit = (o.loot0 || []).find(e => e.n > 0 && qn[e.k]); if (hit) toast('Quest item: ' + ITEMS[hit.k].n + ' (' + qn[hit.k].why[0] + ')', 2); } catch (e) { /* never block looting */ }
     const rm = it.corpse ? 'Zombie' : RN(o.room) || '';
     G.sheet = { kind: 'loot', o, it };
     $('#shKick').textContent = (it.corpse ? 'Corpse' : rm) + ' · searched';
@@ -2016,13 +2019,15 @@
   }
   const tip = id => { if (DM.Game && DM.Game.tip) DM.Game.tip(id); };
   function renderLoot(note) {
+    const qNeed = DM.Game && DM.Game.questNeeds ? DM.Game.questNeeds() : {};   // 0.19.1
     const s = G.sheet, o = s.o, grid = $('#shGrid'); grid.innerHTML = '';
     $('#shActs').innerHTML = '';
     const items = o.loot0 || [];
     if (!items.length) grid.innerHTML = `<div class="empty">${s.it.corpse ? 'Nothing useful on it.' : 'Nothing useful.'}</div>`;
     const hd = S().hands ? D.wDmg(S().hands) : WEAPONS.fists.dmg;   // 0.19: weapons show their damage (with quality) against what she holds
     items.forEach((e, i) => { const fits = roomFor(e.k) > 0, w = ITEMS[e.k].w, dm = w ? D.wDmg(e) : 0;
-      grid.appendChild(itemCard(e, () => takeItem(i), !fits ? '<em class="nofit">won\'t fit</em>' : w ? `<em class="wdmg${dm > hd ? ' up' : dm < hd ? ' down' : ''}">${dm} dmg</em>` : '', fits ? '' : ' full')); });
+      const qn = qNeed[e.k];   // 0.19.1: an active quest still needs this
+      grid.appendChild(itemCard(e, () => takeItem(i), (qn ? `<em class="qitem">QUEST ITEM</em>` : '') + (!fits ? '<em class="nofit">won\'t fit</em>' : w ? `<em class="wdmg${dm > hd ? ' up' : dm < hd ? ' down' : ''}">${dm} dmg</em>` : ''), (fits ? '' : ' full') + (qn ? ' quest' : ''))); });
     $('#shCap').textContent = note || `Pack ${G.pack.length}/${packSlots()}`;
     const can = items.some(e => roomFor(e.k) > 0);
     $('#shTake').style.display = can ? '' : 'none';

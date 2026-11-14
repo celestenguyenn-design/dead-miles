@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.19';
+const NEXT_VERSION = '0.19.1';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -456,6 +456,26 @@ const NEXT_VERSION = '0.19';
   Game.onSecret = () => { if (SV && SV.trader) bump('secrets'); };
   function checkFetch() { for (const q of SV.trader.active) if (q.type === 'fetch' && !q.done && countItem('parcel')) questDone(q); }
   const supplyReady = q => q.type === 'supply' && countItem(q.item) >= q.need;
+  // 0.19.1: items the active quests still need, so the loot sheet can flag them: { key: { why, left } }
+  Game.questNeeds = function () {
+    const out = {}; if (!SV || !SV.trader) return out;
+    const add = (k, why, left) => { if (left > 0 && D.ITEMS[k]) { const o = out[k] || (out[k] = { why: [], left: 0 }); o.why.push(why); o.left += left; } };
+    for (const q of SV.trader.active) {
+      if (q.done) continue;
+      if (q.type === 'supply') add(q.item, `Supply run ${Math.min(q.need, countItem(q.item))}/${q.need}`, q.need - countItem(q.item));
+      if (q.type === 'fetch') add('parcel', "Dot's lockbox", 1);
+    }
+    const eq = evQuest(), est = eq && evState();
+    if (eq && eq.give && !evReady(eq, est)) for (const [k, n] of eq.give) add(k, eq.n, n - countItem(k));
+    return out;
+  };
+  // 0.19.1: the quest list behind the HUD chip (tap it): full text + what to look for
+  Game.questList = function () {
+    if (!SV || !SV.trader) return '';
+    const rows = SV.trader.active.map(q => `<div class="ql"><b>${D.QUESTS[q.type].n}${q.done ? ' · done' : ''}</b><span>${esc(questText(q))}</span>${q.type === 'supply' && !q.done ? `<em>Look for: ${D.ITEMS[q.item].n.toLowerCase()} · ${Math.min(q.need, countItem(q.item))}/${q.need}</em>` : ''}</div>`);
+    const eq = evQuest(); if (eq) rows.unshift(`<div class="ql"><b>${esc(eq.n)}</b>${eq.give ? `<em>Look for: ${eq.give.map(([k, n]) => `${D.ITEMS[k].n.toLowerCase()} ${Math.min(n, countItem(k))}/${n}`).join(', ')}</em>` : ''}</div>`);
+    return rows.join('');
+  };
   Game.questChip = function () { // small HUD chip during runs
     if (!SV || !SV.trader) return '';
     const eq = evQuest(), est = eq && evState();

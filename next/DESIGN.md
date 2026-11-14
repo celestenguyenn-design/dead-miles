@@ -414,3 +414,8 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   infected.js and house.js read, and reuses it on resume (tested: same zombies after her gamestage jumped 24 -> 60). A run saved before
   0.19 resumes at gamestage 0 (its original zombies). h.gs is cleared when the run ends. The house list's special tag uses the current
   gamestage. Tutorial, base, watch shifts and the weekly boss ignore the gamestage.
+
+## Done in 0.19.1 (owner: "make it highlighted when we open a cabinet and it should say quest item")
+- Game.questNeeds(): items active quests still need (supply runs, Dot's lockbox, the event job's gives). On the loot sheet those
+  items glow gold with a QUEST ITEM tag, and opening a container that holds one toasts "Quest item: Duct tape (Supply run 0/3)".
+- The run HUD quest chip is tappable ("▾ quests"): it drops down the full quest list with "Look for: duct tape · 0/3".
