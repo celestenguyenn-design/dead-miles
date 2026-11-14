@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.8';
+const NEXT_VERSION = '0.8.1';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -162,6 +162,24 @@ const NEXT_VERSION = '0.8';
     const s = src === 'typed' ? 'typed' : 'phone';    // 'phone' and 'shortcut' both count as phone steps
     if (info && info.late && info.day) addLateSteps(delta, s, info.day); else DM.addSteps(delta, s);
     return true;
+  }
+  // A one-time correction from NET (steps that were counted twice): take them back from that day.
+  function onNetFix(day, back, id) {
+    if (!SV || !SV.survivor) return;
+    SV.fixes = SV.fixes || {}; if (SV.fixes[id]) return; SV.fixes[id] = 1;
+    const d = SV.day.key === day ? SV.day : SV.prevDay && SV.prevDay.key === day ? SV.prevDay : null;
+    SV.walked = Math.max(0, (SV.walked || 0) - back);
+    if (SV.base) SV.base.pool = Math.max(0, (SV.base.pool || 0) - back);
+    if (d) {
+      d.phone = Math.max(0, d.phone - back);
+      const want = housesFor(worth(effective(d)));
+      while (d.scouted > want) {
+        let i = -1; for (let j = SV.houses.length - 1; j >= 0; j--) { const h = SV.houses[j]; if (h.day === day && h.status === 'new' && !h.quest && !h.run) { i = j; break; } }
+        if (i < 0) break; SV.houses.splice(i, 1); d.scouted--;
+      }
+    }
+    Game.save(); if (!DM.scene) renderHome();
+    toast('Step count corrected for ' + day, 2.2);
   }
   function scout() {
     const w = worth(effective(SV.day)), target = housesFor(w);
@@ -1386,6 +1404,7 @@ const NEXT_VERSION = '0.8';
         }
       }
     } catch (e) { /* offline */ }
+    N.onFix = onNetFix;
     N.onSteps = onNetSteps;   // set only after the save is settled: steps wait in the ledger until then
     try { if (N.ok) await withTimeout(N.partyGet(), 6000); } catch (e) { /* offline */ }
     resolveHorde().then(() => DM.Horde.flush(SV.horde)).then(() => { Game.save(); renderHome(); }).catch(() => { });
