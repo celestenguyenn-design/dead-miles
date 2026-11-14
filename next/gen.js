@@ -189,7 +189,7 @@
       while (q.length) { const [x, y] = q.shift(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= MW || ny >= MH) continue; const i = ny * MW + nx; if (dist[i] >= 0 || !isFloor(nx, ny) || occ[ny][nx] === 1) continue; dist[i] = 1; q.push([nx, ny]); } }
       return dist;
     }
-    const furn = [];
+    const furn = [], tallAt = new Set();
     function accessible(f, dist) {
       const [x0, y0, w, h] = f.at;
       if (f.wall) return dist[(y0 + 1) * MW + x0] >= 0;
@@ -226,11 +226,21 @@
       const rw = r.x1 - r.x0 + 1, rh = r.y1 - r.y0 + 1;
       if (V2 && solid && !r.hidden && !r.isolated && (rw * rh < 16 || Math.min(rw, rh) <= 3)) {
         let used = 0; for (let yy = r.y0; yy <= r.y1; yy++) for (let xx = r.x0; xx <= r.x1; xx++) if (occ[yy][xx] === 1) used++;
-        if (used + w * h > Math.ceil(rw * rh * .4)) return null;
+        if (used + w * h > Math.max(2, Math.floor(rw * rh * .4))) return null;
+      }
+      // 0.9: a tall piece (shelf, wardrobe, fridge...) never stands right in front of another piece, where its
+      // picture would hide that piece's front and the floor she needs to search it from
+      if (V2 && solid) {
+        const tall = spec.H >= 40;
+        for (let xx = x; xx < x + w; xx++) {
+          if (tall && y - 1 >= r.y0 && (occ[y - 1][xx] === 1 || (y - 2 >= r.y0 && occ[y - 2][xx] === 1))) return null;
+          if (y + h + 1 <= r.y1 && tallAt.has(xx + ',' + (y + h + 1))) return null;
+        }
       }
       for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) occ[yy][xx] = solid ? 1 : 2;
       const f = mk(spec, r, x, y); furn.push(f);
       if (solid && !valid()) { furn.pop(); for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) occ[yy][xx] = 0; return null; }
+      if (V2 && solid && spec.H >= 40) for (let xx = x; xx < x + w; xx++) tallAt.add(xx + ',' + y);
       return f;
     }
     function mk(spec, r, x, y) {
@@ -285,7 +295,7 @@
           for (let y = hr.y0; y <= hr.y1; y++) for (let x = hr.x0; x <= hr.x1; x++) g[y][x] = 'S';
           g[yT][dx] = '='; doorMap[dx + ',' + yT] = 'S';
           const shelf = { art: 'bookshelf', name: 'Bookshelf', at: [dx, r.y0, 2, 1], H: 62, secret: 1, seed: 2, room: r.ch, mustReach: 1 };
-          furn.push(shelf); occ[r.y0][dx] = 1; occ[r.y0][dx + 1] = 1; occ[r.y0][dx + 2] = V2 ? 1 : 3;   // 0.9: the shelf slides into that tile, so nothing may need it as a path occ[r.y0 + 1][dx] = 3; occ[r.y0 + 1][dx + 1] = 3;
+          furn.push(shelf); occ[r.y0][dx] = 1; occ[r.y0][dx + 1] = 1; occ[r.y0][dx + 2] = V2 ? 1 : 3; occ[r.y0 + 1][dx] = 3; occ[r.y0 + 1][dx + 1] = 3;   // 0.9 (v2): the shelf slides into dx+2, so nothing may need that tile as a path
           furn.push({ art: 'crate', name: 'Hidden crate', at: [hx, hr.y0, 2, 1], H: 30, time: 3, noise: 4, loot: 'crate', rare: 1, secretLoot: 1, room: 'S', pocket: 1 });
           furn.push({ art: 'supply', at: [hx + 2, hr.y0, 2, 1], H: 56, room: 'S', pocket: 1 });
           secOut.push({ type: 'shelf', furn: furn.indexOf(shelf), room: 'S' });

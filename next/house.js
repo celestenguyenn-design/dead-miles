@@ -124,9 +124,13 @@
       const d = L.furn[i], ch = x.searched || (d.lock && !x.locked) || (d.keyLock && !x.keyLock) || x.opened || x.slideState || x.swing;
       if (!ch) return; const o = {}; for (const k of FKEEP) if (x[k] != null) o[k] = x[k]; f[i] = o;
     });
-    return { f, sec, so: !!G.secretOpen };
+    return { f, sec, so: !!G.secretOpen, fp: runPrint() };
   }
+  // 0.9: a fingerprint of the house's furniture, so saved progress is never laid onto a different layout
+  const runPrint = () => (L.furn || []).length + ':' + (L.furn || []).map(d => d.art[0] + d.at.join('')).join('').length + ':' + (L.furn || []).reduce((a, d, i) => (a * 31 + d.at[0] * 7 + d.at[1] + i) % 1000003, 7);
   function restoreRun(r) {
+    if (r && r.fp && r.fp !== runPrint()) return;   // the layout changed since: start the house fresh
+    if (r && !r.fp && Object.keys(r.f || {}).some(i => !G.furn[+i] || (r.f[i].searched && !G.furn[+i].lootable))) return;   // 0.8.x save that does not fit
     try {
       for (const i of Object.keys(r.f || {})) { const x = G.furn[+i]; if (x) Object.assign(x, JSON.parse(JSON.stringify(r.f[i]))); }
       (r.sec || []).forEach((v, i) => { if (G.sec[i]) Object.assign(G.sec[i], v); });
