@@ -419,3 +419,10 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Game.questNeeds(): items active quests still need (supply runs, Dot's lockbox, the event job's gives). On the loot sheet those
   items glow gold with a QUEST ITEM tag, and opening a container that holds one toasts "Quest item: Duct tape (Supply run 0/3)".
 - The run HUD quest chip is tappable ("▾ quests"): it drops down the full quest list with "Look for: duct tape · 0/3".
+
+## Done in 0.19.2 (owner: "The live map doesn't work, it just loads for a very long time" / "map servers are busy, request timed out")
+- One big Overpass query per ~700 m square timed out on dense Brooklyn blocks. Now three small stages: places (landmarks work
+  right away), streets + parks, then building footprints in four quarters; each stage draws as soon as it lands.
+- Four Overpass mirrors, hedged: the next mirror is asked if the current one has not answered in 3.5 s; first good answer wins,
+  the rest are cancelled; the mirror that answered goes first next time. 20 s cap per question. With the main mirror hanging
+  (mocked) the map draws in ~5 s instead of failing after 44 s.
