@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.19';
+const NEXT_VERSION = '0.21';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -206,7 +206,7 @@ const NEXT_VERSION = '0.19';
   }
   function scout() {
     const w = worth(effective(SV.day)), target = housesFor(w);
-    while (SV.day.scouted < target) { SV.day.scouted++; addHouse(worth(effective(SV.day)) * SV.day.scouted / Math.max(1, target)); }
+    while (SV.day.scouted < target) { SV.day.scouted++; if (DM.Route && DM.Route.payDebt()) continue; addHouse(worth(effective(SV.day)) * SV.day.scouted / Math.max(1, target)); }   // 0.21 route: a route pick made with no house to trade in takes the next one
   }
   function pickType(w, rnd) {
     const T = D.BTYPES, keys = Object.keys(T).filter(k => T[k].w > 0);
@@ -254,6 +254,21 @@ const NEXT_VERSION = '0.19';
     return 'ok';
   };
   Game.layoutOf = layoutOf;
+  // 0.21 route: the daily route map (route.js) adds the house a stop leads to, and trades in one of today's scouted ones
+  Game.routeApi = {
+    effective: () => effective(SV.day), pickType: (w, rnd) => pickType(w, rnd),
+    addHouse(type, seed, extra) {
+      const seq = SV.houseSeq++, h = Object.assign({ id: 'rt' + seq, type, seed, gv: GV, day: SV.day.key, status: 'new' }, extra);
+      const L = layoutOf(h); Object.assign(h, { address: L.address, danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies });
+      SV.houses.push(h); return h;
+    },
+    toStash(stacks) {   // like the crew's haul: everything to the stash; returns what did not fit
+      const lost = [];
+      for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'key') { SV.survivor.keys = (+SV.survivor.keys || 0) + e.n; continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, STASH_SLOTS, e.k, e.n, e.d, e.q); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k, false, e.q); }
+      return lost;
+    },
+    showResult: (...a) => showResult(...a), openTrader: () => openTrader(), maxHp: s => maxHp(s), dayNum: k => dayNum(k),
+  };
   function rollDay(force) {
     const t = today();
     if (SV.day.key === t && !force) return;
@@ -272,6 +287,7 @@ const NEXT_VERSION = '0.19';
   function devNewDay() { // pretend a day passed: shift every date back one day, then roll over
     SV.day.key = keyOf(dayNum(SV.day.key) - 1);
     for (const h of SV.houses) if (!h.quest) h.day = keyOf(dayNum(h.day) - 1);
+    if (SV.route) { SV.route.day = ''; SV.routeDev = (SV.routeDev || 0) + 1; }   // 0.21 route: a pretend new day gets a new route map
     rollDay(true); Game.save(); renderHome(); toast('A new day', 1.4);
   }
 
@@ -319,6 +335,7 @@ const NEXT_VERSION = '0.19';
         L.furn = L.furn.slice(); L.furn[i] = Object.assign({}, f, { extra: (f.extra || []).concat(D.pickCos([h.type], rnd)), noEmpty: 1 });
       }
     }
+    if (h.route && DM.Route) L.furn = DM.Route.prepRun(h, L);   // 0.21 route: an elite stop hides a guaranteed jackpot
     // 0.19: the gamestage is snapshotted on the house when the run starts and reused on resume, so a resumed run meets the
     // same zombies. A run started before 0.19 has none: it resumes at gamestage 0 (exactly the zombies it had). Tutorial: none.
     if (h.type === 'tutorial') h.gs = 0;
@@ -870,7 +887,7 @@ const NEXT_VERSION = '0.19';
   const TYPEICON = { tutorial: B.row, rowS: B.row, rowL: B.row, apt: B.apt, bodega: B.shop(['#f07b3c', '#f6e3bb']), laundro: B.shop(['#3fa7a0', '#f6e3bb'], '<circle cx="23" cy="38" r="5" fill="#5a6a8e" stroke="#11142f" stroke-width="1.5"/>'),
     pharmacy: B.shop(['#93a86c', '#f6e3bb'], '<path d="M20 34h6v-4h4v4h6v4h-6v4h-4v-4h-6z" fill="#b53a2e"/>'), garage: B.garage, school: B.school, police: B.police, mansion: B.mansion };
   const typeIcon = t => `<svg viewBox="0 0 64 64" class="bicon">${TYPEICON[t] || B.row}</svg>`;
-  Game.ui = { typeIcon, esc, skulls: n => SKULL.repeat(n) + `<span class="dim">${SKULL.repeat(Math.max(0, 5 - n))}</span>`, sheetOpen: h => sheetOpen(h), sheetClose: () => sheetClose() };   // 0.18: for daily.js
+  Game.ui = { typeIcon, typeInner: t => TYPEICON[t] || B.row, esc, skulls: n => SKULL.repeat(n) + `<span class="dim">${SKULL.repeat(Math.max(0, 5 - n))}</span>`, sheetOpen: h => sheetOpen(h), sheetClose: () => sheetClose() };   // 0.18: for daily.js
 
   function showResult(title, stacks, lost, note, kick) {
     const el = $('#mres');
@@ -1142,6 +1159,9 @@ const NEXT_VERSION = '0.19';
     if (!SV.tutorialDone) list.push({ id: 'tutorial', type: 'tutorial', seed: 0, status: 'new', day: SV.day.key, address: '14 Halsey St', danger: 1, nLocks: 3, nZombies: 2 });
     list.push(...SV.houses);
     const el = $('#mpane');
+    // 0.21 route: "List | Route" toggle (route.js draws the daily route map as another view of this tab)
+    const rseg = SV.tutorialDone && DM.Route ? DM.Route.segHTML() : '';
+    if (rseg && DM.Route.view() === 'route') { el.innerHTML = rseg + DM.Route.html(); DM.Route.bind(el, () => renderHome()); return; }
     refreshTrader();
     const T = SV.trader, ready = T.active.filter(q => q.done || supplyReady(q)).length, away = dotLeft();
     const traderCard = SV.tutorialDone ? `<div class="hcard trader${away ? ' away' : ''}"><div class="bicon dotmini">${DOT_SVG}</div>
@@ -1151,10 +1171,10 @@ const NEXT_VERSION = '0.19';
         : `<div class="hdays">Safe zone · ${icon('caps')} ${T.caps} caps</div>`}</div>
       <div class="hbtns"><button class="mbtn${away ? ' ghost' : ''}" id="hTrader">${away ? 'Away' : 'Visit'}</button></div></div>` : '';
     const dailyCard = SV.tutorialDone && DM.Daily ? DM.Daily.cardHTML() : '';   // 0.18: the daily challenge house (daily.js)
-    if (!list.length) { el.innerHTML = traderCard + dailyCard + `<div class="empty big">No houses scouted yet.<br>Walk - every ~1,000 steps turns up another door.</div>`; if ($('#hTrader')) $('#hTrader').onclick = openTrader; if (dailyCard) DM.Daily.bind(el); return; }
+    if (!list.length) { el.innerHTML = rseg + traderCard + dailyCard + `<div class="empty big">No houses scouted yet.<br>Walk - every ~1,000 steps turns up another door.</div>`; if ($('#hTrader')) $('#hTrader').onclick = openTrader; if (dailyCard) DM.Daily.bind(el); if (rseg) DM.Route.bind(el, () => renderHome()); return; }
     const bossCard = SV.tutorialDone ? DM.Boss.cardHTML(true) : '';
     const gstage = gamestage().gs;   // 0.19: the house list's special-infected tag uses your gamestage
-    el.innerHTML = traderCard + dailyCard + bossCard + list.map(h => {
+    el.innerHTML = rseg + traderCard + dailyCard + bossCard + list.map(h => {
       const T = D.BTYPES[h.type], left = 3 - (dayNum(SV.day.key) - dayNum(h.day)), done = h.status !== 'new' && h.status !== 'far';
       const q = h.quest && questById(h.quest), far = h.status === 'far';
       const tags = [h.nLocks ? `${h.nLocks} lock${h.nLocks > 1 ? 's' : ''}` : 'no locks', `${h.nZombies} zombie${h.nZombies === 1 ? '' : 's'}`];
@@ -1163,6 +1183,7 @@ const NEXT_VERSION = '0.19';
       if (!done && !far && h.type !== 'tutorial') { const HL = layoutOf(h); if (HL.car) tags.push('<b class="keytag">🔑 locked car</b>'); if (HL.keyRoom) tags.push('<b class="keytag">🔑 locked room</b>');   // 0.8: brass-key spots
         const ip = DM.Inf.plan(HL, h.gs != null ? h.gs : gstage), ni = ip.kinds.filter(Boolean).length, nz = (HL.zombies || []).length + ip.extra;   // 0.13: special infected (danger 3+)
         tags[1] = `${nz} zombie${nz === 1 ? '' : 's'}`; if (ni) tags.push(`<b class="inftag">☣ ${ni} special infected</b>`); }
+      if (h.route && !done && DM.Route) tags.push(DM.Route.tagHTML(h));   // 0.21 route: picked on the route map
       return `<div class="hcard${done ? ' done' : ''}${h.type === 'tutorial' ? ' tut' : ''}${q ? ' quest' : ''}">
         ${typeIcon(h.type)}
         <div class="hinfo"><div class="hname">${T.n} <em>${T.size}</em>${h.landmark ? ` <em class="first lmk">${PIN}landmark</em>` : ''}${h.type === 'tutorial' ? ' <em class="first">first house</em>' : ''}${q ? ` <em class="first">quest: ${D.QUESTS[q.type].n.toLowerCase()}</em>` : ''}</div>
@@ -1175,6 +1196,7 @@ const NEXT_VERSION = '0.19';
     const find = id => id === 'tutorial' ? { id: 'tutorial', type: 'tutorial', seed: 0, status: 'new' } : SV.houses.find(h => h.id === id);
     if ($('#hTrader')) $('#hTrader').onclick = () => { SFX.play('ui'); openTrader(); };
     DM.Boss.bind(el); if (dailyCard) DM.Daily.bind(el);
+    if (rseg) DM.Route.bind(el, () => renderHome());   // 0.21 route: the List | Route toggle
     el.querySelectorAll('[data-loot]').forEach(b => b.onclick = () => { SFX.play('ui'); loot(find(b.dataset.loot)); });
     el.querySelectorAll('[data-auto]').forEach(b => b.onclick = () => { SFX.play('ui'); autoSearch(find(b.dataset.auto)); });
   }
@@ -1429,6 +1451,7 @@ const NEXT_VERSION = '0.19';
   }
   const HOWTO = [
     ['Steps & houses', 'All your daily steps count. About every 1,000 steps scouts another house (up to 10 a day; the more you walk, the better the odds of big places like police stations and mansions). Houses wait 3 days. Loot one yourself, or send your Crew - they bring back less and never find secrets.'],
+    ['Daily route', 'Houses tab > Route shows today\'s route: a small branching map, new every midnight. Every 1,500 steps you walk today (typed steps at half, like scouting) opens the next row, and you pick ONE stop in it, from the ones joined to your last pick. Stops: a house (type and danger shown), a ☣ danger house (pharmacy, school, police, mansion), a safehouse (+30 HP, food and water, one day off an infection), Dot (she comes back early for one visit), a supply drop (a few things straight to your stash, no fight), an event (a small choice with a risk) and an elite house (police station or mansion with a jackpot hidden inside). Rows get more dangerous as you go, and the last row is the big one. A stop does not add a house: it takes the place of one of today\'s scouted houses (the newest one you have not touched), so the route chooses which houses you get, not how many. If you already went into all of today\'s houses, the stop takes the next house your steps scout instead. Rows you have reached can still be picked later the same day, in order; whatever is left at midnight is gone. The List view works as before.'],
     ['Looting', 'Walk with the joystick (drag anywhere). Stand by furniture and tap the magnifier to search. Searching makes noise. Your pack has 12 slots; things stack. Leave by the front door - anything you dropped stays behind. Your level makes searches a little faster and luckier (up to level 10).'],
     ['Levels & skills', 'Everything you do earns XP: searching, kills (special infected more), secrets, locks and keys, Dot\'s jobs, horde watch shifts and boss fights. Every level gives 1 skill point - early levels come every few houses, later ones slower. Tap Skills on the home card to spend them in five trees, 5 ranks each: Scavenging (faster searches, extra finds, Keen eye, Pack rat), Stealth (quieter steps and searches, zombies spot you later), Combat (melee and bow damage, longer dodge, more HP), Survival (slower hunger and thirst, better healing, more stamina) and Lockwork (wider sweet spots, picks last longer, quieter crowbar). Each rank needs the one before it; later ranks cost 2-3 points. Your job gives rank 1 of its tree free (Scavenger: Scavenging, Hunter: Stealth, Brawler: Combat, Mechanic: Survival, Thief: Lockwork). Survivors from before 0.13 kept Quiet hands, Keen eye and Pack rat for free and got every point their level earned. Once a week you can reset your skills for 150 caps.'],
     ['Weapon quality', 'Every weapon (bows and crowbars too) has a quality: Rusty, Worn, Solid, Fine or Masterwork, shown as stars and a coloured name and border on its card. Each tier above Rusty adds about 8% damage and 15% durability, so a Masterwork hits about a third harder and lasts 60% longer than a Rusty one - nice, never game-breaking. Most house finds are Rusty or Worn; danger 3+ buildings, hidden stashes, key-locked rooms and car trunks, special infected and raiders carry better ones. Crafted weapons come out Worn or Solid (better with your level and the Combat and Scavenging trees). Dot sells Worn, sometimes Solid. Masterwork is very rare: the weekly boss and the deepest places. Weapons from before 0.19 are Worn.'],
