@@ -582,3 +582,28 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Base piece Storage (3 upgrades): Shelving unit +10, Storage lockers +10, Shipping crate +20 -> stash 40 -> 80 slots.
   Costs (before the 0.14.1 x2): 1,500 / 3,000 / 6,000 build steps + wood/nails, scrap/nails/tape. Not a horde target.
 - Gear tab: Discard (or "Discard all N") on backpack and stash items, tap twice; quest items can't be discarded.
+
+## NEXT UP (handoff for a new chat, written 2026-11-14)
+### 1. Real-world map still times out on the owner's phone ("The map servers are busy - timed out")
+- Measured from the dev container against real Overpass (Bed-Stuy square 40.6796,-73.9444,40.6864,-73.9376):
+  overpass.private.coffee and overpass.kumi.systems never answered (40 s); maps.mail.ru answered in 13-24 s and then
+  started returning 504 under a few requests; even a 27-POI query took 14.5 s in its queue. overpass-api.de could not be
+  tested yet (the proxy had not picked up the new host). Conclusion: public Overpass is too slow/busy for a game, whatever the
+  query shape (0.19.2's staging + hedging can't fix queue time).
+- Plan: replace the Overpass data layer in map.js with OpenFreeMap vector tiles (https://tiles.openfreemap.org, free, no key,
+  OpenMapTiles schema: transportation/transportation_name (roads + names), building, park/landcover, water, poi with
+  class/subclass + name). Fetch z14 tiles for the view (CDN-fast), decode MVT in the browser (vendor a small pbf + vector-tile
+  decoder, BSD/MIT, or write a minimal one), convert to the existing encode()/ingest() record format so the drawing code,
+  caching (IndexedDB), landmark claiming rules and privacy rules stay as they are. Map POI classes to game types
+  (pharmacy, police, school, fuel/car repair -> garage, convenience/supermarket/deli -> bodega, laundry; houses from building
+  footprints with an address/housenumber). Keep Overpass only as a last-resort fallback, or drop it.
+- The cloud dev environment "dead-miles" (personal) allows overpass-api.de, overpass.private.coffee, maps.mail.ru,
+  overpass.kumi.systems and api.open-meteo.com; add tiles.openfreemap.org to test against the real tiles.
+- Test scripts: the mocked map test is in the old session scratchpad (m16/t2.js); rewrite its mock to serve MVT tiles.
+### 2. Other open items
+- A friend's Android blocks the step-sync app install: waiting on her handle or a screenshot (fallback: add her handle to
+  NET.cfg.trustedTyped in net.js so typed steps count like phone steps).
+- Not yet heard on a real iPhone: area music, positional groans (older Safari has no StereoPanner), title screen thunder.
+- Balance to watch: deep-run Nest floors (~14 zombies, many specials), special-infected share as gamestage climbs.
+- Oura API integration was postponed by the owner ("I'll do it next time"); steps from the ring already sync via Apple Health
+  with the Shortcut's "Source is Oura" filter.
