@@ -572,3 +572,8 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - D.pickBP: every blueprint roll (loot tables, jackpots, deep runs, route caches, crates) skips blueprints she already knows,
   carries (pack/stash/hands/run pack) or rolled in the last 30 min (no two of the same in one house). All known -> a pocket
   watch. One rnd() per roll either way (seeded daily house stays in step). Dot's shop and quest rewards skip carried ones too.
+
+## Done in 0.24.4 (owner: "I'm getting arrow blueprints as a hunter")
+- Hunters know Arrows from the start, so 0.24.3 already skipped bp_arrow in new rolls - but containers pre-rolled before it
+  (a house's cabinets roll when she walks in; today's route was made at midnight) still held them. D.toStacks now swaps any
+  blueprint she already knows for one she can use (D.pickBP) at the moment a container opens.
