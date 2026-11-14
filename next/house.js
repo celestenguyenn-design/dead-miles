@@ -210,8 +210,35 @@
   // 0.8: what she bumps into is the drawn base of the piece, a little inset, so she can squeeze past corners
   // 0.9: low, deep pieces (beds, cots, tables, tubs, the car) are drawn starting well below their tile's top
   // edge, and that strip looked like floor but was solid. Now she bumps into the drawn top edge instead.
-  const collTop = f => Math.max(3, Math.min(f.h - 14, ART.geo(f).ty0 - f.y + 6));
-  function collRect(f) { const s = (f.slide || 0) * T, t = f.cTop == null ? (f.cTop = collTop(f)) : f.cTop; return { x: f.x + 4 + s, y: f.y + t, w: f.w - 8, h: f.h - 5 - t }; }
+  // The drawn outline is measured once per piece kind from its own picture (headboards, lamps, table legs, a thin
+  // lamp post): top edge, bottom edge, and how wide its base is.
+  const outCache = {};
+  function drawnBox(f) {
+    const k = f.art + ':' + f.tw + 'x' + f.th + ':' + f.H;
+    if (outCache[k]) return outCache[k];
+    let o = { top: ART.geo(f).ty0 - f.y, bot: f.h, l: 0, r: f.w };
+    try {
+      const q = Object.assign({}, f, { x: 0, y: 0, searched: false, slide: 0, swing: 0, _c: null }), g = ART.geo(q), by = Math.floor(g.ty0 - 50), bw = Math.ceil(q.w + 8), bh = Math.ceil(q.h + 4 - by);
+      const c = document.createElement('canvas'); c.width = bw; c.height = bh; const x = c.getContext('2d'); x.translate(4, -by);
+      (ART.FURN[q.art] || ART.FURN.counter)(x, q, g);
+      const d = x.getImageData(0, 0, bw, bh).data, A = (xx, yy) => d[(yy * bw + xx) * 4 + 3] > 40;
+      let top = null, bot = null;
+      for (let yy = 0; yy < bh && top == null; yy++) for (let xx = 8; xx < bw - 8; xx++) if (A(xx, yy)) { top = yy; break; }
+      for (let yy = bh - 1; yy >= 0 && bot == null; yy--) for (let xx = 4; xx < bw - 4; xx++) if (A(xx, yy)) { bot = yy; break; }
+      if (top != null && bot != null) {
+        let l = bw, r = 0;   // base width: the lowest 14 drawn rows
+        for (let yy = Math.max(0, bot - 14); yy <= bot; yy++) for (let xx = 0; xx < bw; xx++) if (A(xx, yy)) { if (xx < l) l = xx; if (xx > r) r = xx; }
+        o = { top: top + by, bot: bot + by + 1, l: l - 4, r: r - 4 + 1 };
+      }
+    } catch (e) { /* keep the geometric box */ }
+    return (outCache[k] = o);
+  }
+  function collBox(f) {
+    const o = drawnBox(f), t = Math.max(3, Math.min(f.h - 14, o.top + 6)), b = Math.max(t + 8, Math.min(f.h - 5, o.bot - 5));
+    const l = Math.max(4, o.l + 3), r = Math.min(f.w - 4, o.r - 3);
+    return r - l >= 8 ? { t, b, l, r } : { t, b, l: 4, r: f.w - 4 };
+  }
+  function collRect(f) { const s = (f.slide || 0) * T, c = f.cBox || (f.cBox = collBox(f)); return { x: f.x + c.l + s, y: f.y + c.t, w: c.r - c.l, h: c.b - c.t }; }
   function furnRect(f) { const s = (f.slide || 0) * T; return { x: f.x + 2 + s, y: f.y, w: f.w - 4, h: f.h - 5 }; }
   function overlapsSolid(e, x, y) {
     const x0 = x - e.hw, x1 = x + e.hw, y0 = y - e.hh, y1 = y + e.hh;
