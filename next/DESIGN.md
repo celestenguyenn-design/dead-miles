@@ -200,3 +200,9 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   else 10% tried), cars 20% tried. Each locked room has one guaranteed prize (D.JACK: gun / meds / safe / stash by building),
   the trunk too (trunk pool). ~50% of locked rooms hide their key in a container elsewhere in the same house (L.keyRoom.keyHere,
   door toast hints at it). One key opens the whole car. House list shows a gold "🔑 locked room / car" tag. Keys stay rare.
+
+## Done in 0.11
+- Every house has its own look from its seed (art.js houseLook, house.js rugLook): wood tone, carpet, kitchen/bath tiles,
+  wallpaper colour + pattern, front brick, and 12 rug colourways x 4 patterns. The secret rug uses the same set, so it
+  no longer stands out as "the red rug". Visual only. Base and tutorial keep the default look.
+- Second step correction for celeste on 2026-11-13 (c1113b): an older duplicate shortcut posted phone + ring until 23:51.

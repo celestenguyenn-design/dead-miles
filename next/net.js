@@ -24,7 +24,9 @@
       // One-time step corrections the owner asked for. Posts for day d sent before
       // 'before' (ms) are ignored, and the day is lowered to 'to' once.
       // celeste 2026-11-13: Oura + iPhone were both counted until the Shortcut got its Source filter.
-      fixes: [{ id: 'c1113', h: 'celeste', d: '2026-11-13', before: Date.parse('2026-11-14T01:11:00Z'), to: 3064 }] },
+      fixes: [{ id: 'c1113', h: 'celeste', d: '2026-11-13', before: Date.parse('2026-11-14T01:11:00Z'), to: 3064 },
+        // a second, older shortcut kept posting phone + ring until 23:51 New York
+        { id: 'c1113b', h: 'celeste', d: '2026-11-13', before: Date.parse('2026-11-14T04:51:00Z'), to: 4032 }] },
     onConflict: null,   // ({local, remote}) => 'local' | 'remote' | Promise of either
     onChange: null      // () => void, any status change (panel uses it)
   };
@@ -255,7 +257,7 @@
     }
     saveLedger();
   }
-  function fixFor(d) { const h = String(NET.handle || '').toLowerCase(); return (NET.cfg.fixes || []).find(f => f.h === h && f.d === d) || null; }
+  function fixFor(d) { const h = String(NET.handle || '').toLowerCase(); return (NET.cfg.fixes || []).filter(f => f.h === h && f.d === d).sort((a, b) => b.before - a.before)[0] || null; }   // the latest correction for that day wins
   // Apply each correction once per device: lower the ledger and tell the game how many steps to take back.
   function applyFixes() {
     const L = ledger(); L.fixed = L.fixed || {};

@@ -510,6 +510,35 @@ const ART = (() => {
     Y: { a: '#2f3f3c', b: '#283633', kind: 'grass' },   // base yard
     X: { a: '#2a2638', b: '#232031', kind: 'dirt' },    // outside the base walls
   };
+  // 0.10: every house gets its own look - wood tone, carpet, kitchen and bath tiles, wallpaper - from its seed.
+  // Visual only: layout, loot and saved runs do not change. houseLook(null) puts the defaults back (base, tutorial).
+  const FLOOR0 = JSON.parse(JSON.stringify(FLOOR)); let WALL0 = null;   // WALLFACE is declared further down
+  const LK = {
+    wood: [['#453453', '#3c2e4b'], ['#5a4434', '#4c392b'], ['#4a3a36', '#3e302d'], ['#4a4658', '#3f3b4c'], ['#5e4a3a', '#504030'], ['#3e3448', '#342b3e'], ['#523a3a', '#463030']],
+    carpet: [['#4f3a66', '#463360'], ['#2f4f55', '#28454a'], ['#5a3a48', '#4e3240'], ['#45482e', '#3b3e27'], ['#353f66', '#2d365a'], ['#5a4a3a', '#4e4032'], ['#3f3f4f', '#363646']],
+    check: [['#39406a', '#2f3559'], ['#3a5450', '#2f4642'], ['#5a3436', '#2e2a40'], ['#5a4a2c', '#2f3559'], ['#4a4466', '#3e3a5a'], ['#56586a', '#2c2c3e']],
+    btile: [['#4a5f7e', '#3f5270'], ['#5a4054', '#4e3648'], ['#3e5a4e', '#344e42'], ['#56566a', '#4a4a5c'], ['#5e5a44', '#524e3a']],
+    wall: [['#523f6e', '#463562', '#2a1f4a'], ['#3e5a5e', '#344e52', '#22363a'], ['#6a4a4a', '#5c3e3e', '#3a2626'], ['#4a5a3e', '#3e4e34', '#28341f'], ['#5a5a78', '#4c4c6a', '#30304a'], ['#6a5a46', '#5c4c3a', '#3a3024'], ['#5a3e5e', '#4e3452', '#321f36'], ['#6a4d86', '#5e4279', '#3d2d61']],
+    twall: [['#5c6a8e', '#4c5880', '#3a4470'], ['#5e7a74', '#4e6a64', '#34504a'], ['#8a6a74', '#7a5a64', '#523a44'], ['#7a7a8a', '#6a6a7a', '#44445a'], ['#7a6e56', '#6a5e48', '#4a402e']]
+  };
+  function houseLook(seed) {
+    for (const k in FLOOR0) Object.assign(FLOOR[k], FLOOR0[k]);
+    if (!WALL0) WALL0 = JSON.parse(JSON.stringify(WALLFACE));
+    for (const k in WALL0) Object.assign(WALLFACE[k], WALL0[k]);
+    if (seed == null) return;
+    let i = 0; const rnd = () => hash(seed | 0, 977, ++i), pick = a => a[Math.floor(rnd() * a.length)];
+    const set = (k, [a, b], kind) => { FLOOR[k].a = a; FLOOR[k].b = b; if (kind) FLOOR[k].kind = kind; };
+    const wood = pick(LK.wood);
+    for (const k of ['h', 'l', 'w', 'c']) set(k, rnd() < .7 ? wood : pick(LK.wood));
+    set('r', pick(LK.carpet)); if (rnd() < .3) set('l', pick(LK.carpet), 'carpet'); if (rnd() < .25) set('r', pick(LK.wood), 'planks');
+    for (const k of ['k', 'q', 't']) set(k, pick(LK.check));
+    for (const k of ['b', 'm']) set(k, pick(LK.btile));
+    const kinds = ['stripe', 'wainscot', 'plain', 'wainscot'];
+    for (const k of ['h', 'l', 'r', 'w', 't', 'c']) { const [a, b, trim] = pick(LK.wall); Object.assign(WALLFACE[k], { a, b, trim, kind: k === 'c' ? 'plain' : pick(kinds) }); }
+    for (const k of ['k', 'b', 'm', 'q']) { const [a, b, trim] = pick(LK.twall); Object.assign(WALLFACE[k], { a, b, trim }); }
+    const [oa, ob, ot] = pick([['#3d2d61', '#33264f', '#1a1336'], ['#5a3030', '#4a2626', '#2a1414'], ['#4a4a5a', '#3c3c4c', '#222230'], ['#5a4632', '#4a3a28', '#2a2016'], ['#2f4646', '#263a3a', '#142222']]);
+    Object.assign(WALLFACE.o, { a: oa, b: ob, trim: ot });   // the brick out front
+  }
   function drawFloorTile(ctx, room, tx, ty, T) {
     const f = FLOOR[room]; if (!f) return;
     const x = tx * T, y = ty * T;
@@ -1115,5 +1144,5 @@ const ART = (() => {
 
   // later screens (base.js) register their own icons: raw SVG bodies in the same -36..36 box, or ready URLs
   function addIcons(o) { for (const k in o) { if (/^data:/.test(o[k])) iconURL[k] = o[k]; else { EXTRA_ICONS[k] = o[k]; iconURL[k] = svgURL(o[k], '-36 -36 72 72', 96, 96); } } }
-  return { addIcons, P, LOOK, rigs, buildRig, drawRig, buildIcons, iconURL, rr, blk, line, dot, hash, drawFloorTile, drawWallFace, FURN, geo, candle, VB };
+  return { addIcons, P, LOOK, rigs, buildRig, drawRig, buildIcons, iconURL, rr, blk, line, dot, hash, drawFloorTile, drawWallFace, houseLook, FURN, geo, candle, VB };
 })();
