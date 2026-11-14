@@ -414,3 +414,13 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   infected.js and house.js read, and reuses it on resume (tested: same zombies after her gamestage jumped 24 -> 60). A run saved before
   0.19 resumes at gamestage 0 (its original zombies). h.gs is cleared when the run ends. The house list's special tag uses the current
   gamestage. Tutorial, base, watch shifts and the weekly boss ignore the gamestage.
+
+## Done in 0.23 (home screen redo, owner: "I want the UI to be better." / "Go to base should be a small home icon on the top right somewhere." / "Horde night should be a small red box somewhere on the top with the timer." / "Everything is just really bunched up.")
+- Layout and presentation only: no game rules changed.
+- **Top bar** (sticky while the home scrolls): DEAD MILES + version on the left (5 taps on the version still opens the dev panel off GitHub), then a small **red horde pill** with the countdown ("HORDE 1d 9h"; "SHIFT OPEN 4h 59m" pulsing in the last 24 h; an orange dot when a horde result is waiting), then three icon buttons on the right: **home icon = go to base** (orange dot when the garden needs water or is ready), account & friends, settings. Base + horde only show after the first house, as before.
+- Tapping the horde pill opens the old horde card in a sheet: countdown, party line, Start watch shift, Join party / Party, last horde's result + OK.
+- **One hero card**: survivor (portrait, Edit look, Wardrobe + new-cosmetics badge, HP, hunger/thirst (tap = Eat & drink), infected/hungry chips, Level + Skills with the skill-point pulse, weapon) joined to the steps block (steps today, houses found, worth + next house, typed total + Log, sync status, How to sync steps / Fix sync, Sync my steps now on iPhone).
+- **"This week" tiles** instead of the big stacked cards: Weekly boss (HP bar, FIGHT badge when you can), Deep run (pass progress, GO / CLAIM / BACK IN), Daily challenge (time left, GO), Crew & strays (crew/pets, NOTE / NEWS badge), plus Garden and Horde result tiles only when they have something to say. Each tile opens the full old card in a sheet (all its buttons work there); the daily tile jumps to the daily house in the Houses list. The event banner sits above the tiles in a slimmer form.
+- The weekly boss is no longer shown twice: it left the Houses list (home tile only).
+- The tab bar (Houses / Gear / Workbench / Map) sticks under the top bar once you scroll into the lists.
+- Spacing on an 8 / 12 / 16 px scale, one border + shadow per card instead of three stacked cards; checked at 360, 375 (390) and 430 px with nothing overflowing. Shots: next/shots/250-before-*, 250-after-*, 250-compare.png.

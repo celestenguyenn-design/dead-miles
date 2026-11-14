@@ -699,6 +699,59 @@
   .dlyparts td small { display: block; font-size: 10.5px; color: var(--mute); font-weight: 700; } .dlyparts tr.neg td:last-child { color: #ff8a72; }
   .dlyparts tr.sum td { border-bottom: 0; font-size: 15px; } .dlyparts tr.sum td:last-child { color: #ffd27a; }
   .dlyhow { font-size: 11px; color: var(--mute); line-height: 1.45; margin: 8px 0 4px; }
+  /* ---------- 0.23 ui: home screen redo - sticky top bar (base icon, red horde pill), one hero card, feature tiles. Spacing: 8 / 12 / 16 ---------- */
+  .mtop.hometop { position: sticky; top: calc(-14px - var(--st)); z-index: 5; gap: 8px; margin: calc(-14px - var(--st)) -14px 12px; padding: calc(10px + var(--st)) 14px 10px;
+    background: rgba(17,20,47,.94); border-bottom: 2px solid rgba(61,45,97,.7); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .hometop .mbrand { flex: none; display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+  .hometop .logo { flex: none; font-size: 16px; letter-spacing: .12em; line-height: 1.1; text-shadow: 0 2px 0 var(--ink); white-space: nowrap; }
+  .hometop .ver { padding: 1px 0 0; background: none; font-size: 9px; letter-spacing: .12em; }
+  .hometop .mtsp { flex: 1; }
+  .hometop .gear { flex: none; width: 36px; height: 36px; border-radius: 11px; padding: 6px; border-width: 2px; position: relative; }
+  .hometop .tbase { background: #2c3d2f; color: #cfe3a8; }
+  .hometop .tbase.dot::after, .hpill .pdot { content: ""; position: absolute; top: -4px; right: -4px; width: 11px; height: 11px; border-radius: 50%; background: var(--ora); border: 2px solid var(--ink); }
+  .hpill { position: relative; flex: none; display: flex; align-items: center; gap: 5px; height: 36px; padding: 0 9px 0 7px; border-radius: 9px; background: #6e1c22; border: 2px solid #ff6b5a;
+    color: #fff; font-size: 13px; font-weight: 900; white-space: nowrap; text-align: left; }
+  .hpill span { display: flex; flex-direction: column; line-height: 1.05; } .hpill small { font-size: 8.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: #ffb3a6; }
+  .hpill.open small { color: #fff; }
+  .hpill svg { width: 14px; height: 14px; flex: none; color: #ff8a7a; }
+  .hpill.open { background: #c0392b; border-color: #ffb3a6; color: #fff; animation: hpulse 1.2s ease-in-out infinite; }
+  .hpill.open svg { color: #fff; }
+  @keyframes hpulse { 50% { box-shadow: 0 0 0 5px rgba(255,107,90,.35); background: #e0503c; } }
+  .hero { border-radius: 20px; background: #1c1538; border: 3px solid var(--ink); box-shadow: 0 4px 0 var(--plum); overflow: hidden; }
+  .hero .scard { padding: 12px 12px 12px 4px; border: 0; border-radius: 0; box-shadow: none; background: none; }
+  .hero .scard canvas { width: 84px; height: 106px; }
+  .hero .lookbtns { width: 80px; }
+  .hero .sinfo { gap: 6px; }
+  .hero .sname { font-size: 22px; }
+  .hero .stepcard { margin: 0; padding: 12px 16px 12px; border: 0; border-top: 2px solid rgba(61,45,97,.8); border-radius: 0; background: rgba(17,20,47,.55); }
+  .steptop { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .steptop .steps b { font-size: 30px; }
+  .scout { flex: none; text-align: right; } .scout b { font-size: 20px; font-weight: 900; color: var(--ora); } .scout span { margin-left: 4px; font-size: 11px; font-weight: 800; color: var(--mute); }
+  .hero .stepinfo { margin-top: 2px; } .hero .stepinfo b { color: var(--crm); }
+  .hero .steprow { margin-top: 12px; } .hero .steprow input { height: 40px; font-size: 14px; }
+  .syncrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .syncrow .msync { margin: 0; min-width: 0; } .syncrow .synclink { margin: 0; flex: none; }
+  .hsect { display: flex; align-items: baseline; justify-content: space-between; margin: 16px 2px 8px; }
+  .hsect + .evban { margin: 0 0 8px; padding: 8px 12px; border-width: 2px; box-shadow: none; border-left: 5px solid var(--evc); }
+  .hsect + .evban .evg { width: 32px; height: 32px; border-radius: 10px; border-width: 2px; } .hsect + .evban .evg svg { width: 20px; height: 20px; }
+  .hsect + .evban .evt b { font-size: 14px; } .hsect + .evban .evt em { font-size: 10.5px; } .hsect + .evban .evgo { font-size: 22px; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tile { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; min-height: 64px; padding: 10px 12px 12px 14px; border-radius: 14px; text-align: left;
+    background: #1c1538; border: 2px solid var(--ink); box-shadow: inset 4px 0 0 var(--tc); overflow: hidden; }
+  .tile:active { transform: translateY(1px); }
+  .tile:last-child:nth-child(odd) { grid-column: span 2; }
+  .tile .tn { max-width: 100%; font-size: 13.5px; font-weight: 900; color: var(--crm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 2px; }
+  .tile .ts { max-width: 100%; font-size: 11px; font-weight: 800; color: var(--mute); line-height: 1.25; }
+  .tile .tbar { position: relative; display: block; width: 100%; height: 5px; margin-top: 5px; border-radius: 3px; background: var(--ink); overflow: hidden; }
+  .tile .tbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--tc); }
+  .tile .thot { position: absolute; bottom: 10px; right: 8px; padding: 1px 6px; border-radius: 6px; background: var(--tc); color: var(--ink); font-size: 9.5px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+  .tile:has(.thot) .ts { padding-right: 56px; } .tile:has(.thot):has(.tbar) .thot { top: 9px; bottom: auto; } .tile:has(.thot):has(.tbar) .ts { padding-right: 0; } .tile:has(.thot):has(.tbar) .tn { padding-right: 46px; }
+  .hometop ~ #mtabs { position: sticky; top: 44px; z-index: 4; margin: 16px -14px 12px; padding: 8px 14px; background: rgba(17,20,47,.94); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .cardsheet > div { margin: 0 0 12px !important; box-shadow: none !important; }
+  .cardsheet .hbtnrow .mbtn { width: auto; margin-top: 0; white-space: nowrap; } .cardsheet .hbtnrow .mbtn:first-child { flex: 1; } .cardsheet .hbtnrow .mbtn.ghost { flex: none; }
+  #msheet .cardsheet .hordecard, #msheet .cardsheet .bosscard, #msheet .cardsheet .deepcard, #msheet .cardsheet .crewcard { border-width: 2px; }
+  .hcard.daily.flash { animation: tflash .45s 3 alternate; } @keyframes tflash { to { box-shadow: 0 0 0 4px var(--ora); } }
+  @media (max-width: 389px) { .hometop .logo { font-size: 14px; letter-spacing: .1em; } .hpill { padding: 0 6px 0 5px; font-size: 12px; } .hometop .gear { width: 34px; height: 34px; } .tile .tn { font-size: 13px; } }
 </style>
 </head>
 <body>
@@ -760,29 +813,29 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.19"></script>
-<script src="art.js?v=0.19"></script>
-<script src="net.js?v=0.19"></script>
-<script src="netpanel.js?v=0.19"></script>
-<script src="syncguide.js?v=0.19"></script>
-<script src="events.js?v=0.19"></script>
-<script src="data.js?v=0.19"></script>
-<script src="food.js?v=0.19"></script>
-<script src="skills.js?v=0.19"></script>
-<script src="infection.js?v=0.19"></script>
-<script src="infected.js?v=0.19"></script>
-<script src="engine.js?v=0.19"></script>
-<script src="music.js?v=0.19"></script>
-<script src="gen.js?v=0.19"></script>
-<script src="raiders.js?v=0.19"></script>
-<script src="house.js?v=0.19"></script>
-<script src="horde.js?v=0.19"></script>
-<script src="base.js?v=0.19"></script>
-<script src="crew.js?v=0.19"></script>
-<script src="boss.js?v=0.19"></script>
-<script src="daily.js?v=0.19"></script>
-<script src="deep.js?v=0.19"></script>
-<script src="game.js?v=0.19"></script>
-<script src="map.js?v=0.19"></script>
+<script src="s2art.js?v=0.23"></script>
+<script src="art.js?v=0.23"></script>
+<script src="net.js?v=0.23"></script>
+<script src="netpanel.js?v=0.23"></script>
+<script src="syncguide.js?v=0.23"></script>
+<script src="events.js?v=0.23"></script>
+<script src="data.js?v=0.23"></script>
+<script src="food.js?v=0.23"></script>
+<script src="skills.js?v=0.23"></script>
+<script src="infection.js?v=0.23"></script>
+<script src="infected.js?v=0.23"></script>
+<script src="engine.js?v=0.23"></script>
+<script src="music.js?v=0.23"></script>
+<script src="gen.js?v=0.23"></script>
+<script src="raiders.js?v=0.23"></script>
+<script src="house.js?v=0.23"></script>
+<script src="horde.js?v=0.23"></script>
+<script src="base.js?v=0.23"></script>
+<script src="crew.js?v=0.23"></script>
+<script src="boss.js?v=0.23"></script>
+<script src="daily.js?v=0.23"></script>
+<script src="deep.js?v=0.23"></script>
+<script src="game.js?v=0.23"></script>
+<script src="map.js?v=0.23"></script>
 </body>
 </html>
