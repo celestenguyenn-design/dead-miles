@@ -42,10 +42,15 @@
       { n: 'Garden bed 3', s: 1000, m: { wood: 3, nails: 6 }, def: 0 }, { n: 'Garden bed 4', s: 1000, m: { wood: 3, nails: 6 }, def: 0 }] },
     bunks: { n: 'Bunk bed', d: 'Room in the shack for one more crew member (you start with 2 bunks).', unit: 1, tiers: [
       { n: 'Third bunk', s: 2500, m: { wood: 6, nails: 10, cloth: 3 }, def: 0 }, { n: 'Fourth bunk', s: 4000, m: { wood: 8, nails: 14, cloth: 4 }, def: 0 }] },
+    // 0.24.5 (owner: "is there a way to increase our stash space"): storage at the base, three upgrades, 40 -> 80 slots
+    storage: { n: 'Storage', d: 'More room in your stash chest: shelves, then lockers, then a shipping crate.', tiers: [
+      { n: 'Shelving unit (+10 stash)', s: 1500, m: { wood: 6, nails: 10 }, def: 0 },
+      { n: 'Storage lockers (+10 stash)', s: 3000, m: { scrap: 8, nails: 8, tape: 2 }, def: 0 },
+      { n: 'Shipping crate (+20 stash)', s: 6000, m: { scrap: 14, nails: 16, tape: 3 }, def: 0 }] },
     gen: { n: 'Generator', d: 'Floodlight over the yard (+defence). More perks later.', tiers: [
       { n: 'Generator', s: 8000, m: { scrap: 12, battery: 6, tape: 3 }, def: 5 }] },
   };
-  const ORDER = ['walls', 'gate', 'spikes', 'wire', 'tower', 'beds', 'barrel', 'bunks', 'gen'];
+  const ORDER = ['walls', 'gate', 'spikes', 'wire', 'tower', 'beds', 'barrel', 'bunks', 'storage', 'gen'];
   const mech = () => G().survivor && G().survivor.job === 'mechanic';
   function costOf(key, tier, repair) { // tier: 1-based tier being built
     const t = PIECES[key].tiers[tier - 1], k = (mech() ? .75 : 1) * (repair ? .3 * (DM.Crew ? DM.Crew.repairMul() : 1) : 1), m = {};   // a Tinkerer in the crew makes repairs cheaper
@@ -60,7 +65,7 @@
       const d = st && st.day; b.pool = d ? Math.min(POOL_MAX, Math.round((d.phone || 0) + (d.walk || 0) + (d.typed || 0) * .5)) : 0;
     }
     b.v = b.v || 1;
-    b.built = Object.assign({ walls: 0, gate: 0, tower: 0, spikes: 0, wire: 0, barrel: 0, beds: 0, gen: 0, bunks: 0 }, b.built || {});
+    b.built = Object.assign({ walls: 0, gate: 0, tower: 0, spikes: 0, wire: 0, barrel: 0, beds: 0, gen: 0, bunks: 0, storage: 0 }, b.built || {});
     b.broken = b.broken && typeof b.broken === 'object' ? b.broken : {};
     b.beds = Array.isArray(b.beds) ? b.beds : [];
     while (b.beds.length < 4) b.beds.push(null);
@@ -83,6 +88,7 @@
   // 0.14.1 (owner: "I built 4 things with just my 4k steps"): build steps fill at half the walking rate and pieces cost twice
   // as many, so a piece is ~4x the walking it was. Watering stays 300 build steps (= ~600 steps walked).
   const POOL_RATE = .5, COST_MUL = 2;
+  B.stashBonus = () => { const s = SV() && SV().base; return [0, 10, 20, 40][(s && s.built && s.built.storage) || 0] || 0; };   // 0.24.5
   B.addPool = function (st, n) { if (!st || !st.base || !(n > 0)) return; st.base.pool = Math.min(POOL_MAX, st.base.pool + n * POOL_RATE); };
   const base = () => SV().base;
 
