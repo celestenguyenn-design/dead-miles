@@ -42,6 +42,89 @@ window.DM = window.DM || {};
       const gn = a.createGain(); gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(g, t + .015); gn.gain.exponentialRampToValueAtTime(.0005, t + dur);
       o.connect(gn); gn.connect(this.master); o.start(t); o.stop(t + dur + .05);
     },
+    // ---- 0.20 zombie voices, positional. o = { kind, v (variant 0-3), snarl, gain 0..1 (distance), pan -1..1, rate (pitch),
+    // muffle (a wall in between), force (skip the limits), when (seconds from now) }. A formant-ish voice: a sawtooth throat
+    // (+ breath noise, + a square for grit) with a pitch glide and a wobble, through three vowel band-passes gliding from one
+    // vowel to another. Four groans (moan, groan, gargle, sigh) and a snarl for when one starts chasing; the runner pants,
+    // the bloater gurgles, the screamer wails, the turkey gobbles. At most 2 at once and one start per .45 s (a snarl skips
+    // the spacing, not the cap). gLog keeps the last 60 (tests). Through master, so the sound-effects volume applies.
+    gAct: [], gLast: -9, gLog: [],
+    VOW: { u: [330, 750, 2300], o: [450, 850, 2400], a: [720, 1150, 2500], uh: [550, 1050, 2400], ee: [300, 2200, 2900], ae: [650, 1700, 2400] },
+    vox(t, out, s) {
+      const a = this.ac, d = s.dur, end = t + d, nodes = [];
+      const env = a.createGain(); env.connect(out);
+      env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(s.peak, t + s.atk);
+      env.gain.linearRampToValueAtTime(s.peak * .7, t + Math.max(s.atk + .01, d * .55)); env.gain.exponentialRampToValueAtTime(.0008, end);
+      const src = a.createGain();
+      const curve = p => s.f.forEach(([x, f], i) => i ? p.linearRampToValueAtTime(f, t + x * d) : p.setValueAtTime(f, t));
+      const o = a.createOscillator(); o.type = 'sawtooth'; curve(o.frequency); const og = a.createGain(); og.gain.value = s.saw == null ? 1 : s.saw; o.connect(og); og.connect(src); nodes.push(o);
+      const f0 = s.f[0][1];
+      const l1 = a.createOscillator(), g1 = a.createGain(); l1.frequency.value = s.vib || 5.5; g1.gain.value = f0 * .035; l1.connect(g1); g1.connect(o.frequency); nodes.push(l1);
+      const l2 = a.createOscillator(), g2 = a.createGain(); l2.type = 'triangle'; l2.frequency.value = 1.4 + Math.random() * 1.2; g2.gain.value = f0 * .06; l2.connect(g2); g2.connect(o.frequency); nodes.push(l2);
+      if (s.grit) { const q = a.createOscillator(), qg = a.createGain(); q.type = 'square'; curve(q.frequency); q.detune.value = 18; qg.gain.value = s.grit * .5; q.connect(qg); qg.connect(src); nodes.push(q); }
+      if (s.breath) { const n = a.createBufferSource(), ng = a.createGain(); n.buffer = this.nb; n.loop = true; n.playbackRate.value = .7 + Math.random() * .3; ng.gain.value = s.breath; n.connect(ng); ng.connect(src); nodes.push(n); }
+      let into = src;
+      if (s.trem) { const tg = a.createGain(), tl = a.createOscillator(), tlg = a.createGain(); tg.gain.value = 1 - s.trem[1] / 2; tl.frequency.value = s.trem[0]; tlg.gain.value = s.trem[1] / 2; tl.connect(tlg); tlg.connect(tg.gain); src.connect(tg); into = tg; nodes.push(tl); }
+      const fs = s.fs || 1, A = s.A, B = s.B || s.A;
+      [[7, 1], [9, .55], [11, .22]].forEach(([q, g], i) => {
+        const bp = a.createBiquadFilter(), bg = a.createGain(); bp.type = 'bandpass'; bp.Q.value = q;
+        bp.frequency.setValueAtTime(A[i] * fs, t); bp.frequency.linearRampToValueAtTime(B[i] * fs, end); bg.gain.value = g * 2.2;
+        into.connect(bp); bp.connect(bg); bg.connect(env);
+      });
+      const body = a.createBiquadFilter(), bdg = a.createGain(); body.type = 'lowpass'; body.frequency.value = 260; bdg.gain.value = .22; into.connect(body); body.connect(bdg); bdg.connect(env);
+      for (const n of nodes) { n.start(t); n.stop(end + .05); }
+      return end;
+    },
+    groan(o = {}) {
+      const a = this.ac; if (!a || !this.master) return false;
+      if ((this.sfxVol != null ? this.sfxVol : this.master.gain.value) < .01) return false;   // sound effects turned all the way down (music.js sets sfxVol)
+      const now = a.currentTime, t = now + (o.when || 0);
+      this.gAct = this.gAct.filter(e => e > now);
+      if (!o.force) { if (this.gAct.length >= 2) return false; if (!o.snarl && now - this.gLast < .45) return false; }
+      const gain = o.gain == null ? 1 : Math.max(0, Math.min(1, o.gain)), pan = Math.max(-1, Math.min(1, o.pan || 0)), k = o.kind || '';
+      let r = o.rate || (.88 + Math.random() * .24);
+      if (k === 'armored') r *= .82; else if (k === 'krampus') r *= .62; else if (o.boss) r *= .75;
+      const v = o.v != null ? o.v % 4 : Math.floor(Math.random() * 4), V = this.VOW, fs = Math.sqrt(r);
+      const lvl = a.createGain(); lvl.gain.value = gain; lvl.connect(this.master);
+      let out = lvl;
+      if (a.createStereoPanner) { const p = a.createStereoPanner(); p.pan.value = pan; p.connect(out); out = p; }
+      if (o.muffle) { const m = a.createBiquadFilter(); m.type = 'lowpass'; m.frequency.value = 650; m.connect(out); out = m; }
+      let end = t;
+      if (k === 'turkey') {   // the gobble, placed like the rest
+        for (let i = 0; i < 5; i++) {
+          const tt = t + i * .065, os = a.createOscillator(), g = a.createGain(); os.type = 'sawtooth';
+          os.frequency.setValueAtTime(420 - i * 30 + Math.random() * 60, tt); os.frequency.exponentialRampToValueAtTime(260, tt + .07);
+          g.gain.setValueAtTime(0, tt); g.gain.linearRampToValueAtTime(.06, tt + .015); g.gain.exponentialRampToValueAtTime(.0005, tt + .07);
+          os.connect(g); g.connect(out); os.start(tt); os.stop(tt + .1);
+        }
+        end = t + .45;
+      } else if (k === 'runner' && !o.snarl) {   // a raspy pant: four quick breaths, in and out
+        for (let i = 0; i < 4; i++) end = this.vox(t + i * .27, out, { dur: .2, f: [[0, 175 * r], [1, 150 * r]], A: i % 2 ? V.ae : V.a, B: V.uh, fs, breath: 1.3, saw: .35, peak: .55, atk: .04, vib: 9 });
+      } else if (o.snarl) {
+        const S = k === 'runner' ? { dur: .55, f: [[0, 210 * r], [.3, 270 * r], [1, 150 * r]], trem: [28, .5] }
+          : k === 'bloater' ? { dur: .9, f: [[0, 95 * r], [.3, 120 * r], [1, 70 * r]], trem: [13, .8] }
+            : k === 'screamer' ? { dur: .7, f: [[0, 260 * r], [.3, 330 * r], [1, 200 * r]], trem: [22, .4] }
+              : { dur: .75, f: [[0, 150 * r], [.3, 200 * r], [1, 115 * r]], trem: [24, .5] };
+        end = this.vox(t, out, Object.assign({ A: V.a, B: V.uh, fs, breath: .6, grit: .8, peak: 1.25, atk: .03 }, S));
+      } else if (k === 'bloater') {   // a wet gurgle
+        end = this.vox(t, out, { dur: 1.4, f: [[0, 64 * r], [.5, 72 * r], [1, 52 * r]], A: V.uh, B: V.o, fs, breath: .5, grit: .7, trem: [11 + Math.random() * 3, .85], peak: .9, atk: .12 });
+      } else if (k === 'screamer') {   // a thin wail (its shriek is separate)
+        end = this.vox(t, out, { dur: 1.2, f: [[0, 230 * r], [.4, 262 * r], [1, 170 * r]], A: V.ee, B: V.ae, fs, breath: .35, peak: .6, atk: .15, vib: 6.5 });
+      } else {
+        const G = [
+          { dur: 1.5, f: [[0, 90 * r], [.5, 78 * r], [1, 62 * r]], A: V.o, B: V.u, breath: .25, atk: .25 },                 // moan
+          { dur: 1.0, f: [[0, 105 * r], [.3, 122 * r], [1, 76 * r]], A: V.a, B: V.o, breath: .3, atk: .12 },                // groan
+          { dur: 1.2, f: [[0, 82 * r], [.6, 74 * r], [1, 64 * r]], A: V.uh, B: V.o, breath: .4, trem: [9, .6], atk: .15 },  // gargle
+          { dur: 1.1, f: [[0, 72 * r], [1, 55 * r]], A: V.a, B: V.uh, breath: 1.1, saw: .5, atk: .2 },                      // sigh
+        ][v];
+        end = this.vox(t, out, Object.assign({ fs, peak: 1, grit: k === 'armored' ? .4 : 0 }, G));
+      }
+      if (!o.keep) setTimeout(() => { try { lvl.disconnect(); } catch (e) { /* ignore */ } }, (end - now + .3) * 1000);
+      this.gAct.push(end); this.gLast = now;
+      this.gLog.push({ k: k || 'zombie', v, snarl: !!o.snarl, gain: +gain.toFixed(3), pan: +pan.toFixed(2), rate: +r.toFixed(2), muffle: !!o.muffle, t: +now.toFixed(2), dur: +(end - t).toFixed(2) });
+      if (this.gLog.length > 60) this.gLog.shift();
+      return true;
+    },
     play(k) {
       if (!this.ac) return;
       switch (k) {
@@ -59,14 +142,7 @@ window.DM = window.DM || {};
         case 'open': this.noise(.25, 'lowpass', 500, 150, .12, 2); this.tone('sine', 90, 60, .2, .08); break;
         case 'scrape': for (let i = 0; i < 6; i++) this.noise(.22, 'bandpass', 260 + Math.random() * 120, 180, .14, 4, i * .17); break;
         case 'whoosh': this.noise(.25, 'highpass', 400, 2000, .07, .7); break;
-        case 'groan': {
-          const a = this.ac, t = a.currentTime, o = a.createOscillator(), l = a.createOscillator(), lg = a.createGain(), f = a.createBiquadFilter(), g = a.createGain();
-          o.type = 'sawtooth'; const base = 70 + Math.random() * 30; o.frequency.setValueAtTime(base, t); o.frequency.linearRampToValueAtTime(base * .75, t + .9);
-          l.frequency.value = 6; lg.gain.value = 6; l.connect(lg); lg.connect(o.frequency);
-          f.type = 'lowpass'; f.frequency.value = 420; f.Q.value = 6;
-          g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.09, t + .15); g.gain.exponentialRampToValueAtTime(.0005, t + 1);
-          o.connect(f); f.connect(g); g.connect(this.master); o.start(t); l.start(t); o.stop(t + 1.05); l.stop(t + 1.05); break;
-        }
+        case 'groan': this.groan({ force: 1, gain: .8 }); break;   // 0.20: not positional (a boss, the horde arriving); zombies in a run call groan() with a place
         case 'alert': this.tone('triangle', 520, 300, .18, .06); break;
         case 'gobble': for (let i = 0; i < 5; i++) this.tone('sawtooth', 420 - i * 30 + Math.random() * 60, 260, .07, .035, i * .065); break;
         case 'ui': this.tone('sine', 520, 700, .06, .05); break;

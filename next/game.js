@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.21';
+const NEXT_VERSION = '0.23';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1071,30 +1071,32 @@ const NEXT_VERSION = '0.21';
     const eff = effective(d), nxt = nextHouseAt(d), w = worth(eff);
     $('#menu').className = '';
     const hands = s.hands ? `${icon(s.hands.k)}<span style="color:${D.qOf(s.hands) > 2 ? D.QUAL[D.qOf(s.hands)].c : 'inherit'}">${D.ITEMS[s.hands.k].n}<i class="dur"><i style="width:${Math.max(3, Math.min(100, s.hands.d / D.wMax(s.hands) * 100))}%"></i></i></span>` : '<span>Fists</span>';   // 0.19: tier colour
+    const gated = SV.tutorialDone || SV.stats.runs;   // 0.23 ui: base/horde/boss/deep/crew only after the first house, as before
     $('#mbody').innerHTML = `
-      <div class="mtop"><div class="logo">DEAD MILES</div><button id="mver" class="ver">${VERSION}</button><button id="mnet" class="gear" aria-label="Account and friends"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.8 19.5c.6-3.6 3.2-5.6 6.2-5.6s5.6 2 6.2 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16.5 13.6c2.6.1 4.4 1.8 4.9 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><button id="mset" class="gear" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 4.6.1-1.1-.1-1.1 2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.9-1.1L15.8 3h-4l-.4 2.6a8 8 0 0 0-1.9 1.1l-2.4-1-2 3.4 2 1.6-.1 1.1.1 1.1-2 1.6 2 3.4 2.4-1c.6.5 1.2.8 1.9 1.1l.4 2.6h4l.4-2.6a8 8 0 0 0 1.9-1.1l2.4 1 2-3.4z" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></button></div>
-      ${eventBanner()}
-      <div class="scard">
-        <div class="portwrap"><canvas id="mPort" width="150" height="190"></canvas><div class="lookbtns"><button class="editlook" id="mLook">Edit look</button><button class="editlook ward" id="mWard">Wardrobe${newCos() ? `<i class="nbadge">${newCos()}</i>` : ''}</button></div></div>
-        <div class="sinfo">
-          <div class="sname">${esc(s.name)}</div>
-          <div class="sjob">${J.n} · <span>${J.stats.join(' · ')}</span></div>
-          <div class="mbar hp"><i style="width:${s.hp / maxHp(s) * 100}%"></i><span>HP ${Math.ceil(s.hp)}/${maxHp(s)}</span></div>
-          ${DM.Food.barsHTML(s)}${needStat(s)}
-          <button class="sline skbtn${pts ? ' pts' : ''}" id="mSkills"><span>Level ${xl.L}${pts ? ` · <b>${pts} skill point${pts > 1 ? 's' : ''}</b>` : ''}</span><em>Skills ›</em><div class="mbar xp"><i style="width:${xl.pct}%"></i></div></button>
-          <div class="shands">${hands}</div>
+      <div class="mtop hometop"><div class="mbrand"><div class="logo">DEAD MILES</div><button id="mver" class="ver">${VERSION}</button></div>${gated ? hordePill() : ''}<span class="mtsp"></span>
+        ${gated ? `<button id="hBase" class="gear tbase${BS.gardenNote() ? ' dot' : ''}" aria-label="Go to base"><svg viewBox="0 0 24 24"><path d="M3.5 11.2 12 4l8.5 7.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.8 9.6V20h4.4v-5.4h3.6V20h4.4V9.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>` : ''}<button id="mnet" class="gear" aria-label="Account and friends"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.8 19.5c.6-3.6 3.2-5.6 6.2-5.6s5.6 2 6.2 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16.5 13.6c2.6.1 4.4 1.8 4.9 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><button id="mset" class="gear" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 4.6.1-1.1-.1-1.1 2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.9-1.1L15.8 3h-4l-.4 2.6a8 8 0 0 0-1.9 1.1l-2.4-1-2 3.4 2 1.6-.1 1.1.1 1.1-2 1.6 2 3.4 2.4-1c.6.5 1.2.8 1.9 1.1l.4 2.6h4l.4-2.6a8 8 0 0 0 1.9-1.1l2.4 1 2-3.4z" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></button></div>
+      <div class="hero">
+        <div class="scard">
+          <div class="portwrap"><canvas id="mPort" width="150" height="190"></canvas><div class="lookbtns"><button class="editlook" id="mLook">Edit look</button><button class="editlook ward" id="mWard">Wardrobe${newCos() ? `<i class="nbadge">${newCos()}</i>` : ''}</button></div></div>
+          <div class="sinfo">
+            <div class="sname">${esc(s.name)}</div>
+            <div class="sjob">${J.n} · <span>${J.stats.join(' · ')}</span></div>
+            <div class="mbar hp"><i style="width:${s.hp / maxHp(s) * 100}%"></i><span>HP ${Math.ceil(s.hp)}/${maxHp(s)}</span></div>
+            ${DM.Food.barsHTML(s)}${needStat(s)}
+            <button class="sline skbtn${pts ? ' pts' : ''}" id="mSkills"><span>Level ${xl.L}${pts ? ` · <b>${pts} skill point${pts > 1 ? 's' : ''}</b>` : ''}</span><em>Skills ›</em><div class="mbar xp"><i style="width:${xl.pct}%"></i></div></button>
+            <div class="shands">${hands}</div>
+          </div>
+        </div>
+        <div class="stepcard">
+          <div class="steptop"><div class="steps"><b>${Math.round(d.phone + d.walk + d.typed).toLocaleString('en-US')}</b><span>steps today</span></div>
+            <div class="scout"><b>${d.scouted}</b><span>house${d.scouted === 1 ? '' : 's'} found</span></div></div>
+          <div class="stepinfo">${d.typed ? `${d.typed.toLocaleString('en-US')} typed (half value) · ` : ''}${Math.round(w).toLocaleString('en-US')} worth${nxt ? ` · next house at <b>${nxt.toLocaleString('en-US')}</b>` : ' · that\'s the max today'}</div>
+          <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="Type today's total" maxlength="8"><button id="mLog" class="mbtn sm">Log</button></div>
+          <div class="syncrow"><div id="msync" class="msync"></div>${window.SYNC ? (window.NET && NET.ok && !d.phone && new Date().getHours() >= 14 ? '<button class="synclink nudge" id="mSyncG" data-m="fix">No phone steps? Fix sync</button>' : '<button class="synclink" id="mSyncG">How to sync steps</button>') : ''}</div>
+          ${IS_IOS && window.NET && NET.ok ? '<button class="mbtn sm" id="mSyncNow" style="width:100%;margin:8px 0 0">Sync my steps now</button>' : ''}
         </div>
       </div>
-      <div class="stepcard">
-        <div class="steps"><b>${Math.round(d.phone + d.walk + d.typed).toLocaleString('en-US')}</b><span>steps today</span></div>
-        <div class="stepinfo">${d.typed ? `${d.typed.toLocaleString('en-US')} typed (half value) · ` : ''}${Math.round(w).toLocaleString('en-US')} worth<br>
-          <b>${d.scouted}</b> house${d.scouted === 1 ? '' : 's'} scouted${nxt ? ` · next at ${nxt.toLocaleString('en-US')}` : ' · that\'s the max today'}</div>
-        <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="My total today" maxlength="8"><button id="mLog" class="mbtn sm">Log</button></div>
-        <div id="msync" class="msync"></div>
-        ${IS_IOS && window.NET && NET.ok ? '<button class="mbtn sm" id="mSyncNow" style="width:100%;margin:8px 0 2px">Sync my steps now</button>' : ''}
-        ${window.SYNC ? (window.NET && NET.ok && !d.phone && new Date().getHours() >= 14 ? '<button class="synclink nudge" id="mSyncG" data-m="fix">No phone steps yet today? Fix step sync</button>' : '<button class="synclink" id="mSyncG">How to sync steps</button>') : ''}
-      </div>
-      ${SV.tutorialDone || SV.stats.runs ? baseCards() + (DM.Deep ? DM.Deep.cardHTML() : '') + DM.Boss.cardHTML() + DM.Crew.cardHTML() : ''}
+      ${gated ? homeTiles() : eventBanner()}
       <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}</div>
       <div id="mpane"></div>`;
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { SFX.play('ui'); if (b.dataset.t === 'map') { DM.Map.open(); return; } tab(b.dataset.t); }; });
@@ -1105,9 +1107,8 @@ const NEXT_VERSION = '0.21';
       const used = DM.addSteps(v, 'typed'); if (used < v) toast(`Typed steps are capped at 4,000 a day (${used.toLocaleString('en-US')} counted)`, 2.6);
     };
     $('#mnet').onclick = openAccount;
-    bindBaseCards();
-    DM.Boss.bind($('#mbody')); DM.Crew.bindCard(() => renderHome());
-    if (DM.Deep) DM.Deep.bind($('#mbody'));   // 0.17 deep runs (deep.js)
+    bindHomeTop();   // 0.23 ui: base icon + horde pill in the top bar, feature tiles open their own sheets
+    DM.Boss.bind($('#mbody'));   // (shows the boss reward sheet when one is waiting)
     if ($('#evBan')) $('#evBan').onclick = () => { SFX.play('ui'); openEvent(); };
     // iPhone: run the player's own "Dead Miles Steps" Shortcut and come straight back here
     // (x-callback-url), so a manual sync is one tap instead of a trip to the Shortcuts app.
@@ -1128,6 +1129,7 @@ const NEXT_VERSION = '0.21';
     updateSync();
     if (cosQueue.length) setTimeout(showCosPop, 400); else { tip('home'); if (s.food.h < DM.Food.LOW || s.food.t < DM.Food.LOW) tip('food'); if (DM.Infect && DM.Infect.is(s)) tip('infect'); }
     const ic = document.querySelector('.nstat .inf'); if (ic) ic.onclick = () => { SFX.play('ui'); toast(DM.Infect.effects(s)[0], 5); };   // 0.18
+    refreshCardSheet();   // 0.23 ui: a feature sheet left open follows the new state
   }
   // ---- 0.8: hunger + thirst (food.js). Real time drains them, so catch up whenever the home screen shows.
   const FD = DM.Food;
@@ -1192,7 +1194,7 @@ const NEXT_VERSION = '0.21';
       <div class="hbtns"><button class="mbtn${away ? ' ghost' : ''}" id="hTrader">${away ? 'Away' : 'Visit'}</button></div></div>` : '';
     const dailyCard = SV.tutorialDone && DM.Daily ? DM.Daily.cardHTML() : '';   // 0.18: the daily challenge house (daily.js)
     if (!list.length) { el.innerHTML = rseg + traderCard + dailyCard + `<div class="empty big">No houses scouted yet.<br>Walk - every ~1,000 steps turns up another door.</div>`; if ($('#hTrader')) $('#hTrader').onclick = openTrader; if (dailyCard) DM.Daily.bind(el); if (rseg) DM.Route.bind(el, () => renderHome()); return; }
-    const bossCard = SV.tutorialDone ? DM.Boss.cardHTML(true) : '';
+    const bossCard = '';   // 0.23 ui: the weekly boss lives on its home tile only (was shown twice)
     const gstage = gamestage().gs;   // 0.19: the house list's special-infected tag uses your gamestage
     el.innerHTML = rseg + traderCard + dailyCard + bossCard + list.map(h => {
       const T = D.BTYPES[h.type], left = 3 - (dayNum(SV.day.key) - dayNum(h.day)), done = h.status !== 'new' && h.status !== 'far';
@@ -1223,13 +1225,19 @@ const NEXT_VERSION = '0.21';
 
   // ---- base + horde night cards (phase 4)
   const HD = DM.Horde, BS = DM.Base;
-  function baseCards() {
-    const b = SV.base, gn = BS.gardenNote(), n = HD.next(), open = HD.windowOpen(), party = window.NET && NET.party, code = party && party.code;
+  // 0.23 ui: the big base + horde cards became a home icon and a red horde pill in the top bar; the horde card lives in a sheet
+  function hordeRes() { return Object.keys(SV.horde.resolved).sort().map(k => [k, SV.horde.resolved[k]]).filter(([, r]) => r && !r.skip && !r.seen).pop(); }
+  function hordePillText(n, open) { return `<small>${open ? 'Shift open' : 'Horde'}</small>${n ? BS.until(n.at) : ''}`; }
+  function hordePill() {
+    const n = HD.next(), open = HD.windowOpen(), res = hordeRes();
+    return `<button id="hPill" class="hpill${open ? ' open' : ''}" aria-label="Horde night"><svg viewBox="0 0 20 20"><path d="M10 2.2c-4.1 0-7 2.8-7 6.5 0 2.3 1.1 3.7 2.3 4.3v2.7c0 .8.6 1.3 1.3 1.3h6.8c.7 0 1.3-.5 1.3-1.3V13c1.2-.6 2.3-2 2.3-4.3 0-3.7-2.9-6.5-7-6.5z" fill="currentColor"/><circle cx="7.3" cy="9" r="1.9" fill="#2a1622"/><circle cx="12.7" cy="9" r="1.9" fill="#2a1622"/></svg><span id="hPillT">${hordePillText(n, open)}</span>${res ? '<i class="pdot"></i>' : ''}</button>`;
+  }
+  function hordeCardHTML() {
+    const n = HD.next(), open = HD.windowOpen(), party = window.NET && NET.party, code = party && party.code;
     const wk = n && SV.horde.weeks[n.week], mine = wk ? wk.n : 0, sp = n ? HD.special(n.week) : { size: 1 };
     const pk = code && party.data && party.data.horde && n && party.data.horde[n.week], pkills = pk ? Object.values(pk.shifts || {}).reduce((a, x) => a + (x.k || 0), 0) : 0;
-    const res = Object.keys(SV.horde.resolved).sort().map(k => [k, SV.horde.resolved[k]]).filter(([, r]) => r && !r.skip && !r.seen).pop();
-    return `<div class="basecard"><div class="bci"><b>Your base</b><span>Defence <em>${BS.defense()}</em> · <em>${Math.round(b.pool).toLocaleString('en-US')}</em> build steps</span>${gn ? `<span class="gnote">Garden: ${gn}</span>` : ''}</div><button class="mbtn" id="hBase">Go to base</button></div>
-      <div class="hordecard${open ? ' open' : ''}${sp.name ? ' special' : ''}"><div class="hhead"><span class="kick">${sp.name ? esc(sp.name) : 'Horde night'}</span><span class="hwhen">Sun 9 PM New York</span></div>
+    const res = hordeRes();
+    return `<div class="hordecard${open ? ' open' : ''}${sp.name ? ' special' : ''}"><div class="hhead"><span class="kick">${sp.name ? esc(sp.name) : 'Horde night'}</span><span class="hwhen">Sun 9 PM New York</span></div>
         ${sp.name ? `<div class="hspecial">${Math.round((sp.size - 1) * 100)}% bigger horde · better crates for everyone who holds</div>` : ''}
         ${n && new Date(n.at).getHours() !== 21 ? `<div class="hlocal">${esc(BS.when(n.at))} your time</div>` : ''}
         <div class="hcount" id="hCount">${n ? (open ? 'Watch shift open · hits in ' : 'in ') + BS.until(n.at) : ''}</div>
@@ -1237,18 +1245,73 @@ const NEXT_VERSION = '0.21';
         <div class="hbtnrow">${open && mine < HD.MAX_SHIFTS ? '<button class="mbtn sm" id="hShift">Start watch shift</button>' : open ? '<span class="hdone">Shifts done this week</span>' : '<span class="hdone">Shifts open 24 h before</span>'}<button class="mbtn sm ghost" id="hParty">${code ? 'Party' : 'Join party'}</button></div>
         ${res ? resultHTML(res[0], res[1]) : ''}</div>`;
   }
+  // the home tiles: one compact tile per feature; each opens its own sheet
+  function homeTiles() {
+    const t = [], s = SV.survivor, hr = hordeRes();
+    if (hr) t.push({ k: 'horde', c: hr[1].hold ? '#93a86c' : '#ff6b5a', n: 'Horde night', sub: hr[1].hold ? 'Your base held!' : 'The horde got in', hot: 'See' });
+    if (DM.Boss) {
+      const B = DM.Boss; B.roll(); const st = B.state(), boss = B.bossOf(B.week()), ws = B.weekSteps(), far = ws < B.STEPS, dead = st.hp <= 0, left = B.fightsLeft(), pct = Math.round(Math.max(0, st.hp / st.max * 100));
+      t.push({ k: 'boss', c: boss.col, n: 'Weekly boss', sub: dead ? 'Defeated!' : far ? `${fmtN(B.STEPS - ws)} steps to reach` : `${pct}% HP left`, bar: dead ? 0 : pct, hot: !dead && !far && left ? 'Fight' : '' });
+    }
+    if (DM.Deep) {
+      const dp = SV.deep || {}, ps = DM.Deep.passes(), nx = DM.Deep.toNext(), held = (dp.held || []).reduce((a, e) => a + e.n, 0);
+      t.push({ k: 'deep', c: '#7fd99a', n: 'Deep run', sub: dp.run ? `In floor ${dp.run.f} · go back` : held ? `${held} thing${held > 1 ? 's' : ''} to claim` : ps ? `${ps} pass${ps > 1 ? 'es' : ''} ready` : `Pass in ${fmtN(nx)} steps`, bar: nx == null ? 100 : (1 - nx / DM.Deep.STEPS) * 100, hot: dp.run ? 'Back in' : held ? 'Claim' : ps ? 'Go' : '' });
+    }
+    if (SV.tutorialDone && DM.Daily) {
+      const dy = DM.Daily.state();
+      t.push({ k: 'daily', c: '#f0c64a', n: 'Daily challenge', sub: dy && dy.res ? `Scored ${fmtN(dy.res.total)} · ${DM.Daily.leftText()}` : DM.Daily.leftText(), hot: dy && !dy.res ? (dy.h.run ? 'Continue' : 'Go') : '' });
+    }
+    if (DM.Crew) {
+      const cr = (SV.crew && SV.crew.list) || [], pl = (SV.pets && SV.pets.list) || [], notes = SV.crew && SV.crew.notes ? SV.crew.notes.filter(x => !x.seen).length : 0, mo = SV.crew && SV.crew.morning && !SV.crew.morning.seen;
+      const hungry = cr.some(m => m.hungry);
+      t.push({ k: 'crew', c: '#3fa7a0', n: 'Crew & strays', sub: cr.length || pl.length ? `${cr.length}/${DM.Crew.bunks()} crew · ${pl.length} pet${pl.length === 1 ? '' : 's'}${hungry ? ' · hungry!' : ''}` : 'Nobody yet', hot: notes ? 'Note' : mo ? 'News' : '' });
+    }
+    const gn = BS.gardenNote(); if (gn) t.push({ k: 'garden', c: '#93a86c', n: 'Garden', sub: gn, hot: '' });
+    const ev = eventBanner();
+    return `<div class="hsect"><span class="kick">This week</span></div>${ev}<div class="tiles">${t.map(x => `<button class="tile" data-tile="${x.k}" style="--tc:${x.c}"><span class="tn">${esc(x.n)}</span><span class="ts">${esc(x.sub)}</span>${x.bar != null ? `<i class="tbar"><i style="width:${Math.max(0, Math.min(100, x.bar))}%"></i></i>` : ''}${x.hot ? `<b class="thot">${esc(x.hot)}</b>` : ''}</button>`).join('')}</div>`;
+  }
+  let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
+  function openCardSheet(k) {
+    cardSheet = k;
+    const html = k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
+    sheetOpen(`<div class="cardsheet" data-cs="${k}">${html}</div><button class="mbtn ghost" id="csDone">Close</button>`);
+    const el = $('#msheet'), root = el.querySelector('.cardsheet');
+    el.onclick = e => { if (e.target === el) closeCardSheet(); };
+    $('#csDone').onclick = () => { SFX.play('ui'); closeCardSheet(); };
+    // actions that leave the menu (a fight, a shift, back into a run) close the sheet first
+    root.addEventListener('click', e => { if (e.target.closest('[data-boss="go"],[data-deep="resume"],#hShift')) { cardSheet = null; sheetClose(); } }, true);
+    if (k === 'boss') DM.Boss.bind(root);
+    else if (k === 'deep') DM.Deep.bind(root);
+    else if (k === 'crew') DM.Crew.bindCard(() => renderHome());
+    else {
+      if ($('#hShift')) $('#hShift').onclick = () => { SFX.play('ui'); cardSheet = null; sheetClose(); startShift(); };
+      $('#hParty').onclick = () => { SFX.play('ui'); cardSheet = null; partySheet(); };
+      root.querySelectorAll('[data-seen]').forEach(x => x.onclick = () => { SV.horde.resolved[x.dataset.seen].seen = true; Game.save(); renderHome(); });
+    }
+  }
+  function closeCardSheet() { cardSheet = null; sheetClose(); }
+  function refreshCardSheet() {
+    if (!cardSheet) return;
+    const el = $('#msheet'), cs = el.querySelector('.cardsheet');
+    if (!el.classList.contains('on') || !cs || cs.dataset.cs !== cardSheet) { cardSheet = null; return; }   // another sheet took over
+    openCardSheet(cardSheet);
+  }
+  function bindHomeTop() {
+    const b = $('#hBase'); if (b) b.onclick = () => { SFX.play('ui'); goBase(); };
+    const p = $('#hPill'); if (p) p.onclick = () => { SFX.play('ui'); openCardSheet('horde'); };
+    document.querySelectorAll('[data-tile]').forEach(x => x.onclick = () => {
+      SFX.play('ui'); const k = x.dataset.tile;
+      if (k === 'garden') goBase();
+      else if (k === 'horde') openCardSheet('horde');
+      else if (k === 'daily') { tab('houses'); const c = $('#dlyCard'); if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 1400); } }
+      else openCardSheet(k);
+    });
+  }
   function resultHTML(week, r) {
     const title = (r.special ? r.special + ' · ' : '') + (r.hold ? (r.shifted ? 'Your base held!' : 'Your base held') : 'The horde got in');
     return `<div class="hres ${r.hold ? 'held' : 'fail'}"><b>${title}</b><span>Horde of ${r.S}${r.solo ? ' (solo)' : ''} · ${r.K} killed on shifts · ${r.A} reached your walls · your defence ${r.defense}</span>
       ${r.crate && r.crate.length ? `<div class="picons">Crate: ${r.crate.map(e => `${icon(e.k)}${D.ITEMS[e.k].n}${e.n > 1 ? ' x' + e.n : ''}`).join(' ')}</div>` : r.hold && !r.shifted ? '<span>No crate: you skipped the watch shift.</span>' : ''}
       ${r.dmg ? `<span class="bad">${esc(r.dmg)} was wrecked. Repair it at the base.</span>` : ''}${r.lost && r.lost.length ? `<span class="bad">No room for: ${r.lost.map(e => D.ITEMS[e.k].n).join(', ')}</span>` : ''}<button class="mbtn sm" data-seen="${week}">OK</button></div>`;
-  }
-  function bindBaseCards() {
-    const b = $('#hBase'); if (!b) return;
-    b.onclick = () => { SFX.play('ui'); goBase(); };
-    if ($('#hShift')) $('#hShift').onclick = () => { SFX.play('ui'); startShift(); };
-    $('#hParty').onclick = () => { SFX.play('ui'); partySheet(); };
-    document.querySelectorAll('[data-seen]').forEach(x => x.onclick = () => { SV.horde.resolved[x.dataset.seen].seen = true; Game.save(); renderHome(); });
   }
   function goBase(o = {}) {
     if (SV.survivor.hp < 15 && o.shift) { toast('Too hurt for a shift. Eat or patch up first.', 2.2); return; }
@@ -1439,10 +1502,14 @@ const NEXT_VERSION = '0.21';
   // ---- settings: export / import / reset
   function sheetOpen(html) { const el = $('#msheet'); el.innerHTML = `<div class="mcard">${html}</div>`; el.classList.add('on'); el.onclick = e => { if (e.target === el) el.classList.remove('on'); }; }
   const sheetClose = () => $('#msheet').classList.remove('on');
+  // 0.20: the music picker (music.js) - a short hint after each track's name
+  const TRACK_NOTE = { lantern: 'home', rust: 'map', brown: 'looting', radio: 'base', horde: 'fights', carol: 'winter', eerie: 'live, speeds up with danger' };
   function openSettings() {
     const MC = DM.Music ? DM.Music.cfg() : null;
     sheetOpen(`<div class="kick">Settings</div><button class="mbtn" id="mHow">How to play</button>
-      ${MC ? `<h3 class="sndh">Sound</h3><div class="btnrow tipsrow"><span>Music <small>· eerie, speeds up with danger</small></span><button class="mbtn sm${MC.music ? '' : ' ghost'}" id="mMus">${MC.music ? 'On' : 'Off'}</button></div>
+      ${MC ? `<h3 class="sndh">Sound</h3><div class="btnrow tipsrow"><span>Music <small>· ${MC.track === 'auto' ? 'changes with where you are' : 'one track everywhere'}</small></span><button class="mbtn sm${MC.music ? '' : ' ghost'}" id="mMus">${MC.music ? 'On' : 'Off'}</button></div>
+      <label class="volrow"><span>Track</span><select id="mTrack"${MC.music ? '' : ' disabled'}><option value="auto"${MC.track === 'auto' ? ' selected' : ''}>Auto (by area)</option>${DM.Music.ORDER.map(k => `<option value="${k}"${MC.track === k ? ' selected' : ''}>${esc(DM.Music.TRACKS[k].n)}${TRACK_NOTE[k] ? ' · ' + TRACK_NOTE[k] : ''}</option>`).join('')}</select></label>
+      ${MC.music && DM.Music.nowName() ? `<div class="mp dim nowmus">Now playing: ${esc(DM.Music.nowName())}</div>` : ''}
       <label class="volrow"><span>Music volume</span><input type="range" id="mMvol" min="0" max="100" value="${Math.round(MC.mvol * 100)}"${MC.music ? '' : ' disabled'}></label>
       <label class="volrow"><span>Sound effects</span><input type="range" id="mSfx" min="0" max="100" value="${Math.round(MC.sfx * 100)}"></label>` : ''}
       <div class="btnrow tipsrow"><span>First-time tips</span><button class="mbtn sm ghost" id="mTips">${SV.tips.off ? 'Turn on' : 'Turn off'}</button></div><h3>Save</h3>
@@ -1456,6 +1523,7 @@ const NEXT_VERSION = '0.21';
     $('#mAcc').onclick = () => { sheetClose(); openAccount(); };
     if ($('#mMus')) {
       $('#mMus').onclick = () => { DM.Music.set('music', !DM.Music.cfg().music); SFX.play('ui'); openSettings(); };
+      $('#mTrack').onchange = e => { DM.Music.set('track', e.target.value); SFX.play('ui'); setTimeout(() => { if ($('#mTrack')) openSettings(); }, 150); };
       $('#mMvol').oninput = e => DM.Music.set('mvol', e.target.value / 100);
       $('#mSfx').oninput = e => DM.Music.set('sfx', e.target.value / 100);
       $('#mSfx').onchange = () => SFX.play('pick');
@@ -1654,7 +1722,7 @@ const NEXT_VERSION = '0.21';
     boot2();
     $('#loading').remove();
     netStart();
-    setInterval(() => { if (SV.day.key !== today()) { rollDay(); Game.save(); renderHome(); } resolveHorde(); if (++bossTick % 3 === 0) DM.Boss.sync().then(() => { if (!DM.scene && !$('#msheet').classList.contains('on')) renderHome(); }).catch(() => { }); const c = document.getElementById('hCount'), n = DM.Horde.next(); if (c && n) c.textContent = (DM.Horde.windowOpen() ? 'Watch shift open · hits in ' : 'in ') + DM.Base.until(n.at); }, 60000);
+    setInterval(() => { if (SV.day.key !== today()) { rollDay(); Game.save(); renderHome(); } resolveHorde(); if (++bossTick % 3 === 0) DM.Boss.sync().then(() => { if (!DM.scene && !$('#msheet').classList.contains('on')) renderHome(); }).catch(() => { }); const c = document.getElementById('hCount'), n = DM.Horde.next(); if (c && n) c.textContent = (DM.Horde.windowOpen() ? 'Watch shift open · hits in ' : 'in ') + DM.Base.until(n.at); const hp = document.getElementById('hPill'); if (hp) { hp.classList.toggle('open', !!DM.Horde.windowOpen()); $('#hPillT').innerHTML = hordePillText(n, DM.Horde.windowOpen()); } }, 60000);   // 0.23 ui: the top-bar horde pill ticks too
     checkVersion();
     DM.ready = true;
   };

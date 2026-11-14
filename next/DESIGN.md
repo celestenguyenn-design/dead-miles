@@ -31,7 +31,9 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   (INK #11142f, PLUM #3d2d61, ORA #f07b3c, CRM #f6e3bb, WALL #2a1f4a, LIL #5a4a86).
 - Controls: virtual joystick + action buttons (search/interact, attack).
 - Combat: real-time, physical, animated; you can run.
-- Music: the Eerie generated track that speeds up with danger (s2.js MUSIC).
+- Music: area tracks made with our own synth (0.20: Lantern Hollow home, Rust & Hum map, Brownstone Pulse
+  looting, Last Light Radio base, Horde Night fights, Midnight Carol at Christmas); the live Eerie track stays
+  as an option. Zombies groan by where they are.
 - Pacing: steps taper through the day (7k full, then 50%, then 15%); typed
   steps half value, max 4k/day. Loot is stingy; good gear from raids/boss.
 - Social: (shared camp dropped - personal bases instead), weekly
@@ -414,6 +416,16 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   infected.js and house.js read, and reuses it on resume (tested: same zombies after her gamestage jumped 24 -> 60). A run saved before
   0.19 resumes at gamestage 0 (its original zombies). h.gs is cleared when the run ends. The house list's special tag uses the current
   gamestage. Tutorial, base, watch shifts and the weekly boss ignore the gamestage.
+
+## Done in 0.23 (home screen redo, owner: "I want the UI to be better." / "Go to base should be a small home icon on the top right somewhere." / "Horde night should be a small red box somewhere on the top with the timer." / "Everything is just really bunched up.")
+- Layout and presentation only: no game rules changed.
+- **Top bar** (sticky while the home scrolls): DEAD MILES + version on the left (5 taps on the version still opens the dev panel off GitHub), then a small **red horde pill** with the countdown ("HORDE 1d 9h"; "SHIFT OPEN 4h 59m" pulsing in the last 24 h; an orange dot when a horde result is waiting), then three icon buttons on the right: **home icon = go to base** (orange dot when the garden needs water or is ready), account & friends, settings. Base + horde only show after the first house, as before.
+- Tapping the horde pill opens the old horde card in a sheet: countdown, party line, Start watch shift, Join party / Party, last horde's result + OK.
+- **One hero card**: survivor (portrait, Edit look, Wardrobe + new-cosmetics badge, HP, hunger/thirst (tap = Eat & drink), infected/hungry chips, Level + Skills with the skill-point pulse, weapon) joined to the steps block (steps today, houses found, worth + next house, typed total + Log, sync status, How to sync steps / Fix sync, Sync my steps now on iPhone).
+- **"This week" tiles** instead of the big stacked cards: Weekly boss (HP bar, FIGHT badge when you can), Deep run (pass progress, GO / CLAIM / BACK IN), Daily challenge (time left, GO), Crew & strays (crew/pets, NOTE / NEWS badge), plus Garden and Horde result tiles only when they have something to say. Each tile opens the full old card in a sheet (all its buttons work there); the daily tile jumps to the daily house in the Houses list. The event banner sits above the tiles in a slimmer form.
+- The weekly boss is no longer shown twice: it left the Houses list (home tile only).
+- The tab bar (Houses / Gear / Workbench / Map) sticks under the top bar once you scroll into the lists.
+- Spacing on an 8 / 12 / 16 px scale, one border + shadow per card instead of three stacked cards; checked at 360, 375 (390) and 430 px with nothing overflowing. Shots: next/shots/250-before-*, 250-after-*, 250-compare.png.
 ## Done in 0.21 (the daily route map, owner approved as an extra view of the Houses tab)
 - route.js (new). Houses tab gets a "List | Route" toggle (after the tutorial); the list is unchanged. The toggle remembers the
   last view (SV.route.view); a "!" badge on Route when a row is ready to pick.
@@ -467,3 +479,43 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Four Overpass mirrors, hedged: the next mirror is asked if the current one has not answered in 3.5 s; first good answer wins,
   the rest are cancelled; the mirror that answered goes first next time. 20 s cap per question. With the main mirror hanging
   (mocked) the map draws in ~5 s instead of failing after 44 s.
+## Done in 0.20 (area music + zombie groans; owner: loved the tracks, "especially Lantern Hollow"; "I do want the track for looting a house to have the zombies make noises if they're close by")
+- Area music (music.js). Auto picks by where she is: home / menus Lantern Hollow (Midnight Carol while the Christmas
+  event runs, D.EV), the real-world map Rust & Hum, house runs Brownstone Pulse, the base Last Light Radio, fights Horde
+  Night. A fight = a house run where something is after her (M.tension() >= .75: a zombie chasing / attacking, or a
+  raider that knows she is there) -> Horde Night in 1.5 s; after 7 s of calm it goes back (3 s). Watch shifts, the weekly
+  boss (body.bossfight) and the deep-run boss floor (a live z.deepBoss) are fights from the start. Between deep floors
+  (no scene, body.deeprun) the run's music carries on. The area is read from what is on screen (#mapv.on, DM.scene, body
+  classes inrun / atbase / shift / bossfight / deeprun) every 100 ms, with a .4 s debounce, so no other file needed hooks.
+- Settings > Sound: Music On/Off, a Track picker ("Auto (by area)" default, or pin any of the six, or Eerie), "Now
+  playing", music volume, sound effects. Stored on the phone only (localStorage dm-next-audio: { music, mvol, sfx, track }).
+- The files: next/music/*.mp3, mono 22.05 kHz 64 kbps, 45-53 s, 360-430 KB each (2.3 MB in all), rendered by
+  mockups/music/loops.py from the same synth as the approved mockups, as SEAMLESS LOOPS: whole bars, no intro or fade,
+  held layers crossfaded onto the start, the reverb tail wrapped round (circular). Each file holds [last .3 s][loop][first
+  .3 s] and plays with loopStart .3 / loopEnd .3 + L, so it stays seamless whatever start delay or padding the phone's MP3
+  decoder adds. Checked by rendering the real WebAudio loop across the seam: matches straight-through playback (-27 to
+  -60 dB, MP3 noise) with no step at the seam. Frost on the Glass was rejected and is not shipped. Re-render: python3
+  mockups/music/loops.py, then bump REV in music.js (file cache-busting, separate from the game version).
+- Playback: AudioBufferSourceNode loop=true on the music bus (the engine's AudioContext, started by the first tap), through
+  a low-pass and an 11 ms Haas copy on the right for width. Lazy: only the area's track is fetched, then the likely next one
+  (home -> Brownstone, house -> Horde Night, fight -> Brownstone, map / base -> home's); none on data saver; a pinned track
+  fetches only itself. Decoded at 22.05 kHz through an OfflineAudioContext where the browser allows (about 4.7 MB a track),
+  at most 3 decoded at once (least recently used dropped, never the playing / wanted one). Fetch + decode never block: the
+  old track plays until the new one is ready, then a 2.5 s crossfade (1.2 s fade-in from silence). Each track resumes about
+  where it faded out. A file that fails (network, decode, too short) -> the live Eerie track, tried again after 90 s.
+- Adaptive in house runs: the low-pass opens with tension (about 3 kHz calm, 6 kHz with noise, wide open in a fight), the
+  track swells a little (x.8 -> x1), and a live heartbeat joins Brownstone Pulse when an awake zombie is within 7 tiles,
+  on the track's own odd beats (its built-in heartbeat is on the even ones, so the pulse doubles as they close in), louder
+  the nearer (full at 2 tiles); a free heartbeat (62-120 bpm) over any other pinned track. Eerie keeps its own behaviour.
+- Zombie groans (engine.js SFX.groan, house.js groanZ): positional. Gain .06 + .94 x (1 - (d - 1.5) / 7.5)^1.6: full within
+  1.5 tiles, faint at 8.5, silent past 9; pan = dx / 5 tiles (x.9) on a StereoPannerNode; a 650 Hz low-pass when a wall is
+  in between; each zombie has its own pitch (x.86-1.14; armoured x.82, krampus x.62, bosses x.75) and favourite groan.
+  Voices are procedural: a sawtooth throat + breath noise (+ a square for grit) with a pitch glide and wobble through three
+  vowel band-passes gliding between two vowels. Four groans (moan, groan, gargle, sigh), a harsh snarl when one first sees
+  her and starts chasing, the runner pants, the bloater gurgles, the screamer wails (its shriek is separate), the turkey
+  gobbles. When: idle zombies every 3-6 s within 5 tiles (5-11 s further, heard within 9), investigating every 2.5-5 s
+  (70% on the alert), rising from sleep, chasing every 3-7 s, the screamer's call, the stoop wanderer (faint from the
+  street). Limits: each zombie waits 3.5-4.5 s between groans (snarls: 4 s between snarls), at most 2 at once, one start per
+  .45 s (a snarl skips the spacing). SFX.play('groan') (weekly boss, horde arriving) is the new voice, centred. Respects the
+  sound-effects slider (none at 0). Raiders never groan.
+- Demo for the owner: mockups/music/looting-demo.mp3 (44 s), rendered offline with the game's own WebAudio code.
