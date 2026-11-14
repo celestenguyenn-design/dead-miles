@@ -70,10 +70,11 @@
 
   // ---------------------------------------------------------------- generator
   GEN.generate = function (type, seed, opts = {}) {
-    for (let attempt = 0; attempt < 30; attempt++) {
+    for (let attempt = 0; attempt < ((opts.gv || 1) >= 2 ? 60 : 30); attempt++) {
       const out = tryGen(type, (seed + attempt * 7919) >>> 0, opts);
       if (out) { out.seed = seed; out.attempts = attempt + 1; return out; }
     }
+    if ((opts.gv || 1) >= 2) return GEN.generate(type, seed, Object.assign({}, opts, { gv: 1 }));   // never fail: fall back to the v1 rules
     throw new Error('generator failed for ' + type + ' ' + seed);
   };
 
@@ -83,6 +84,9 @@
     const pick = a => a[Math.floor(rnd() * a.length)];
     const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
     const rc = R[type], bt = D.BTYPES[type];
+    // 0.9 (generator v2, houses scouted from 0.9 on): walkways in small rooms, containers open at the front, no sealed-off
+    // floor, rugs on open floor. Houses already in a list keep v1, so they (and a saved half-done run) stay exactly the same.
+    const V2 = (opts.gv || 1) >= 2;
 
     // secrets chosen first: they reserve space around the house
     const nSec = ri(rc.secrets[0], rc.secrets[1]);
@@ -185,10 +189,18 @@
       while (q.length) { const [x, y] = q.shift(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= MW || ny >= MH) continue; const i = ny * MW + nx; if (dist[i] >= 0 || !isFloor(nx, ny) || occ[ny][nx] === 1) continue; dist[i] = 1; q.push([nx, ny]); } }
       return dist;
     }
-    const furn = [];
+    const furn = [], tallAt = new Set();
     function accessible(f, dist) {
       const [x0, y0, w, h] = f.at;
       if (f.wall) return dist[(y0 + 1) * MW + x0] >= 0;
+      // 0.9: a container needs a free tile in FRONT of it (south), or on its open side when it stands against a side wall
+      if (V2 && f.loot && f.room !== 'o' && roomOfCh[f.room]) {
+        const r = roomOfCh[f.room], ok = (x, y) => x >= 0 && y >= 0 && x < MW && y < MH && dist[y * MW + x] >= 0;
+        for (let x = x0; x < x0 + w; x++) if (ok(x, y0 + h)) return true;
+        if (x0 === r.x0) for (let y = y0; y < y0 + h; y++) if (ok(x0 + w, y)) return true;
+        if (x0 + w - 1 === r.x1) for (let y = y0; y < y0 + h; y++) if (ok(x0 - 1, y)) return true;
+        return false;
+      }
       for (let x = x0; x < x0 + w; x++) { if (y0 + h < MH && dist[(y0 + h) * MW + x] >= 0) return true; if (y0 - 1 >= 0 && dist[(y0 - 1) * MW + x] >= 0) return true; }
       for (let y = y0; y < y0 + h; y++) { if (dist[y * MW + x0 - 1] >= 0 || dist[y * MW + x0 + w] >= 0) return true; }
       return false;
@@ -197,6 +209,8 @@
       const dist = reach();
       for (const d of doors) if (dist[d.y * MW + d.x] < 0) return false;
       for (const f of furn) if ((f.loot || f.mustReach) && !f.pocket && !accessible(f, dist)) return false;
+      // 0.9: no open floor sealed off behind furniture - every free tile of a room can be walked to
+      if (V2) for (const r of rooms) { if (r.hidden || r.isolated) continue; for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) if (occ[y][x] !== 1 && g[y][x] === r.ch && dist[y * MW + x] < 0) return false; }
       return true;
     }
     function tryPlace(r, spec, x, y) {
@@ -208,9 +222,25 @@
       }
       for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) { if (xx < r.x0 || xx > r.x1 || yy < r.y0 || yy > r.y1 || occ[yy][xx]) return null; }
       const solid = spec.solid !== 0;
+      // 0.9: small rooms (under ~4x4, or 3 wide) keep a walkway - furniture may cover at most ~40% of the floor
+      const rw = r.x1 - r.x0 + 1, rh = r.y1 - r.y0 + 1;
+      if (V2 && solid && !r.hidden && !r.isolated && (rw * rh < 16 || Math.min(rw, rh) <= 3)) {
+        let used = 0; for (let yy = r.y0; yy <= r.y1; yy++) for (let xx = r.x0; xx <= r.x1; xx++) if (occ[yy][xx] === 1) used++;
+        if (used + w * h > Math.max(2, Math.floor(rw * rh * .4))) return null;
+      }
+      // 0.9: a tall piece (shelf, wardrobe, fridge...) never stands right in front of another piece, where its
+      // picture would hide that piece's front and the floor she needs to search it from
+      if (V2 && solid) {
+        const tall = spec.H >= 40;
+        for (let xx = x; xx < x + w; xx++) {
+          if (tall && y - 1 >= r.y0 && (occ[y - 1][xx] === 1 || (y - 2 >= r.y0 && occ[y - 2][xx] === 1))) return null;
+          if (y + h + 1 <= r.y1 && tallAt.has(xx + ',' + (y + h + 1))) return null;
+        }
+      }
       for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) occ[yy][xx] = solid ? 1 : 2;
       const f = mk(spec, r, x, y); furn.push(f);
       if (solid && !valid()) { furn.pop(); for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) occ[yy][xx] = 0; return null; }
+      if (V2 && solid && spec.H >= 40) for (let xx = x; xx < x + w; xx++) tallAt.add(xx + ',' + y);
       return f;
     }
     function mk(spec, r, x, y) {
@@ -265,7 +295,7 @@
           for (let y = hr.y0; y <= hr.y1; y++) for (let x = hr.x0; x <= hr.x1; x++) g[y][x] = 'S';
           g[yT][dx] = '='; doorMap[dx + ',' + yT] = 'S';
           const shelf = { art: 'bookshelf', name: 'Bookshelf', at: [dx, r.y0, 2, 1], H: 62, secret: 1, seed: 2, room: r.ch, mustReach: 1 };
-          furn.push(shelf); occ[r.y0][dx] = 1; occ[r.y0][dx + 1] = 1; occ[r.y0][dx + 2] = 3; occ[r.y0 + 1][dx] = 3; occ[r.y0 + 1][dx + 1] = 3;
+          furn.push(shelf); occ[r.y0][dx] = 1; occ[r.y0][dx + 1] = 1; occ[r.y0][dx + 2] = V2 ? 1 : 3; occ[r.y0 + 1][dx] = 3; occ[r.y0 + 1][dx + 1] = 3;   // 0.9 (v2): the shelf slides into dx+2, so nothing may need that tile as a path
           furn.push({ art: 'crate', name: 'Hidden crate', at: [hx, hr.y0, 2, 1], H: 30, time: 3, noise: 4, loot: 'crate', rare: 1, secretLoot: 1, room: 'S', pocket: 1 });
           furn.push({ art: 'supply', at: [hx + 2, hr.y0, 2, 1], H: 56, room: 'S', pocket: 1 });
           secOut.push({ type: 'shelf', furn: furn.indexOf(shelf), room: 'S' });
@@ -314,6 +344,9 @@
         const cells = [], good = [];
         for (let y = ry0; y <= ry1; y++) for (let x = rx0; x <= rx1; x++) if (!occ[y][x] && (y === t.at[1] + t.at[3] || x === t.at[0] + t.at[2])) cells.push([x, y]);
         if (!cells.length) continue;
+        // 0.9: the rug has to lie mostly on open floor, with at least 2 tiles of it she can stand on
+        let open = 0, all = 0; for (let y = ry0; y <= ry1; y++) for (let x = rx0; x <= rx1; x++) { all++; if (occ[y][x] !== 1 && rdist[y * MW + x] >= 0) open++; }
+        if (V2 && (open < 2 || open < all * .45)) continue;
         // 0.8: prefer a board cell she can stand on (also left of the table). Same single roll as before, so seeds keep their houses.
         for (let y = ry0; y <= ry1; y++) for (let x = rx0; x <= rx1; x++) if (!occ[y][x] && rdist[y * MW + x] >= 0 && (y === t.at[1] + t.at[3] || x === t.at[0] + t.at[2] || x === t.at[0] - 1)) good.push([x, y]);
         const v = rnd(), orig = cells[Math.floor(v * cells.length)], use = good.length ? good : cells, [bx, by] = use[Math.floor(v * use.length)]; occ[orig[1]][orig[0]] = 3;   // reserve the old cell: the rest of the house rolls exactly as before
@@ -393,7 +426,7 @@
       }
     }
     for (const f of furn) if (f.art === 'coffee') { const r = roomOfCh[f.room]; L.rugs.push([Math.max(r.x0, f.at[0] - .6), Math.max(r.y0, f.at[1] - 1.3), f.at[2] + 1.2, 3, 1]); }
-    for (const f of furn) if (f.art === 'bed') { L.rugs.push([f.at[0] + f.at[2] + .3, f.at[1] + 1, 2.6, 1.8, 0]); }
+    for (const f of furn) if (f.art === 'bed') { const r = roomOfCh[f.room], rx = f.at[0] + f.at[2] + .3; if (!r || rx + 2.6 <= r.x1 + 1) L.rugs.push([rx, f.at[1] + 1, 2.6, 1.8, 0]); else if (f.at[0] - 2.9 >= r.x0) L.rugs.push([f.at[0] - 2.9, f.at[1] + 1, 2.6, 1.8, 0]); }   // 0.9: never outside the room
     if (spine.y1 - spine.y0 > 4 && !secOut.some(s => s.type === 'rug' && s.room === spine.ch)) L.rugs.push([spine.x0 + (spine.x1 - spine.x0) / 2 - .5 + .25, spine.y0 + 1, 1.5, spine.y1 - spine.y0 - 1, 2]);
     for (const r of rooms) if (r.t === 'bath') L.rugs.push([r.x0 + .5, r.y1 - .2, 1.6, 1, 3]);
 

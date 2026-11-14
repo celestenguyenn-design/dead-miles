@@ -124,9 +124,13 @@
       const d = L.furn[i], ch = x.searched || (d.lock && !x.locked) || (d.keyLock && !x.keyLock) || x.opened || x.slideState || x.swing;
       if (!ch) return; const o = {}; for (const k of FKEEP) if (x[k] != null) o[k] = x[k]; f[i] = o;
     });
-    return { f, sec, so: !!G.secretOpen };
+    return { f, sec, so: !!G.secretOpen, fp: runPrint() };
   }
+  // 0.9: a fingerprint of the house's furniture, so saved progress is never laid onto a different layout
+  const runPrint = () => (L.furn || []).length + ':' + (L.furn || []).map(d => d.art[0] + d.at.join('')).join('').length + ':' + (L.furn || []).reduce((a, d, i) => (a * 31 + d.at[0] * 7 + d.at[1] + i) % 1000003, 7);
   function restoreRun(r) {
+    if (r && r.fp && r.fp !== runPrint()) return;   // the layout changed since: start the house fresh
+    if (r && !r.fp && Object.keys(r.f || {}).some(i => !G.furn[+i] || (r.f[i].searched && !G.furn[+i].lootable))) return;   // 0.8.x save that does not fit
     try {
       for (const i of Object.keys(r.f || {})) { const x = G.furn[+i]; if (x) Object.assign(x, JSON.parse(JSON.stringify(r.f[i]))); }
       (r.sec || []).forEach((v, i) => { if (G.sec[i]) Object.assign(G.sec[i], v); });
@@ -181,6 +185,9 @@
       if (E) rects.push({ x: cx, y: gy0, w: T / 2, h: WT, k: 'e' });
       if (N) rects.push({ x: cx - WT / 2, y: y * T, w: WT, h: T - WT, k: 'n' });
       wallRects[y * MW + x].push(...rects);
+      // 0.9: an east-west wall blocks over its whole cell - its face is drawn over all of it, so she used
+      // to walk right into the wall picture from the room above it. Only collision changes, not the drawing.
+      if (W || E) wallRects[y * MW + x].push({ x: W ? x * T : cx - WT / 2, y: y * T, w: (E ? (x + 1) * T : cx + WT / 2) - (W ? x * T : cx - WT / 2), h: T - WT, k: 'b' });
       const cell = { x, y, rects, key: gy1, cut: 1, W, E, N, S };
       if (!S && !isVoid(x, y + 1)) {
         cell.face = { x0: W ? x * T : cx - WT / 2, x1: E ? (x + 1) * T : cx + WT / 2, room: roomAt(x, y + 1) || 'h', decor: L.decor[x + ',' + y] };
@@ -205,7 +212,37 @@
     G.fieldCell = -1;
   }
   // 0.8: what she bumps into is the drawn base of the piece, a little inset, so she can squeeze past corners
-  function collRect(f) { const s = (f.slide || 0) * T; return { x: f.x + 4 + s, y: f.y + 3, w: f.w - 8, h: f.h - 8 }; }
+  // 0.9: low, deep pieces (beds, cots, tables, tubs, the car) are drawn starting well below their tile's top
+  // edge, and that strip looked like floor but was solid. Now she bumps into the drawn top edge instead.
+  // The drawn outline is measured once per piece kind from its own picture (headboards, lamps, table legs, a thin
+  // lamp post): top edge, bottom edge, and how wide its base is.
+  const outCache = {};
+  function drawnBox(f) {
+    const k = f.art + ':' + f.tw + 'x' + f.th + ':' + f.H + (f.car ? ':' + f.car.half + f.car.flip : '') + (f.vert ? ':v' : '') + (f.table ? ':t' : '');
+    if (outCache[k]) return outCache[k];
+    let o = { top: ART.geo(f).ty0 - f.y, bot: f.h, l: 0, r: f.w };
+    try {
+      const q = Object.assign({}, f, { x: 0, y: 0, searched: false, slide: 0, swing: 0, _c: null }), g = ART.geo(q), by = Math.floor(g.ty0 - 50), bw = Math.ceil(q.w + 8), bh = Math.ceil(q.h + 4 - by);
+      const c = document.createElement('canvas'); c.width = bw; c.height = bh; const x = c.getContext('2d'); x.translate(4, -by);
+      (ART.FURN[q.art] || ART.FURN.counter)(x, q, g);
+      const d = x.getImageData(0, 0, bw, bh).data, A = (xx, yy) => d[(yy * bw + xx) * 4 + 3] > 40;
+      let top = null, bot = null;
+      for (let yy = 0; yy < bh && top == null; yy++) for (let xx = 8; xx < bw - 8; xx++) if (A(xx, yy)) { top = yy; break; }
+      for (let yy = bh - 1; yy >= 0 && bot == null; yy--) for (let xx = 4; xx < bw - 4; xx++) if (A(xx, yy)) { bot = yy; break; }
+      if (top != null && bot != null) {
+        let l = bw, r = 0;   // base width: the lowest 14 drawn rows
+        for (let yy = Math.max(0, bot - 14); yy <= bot; yy++) for (let xx = 0; xx < bw; xx++) if (A(xx, yy)) { if (xx < l) l = xx; if (xx > r) r = xx; }
+        o = { top: top + by, bot: bot + by + 1, l: l - 4, r: r - 4 + 1 };
+      }
+    } catch (e) { /* keep the geometric box */ }
+    return (outCache[k] = o);
+  }
+  function collBox(f) {
+    const o = drawnBox(f), t = Math.max(3, Math.min(f.h - 14, o.top + 6)), b = Math.max(t + 8, Math.min(f.h - 5, o.bot - 5));
+    const l = Math.max(4, o.l + 3), r = Math.min(f.w - 4, o.r - 3);
+    return r - l >= 8 ? { t, b, l, r } : { t, b, l: 4, r: f.w - 4 };
+  }
+  function collRect(f) { const s = (f.slide || 0) * T, c = f.cBox || (f.cBox = collBox(f)); return { x: f.x + c.l + s, y: f.y + c.t, w: c.r - c.l, h: c.b - c.t }; }
   function furnRect(f) { const s = (f.slide || 0) * T; return { x: f.x + 2 + s, y: f.y, w: f.w - 4, h: f.h - 5 }; }
   function overlapsSolid(e, x, y) {
     const x0 = x - e.hw, x1 = x + e.hw, y0 = y - e.hh, y1 = y + e.hh;
@@ -226,13 +263,20 @@
     let hit = false;
     if (dx) {
       const nx = e.x + dx; const r = overlapsSolid(e, nx, e.y);
-      if (!r) e.x = nx; else { hit = true; if (!r.edge) e.x = dx > 0 ? Math.min(nx, r.x - e.hw - .01) : Math.max(nx, r.x + r.w + e.hw + .01); if (overlapsSolid(e, e.x, e.y)) e.x -= dx > 0 ? Math.max(0, e.x - (nx - dx)) : Math.min(0, e.x - (nx - dx)); }
+      if (!r) e.x = nx; else { hit = true; if (!r.edge) e.x = dx > 0 ? Math.min(nx, r.x - e.hw - .01) : Math.max(nx, r.x + r.w + e.hw + .01); if (overlapsSolid(e, e.x, e.y)) e.x -= dx > 0 ? Math.max(0, e.x - (nx - dx)) : Math.min(0, e.x - (nx - dx));  if (!r.edge && Math.abs(dy) < Math.abs(dx) * .6) nudge(e, r, 'y', Math.abs(dx)); }
     }
     if (dy) {
       const ny = e.y + dy; const r = overlapsSolid(e, e.x, ny);
-      if (!r) e.y = ny; else { hit = true; if (!r.edge) e.y = dy > 0 ? Math.min(ny, r.y - e.hh - .01) : Math.max(ny, r.y + r.h + e.hh + .01); if (overlapsSolid(e, e.x, e.y)) e.y = ny - dy; }
+      if (!r) e.y = ny; else { hit = true; if (!r.edge) e.y = dy > 0 ? Math.min(ny, r.y - e.hh - .01) : Math.max(ny, r.y + r.h + e.hh + .01); if (overlapsSolid(e, e.x, e.y)) e.y = ny - dy; if (!r.edge && Math.abs(dx) < Math.abs(dy) * .6) nudge(e, r, 'x', Math.abs(dy)); }
     }
     return hit;
+  }
+  // 0.9: clipping a corner by a few pixels slides her round it (doorways, furniture ends) instead of stopping dead
+  function nudge(e, r, ax, spd) {
+    const lo = ax === 'x' ? (e.x + e.hw) - r.x : (e.y + e.hh) - r.y, hi = ax === 'x' ? (r.x + r.w) - (e.x - e.hw) : (r.y + r.h) - (e.y - e.hh);
+    const d = lo < hi ? -lo : hi; if (Math.abs(d) > 12) return;
+    const st = Math.sign(d) * Math.min(Math.abs(d) + .02, Math.max(.6, spd));
+    if (ax === 'x') { if (!overlapsSolid(e, e.x + st, e.y)) e.x += st; } else if (!overlapsSolid(e, e.x, e.y + st)) e.y += st;
   }
   function cellOf(e) {
     let cx = Math.floor(e.x / T), cy = Math.floor(e.y / T);
@@ -525,7 +569,9 @@
         for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) { const x = tx + dx, y = ty + dy; if (x < 0 || y < 0 || x >= MW || y >= MH || solidCell[y * MW + x]) continue; const d = Math.hypot((x + .5) * T - wx, (y + .5) * T - wy); if (d < bd) { bd = d; bc = [x, y]; } }
         if (!bc || bd > T * 1.2) return; [tx, ty] = bc;
       }
-      p.auto = { gx: tx, gy: ty, px: wx, py: wy, field: bfs(tx, ty), t: 0 };
+      const field = bfs(tx, ty), [mx, my] = cellOf(p);
+      if (field[my * MW + mx] < 0) { toast('No way through from here', 1.2); return; }   // 0.9: e.g. inside a room that is still locked
+      p.auto = { gx: tx, gy: ty, px: wx, py: wy, field, t: 0 };
       G.tapMark = { x: wx, y: wy, t: 0 };
     }
   }
@@ -548,7 +594,9 @@
     const tgt = st.same ? { x: a.px, y: a.py } : st;
     const dx = tgt.x - p.x, dy = tgt.y - p.y, d = Math.hypot(dx, dy);
     if (st.same && d < 5) { p.auto = null; if (a.it && rectDist(p.x, p.y, a.it.rect) <= 44) startSearch(a.it); return null; }
-    if (a.t > 9) { p.auto = null; return null; }
+    // 0.9: long walks across a big house no longer give up after 9 s; she stops only if she is truly stuck
+    if (!a.chk || a.t - a.chk.t > 1.2) { if (a.chk && Math.hypot(p.x - a.chk.x, p.y - a.chk.y) < 4) { p.auto = null; return null; } a.chk = { t: a.t, x: p.x, y: p.y }; }
+    if (a.t > 40) { p.auto = null; return null; }
     return { x: dx / (d || 1), y: dy / (d || 1), m: st.same ? Math.min(1, d / 20 + .35) : 1, run: false };
   }
 
@@ -963,7 +1011,12 @@
       if (!rm && isWall(x, y)) rm = roomAt(x, y - 1) || roomAt(x - 1, y) || roomAt(x + 1, y) || roomAt(x, y + 1);
       if (ch(x, y) === '=') rm = roomAt(x, y + 1);
       if (isWall(x, y) && isVoid(x, y + 1) && y < L.streetY) rm = null; // pockets: nothing below their south wall
-      if (rm) ART.drawFloorTile(c, styleOf(rm), x, y, T);
+      if (!rm) continue;
+      // 0.9: under an outside wall, only the inner half gets floor - no strip of floor outside the house
+      const vw = isWall(x, y) && isVoid(x - 1, y), ve = isWall(x, y) && isVoid(x + 1, y);
+      if (vw || ve) { c.save(); c.beginPath(); const x0 = vw ? x * T + T / 2 - WT / 2 : x * T, x1 = ve ? x * T + T / 2 + WT / 2 : (x + 1) * T; c.rect(x0, y * T, x1 - x0, T); c.clip(); }
+      ART.drawFloorTile(c, styleOf(rm), x, y, T);
+      if (vw || ve) c.restore();
     }
     // street + curb
     const sy = L.streetY;
@@ -2121,6 +2174,8 @@
     target() { const t = findTarget(); return t ? { act: t.act, name: t.name } : null; },
     use() { btn.use = true; }, attack() { btn.atkPressed = true; },
     furn(name) { return G.furn.find(f => f.name === name); },
+    // 0.9 walkability tests: collision as the player feels it, and the wall pieces as drawn
+    coll: { hit: (x, y, e) => overlapsSolid(e || G.p, x, y), walls: () => wallRects, leaves: () => doorLeaves, rebuild() { buildWalls(); buildSolid(); }, size: () => [MW, MH], ch, collRect },
     T,
   });
   Object.defineProperty(DM, 'G', { get: () => G, configurable: true });

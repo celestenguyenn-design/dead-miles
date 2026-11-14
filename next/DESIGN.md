@@ -178,3 +178,18 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Secrets: board cell of a rug secret is always a reachable floor tile; secret actions win the use button; quiet hint before the gate (from main).
 - Feel: furniture collision inset, taps on part-wall tiles walk next to them, wall fade only for the segment over her sprite (to ~65%).
 
+
+## Done in 0.9
+- Walkability: east-west walls block over their whole drawn cell (she no longer walks into the wall picture from the room
+  above); no floor strip drawn outside outer walls; furniture collision is measured from each piece's own drawing (top
+  edge, bottom edge, base width - beds, cots, tables, tubs, lamp posts, box stacks); corner nudge slides her round
+  door jambs and furniture ends; tap-to-walk keeps going on long routes (stops only if truly stuck) and says
+  "No way through" for unreachable spots. Bed rugs stay inside the room.
+- Generator v2 (houses scouted from 0.9; unstarted older houses are upgraded on load, a house with a run in progress keeps
+  v1 so its saved progress lines up; run saves carry a layout fingerprint): small rooms keep a walkway (furniture <= 40% of
+  rooms under 4x4 or 3 wide), every container has a free tile in front (or on its open side against a side wall), no
+  room floor is sealed off, tall pieces never stand in front of another piece, rugs need >= 2 standable tiles and must be
+  mostly open floor, the sliding-shelf target tile is never part of a path.
+- Real-world map (map.js): Map tab -> full-screen Leaflet/OSM map (tinted), GPS only while open, Overpass by ~700 m grid
+  square (cached on the phone), landmark houses within ~35 m on foot (3/day, speed lockout as in the old street.js, must
+  have been walked up to). Save keeps only type, name/street, seed and salted-hash dedupe keys (SV.map).

@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.8.1';
+const NEXT_VERSION = '0.9';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -60,6 +60,11 @@ const NEXT_VERSION = '0.8.1';
     if (v.survivor) DM.Food.norm(v.survivor);   // 0.8: hunger + thirst (older saves start at 80/80, draining from now)
     DM.Crew.norm(v);                        // phase 5b: crew + strays (SV.crew, SV.pets)
     DM.Boss.norm(v);                        // phase 5b: the weekly boss (SV.boss)
+    // 0.9: houses not started yet move to the v2 generator (walkways, open container fronts, rugs on open floor).
+    // A house with a run in progress, quest houses and the tutorial keep their layout, so saved progress lines up.
+    for (const h of v.houses || []) if (h.type !== 'tutorial' && !h.quest && !h.run && h.status === 'new' && (h.gv || 1) < GV) {
+      try { h.gv = GV; const L = layoutOf(h); Object.assign(h, { address: L.address, danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies }); } catch (e) { delete h.gv; }
+    }
     return v;
   }
   // phase 5: cosmetics live in the wardrobe, not the pack. The 0.4 'Pilgrim hat' pack item (and any stray cosmetic item) moves in.
@@ -197,15 +202,39 @@ const NEXT_VERSION = '0.8.1';
     const seq = SV.houseSeq++;
     const seed = D.hashStr(SV.seedBase + ':' + seq);
     const type = pickType(w, D.mulberry32(seed ^ 0x9e3779b9));
-    const L = layoutOf({ type, seed });
-    SV.houses.push({ id: 'h' + seq, type, seed, day: day || SV.day.key, status: 'new', address: L.address, danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies });
+    const L = layoutOf({ type, seed, gv: GV });
+    SV.houses.push({ id: 'h' + seq, type, seed, gv: GV, day: day || SV.day.key, status: 'new', address: L.address, danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies });
   }
   const cache = new Map();
+  const GV = 2;   // 0.9: generator version for newly scouted houses (older houses keep the layout they were scouted with)
+  Game.GV = GV;
   function layoutOf(h) {
-    const k = h.type + ':' + h.seed;
-    if (!cache.has(k)) cache.set(k, h.type === 'tutorial' ? DM.Gen.tutorial() : DM.Gen.generate(h.type, h.seed));
-    return cache.get(k);
+    const k = h.type + ':' + h.seed + ':' + (h.gv || 1);
+    if (!cache.has(k)) cache.set(k, h.type === 'tutorial' ? DM.Gen.tutorial() : DM.Gen.generate(h.type, h.seed, { gv: h.gv || 1 }));
+    const L = cache.get(k);
+    if (h.landmark && h.address) { L.address = h.address; const m = /\b(\d{1,4})\b/.exec(h.address); if (m) L.houseNum = +m[1]; }   // 0.9: a real place keeps its real name (and number)
+    return L;
   }
+  // ---- 0.9: landmark houses from the real-world map (map.js). Only the type, name/street and a seed are kept -
+  // never a coordinate or an OpenStreetMap id (the dedupe key is a salted hash).
+  const LM_DAY = 3;
+  function lmState() { const m = SV.map = SV.map || { day: '', n: 0, ids: [] }; if (m.day !== SV.day.key) { m.day = SV.day.key; m.n = 0; } m.ids = m.ids || []; return m; }
+  Game.landmarkKey = raw => String(D.hashStr(SV.seedBase + ':lm:' + raw));
+  Game.landmarkLeft = () => { rollDay(); return Math.max(0, LM_DAY - lmState().n); };
+  Game.landmarkHave = key => lmState().ids.includes(key);
+  Game.addLandmark = pl => {   // pl: { key, type, name, street }
+    rollDay(); const m = lmState();
+    if (m.ids.includes(pl.key)) return 'dup';
+    if (m.n >= LM_DAY) return 'cap';
+    if (!D.BTYPES[pl.type] || !D.BTYPES[pl.type].w) return 'bad';
+    const seq = SV.houseSeq++, seed = D.hashStr(SV.seedBase + ':lmh:' + pl.key);
+    const name = String(pl.name || D.BTYPES[pl.type].n).slice(0, 40), street = String(pl.street || '').slice(0, 40);
+    const h = { id: 'lm' + seq, type: pl.type, seed, gv: GV, day: SV.day.key, status: 'new', landmark: 1, address: name + (street && street !== name ? ' · ' + street : '') };
+    const L = layoutOf(h); Object.assign(h, { danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies });
+    SV.houses.push(h); m.n++; m.ids.push(pl.key); if (m.ids.length > 300) m.ids.splice(0, m.ids.length - 300);
+    Game.save(); if (!DM.scene) renderHome();
+    return 'ok';
+  };
   Game.layoutOf = layoutOf;
   function rollDay(force) {
     const t = today();
@@ -353,7 +382,7 @@ const NEXT_VERSION = '0.8.1';
     if (type === 'clear' || type === 'fetch') {
       const types = D.QUEST_HOUSE[tier]; q.htype = types[Math.floor(rnd() * types.length)];
       q.seed = D.hashStr(SV.seedBase + ':' + q.id); q.away = Math.round((800 + tier * 900 + rnd() * 600) / 100) * 100;
-      q.addr = layoutOf({ type: q.htype, seed: q.seed }).address;
+      q.gv = GV; q.addr = layoutOf({ type: q.htype, seed: q.seed, gv: GV }).address;
     }
     q.reward = { caps: 10 + tier * 12, xp: tier * 8 };
     return q;
@@ -367,7 +396,7 @@ const NEXT_VERSION = '0.8.1';
     T.active.push(q);
     if (q.type === 'clear' || q.type === 'fetch') {
       q.base = SV.walked || 0;
-      SV.houses.push({ id: 'q-' + q.id, quest: q.id, type: q.htype, seed: q.seed, day: SV.day.key, status: 'far', address: q.addr, danger: D.BTYPES[q.htype].danger, ...(() => { const L = layoutOf({ type: q.htype, seed: q.seed }); return { nLocks: L.nLocks, nZombies: L.nZombies }; })() });
+      SV.houses.push({ id: 'q-' + q.id, quest: q.id, type: q.htype, seed: q.seed, gv: q.gv || 1, day: SV.day.key, status: 'far', address: q.addr, danger: D.BTYPES[q.htype].danger, ...(() => { const L = layoutOf({ type: q.htype, seed: q.seed, gv: q.gv || 1 }); return { nLocks: L.nLocks, nZombies: L.nZombies }; })() });
       revealQuestHouses();
     }
     Game.save(); SFX.play('pick'); toast('Quest taken: ' + D.QUESTS[q.type].n, 1.6);
@@ -751,6 +780,7 @@ const NEXT_VERSION = '0.8.1';
   }
 
   // ---------------------------------------------------------------- UI helpers
+  const PIN = '<svg class="pin" viewBox="0 0 12 16" width="9" height="12"><path d="M6 15.5C2.5 10.6 1 8.2 1 6a5 5 0 0 1 10 0c0 2.2-1.5 4.6-5 9.5z" fill="currentColor"/><circle cx="6" cy="6" r="1.9" fill="#f07b3c"/></svg>';
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const icon = k => `<img alt="" src="${ART.iconURL[D.ITEMS[k].i]}">`;
   const SKULL = '<svg viewBox="0 0 20 20" class="skull"><path d="M10 2C5.6 2 3 5 3 8.6c0 2.2 1 3.6 2.4 4.4V16h2v-1.6h1.3V16h2.6v-1.6h1.3V16h2v-3c1.4-.8 2.4-2.2 2.4-4.4C17 5 14.4 2 10 2z" fill="currentColor"/><circle cx="7.2" cy="9" r="1.9" fill="#1c1538"/><circle cx="12.8" cy="9" r="1.9" fill="#1c1538"/></svg>';
@@ -953,9 +983,9 @@ const NEXT_VERSION = '0.8.1';
         ${window.SYNC ? (window.NET && NET.ok && !d.phone && new Date().getHours() >= 14 ? '<button class="synclink nudge" id="mSyncG" data-m="fix">No phone steps yet today? Fix step sync</button>' : '<button class="synclink" id="mSyncG">How to sync steps</button>') : ''}
       </div>
       ${SV.tutorialDone || SV.stats.runs ? baseCards() + DM.Boss.cardHTML() + DM.Crew.cardHTML() : ''}
-      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Pack &amp; stash${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button></div>
+      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Pack &amp; stash${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}</div>
       <div id="mpane"></div>`;
-    document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { SFX.play('ui'); tab(b.dataset.t); }; });
+    document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { SFX.play('ui'); if (b.dataset.t === 'map') { DM.Map.open(); return; } tab(b.dataset.t); }; });
     $('#mLog').onclick = () => {
       const v = parseInt(String($('#mSteps').value).replace(/[^0-9]/g, ''), 10); /* "8,500" or "8 500" is 8500, not 8 */ if (!(v > 0)) { toast('Type your step total for today', 1.6); return; }
       // typed steps go through the step ledger so a phone catching up later never counts the same steps twice
@@ -1048,7 +1078,7 @@ const NEXT_VERSION = '0.8.1';
       if (!done && !far && h.type !== 'tutorial') { const HL = layoutOf(h); if (HL.car) tags.push('parked car'); if (HL.keyRoom) tags.push('key-locked room'); }   // 0.8: brass-key spots
       return `<div class="hcard${done ? ' done' : ''}${h.type === 'tutorial' ? ' tut' : ''}${q ? ' quest' : ''}">
         ${typeIcon(h.type)}
-        <div class="hinfo"><div class="hname">${T.n} <em>${T.size}</em>${h.type === 'tutorial' ? ' <em class="first">first house</em>' : ''}${q ? ` <em class="first">quest: ${D.QUESTS[q.type].n.toLowerCase()}</em>` : ''}</div>
+        <div class="hinfo"><div class="hname">${T.n} <em>${T.size}</em>${h.landmark ? ` <em class="first lmk">${PIN}landmark</em>` : ''}${h.type === 'tutorial' ? ' <em class="first">first house</em>' : ''}${q ? ` <em class="first">quest: ${D.QUESTS[q.type].n.toLowerCase()}</em>` : ''}</div>
           <div class="haddr">${esc(h.address)}</div>
           <div class="hmeta"><span class="danger">${SKULL.repeat(h.danger)}<span class="dim">${SKULL.repeat(5 - h.danger)}</span></span><span>${tags.join(' · ')}</span></div>
           <div class="hdays">${q ? (far ? `${Math.max(0, Math.ceil(q.away - ((SV.walked || 0) - q.base))).toLocaleString('en-US')} steps away` : q.done ? 'Job done - see Dot' : 'Reached · no rush') : done ? (h.status === 'auto' ? 'Crew searched' : 'Looted') : h.type === 'tutorial' ? 'Start here' : left <= 1 ? 'Gone tomorrow' : left + ' days left'}</div></div>
@@ -1273,6 +1303,7 @@ const NEXT_VERSION = '0.8.1';
     ['Weapons & equipping', 'The weapon in your hand is what you fight with. At home: Pack & stash > tap a weapon > Equip. In a house: tap the Swap button (bottom right) to pick any weapon in your pack. Weapons wear out - repair them with scrap. Zombies hear noise; you can run (push the stick far) and dodge.'],
     ['Cosmetics & wardrobe', 'Cosmetics are earned: rare finds in houses and on zombies, better in mansions and police stations, plus Dot\'s shop and jobs, horde-night crates and events. They unlock straight into your Wardrobe and never use pack space. Wardrobe (home screen) > tap one to wear it. Spares are sold to Dot automatically.'],
     ['Food & water', 'Two bars under your HP: Hunger (drumstick) and Thirst (droplet). They drain with real time, even while the app is closed - about one meal and two drinks a day - and a little faster during runs (sprinting and fighting most). Tap the bars, or a food in Pack & stash, to eat or drink: beans and pie fill Hunger, water and soda fill Thirst, cranberry sauce and tomatoes a bit of both, coffee gives stamina. Garden crops are food, and a rain barrel at the base gives a drink (+50 thirst). Below 30: Hungry means slower stamina and no overnight healing; Thirsty means slower searches and max stamina 80. At 0 you lose 1 HP an hour, but never below 10 from hunger alone. Above 80 on both: +10% scavenging XP. Your crew eats from the stash separately.'],
+    ['Real-world map', 'Tap Map on the home screen to see real buildings near you (OpenStreetMap). Your phone asks for your location only when the map opens, and your position is never saved or sent to the game server. Walk within about 35 m of a marked place - a pharmacy, police station, gas station, corner store, laundromat, school, or a house or apartment block - and it becomes a landmark house in your list, with its real name and a pin. Up to 3 a day, on foot only (it ignores you while you are moving faster than about 30 km/h). These are extra houses on top of the ones your steps scout. No location or no signal? The rest of the game works the same.'],
     ['Base & farming', 'Your base is built with steps (the same steps also scout houses). Build walls, a gate, traps and garden beds; decorate with furniture you find. Plant seeds, water them with steps each day, and harvest real food. The stash chest lives here.'],
     ['Horde night', 'Every Sunday 9 PM New York time a horde hits. In the 24 hours before, do a watch shift (a 2-3 minute defence) - every kill thins the horde for your whole party. Strong bases hold and pay out a crate; weak ones lose something you repair with steps. Skip the shift and you get nothing.'],
     ['Seasonal events', 'Holidays switch on by themselves: Thanksgiving (the week around it) and Christmas (Dec 18 - Jan 2). Events bring holiday loot, a mini-boss in about 1 in 3 houses, a chain of event jobs from Dot, and once-a-year cosmetics. Thanksgiving also has the Black Friday horde: a bigger Sunday horde with better crates.'],
