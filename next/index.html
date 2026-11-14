@@ -286,6 +286,14 @@
   .job.on { border-color: var(--ora); box-shadow: 0 3px 0 var(--ora); background: #2a1f4a; } .job.on span { color: var(--crm); }
   #qchip { display: none; max-width: 150px; padding: 5px 8px; border-radius: 10px; background: rgba(17,20,47,.9); border: 2px solid var(--ora); font-size: 10px; font-weight: 800; line-height: 1.35; color: var(--crm); text-align: right; }
   #qchip.on { display: block; } #qchip b { color: var(--ora); } #qchip i { display: block; height: 3px; }
+  /* 0.19.1: tap the chip for the full quest list; quest items glow on the loot sheet */
+  #qchip { pointer-events: auto; cursor: pointer; } #qchip .qcaret { display: block; margin-top: 3px; font-size: 9px; font-weight: 900; letter-spacing: .08em; color: var(--ora); opacity: .85; }
+  #qchip.open { max-width: 230px; } #qchip .qlist { margin-top: 6px; text-align: left; display: grid; gap: 6px; }
+  #qchip .ql { padding: 5px 6px; border-radius: 8px; background: rgba(61,45,97,.7); } #qchip .ql b { display: block; font-size: 10.5px; }
+  #qchip .ql span { display: block; font-size: 10px; font-weight: 700; color: var(--crm); } #qchip .ql em { display: block; margin-top: 2px; font-style: normal; font-size: 10px; font-weight: 900; color: #ffd27a; }
+  .slot.quest { box-shadow: 0 0 0 3px #ffd27a, 0 0 14px rgba(255,210,122,.65) !important; animation: qglow 1.2s ease-in-out infinite alternate; }
+  @keyframes qglow { from { box-shadow: 0 0 0 3px #ffd27a, 0 0 6px rgba(255,210,122,.35); } to { box-shadow: 0 0 0 3px #ffd27a, 0 0 16px rgba(255,210,122,.8); } }
+  .slot em.qitem { position: absolute; z-index: 6; top: -8px; left: 50%; right: auto; transform: translateX(-50%); box-shadow: 0 0 0 2px var(--ink); padding: 1px 5px; border-radius: 5px; background: #ffd27a; color: var(--ink); font-style: normal; font-size: 8px; font-weight: 900; letter-spacing: .06em; white-space: nowrap; }
   .msync { margin-top: 8px; font-size: 11px; font-weight: 800; color: var(--mute); }
   .msync.online { color: var(--grn); } .msync.offline::before, .msync.signed-out::before, .msync.local::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--mute); margin-right: 6px; }
   .msync.online::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--grn); margin-right: 6px; }
@@ -835,6 +843,7 @@
 <script src="boss.js?v=0.23"></script>
 <script src="daily.js?v=0.23"></script>
 <script src="deep.js?v=0.23"></script>
+<script src="route.js?v=0.23"></script>
 <script src="game.js?v=0.23"></script>
 <script src="map.js?v=0.23"></script>
 </body>

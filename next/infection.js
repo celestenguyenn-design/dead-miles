@@ -34,7 +34,7 @@ window.DM = window.DM || {};
   // Catch up: fought off after CLEARS days; current HP never above the (lower) max. Returns a message if it cleared.
   I.tick = function (s = S()) {
     const f = inf(s); if (!f) return '';
-    if (I.days(s) >= I.CLEARS) { f.at = 0; return 'You fought off the infection. Max HP is back.'; }
+    if (I.days(s) + (+f.rest || 0) >= I.CLEARS) { f.at = 0; f.rest = 0; return 'You fought off the infection. Max HP is back.'; }
     s.hp = Math.min(s.hp, D.maxHp(s));
     return '';
   };
@@ -43,9 +43,11 @@ window.DM = window.DM || {};
     if (!s || !z || z.raider || z.boss || z.kind === 'wboss' || inf(s)) return false;
     if (rnd() >= I.chance(z, s)) return false;
     s.inf = s.inf && typeof s.inf === 'object' ? s.inf : {};
-    s.inf.at = I.now(); s.inf.n = (s.inf.n || 0) + 1;
+    s.inf.at = I.now(); s.inf.n = (s.inf.n || 0) + 1; s.inf.rest = 0;
     return true;
   };
+  // 0.21 route: a safehouse rest takes `d` days off the time left (max HP loss is unchanged). Returns the days left.
+  I.rest = function (s = S(), d = 1) { const f = inf(s); if (!f) return 0; f.rest = (+f.rest || 0) + d; I.tick(s); return inf(s) ? Math.max(0, I.CLEARS - I.days(s) - f.rest) : 0; };
   I.cure = function (s = S()) {
     if (!inf(s)) return '';
     s.inf.at = 0;
@@ -57,5 +59,5 @@ window.DM = window.DM || {};
   // short label for the home card / run HUD
   I.label = (s = S()) => { const f = inf(s); if (!f) return ''; return 'Infected · -' + I.hpLoss(s) + ' max HP'; };
   I.status = (s = S()) => (inf(s) ? [['bad inf', I.label(s)]] : []);
-  I.effects = (s = S()) => (inf(s) ? [`Infected: max HP -${I.hpLoss(s)} (5 more each day, up to 25), hunger drains 15% faster. Antibiotics cure it; otherwise it clears in about ${Math.max(1, Math.ceil(I.CLEARS - I.days(s)))} day${Math.ceil(I.CLEARS - I.days(s)) > 1 ? 's' : ''}.`] : []);
+  I.effects = (s = S()) => (inf(s) ? [`Infected: max HP -${I.hpLoss(s)} (5 more each day, up to 25), hunger drains 15% faster. Antibiotics cure it; otherwise it clears in about ${Math.max(1, Math.ceil(I.CLEARS - I.days(s) - (+inf(s).rest || 0)))} day${Math.ceil(I.CLEARS - I.days(s) - (+inf(s).rest || 0)) > 1 ? 's' : ''}.`] : []);
 })();
