@@ -228,3 +228,7 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   Runner (school/mansion): 60 HP, chases at 3.05 tiles/s, quick windup, hits x0.75; drops food/drink, lockpick 30%.
   Bloater (pharmacy): 110 HP, slow; bursts into a toxic cloud (6 s, 5 HP per 0.5 s inside); drops meds/bandages.
   Screamer (school/mansion): 75 HP; when it sees you it shrieks for 1.3 s (hits delay it) then every zombie in the house hunts you; kill it first.
+
+## Done in 0.13.1 (owner: "so many of them but we barely need it")
+- Food/drink finds cut ~60% (rowhouse ~7 -> ~3 per house, bodega ~16 -> ~9): kitchens give 0-2 items with non-food mixed in,
+  snack weights elsewhere lowered. Drain up: 60 hunger / 85 thirst per day (was 45/70), run cap 8 (was 5).
