@@ -4,14 +4,14 @@
    The map is drawn by hand on a canvas from OpenStreetMap vector data: thick dark-purple streets with ink edges and
    curbs, flat plum building blocks with a 3/4 wall face (lit windows here and there), teal parks with trees, deep blue
    water, her own survivor sprite under a lamp-light circle, real places as the game's house-type icons on round badges,
-   and fog around the edges. No CDN, no tiles: one compact Overpass query per ~700 m grid square, cached per square in
-   IndexedDB (LRU, MAX_CELLS squares) so a square she has walked before draws instantly, even offline.
+   and fog around the edges. 0.25: the data comes from OpenFreeMap vector tiles (z14, decoded by mvt.js; Overpass only as
+   a fallback), turned into one compact record per ~700 m grid square, cached per square in IndexedDB (LRU, MAX_CELLS squares) so a square she has walked before draws instantly, even offline.
 
    Walk within ~35 m of a marked place with the map open and it becomes a LANDMARK house in the house list: its real
    name, a pin, and a type from its tags. Up to 3 a day, on foot only.
 
-   Privacy: location is asked for only when the map opens and lives only in memory while it is open. Overpass is asked
-   for a whole ~700 m grid square, never her exact spot. The phone keeps the squares' map data and which square was
+   Privacy: location is asked for only when the map opens and lives only in memory while it is open. The tile server is
+   asked for whole ~1.8 km tiles (Overpass, the fallback, for a ~700 m square), never her exact spot. The phone keeps the squares' map data and which square was
    shown last (so the map can open instantly) - a square, never a point - and none of it goes into the save. The save
    (cloud too) keeps only each landmark house's type, name/street and seed - never a coordinate or an OpenStreetMap id.
 
@@ -24,7 +24,7 @@
   const hasArt = () => typeof ART !== 'undefined' && ART.rigs;
   const MIRRORS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];   // 0.19.2: four, raced (hedged)
   const CLAIM_M = 35, MAX_ACC = 60, VEHICLE_MS = 9, SETTLE_MS = 45000, FAST_HITS = 3;
-  const CELL = 0.006, PAD = 0.0004, CACHE_V = 2, CACHE_DAYS = 14, MAX_CELLS = 30, HOUSES_SHOWN = 45, HOUSE_BADGES = 24;
+  const CELL = 0.006, PAD = 0.0004, CACHE_V = 3, CACHE_DAYS = 14, MAX_CELLS = 30, HOUSES_SHOWN = 45, HOUSE_BADGES = 24;
   const ASK_MS = 20000, HEDGE_MS = 3500, INTRO_KEY = 'dm-next-mapintro';
   const ZMIN = 0.7, ZMAX = 5, ZDEF = 2.1;   // css px per metre
   const C = {
@@ -174,6 +174,174 @@ way[building]->.b;.b out skel geom qt;
       launch();
     });
   }
+  // ------------------------------------------------------------- 0.25: OpenFreeMap vector tiles (the main source now)
+  // Public Overpass is too slow and busy for a game (the owner's phone: "The map servers are busy - timed out"; measured:
+  // 13-40 s queues, 504s). OpenFreeMap serves OpenMapTiles-schema vector tiles from a CDN: free, no key, ~0.3 s a tile.
+  // A ~700 m square needs 1-4 z14 tiles (~1.8 km each in Brooklyn). Each tile is decoded once (mvt.js), turned into the
+  // same Overpass-style elements encode() already reads, and the square keeps what falls in its box. Ids are made from
+  // the geometry (stable across squares, so a road or building on a square's edge is drawn once). Overpass stays as a
+  // fallback when the tiles cannot be had.
+  const OFM = 'https://tiles.openfreemap.org/planet', TZ = 14, TILE_MS = 12000, OFM_KEY = 'dm-next-ofm';
+  let ofmURL = null;
+  async function tileTemplate() {
+    if (ofmURL) return ofmURL;
+    try { const c = JSON.parse(localStorage.getItem(OFM_KEY) || 'null'); if (c && c.u && Date.now() - c.t < 3 * 864e5) return (ofmURL = c.u); } catch (e) { /* ignore */ }
+    const r = await fetchT(OFM, TILE_MS); if (!r.ok) throw new Error('server said ' + r.status);
+    const j = await r.json(), u = j && j.tiles && j.tiles[0]; if (!u) throw new Error('no tiles');
+    try { localStorage.setItem(OFM_KEY, JSON.stringify({ u, t: Date.now() })); } catch (e) { /* ignore */ }
+    return (ofmURL = u);
+  }
+  function fetchT(url, ms) {
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, t = setTimeout(() => ctl && ctl.abort(), ms);
+    return fetch(url, { signal: ctl ? ctl.signal : undefined }).finally(() => clearTimeout(t));
+  }
+  const tileX = (lon, n) => Math.floor((lon + 180) / 360 * n);
+  const tileY = (lat, n) => Math.floor((1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2 * n);
+  function tilesFor(cy, cx) {
+    const n = 2 ** TZ, s = cy * CELL - PAD, nn = (cy + 1) * CELL + PAD, w = cx * CELL - PAD, e = (cx + 1) * CELL + PAD, out = [];
+    for (let x = tileX(w, n); x <= tileX(e, n); x++) for (let y = tileY(nn, n); y <= tileY(s, n); y++) out.push([x, y]);
+    return out;
+  }
+  const TILES = new Map();   // 'x/y' -> Promise<elements> (this session only; the squares are what is cached)
+  function getTile(x, y) {
+    const k = x + '/' + y;
+    if (!TILES.has(k)) {
+      const p = tileTemplate().then(u => fetchT(u.replace('{z}', TZ).replace('{x}', x).replace('{y}', y), TILE_MS))
+        .then(r => { if (!r.ok) throw new Error('server said ' + r.status); return r.arrayBuffer(); })
+        .then(b => tileEls(DM.MVT.decode(b, TLAYERS), x, y));
+      p.catch(() => TILES.delete(k));
+      TILES.set(k, p);
+      if (TILES.size > 12) TILES.delete(TILES.keys().next().value);
+    }
+    return TILES.get(k);
+  }
+  const TLAYERS = ['transportation', 'transportation_name', 'building', 'housenumber', 'poi', 'water', 'park', 'landcover', 'landuse'];
+  const OMT_ROAD = { motorway: 'motorway', trunk: 'trunk', primary: 'primary', secondary: 'secondary', tertiary: 'tertiary', minor: 'residential', service: 'service', track: 'track' };
+  const OMT_LINK = { motorway: 'motorway_link', trunk: 'trunk_link', primary: 'primary_link', secondary: 'secondary_link', tertiary: 'tertiary_link' };
+  function omtHighway(tg) {
+    if (tg.class === 'path') return tg.subclass === 'pedestrian' ? 'pedestrian' : tg.subclass === 'steps' ? 'steps' : /^(footway|path|cycleway)$/.test(tg.subclass || '') ? 'footway' : null;
+    return (tg.ramp ? OMT_LINK[tg.class] : null) || OMT_ROAD[tg.class] || null;
+  }
+  function omtArea(L, tg) {
+    if (L === 'water') return tg.class === 'swimming_pool' ? null : { natural: 'water' };
+    if (L === 'park') return /^(park|nature_reserve)$/.test(tg.class || '') ? { leisure: 'park' } : null;
+    if (L === 'landcover') return tg.class === 'wood' ? { natural: 'wood' } : tg.class === 'grass' ? { leisure: tg.subclass || 'park' } : null;
+    if (L === 'landuse') return /^(cemetery|pitch|playground|park|garden|grass|village_green|recreation_ground)$/.test(tg.class || '') ? { landuse: 'grass' } : null;
+    return null;
+  }
+  const ringArea = P => { let A = 0; for (let i = 0; i + 3 < P.length; i += 2) A += P[i] * P[i + 3] - P[i + 2] * P[i + 1]; return A / 2; };
+  const hid = (...v) => { let h = 2166136261; for (const x of v) { h = Math.imul(h ^ (x | 0), 16777619); h ^= h >>> 13; } return (h >>> 1) || 1; };
+  // clip a polyline to the tile square [0, E] (no buffer): tiles overlap a little and a road must not be drawn twice
+  function clipLine(P, E) {
+    const out = []; let cur = null;
+    for (let i = 0; i + 3 < P.length; i += 2) {
+      let x0 = P[i], y0 = P[i + 1], x1 = P[i + 2], y1 = P[i + 3], t0 = 0, t1 = 1; const dx = x1 - x0, dy = y1 - y0; let ok = true;
+      for (const [p, q] of [[-dx, x0], [dx, E - x0], [-dy, y0], [dy, E - y0]]) {
+        if (p === 0) { if (q < 0) { ok = false; break; } continue; }
+        const r = q / p; if (p < 0) { if (r > t1) { ok = false; break; } if (r > t0) t0 = r; } else { if (r < t0) { ok = false; break; } if (r < t1) t1 = r; }
+      }
+      if (!ok) { cur = null; continue; }
+      const ax = x0 + dx * t0, ay = y0 + dy * t0, bx = x0 + dx * t1, by = y0 + dy * t1;
+      if (!cur || cur[cur.length - 2] !== ax || cur[cur.length - 1] !== ay) { cur = [ax, ay]; out.push(cur); }
+      cur.push(bx, by);
+      if (t1 < 1) cur = null;
+    }
+    return out.filter(l => l.length >= 4);
+  }
+  // tile units -> lat/lon, and the whole tile -> Overpass-style elements
+  function tileEls(T, tx, ty) {
+    const n = 2 ** TZ, els = [];
+    const ll = (E, x, y) => ({ lat: Math.atan(Math.sinh(Math.PI * (1 - 2 * (ty + y / E) / n))) * 180 / Math.PI, lon: (tx + x / E) / n * 360 - 180 });
+    const geo = (E, P) => { const g = []; for (let i = 0; i < P.length; i += 2) g.push(ll(E, P[i], P[i + 1])); return g; };
+    const L = k => T[k] || { extent: 4096, features: [] };
+    // streets; sidewalks are footways that hug a street in the tile data (the curbs already draw them), so they are dropped
+    const tr = L('transportation'), E = tr.extent, mpu = 2446 * Math.cos((tileYLat(ty + .5, n)) * Math.PI / 180) / E;   // metres per tile unit
+    const car = [], paths = [];
+    tr.features.forEach((f, fi) => {
+      if (f.type !== 2 || f.tags.brunnel === 'tunnel') return;
+      const hw = omtHighway(f.tags); if (!hw) return;
+      f.geom.forEach((P, pi) => { for (const Q of clipLine(P, E)) (hw === 'footway' || hw === 'steps' ? paths : car).push({ hw, Q, id: hid(tx, ty, fi, pi, Q[0], Q[1]) }); });
+    });
+    const grid = new Map(), G = Math.max(16, Math.round(14 / mpu)), gk = (x, y) => Math.floor(x / G) + ',' + Math.floor(y / G);
+    for (const r of car) if (r.hw !== 'service' && r.hw !== 'track' && r.hw !== 'pedestrian') for (let i = 0; i + 3 < r.Q.length; i += 2) {
+      const len = Math.hypot(r.Q[i + 2] - r.Q[i], r.Q[i + 3] - r.Q[i + 1]), st = Math.max(1, Math.ceil(len / (G / 2)));
+      for (let s = 0; s <= st; s++) { const x = r.Q[i] + (r.Q[i + 2] - r.Q[i]) * s / st, y = r.Q[i + 1] + (r.Q[i + 3] - r.Q[i + 1]) * s / st; grid.set(gk(x, y), 1); }
+    }
+    const nearCar = (x, y) => { const gx = Math.floor(x / G), gy = Math.floor(y / G); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (grid.has((gx + a) + ',' + (gy + b))) return true; return false; };
+    const keepPath = Q => { let near = 0, tot = 0; for (let i = 0; i < Q.length; i += 2) { tot++; if (nearCar(Q[i], Q[i + 1])) near++; } return near / tot < .7; };
+    for (const r of car.concat(paths.filter(p => keepPath(p.Q)))) els.push({ type: 'way', id: r.id, tags: { highway: r.hw }, geometry: geo(E, r.Q) });
+    // street names: label-only lines (drawn by ingest as names, not as a second road)
+    const tn = L('transportation_name'), named = [];
+    tn.features.forEach((f, fi) => {
+      if (f.type !== 2 || !f.tags.name) return; const hw = omtHighway(f.tags); if (!hw || hw === 'footway' || hw === 'steps') return;
+      f.geom.forEach((P, pi) => { for (const Q of clipLine(P, tn.extent)) { named.push({ n: f.tags.name, Q, s: E / tn.extent }); els.push({ type: 'way', id: hid(tx, ty, 77, fi, pi, Q[0]), tags: { highway: hw, name: f.tags.name, dm_label: 1 }, geometry: geo(tn.extent, Q) }); } });
+    });
+    // parks, woods, water: outer rings with the holes that follow them
+    for (const k of ['water', 'park', 'landcover', 'landuse']) {
+      const ly = L(k);
+      ly.features.forEach(f => {
+        if (f.type !== 3) return; const tags = omtArea(k, f.tags); if (!tags) return;
+        let rel = null;
+        for (const P of f.geom) {
+          if (P.length < 8) continue;
+          if (ringArea(P) > 0 || !rel) { rel = { type: 'relation', id: 0, tags, members: [] }; els.push(rel); rel.members.push({ type: 'way', role: 'outer', geometry: geo(ly.extent, P) }); }
+          else rel.members.push({ type: 'way', role: 'inner', geometry: geo(ly.extent, P) });
+        }
+      });
+    }
+    // buildings: one footprint per outer ring, kept by the tile its middle is in (so none is cut at the tile edge)
+    const bl = L('building'), BE = bl.extent, bs = [], bgrid = new Map(), BG = 256;
+    bl.features.forEach(f => {
+      if (f.type !== 3) return;
+      for (const P of f.geom) {
+        if (P.length < 8 || ringArea(P) <= 0) continue;
+        let sx = 0, sy = 0, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; const m = P.length / 2 - 1;
+        for (let i = 0; i < m * 2; i += 2) { sx += P[i]; sy += P[i + 1]; x0 = Math.min(x0, P[i]); x1 = Math.max(x1, P[i]); y0 = Math.min(y0, P[i + 1]); y1 = Math.max(y1, P[i + 1]); }
+        sx /= m; sy /= m; if (sx < 0 || sy < 0 || sx >= BE || sy >= BE) continue;
+        const id = hid(Math.round((tx * BE + sx) / 2), Math.round((ty * BE + sy) / 2)), b = { P, id, h: +f.tags.render_height || 0, area: ringArea(P) * (mpu * E / BE) ** 2, box: [x0, y0, x1, y1] };
+        bs.push(b); els.push({ type: 'way', id, geometry: geo(BE, P) });
+        for (let gx = Math.floor(x0 / BG); gx <= Math.floor(x1 / BG); gx++) for (let gy = Math.floor(y0 / BG); gy <= Math.floor(y1 / BG); gy++) { const gk2 = gx + ',' + gy; if (!bgrid.has(gk2)) bgrid.set(gk2, []); bgrid.get(gk2).push(b); }
+      }
+    });
+    const bAt = (x, y) => { for (const b of bgrid.get(Math.floor(x / BG) + ',' + Math.floor(y / BG)) || []) { const [x0, y0, x1, y1] = b.box; if (x >= x0 - 2 && x <= x1 + 2 && y >= y0 - 2 && y <= y1 + 2 && (pip(x, y, b.P) || nearEdge(x, y, b.P, 3))) return b; } return null; };
+    // shops and landmarks
+    const po = L('poi');
+    for (const f of po.features) {
+      if (f.type !== 1 || !f.geom[0]) continue; const [x, y] = f.geom[0]; if (x < 0 || y < 0 || x >= po.extent || y >= po.extent) continue;
+      const sc = f.tags.subclass || f.tags.class, tags = { amenity: sc, shop: sc }; if (f.tags.name) tags.name = f.tags.name;
+      if (!typeOf(tags, '')) continue;
+      els.push(Object.assign({ type: 'node', id: f.id || hid(tx, ty, x, y) }, ll(po.extent, x, y), { tags }));
+    }
+    // houses: an address point inside a building footprint; tall or big = apartments; the street is the nearest named one
+    const hn = L('housenumber'), HE = hn.extent, used = new Set();
+    for (const f of hn.features) {
+      if (f.type !== 1 || !f.geom[0] || !f.tags.housenumber) continue; const [x, y] = f.geom[0]; if (x < 0 || y < 0 || x >= HE || y >= HE) continue;
+      const b = bAt(x * BE / HE, y * BE / HE); if (!b || used.has(b.id)) continue; used.add(b.id);
+      let best = 30 / mpu, street = '';   // within 30 m
+      for (const r of named) { const d = segDist(x * E / HE, y * E / HE, r.Q, r.s); if (d < best) { best = d; street = r.n; } }
+      const lv = b.h ? Math.max(1, Math.round(b.h / 3)) : 0, flats = lv >= 6 || b.area > 900;
+      const tags = { building: flats ? 'apartments' : 'house', 'addr:housenumber': String(f.tags.housenumber).slice(0, 10) };
+      if (lv >= 4) tags['building:levels'] = String(lv);   // brownstones (~3) get the usual mix of short and tall rows if (street) tags['addr:street'] = street;
+      els.push(Object.assign({ type: 'way', id: b.id, center: ll(HE, x, y), tags }));
+    }
+    return els;
+  }
+  function tileYLat(y, n) { return Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI; }
+  function nearEdge(x, y, P, d) { for (let i = 0; i + 3 < P.length; i += 2) if (segD(x, y, P[i], P[i + 1], P[i + 2], P[i + 3]) <= d) return true; return false; }
+  function segD(x, y, ax, ay, bx, by) { const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy, t = l ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l)) : 0; return Math.hypot(x - ax - dx * t, y - ay - dy * t); }
+  function segDist(x, y, Q, s) { let m = Infinity; for (let i = 0; i + 3 < Q.length; i += 2) m = Math.min(m, segD(x, y, Q[i] * s, Q[i + 1] * s, Q[i + 2] * s, Q[i + 3] * s)); return m; }
+  // the square's share of its tiles: ways with a point in the box, places in the box
+  async function fromTiles(cy, cx) {
+    const s = cy * CELL - PAD, n = (cy + 1) * CELL + PAD, w = cx * CELL - PAD, e = (cx + 1) * CELL + PAD;
+    const inB = p => p.lat >= s && p.lat <= n && p.lon >= w && p.lon <= e;
+    const all = await Promise.all(tilesFor(cy, cx).map(([x, y]) => getTile(x, y)));
+    const out = [];
+    for (const els of all) for (const el of els) {
+      if (el.type === 'node' ? inB(el) : el.center ? inB(el.center) : el.geometry ? el.geometry.some(inB) : el.members.some(m => m.geometry.some(inB))) out.push(el);
+    }
+    return out;
+  }
+
   const RC = { motorway: 0, trunk: 0, primary: 0, motorway_link: 1, trunk_link: 1, primary_link: 1, secondary: 1, secondary_link: 1, tertiary: 1, tertiary_link: 1,
     residential: 2, unclassified: 2, living_street: 2, service: 3, pedestrian: 4, footway: 5, path: 5, cycleway: 5, steps: 5, track: 5 };
   function roadCls(tg) {
@@ -216,7 +384,7 @@ way[building]->.b;.b out skel geom qt;
         continue;
       }
       if (el.type === 'way' && el.geometry) {
-        if (tg && tg.highway) { const cls = roadCls(tg); if (cls < 0) continue; const a = q(el.geometry); if (a.length >= 4) r.push([el.id, cls, tg.name ? String(tg.name).slice(0, 40) : '', a]); continue; }
+        if (tg && tg.highway) { const cls = roadCls(tg); if (cls < 0) continue; const a = q(el.geometry); if (a.length >= 4) r.push([el.id, cls, tg.name ? String(tg.name).slice(0, 40) : '', a, tg.dm_label ? 1 : 0]); continue; }
         if (tg && !tg.building) { const cls = areaCls(tg); if (cls >= 0) { const a = q(el.geometry); if (a.length >= 6) g.push([cls, [a], []]); } continue; }
         const a = q(el.geometry); if (a.length >= 6) b.push([el.id, a]);
         continue;
@@ -248,9 +416,10 @@ way[building]->.b;.b out skel geom qt;
       water: new Path2D(), park: new Path2D(), wood: new Path2D(), trees: [], ripples: new Path2D(), walls: [0, 1, 2].map(() => new Path2D()), wallAll: new Path2D(), wins: new Path2D(), lit: new Path2D(),
       roofs: C.ROOF.map(() => new Path2D()), roofAll: new Path2D(), boxes: new Path2D(), nB: 0, nR: 0 };
     const own = id => { if (M.seen.has(id)) return false; M.seen.add(id); L.ids.push(id); return true; };
-    for (const [id, cls, name, a] of rec.r) {
+    for (const [id, cls, name, a, lo] of rec.r) {
       if (!own('r' + id)) continue;
       const P = pts(a), path = L.roads[cls];
+      if (lo) { if (cls <= 2) L.labels.push({ n: name, P, cls }); continue; }   // 0.25: a tile street name (the road is drawn from its own line)
       path.moveTo(P[0], P[1]); for (let i = 2; i < P.length; i += 2) path.lineTo(P[i], P[i + 1]);
       if (cls <= 1) { L.dash.moveTo(P[0], P[1]); for (let i = 2; i < P.length; i += 2) L.dash.lineTo(P[i], P[i + 1]); }
       if (name && cls <= 2) L.labels.push({ n: name, P, cls });
@@ -342,6 +511,16 @@ way[building]->.b;.b out skel geom qt;
     const [cy, cx] = k.split(':').map(Number), bb = bboxOf(cy, cx);
     if (typeof navigator.onLine === 'boolean' && !navigator.onLine) { M.offline = true; M.cells[k] = 'fail'; netTrouble('offline'); return; }
     M.busy = true; M.cells[k] = 'busy'; scoutPill();
+    // 0.25: OpenFreeMap tiles first (one go, ~0.3 s a tile); Overpass only when they fail
+    try {
+      const tEls = await fromTiles(cy, cx);
+      M.busy = false; M.fails = 0; M.offline = false; M.src = 'tiles';
+      const rec = encode(cy, cx, tEls, true);
+      idb('cells', 'readwrite', st => st.put(rec)).then(() => touchCell(k));
+      ingest(rec); M.cells[k] = 'ok'; M.partial = Object.values(M.cells).includes('part');
+      if (M.msgKind === 'net') message();
+      afterData(); pump(); return;
+    } catch (e) { M.tileErr = (e && e.name === 'AbortError') ? 'timed out' : (e && e.message) || 'offline?'; }
     // 0.19.2: staged - places, then streets, then buildings by quarter; each stage shows up as soon as it arrives
     const els = []; let full = true, firstErr = '';
     const stage = async q => { const a = await ask(q); if (a.ok) { for (const e of a.els) els.push(e); return true; } firstErr = firstErr || a.err; full = false; return false; };
@@ -484,7 +663,7 @@ way[building]->.b;.b out skel geom qt;
       <div id="mvMap"><canvas id="mvCv"></canvas><div id="mvPill" class="mvpill"><i></i><span></span></div><div id="mvBanner" class="mvbanner"></div><div id="mvTip" class="mvtip"></div>
         <div class="mvzoom"><button id="mvZin" aria-label="Zoom in">+</button><button id="mvZout" aria-label="Zoom out">&minus;</button></div>
         <button id="mvMe" class="mvme" aria-label="Back to me"><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="#f6e3bb" stroke-width="2.6"/><circle cx="12" cy="12" r="3" fill="#f07b3c"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="#f6e3bb" stroke-width="2.6" stroke-linecap="round"/></svg></button>
-        <div class="mvattr">&copy; OpenStreetMap contributors</div><div id="mvMsg" class="mvmsg"></div></div>
+        <div class="mvattr">OpenFreeMap <div class="mvattr">&copy; OpenStreetMap contributors</div>copy; OpenMapTiles · <div class="mvattr">&copy; OpenStreetMap contributors</div>copy; OpenStreetMap contributors</div><div id="mvMsg" class="mvmsg"></div></div>
       <div class="mvcard" id="mvCard"><div class="mvprog"><span class="mvpips" id="mvPips"></span><span id="mvLeft"></span></div>
         <div class="mvnext"><span class="arr" id="mvArr"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1.5l6 13-6-3.4-6 3.4z" fill="#11142f"/></svg></span><img class="ico" id="mvIco" alt=""><div><span id="mvStat">Finding you...</span><span id="mvSub2"></span></div><em id="mvDist"></em></div></div>
       <div id="mvIntro" class="mvintro"></div>`;
@@ -911,7 +1090,7 @@ way[building]->.b;.b out skel geom qt;
 
   // 0.22: for weather.js - the ~0.1-degree area of the square the map last showed (map users from before 0.22), or null
   const lastArea = () => getMeta('last').then(k => { const m = /^(-?\d+):(-?\d+)$/.exec(String(k || '')); return m ? { lat: Math.round((+m[1] + .5) * CELL * 10) / 10, lon: Math.round((+m[2] + .5) * CELL * 10) / 10 } : null; });
-  DM.Map = { open, close, lastArea, get on() { return M.on; }, _M: M, _typeOf: typeOf, _O: O,
+  DM.Map = { open, close, lastArea, get on() { return M.on; }, _M: M, _typeOf: typeOf, _O: O, _tiles: { fromTiles, encode, cellOf },
     get timing() { return { firstDraw: M.tFirst, data: M.tData, render: M.renderMs }; } };
   if (DM.ready && DM.Game && DM.Game.renderHome) DM.Game.renderHome();   // show the Map tab if the home screen drew first
 })();

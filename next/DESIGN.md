@@ -589,23 +589,28 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   After the 3rd she is "closed for today". A Dot stop on the daily route still opens her and gives one extra visit
   (Game.dotBonus). Rejected: back at midnight (free daily visit), typed steps at half for Dot (unfair to the one typer).
 
-## NEXT UP (handoff for a new chat, written 2026-11-14)
-### 1. Real-world map still times out on the owner's phone ("The map servers are busy - timed out")
-- Measured from the dev container against real Overpass (Bed-Stuy square 40.6796,-73.9444,40.6864,-73.9376):
-  overpass.private.coffee and overpass.kumi.systems never answered (40 s); maps.mail.ru answered in 13-24 s and then
-  started returning 504 under a few requests; even a 27-POI query took 14.5 s in its queue. overpass-api.de could not be
-  tested yet (the proxy had not picked up the new host). Conclusion: public Overpass is too slow/busy for a game, whatever the
-  query shape (0.19.2's staging + hedging can't fix queue time).
-- Plan: replace the Overpass data layer in map.js with OpenFreeMap vector tiles (https://tiles.openfreemap.org, free, no key,
-  OpenMapTiles schema: transportation/transportation_name (roads + names), building, park/landcover, water, poi with
-  class/subclass + name). Fetch z14 tiles for the view (CDN-fast), decode MVT in the browser (vendor a small pbf + vector-tile
-  decoder, BSD/MIT, or write a minimal one), convert to the existing encode()/ingest() record format so the drawing code,
-  caching (IndexedDB), landmark claiming rules and privacy rules stay as they are. Map POI classes to game types
-  (pharmacy, police, school, fuel/car repair -> garage, convenience/supermarket/deli -> bodega, laundry; houses from building
-  footprints with an address/housenumber). Keep Overpass only as a last-resort fallback, or drop it.
-- The cloud dev environment "dead-miles" (personal) allows overpass-api.de, overpass.private.coffee, maps.mail.ru,
-  overpass.kumi.systems and api.open-meteo.com; add tiles.openfreemap.org to test against the real tiles.
-- Test scripts: the mocked map test is in the old session scratchpad (m16/t2.js); rewrite its mock to serve MVT tiles.
+## Done in 0.25 (owner: "The map servers are busy - timed out" on her phone)
+- map.js now gets its data from OpenFreeMap vector tiles (https://tiles.openfreemap.org/planet TileJSON -> the dated tile
+  URL, kept 3 days in localStorage dm-next-ofm; z14 tiles, ~0.3 s each from the CDN, CORS open). mvt.js is a small MVT
+  decoder written for the game. tileEls() turns a tile into the Overpass-style elements encode() already read, so drawing,
+  the IndexedDB square cache (CACHE_V 3: old Overpass squares are refetched once), landmark and privacy rules are unchanged.
+  - Streets: transportation class -> highway (minor = residential, ramp = *_link, path subclasses -> footway/steps/
+    pedestrian), tunnels dropped, lines clipped to the tile (no doubles at tile edges). Sidewalks are not marked in the
+    tiles: a footway with 70%+ of its points within ~14 m of a street is dropped (the curbs draw sidewalks).
+  - Street names: transportation_name lines become label-only records (5th field of a road record = 1).
+  - Parks/woods/water: park (park, nature_reserve), landcover (wood; grass incl. park/garden), landuse (cemetery, pitch,
+    playground ...), water (not swimming pools); outer rings with their holes.
+  - Buildings: one footprint per outer ring, kept only by the tile its middle is in; id from its position (stable).
+  - Places: poi subclass -> the old amenity/shop tables (pharmacy, police, fuel, school, laundry, bodega types, garage).
+    Houses: a housenumber point inside (or within ~3 units of) a footprint; 4+ levels (render_height / 3) or the usual
+    hash mix for row houses; 6+ levels or > 900 m2 = apartments; street = nearest named street within 30 m.
+- Measured (Bed-Stuy, headless, real tiles): first square ready in ~1.0 s (was 13-40 s or a timeout); ~1,400 buildings,
+  ~90 places per square, 123 KB record. Tiles blocked -> the 0.19.2 Overpass path runs as before (checked).
+- Credit line: "OpenFreeMap (c) OpenMapTiles - (c) OpenStreetMap contributors".
+
+## NEXT UP (handoff, updated 2026-11-14)
+### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
+  fallback (MIRRORS, ask(), the staged queries) can be deleted.
 ### 2. Other open items
 - A friend's Android blocks the step-sync app install: waiting on her handle or a screenshot (fallback: add her handle to
   NET.cfg.trustedTyped in net.js so typed steps count like phone steps).
