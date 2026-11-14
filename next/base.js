@@ -71,6 +71,8 @@
     while (b.beds.length < 4) b.beds.push(null);
     b.water = b.water && typeof b.water === 'object' ? b.water : { n: 0, d: dayNo() };
     b.decor = Array.isArray(b.decor) ? b.decor.filter(o => o && D.DECOR[o.k]) : [];
+    // 0.26.1: r = facing 0-3 (front, side, back, other side), m = mirrored. Before, r 0/1 meant mirrored for 'flip' pieces.
+    for (const o of b.decor) if (o.rv !== 2) { if (D.DECOR[o.k].rot === 'flip' && o.r % 2) { o.m = 1; o.r = 0; } o.r = (o.r || 0) % 4; o.rv = 2; }
     b.box = b.box && typeof b.box === 'object' ? b.box : {};
     b.seq = b.seq || 0; b.gateOpen = !!b.gateOpen;
     return b;
@@ -380,16 +382,50 @@
   F.dpresents = (c, f, g) => { const cx = g.x + g.w / 2, yb = g.fy1 - 4;
     for (const [x, w, h, col, rib] of [[cx - 16, 16, 14, '#d9483a', '#e0b94a'], [cx + 1, 14, 18, '#3f6aa8', '#f4efe6'], [cx - 9, 12, 10, '#2f7a4a', '#d9483a']]) {
       const y = x === cx - 9 ? yb - 24 : yb - h; blk(c, x, y, w, h, col, 1, 1.8); line(c, x + w / 2, y, x + w / 2, y + h, rib, 2.4); line(c, x, y + h / 2, x + w, y + h / 2, rib, 2.4); } };
+  // 0.26.1 side (S) and back (B) views. Side = facing right (its back against the left), in a footprint turned on its side.
+  F.armchairS = (c, f, g) => { const x = g.x, y0 = f.y + 4, y1 = g.fy1; blk(c, x + 2, y0 - 14, 14, y1 - y0 + 10, P.LIL2, 6, 2.6);
+    blk(c, x + 10, y0 + 2, g.w - 12, y1 - y0 - 2, P.LIL, 6, 2.6); blk(c, x + 14, y0 + 8, g.w - 22, y1 - y0 - 18, '#8676b0', 4, 2); blk(c, x + 10, y1 - 14, g.w - 12, 12, P.LIL2, 5, 2.2); };
+  F.armchairB = (c, f, g) => { blk(c, g.x + 1, g.ty0 + 4, g.w - 2, g.fy1 - g.ty0 - 4, P.LIL, 6, 2.6); blk(c, g.x + 3, g.ty0 - 16, g.w - 6, g.fy1 - g.ty0 + 12, P.LIL2, 8, 2.6); line(c, g.x + 10, g.ty0 - 6, g.x + g.w - 10, g.ty0 - 6, 'rgba(17,20,47,.3)', 2); };
+  F.sofaS = (c, f, g) => { const x = g.x, y0 = f.y + 4, y1 = g.fy1, ch = (y1 - y0 - 30) / 3;
+    rr(c, x + 8, y0 + 4, g.w - 10, y1 - y0 - 4, 6); c.fillStyle = '#a64d26'; c.fill(); c.lineWidth = 2.6; c.strokeStyle = P.INK; c.stroke();
+    blk(c, x + 2, y0 - 16, 16, y1 - y0 + 12, P.ORAD, 8, 2.6);
+    for (let i = 0; i < 3; i++) blk(c, x + 18, y0 + 14 + i * ch, g.w - 24, ch - 2, P.ORA, 4, 2);
+    blk(c, x + 6, y0 - 2, g.w - 6, 14, P.ORAD, 6, 2.4); blk(c, x + 6, y1 - 16, g.w - 6, 16, P.ORAD, 6, 2.4); };
+  F.sofaB = (c, f, g) => { const x = g.x, w = g.w; rr(c, x, g.ty0 + 4, w, g.fy1 - g.ty0 - 4, 6); c.fillStyle = '#a64d26'; c.fill(); c.lineWidth = 2.6; c.strokeStyle = P.INK; c.stroke();
+    blk(c, x - 3, g.ty0 - 2, 14, g.fy1 - g.ty0 + 2, P.ORAD, 6, 2.4); blk(c, x + w - 11, g.ty0 - 2, 14, g.fy1 - g.ty0 + 2, P.ORAD, 6, 2.4);
+    blk(c, x + 2, g.ty0 - 22, w - 4, g.fy1 - g.ty0 + 16, P.ORAD, 8, 2.6); for (const t of [.34, .66]) line(c, x + w * t, g.ty0 - 16, x + w * t, g.fy1 - 10, 'rgba(17,20,47,.3)', 2); };
+  F.bookshelfS = (c, f, g) => { const x = g.x + 6, w = g.w - 12, y0 = f.y - g.H + 10, y1 = g.fy1; blk(c, x, y0, w, y1 - y0, P.WOOD, 3, 2.6); blk(c, x, y0, w, 10, '#7a5048', 3, 2);
+    for (let i = 1; i < 4; i++) line(c, x + 3, y0 + i * (y1 - y0) / 4, x + w - 3, y0 + i * (y1 - y0) / 4, 'rgba(17,20,47,.3)', 1.6); };
+  F.bookshelfB = (c, f, g) => { const G2 = g; rr(c, G2.x, G2.ty0, G2.w, G2.fy1 - G2.ty0, 3); c.fillStyle = P.WOOD; c.fill(); c.fillStyle = '#7a5048'; rr(c, G2.x, G2.ty0, G2.w, G2.d + 2, 3); c.fill();
+    rr(c, G2.x, G2.ty0, G2.w, G2.fy1 - G2.ty0, 3); c.lineWidth = 2.6; c.strokeStyle = P.INK; c.stroke(); for (let i = 1; i < 4; i++) line(c, G2.x + i * G2.w / 4, G2.fy0 + 4, G2.x + i * G2.w / 4, G2.fy1 - 4, 'rgba(17,20,47,.3)', 1.6); };
+  F.benchS = (c, f, g) => { const x = g.x + 10, w = g.w - 20, y0 = f.y + 6, y1 = g.fy1 - 6; blk(c, x + 2, y1 - 2, 4, 8, P.INK, 0, 0); blk(c, x + w - 6, y1 - 2, 4, 8, P.INK, 0, 0);
+    blk(c, x, y0, w, y1 - y0, P.WOOD, 2, 2); for (let i = 1; i < 3; i++) line(c, x + i * w / 3, y0 + 2, x + i * w / 3, y1 - 2, 'rgba(17,20,47,.3)', 1.4); blk(c, x - 4, y0 - 6, 6, y1 - y0 + 4, P.WOODD || '#5a3a2a', 2, 1.8); };
+  F.dflowersS = (c, f, g) => { const x = g.x + g.w / 2 - 8, y0 = f.y + 8, y1 = g.fy1 - 4; blk(c, x, y0, 16, y1 - y0, '#7a5040', 2, 2.2);
+    for (let i = 0; i < 6; i++) { const yy = y0 + 6 + i * (y1 - y0 - 12) / 5, xx = x + 8 + (i % 2 ? 3 : -3); dot(c, xx, yy - 6, 4.4, P.INK); dot(c, xx, yy - 6, 3.4, ['#f07b3c', '#f6e3bb', '#c96a9a'][i % 3]); } };
+  F.dhayS = (c, f, g) => { const x = g.x + 8, w = g.w - 16, y0 = f.y + 10, y1 = g.fy1 - 4; blk(c, x, y0, w, y1 - y0, '#d9b55a', 3, 2.2);
+    for (let i = 0; i < 6; i++) line(c, x + 3, y0 + 6 + i * (y1 - y0 - 10) / 5, x + w - 3, y0 + 4 + i * (y1 - y0 - 10) / 5, '#b8943a', 1.2); line(c, x + w / 2, y0 + 2, x + w / 2, y1 - 2, '#8a6a3a', 1.6);
+    pumpkin(c, x + w / 2, y0 + 4, 7); pumpkin(c, x + w / 2 + 2, y0 + (y1 - y0) * .55, 6); };
+  F.dgnomeB = (c, f, g) => { const cx = g.x + g.w / 2, yb = g.fy1 - 4; blk(c, cx - 8, yb - 14, 16, 14, '#3f6aa8', 4, 2.2); dot(c, cx, yb - 18, 6, '#f4c49a');
+    c.beginPath(); c.moveTo(cx - 8, yb - 20); c.lineTo(cx, yb - 36); c.lineTo(cx + 8, yb - 20); c.closePath(); c.fillStyle = P.RED; c.fill(); c.lineWidth = 2; c.strokeStyle = P.INK; c.stroke(); line(c, cx - 6, yb - 12, cx + 6, yb - 12, '#2c4e80', 2); };
+  F.dscarecrowB = (c, f, g) => { const cx = g.x + g.w / 2, yb = g.fy1 - 4; F.dscarecrow(c, f, g); dot(c, cx, yb - 52, 7, '#e0c06a'); line(c, cx - 4, yb - 49, cx + 4, yb - 49, '#b8943a', 1.2);
+    poly(c, [cx - 13, yb - 57, cx + 13, yb - 57, cx + 6, yb - 59, cx + 5, yb - 68, cx - 5, yb - 68, cx - 6, yb - 59], '#8a6a3a'); };
+  F.dsnowmanB = (c, f, g) => { const cx = g.x + g.w / 2, yb = g.fy1 - 4; F.dsnowman(c, f, g); ell(c, cx, yb - 43, 7.5, 7, '#f4efe6'); ell(c, cx, yb - 29, 10, 9, '#f4efe6'); line(c, cx - 7, yb - 37, cx + 7, yb - 37, '#d9483a', 3);
+    blk(c, cx - 6, yb - 60, 12, 10, '#2a2838', 1, 1.6); line(c, cx - 10, yb - 50, cx + 10, yb - 50, '#2a2838', 3); line(c, cx - 10, yb - 30, cx - 20, yb - 38, '#6e3f26', 2); line(c, cx + 10, yb - 30, cx + 20, yb - 38, '#6e3f26', 2); };
   function rugArt(c, k, x, y, w, h) {
     if (k === 'd_rug2') { c.beginPath(); c.ellipse(x + w / 2, y + h / 2, w / 2 - 4, h / 2 - 6, 0, 0, 6.28); c.fillStyle = '#4a6a5a'; c.fill(); c.lineWidth = 2.4; c.strokeStyle = P.INK; c.stroke(); for (let i = 1; i < 3; i++) { c.beginPath(); c.ellipse(x + w / 2, y + h / 2, (w / 2 - 4) * (1 - i * .3), (h / 2 - 6) * (1 - i * .3), 0, 0, 6.28); c.strokeStyle = i % 2 ? '#93a86c' : '#f6e3bb'; c.lineWidth = 3; c.stroke(); } return; }
     rr(c, x + 4, y + 6, w - 8, h - 12, 6); c.fillStyle = '#7a3a4a'; c.fill(); c.lineWidth = 2.4; c.strokeStyle = P.INK; c.stroke();
     rr(c, x + 11, y + 13, w - 22, h - 26, 4); c.strokeStyle = '#e0b94a'; c.lineWidth = 3; c.stroke();
     c.fillStyle = P.ORA; for (let i = 0; i < 3; i++) { c.save(); c.translate(x + w * (.3 + i * .2), y + h / 2); c.rotate(.785); c.fillRect(-5, -5, 10, 10); c.restore(); }
   }
-  F.bdecor = (c, f, g) => { // placed decor: the furniture art, mirrored when turned
+  F.bdecor = (c, f, g) => { // placed decor: facing f.r (0 front, 1 side, 2 back, 3 other side), mirrored if f.m
     const d = D.DECOR[f.dk]; if (!d) return;
-    if (f.r && d.rot === 'flip') { c.save(); c.translate(2 * f.x + f.w, 0); c.scale(-1, 1); (F[d.art] || F.counter)(c, f, g); c.restore(); }
-    else (F[d.art] || F.counter)(c, f, g);
+    const face = d.wall ? 0 : (f.r || 0) % 4, side = face % 2 === 1;
+    let fn = F[d.art] || F.counter, mir = !!f.m;
+    if (side && F[d.art + 'S']) fn = F[d.art + 'S'];
+    else if (face === 2 && F[d.art + 'B']) fn = F[d.art + 'B'];
+    else if (face === 2 || (side && !F[d.art + 'S'] && d.w === d.h)) mir = !mir;   // round / symmetric pieces: the back or side looks like the front mirrored
+    if (face === 3) mir = !mir;
+    if (mir) { c.save(); c.translate(2 * f.x + f.w, 0); c.scale(-1, 1); fn(c, f, g); c.restore(); } else fn(c, f, g);
   };
   // icons: seeds + crops as SVG, decor drawn from its furniture art
   (function icons() {
@@ -450,9 +486,9 @@
   }
   function decorFurn(o) {
     const d = D.DECOR[o.k], [w, h] = dims(o);
-    return { art: 'bdecor', dk: o.k, r: o.r || 0, at: [o.x, o.y, w, h], H: d.H, solid: d.wall || d.solid === 0 ? 0 : 1, wall: d.wall ? 1 : 0, decorId: o.id, d: d.H > 40 ? 18 : undefined };
+    return { art: 'bdecor', dk: o.k, r: o.r || 0, m: o.m ? 1 : 0, at: [o.x, o.y, w, h], H: d.H, solid: d.wall || d.solid === 0 ? 0 : 1, wall: d.wall ? 1 : 0, decorId: o.id, d: d.H > 40 ? 18 : undefined };
   }
-  const dims = o => { const d = D.DECOR[o.k]; return d.rot === 'swap' && o.r % 2 ? [d.h, d.w] : [d.w, d.h]; };
+  const dims = o => { const d = D.DECOR[o.k]; return !d.wall && o.r % 2 ? [d.h, d.w] : [d.w, d.h]; };   // 0.26.1: side-on = footprint turned
   function thin(f) { // walls: a thin collision band where the wall is drawn
     if (!f.fence) return;
     if (f.ori === 'v') { f.x += 14; f.w = 16; } else { f.y += 14; f.h = 22; }
@@ -588,7 +624,7 @@
       const x = tx - Math.floor((w - 1) / 2), y = d.wall ? ty : ty - Math.floor((h - 1) / 2);
       const why = fits(S.pend, x, y, 0); if (why) { toast(why, 1.6); return true; }
       if (!takeDecor(S.pend)) { toast('You do not have that any more', 1.4); S.pend = null; editBar(); return true; }
-      const o = { id: 'd' + (++base().seq), k: S.pend, x, y, r: 0 }; base().decor.push(o); S.sel = o.id; S.pend = null;
+      const o = { id: 'd' + (++base().seq), k: S.pend, x, y, r: 0, m: 0, rv: 2 }; base().decor.push(o); S.sel = o.id; S.pend = null;
       G().save(); syncDecor(); SFX.play('pick'); editBar(); toast('Placed. Tap it to move, turn or store it.', 1.8); return true;
     }
     const o = decorAt(wx, wy);
@@ -611,7 +647,7 @@
   function takeDecor(k) { const b = base(); if (b.box[k] > 0) { b.box[k]--; if (!b.box[k]) delete b.box[k]; return true; } return G().takeItems(k, 1).length > 0; }
   function openDecorBox() {
     const c = decorCounts(), ks = Object.keys(c);
-    panel(`<div class="kick">Decorate</div><h3>Decor box</h3><p class="mp">Furniture, posters, rugs, lights and plants you find while looting. Pick one, then tap where it goes.</p>
+    panel(`<div class="kick">Decorate</div><h3>Decor box</h3><p class="mp">Furniture, posters, rugs, lights and plants you find while looting. Pick one, then tap where it goes. Tap a placed piece, then Rotate to turn it a quarter (front, side, back, other side) or Turn to mirror it.</p>
       <div class="grid g4">${ks.length ? ks.map(k => `<button class="slot" data-dk="${k}">${icon(k)}<span>${D.ITEMS[k].n}</span>${c[k] > 1 ? `<i class="cnt">x${c[k]}</i>` : ''}</button>`).join('') : '<div class="empty">Nothing yet. Decor turns up in dressers, hutches, bookshelves and storage - more often in mansions and apartments.</div>'}</div>
       <button class="mbtn ghost" data-close style="margin-top:10px">Close</button>`, 1);
     $('#msheet').querySelectorAll('[data-dk]').forEach(bt => bt.onclick = () => { S.pend = bt.dataset.dk; S.sel = null; panelClose(); editBar(); });
@@ -619,10 +655,13 @@
   function editBar() {
     const el = $('#editbar'), sel = S.sel && base().decor.find(o => o.id === S.sel);
     el.innerHTML = `<div class="ehint">${S.pend ? `Tap where the <b>${D.ITEMS[S.pend].n.toLowerCase()}</b> goes` : sel ? `<b>${D.ITEMS[sel.k].n}</b> · tap a spot to move it` : 'Tap decor to pick it up · walk with the joystick'}</div>
-      <div class="erow">${S.pend ? '<button class="mbtn sm ghost" id="eCancel">Cancel</button>' : `<button class="mbtn sm" id="eBox">Decor box</button>${sel ? '<button class="mbtn sm ghost" id="eRot">Turn</button><button class="mbtn sm ghost" id="eStore">Store</button>' : ''}`}<button class="mbtn sm" id="eDone">Done</button></div>`;
+      <div class="erow">${S.pend ? '<button class="mbtn sm ghost" id="eCancel">Cancel</button>' : `<button class="mbtn sm" id="eBox">Decor box</button>${sel ? `${D.DECOR[sel.k].wall ? '' : '<button class="mbtn sm ghost" id="eRot">Rotate</button>'}<button class="mbtn sm ghost" id="eFlip">Turn</button>` + '<button class="mbtn sm ghost" id="eStore">Store</button>' : ''}`}<button class="mbtn sm" id="eDone">Done</button></div>`;
     const on = (id, fn) => { const b = $('#' + id); if (b) b.onclick = e => { e.stopPropagation(); SFX.play('ui'); fn(); }; };
     on('eBox', openDecorBox); on('eCancel', () => { S.pend = null; editBar(); }); on('eDone', () => setEdit(false));
-    on('eRot', () => { const d = D.DECOR[sel.k], r = (sel.r + 1) % 2; if (d.rot === 'swap') { const why = fits(sel.k, sel.x, sel.y, r, sel.id); if (why) { toast("No room to turn it here", 1.4); return; } } sel.r = r; G().save(); syncDecor(); });
+    // 0.26.1 (owner: "Decorate should have a rotate not just a turn"): Rotate = a quarter turn (front, side, back, other
+    // side; long pieces turn their footprint), Turn = mirror left/right
+    on('eRot', () => { const r = ((sel.r || 0) + 1) % 4, why = fits(sel.k, sel.x, sel.y, r, sel.id); if (why) { toast('No room to rotate it here', 1.4); return; } sel.r = r; G().save(); syncDecor(); });
+    on('eFlip', () => { sel.m = sel.m ? 0 : 1; G().save(); syncDecor(); });
     on('eStore', () => { const b = base(); b.decor = b.decor.filter(o => o !== sel); b.box[sel.k] = (b.box[sel.k] || 0) + 1; S.sel = null; G().save(); syncDecor(); editBar(); toast('Stored in the decor box', 1.2); });
   }
   function setEdit(on) { S.edit = on; S.sel = null; S.pend = null; document.body.classList.toggle('editing', on); if (on) editBar(); else $('#editbar').innerHTML = ''; hudSync(); }
