@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.11';
+const NEXT_VERSION = '0.14';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -212,7 +212,7 @@ const NEXT_VERSION = '0.11';
     SV.houses.push({ id: 'h' + seq, type, seed, gv: GV, day: day || SV.day.key, status: 'new', address: L.address, danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies });
   }
   const cache = new Map();
-  const GV = 3;   // 0.10: rarer key spots with prizes. 0.9: generator version for newly scouted houses (older houses keep the layout they were scouted with)
+  const GV = 4;   // 0.14: varied floor plans (gen.js plan4). 0.10: rarer key spots with prizes. 0.9: generator version for newly scouted houses (older houses keep the layout they were scouted with)
   Game.GV = GV;
   function layoutOf(h) {
     const k = h.type + ':' + h.seed + ':' + (h.gv || 1);
