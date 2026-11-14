@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.14';
+const NEXT_VERSION = '0.14.1';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -583,7 +583,7 @@ const NEXT_VERSION = '0.14';
     loot: ['Looting', 'Tap an item to take it, or Take all. The pack has limited slots - stash extras at home. Some loot only shows up in hidden spots.'],
     weapon: ['You found a weapon', 'Equip it in Pack & stash at home, or tap the Swap button (bottom right) during a run to fight with it right away.'],
     cosmetic: ['Cosmetics are earned', 'They unlock straight into your Wardrobe (home screen, next to Edit look). Tap any you own to wear it - hats, glasses, scarves, packs and jackets.'],
-    base: ['Your base', 'Build steps come from walking. Tap BUILD for walls, traps and garden beds, DECORATE to place furniture you found. The stash chest is here too.'],
+    base: ['Your base', 'Build steps come from walking (half of every step). Tap BUILD for walls, traps and garden beds, DECORATE to place furniture you found. The stash chest is here too.'],
     food: ['Hungry or thirsty', 'Your Hunger and Thirst bars drain slowly, even with the app closed. Below 30 you tire faster and search slower. Tap the bars to eat or drink - beans, water, soda, garden food, or a rain barrel at the base.'],
     lock: ['Locked', 'Lockpicks are silent but can snap - aim, then hold TURN and let go if it binds. A crowbar always works, but it is loud and may smash something.'],
   };
