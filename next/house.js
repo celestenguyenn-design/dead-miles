@@ -2092,6 +2092,8 @@
     target() { const t = findTarget(); return t ? { act: t.act, name: t.name } : null; },
     use() { btn.use = true; }, attack() { btn.atkPressed = true; },
     furn(name) { return G.furn.find(f => f.name === name); },
+    // 0.9 walkability tests: collision as the player feels it, and the wall pieces as drawn
+    coll: { hit: (x, y, e) => overlapsSolid(e || G.p, x, y), walls: () => wallRects, leaves: () => doorLeaves, rebuild() { buildWalls(); buildSolid(); }, size: () => [MW, MH], ch, collRect },
     T,
   });
   Object.defineProperty(DM, 'G', { get: () => G, configurable: true });
