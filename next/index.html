@@ -371,6 +371,36 @@
   .mbtn.big.ghost { margin-top: 8px; }
   .portwrap { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; }
   .editlook { margin-top: -4px; padding: 4px 9px; border-radius: 9px; background: var(--plum); border: 2px solid var(--ink); color: var(--crm); font-size: 10px; font-weight: 900; letter-spacing: .04em; }
+  /* 0.22: the title screen (title.js) - over the menu, under sheets (settings, the save picker) */
+  #title { position: absolute; inset: 0; z-index: 20; background: #0d0a24; overflow: hidden; touch-action: none; cursor: pointer; transition: opacity .7s ease; }
+  #title.out { opacity: 0; pointer-events: none; }
+  body.titleon #msheet, body.titleon #mres { z-index: 40; } body.titleon #loading { display: none; }
+  #tcv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .tltop { position: absolute; left: 0; right: 0; top: calc(3.5% + var(--st)); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+  .tlogo { width: min(84%, 340px); height: auto; overflow: visible; filter: drop-shadow(0 7px 0 rgba(8,6,22,.6)); animation: tlbob 5s ease-in-out infinite; will-change: transform; }
+  @keyframes tlbob { 0%, 100% { transform: translateY(0) rotate(-.7deg); } 50% { transform: translateY(4px) rotate(.7deg); } }
+  #title.lit .tlogo { filter: drop-shadow(0 0 16px rgba(225,215,255,.85)); }
+  .tldrips .d1, .tldrips .d2, .tldrips .d3 { transform-box: fill-box; transform-origin: top; animation: tldrip 6s ease-in-out infinite; }
+  .tldrips .d2 { animation-delay: -2s; } .tldrips .d3 { animation-delay: -4s; }
+  @keyframes tldrip { 0%, 100% { transform: scaleY(1); } 60% { transform: scaleY(1.35); } }
+  .tltag { margin-top: -2px; font-size: 11px; font-weight: 900; letter-spacing: .38em; text-transform: uppercase; color: var(--crm); opacity: .85; text-shadow: 0 2px 0 var(--ink), 0 0 6px var(--ink); }
+  .tlbot { position: absolute; left: 0; right: 0; bottom: calc(14px + var(--sb)); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .tlgo { padding: 13px 28px; border-radius: 16px; background: var(--ora); color: var(--ink); border: 3px solid var(--ink); box-shadow: 0 5px 0 var(--ink); font-size: 17px; font-weight: 900; letter-spacing: .18em; animation: tlpulse 1.5s ease-in-out infinite; will-change: transform; }
+  @keyframes tlpulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.07); opacity: .88; } }
+  #title.go .tlgo { animation: none; transform: scale(.94) translateY(3px); box-shadow: 0 2px 0 var(--ink); }
+  .tllinks { display: flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 800; color: var(--crm); }
+  .tllinks button { padding: 6px 8px; text-decoration: underline; text-underline-offset: 3px; text-shadow: 0 2px 0 var(--ink), 0 0 6px var(--ink); }
+  .tllinks i { font-style: normal; color: var(--mute); }
+  .tlver { position: absolute; right: 12px; bottom: -6px; font-size: 9px; font-weight: 800; letter-spacing: .1em; color: rgba(157,144,191,.6); }
+  #title.still *, #title.still { animation: none !important; transition: none; }
+  @media (prefers-reduced-motion: reduce) { #title, #title * { animation: none !important; } }
+  /* 0.22: the weather chip on the home card (weather.js) */
+  .wxchip { display: flex; align-items: center; gap: 7px; width: 100%; margin: 0 0 10px; padding: 7px 12px; border-radius: 14px; background: rgba(17,20,47,.6); border: 2px solid var(--plum); font-size: 12.5px; font-weight: 800; text-align: left; color: var(--crm); }
+  .wxchip .wxi { font-size: 15px; line-height: 1; } .wxchip b { font-weight: 900; white-space: nowrap; } .wxchip i { font-style: normal; color: var(--mute); white-space: nowrap; }
+  .wxchip em { flex: 1; min-width: 0; font-style: normal; font-size: 11px; color: var(--ora); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wxchip .wxgo { margin-left: auto; color: var(--mute); font-size: 16px; }
+  .wxrow select { flex: 1; min-width: 0; max-width: 60%; padding: 6px 8px; border-radius: 10px; background: #251c47; color: var(--crm); border: 2px solid var(--ink); font: inherit; font-size: 13px; font-weight: 800; }
+  .wxfx li { margin: 4px 0; color: var(--crm); }
   #loading { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 900; letter-spacing: .2em; color: var(--mute); font-size: 12px; }
   /* ---------- base (phase 4) ---------- */
   #basehud { position: absolute; left: 12px; top: calc(112px + var(--st)); display: none; flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -824,30 +854,32 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.23.1"></script>
-<script src="art.js?v=0.23.1"></script>
-<script src="net.js?v=0.23.1"></script>
-<script src="netpanel.js?v=0.23.1"></script>
-<script src="syncguide.js?v=0.23.1"></script>
-<script src="events.js?v=0.23.1"></script>
-<script src="data.js?v=0.23.1"></script>
-<script src="food.js?v=0.23.1"></script>
-<script src="skills.js?v=0.23.1"></script>
-<script src="infection.js?v=0.23.1"></script>
-<script src="infected.js?v=0.23.1"></script>
-<script src="engine.js?v=0.23.1"></script>
-<script src="music.js?v=0.23.1"></script>
-<script src="gen.js?v=0.23.1"></script>
-<script src="raiders.js?v=0.23.1"></script>
-<script src="house.js?v=0.23.1"></script>
-<script src="horde.js?v=0.23.1"></script>
-<script src="base.js?v=0.23.1"></script>
-<script src="crew.js?v=0.23.1"></script>
-<script src="boss.js?v=0.23.1"></script>
-<script src="daily.js?v=0.23.1"></script>
-<script src="deep.js?v=0.23.1"></script>
-<script src="route.js?v=0.23.1"></script>
-<script src="game.js?v=0.23.1"></script>
-<script src="map.js?v=0.23.1"></script>
+<script src="s2art.js?v=0.24"></script>
+<script src="art.js?v=0.24"></script>
+<script src="net.js?v=0.24"></script>
+<script src="netpanel.js?v=0.24"></script>
+<script src="syncguide.js?v=0.24"></script>
+<script src="events.js?v=0.24"></script>
+<script src="data.js?v=0.24"></script>
+<script src="food.js?v=0.24"></script>
+<script src="skills.js?v=0.24"></script>
+<script src="infection.js?v=0.24"></script>
+<script src="infected.js?v=0.24"></script>
+<script src="engine.js?v=0.24"></script>
+<script src="music.js?v=0.24"></script>
+<script src="weather.js?v=0.24"></script>
+<script src="gen.js?v=0.24"></script>
+<script src="raiders.js?v=0.24"></script>
+<script src="house.js?v=0.24"></script>
+<script src="horde.js?v=0.24"></script>
+<script src="base.js?v=0.24"></script>
+<script src="crew.js?v=0.24"></script>
+<script src="boss.js?v=0.24"></script>
+<script src="daily.js?v=0.24"></script>
+<script src="deep.js?v=0.24"></script>
+<script src="route.js?v=0.24"></script>
+<script src="title.js?v=0.24"></script>
+<script src="game.js?v=0.24"></script>
+<script src="map.js?v=0.24"></script>
 </body>
 </html>

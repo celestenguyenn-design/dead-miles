@@ -98,6 +98,7 @@
     for (const k in L.rooms) { const R = L.rooms[k]; G.fog[k] = R.hidden || R.isolated ? .99 : .97; G.visited[k] = false; }
     G.fog[streetRoom()] = 0.12; G.visited[streetRoom()] = true;
     if (opts.noFog) for (const k in L.rooms) { G.fog[k] = 0; G.visited[k] = true; }
+    G.wx = DM.Weather ? DM.Weather.forRun(L, opts) : null;   // 0.22: real weather (weather.js) - hear/sight/move multipliers are 1 in the daily house
     let fid = 0;
     for (const d of L.furn) {
       const f = Object.assign({}, d);
@@ -448,11 +449,11 @@
     if (show && rad >= 1.8) G.rings.push({ x, y, r: rad * T, t: 0 });
     if (!byRaider) G.lastNoise = { x, y, t: G.t };
     for (const z of G.zs) {
-      if (z.raider) { if (!byRaider && !z.dead && z.st !== 'flee' && Math.hypot(z.x - x, z.y - y) / T <= rad * .8) { z.aggro = 1; z.lostT = 0; } continue; }   // 0.15: raiders hear her too
+      if (z.raider) { if (!byRaider && !z.dead && z.st !== 'flee' && Math.hypot(z.x - x, z.y - y) / T <= rad * .8 * (G.wx ? G.wx.hear : 1)) { z.aggro = 1; z.lostT = 0; } continue; }   // 0.15: raiders hear her too
       if (z.dead || z.st === 'chase' || z.st === 'windup' || z.st === 'lunge' || z.st === 'rise') continue;
       if (z.foe && !z.foe.dead && !z.foe.gone && (z.st === 'recover' || z.st === 'hurt')) continue;   // 0.15: busy with a raider
       const d = Math.hypot(z.x - x, z.y - y) / T;
-      let eff = rad * (losClear(z.x, z.y - 20, x, y - 20) ? 1 : .65);
+      let eff = rad * (losClear(z.x, z.y - 20, x, y - 20) ? 1 : .65) * (G.wx ? G.wx.hear : 1);   // 0.22: rain/wind cover the noise
       if (z.st === 'sleep') eff *= .55 * SK.sleeperMul();
       if (d <= eff) alertZombie(z, x, y, false);
     }
@@ -811,7 +812,7 @@
 
     if (p.st === 'free' || p.st === 'swing') {
       running = inp.run && inp.m > .5 && p.sta > 1 && !p.winded && p.st === 'free';
-      spd = (running ? 4.5 : 2.75) * T * inp.m * (p.st === 'swing' ? .35 : 1);
+      spd = (running ? 4.5 : 2.75) * T * inp.m * (p.st === 'swing' ? .35 : 1) * (G.wx ? G.wx.move : 1);   // 0.22: snow slows her a little
       if (running) { p.sta = Math.max(0, p.sta - 24 * SK.sprintMul() * dt); p.staDelay = .7; }
       if (!G.over) F.runDrain(dt, running, G);   // a run makes you hungry and thirsty a little faster
       const tvx = inp.x * spd, tvy = inp.y * spd;
@@ -994,7 +995,7 @@
   function canSee(z) {
     const p = G.p; if (p.st === 'down') return false;
     const dx = p.x - z.x, dy = p.y - z.y, d = Math.hypot(dx, dy) / T;
-    if (d > (z.sight || 7) * SK.sightMul()) return false;   // 0.13: Stealth ranks shrink how far they spot her
+    if (d > (z.sight || 7) * SK.sightMul() * (G.wx ? G.wx.sight : 1)) return false;   // 0.13: Stealth ranks shrink how far they spot her (0.22: fog too)
     const facing = (dx < 0) === (z.fx < 0);
     if (d > 2.6 && !facing) return false;
     if (d > 4 && !p.running && G.room !== z.roomNow && Math.random() < .5) return false;
@@ -1151,6 +1152,7 @@
       G.fog[k] = lerp(G.fog[k], target, 1 - Math.exp(-(target < G.fog[k] ? 5 : 2) * dt));
     }
     G.noiseLvl = Math.max(0, G.noiseLvl - dt * .28);
+    if (G.wx) G.wx.update(dt);   // 0.22: lightning timing
     for (const f of G.furn) if (f.keyDoor && f.swing && f.swing < 1) { f.swing = Math.min(1, f.swing + dt * 2.4); f._key = null; if (f.swing >= 1) { buildWalls(); buildSolid(); } }
     // particles
     for (const q of G.parts) {
@@ -1406,7 +1408,7 @@
     // candle glow in hidden stashes
     for (const f of G.furn) if (f.art === 'crate' && f.secretLoot && (G.visited[f.room] || G.secretOpen)) { const gx = f.x + f.w - 12, gy = f.y + 10; const cg = ctx.createRadialGradient(gx, gy, 2, gx, gy, T * 2.5); cg.addColorStop(0, 'rgba(255,190,110,.22)'); cg.addColorStop(1, 'rgba(255,190,110,0)'); ctx.fillStyle = cg; ctx.fillRect(gx - 2.5 * T, gy - 2.5 * T, 5 * T, 5 * T); }
 
-    if (!dbg && !opts.noFog) drawFog();
+    if (!dbg && !opts.noFog) { const rv = G.wx ? G.wx.reveal() : 0; if (rv < 1) { ctx.globalAlpha = 1 - rv; drawFog(); ctx.globalAlpha = 1; } }   // 0.22: a lightning flash lifts the fog of war for a moment
     drawOverlays();
     if (opts.drawOver) opts.drawOver(ctx, G);
 
@@ -1415,7 +1417,8 @@
     ctx.drawImage(E.vignette, 0, 0, W, H);
     if (G.redFlash > 0) { ctx.fillStyle = `rgba(181,58,46,${G.redFlash * .32})`; ctx.fillRect(0, 0, W, H); }
     if (p.hp < 35 && p.st !== 'down') { ctx.fillStyle = `rgba(181,58,46,${.08 + .06 * Math.sin(G.t * 5)})`; ctx.fillRect(0, 0, W, H); }
-    if (EVA && EVA.ev.accent.snow) drawSnow(W, H);
+    if (EVA && EVA.ev.accent.snow && !(G.wx && G.wx.type === 'snow')) drawSnow(W, H);
+    if (G.wx) G.wx.draw(ctx, W, H, G, G.room === streetRoom() || G.wx.base, DEV.dpr * DEV.zoom);   // 0.22: rain / snow / fog / the flash (weather.js)
     drawBanners();
     drawLock();
   }
@@ -2491,7 +2494,7 @@
     G: () => G, L: () => L, T, MW: () => MW, MH: () => MH, SFX, toast,
     move: (e, dx, dy) => moveEnt(e, dx, dy), hit: (e, x, y) => overlapsSolid(e, x, y), bfs, nextStep, cellOf, los: losClear, roomAt, street: streetRoom,
     mk: mkZombie, hurtPlayer, hitZombie: (z, fa, dmg, by) => hitZombie(z, fa, dmg, false, by), noise: emitNoise, puff, splat, num: dmgNum, banner,
-    xp: (n, x, y) => gainXP(n, x, y), sightMul: () => SK.sightMul(),
+    xp: (n, x, y) => gainXP(n, x, y), sightMul: () => SK.sightMul() * (G && G.wx ? G.wx.sight : 1),   // 0.22: fog
   });
   // debug / test hooks
   Object.assign(DM, {

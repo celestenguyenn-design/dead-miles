@@ -625,6 +625,7 @@ way[building]->.b;.b out skel geom qt;
     const pos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy || 50 };
     noteSpeed(pos, p.coords.speed, p.timestamp || Date.now());
     const first = !M.pos; M.pos = pos; M.gpsMsg = ''; M.guess = null;
+    if (first && DM.Weather) DM.Weather.noteArea(pos.lat, pos.lon);   // 0.22: weather.js keeps only the 0.1-degree area (~10 km), on this phone
     setOrigin(pos.lat, pos.lon);
     if (first && M.msgKind === 'gps') message();
     fetchAround(pos, true);
@@ -908,7 +909,9 @@ way[building]->.b;.b out skel geom qt;
     M.drawn = drawn;
   }
 
-  DM.Map = { open, close, get on() { return M.on; }, _M: M, _typeOf: typeOf, _O: O,
+  // 0.22: for weather.js - the ~0.1-degree area of the square the map last showed (map users from before 0.22), or null
+  const lastArea = () => getMeta('last').then(k => { const m = /^(-?\d+):(-?\d+)$/.exec(String(k || '')); return m ? { lat: Math.round((+m[1] + .5) * CELL * 10) / 10, lon: Math.round((+m[2] + .5) * CELL * 10) / 10 } : null; });
+  DM.Map = { open, close, lastArea, get on() { return M.on; }, _M: M, _typeOf: typeOf, _O: O,
     get timing() { return { firstDraw: M.tFirst, data: M.tData, render: M.renderMs }; } };
   if (DM.ready && DM.Game && DM.Game.renderHome) DM.Game.renderHome();   // show the Map tab if the home screen drew first
 })();
