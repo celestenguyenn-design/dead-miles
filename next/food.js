@@ -33,8 +33,9 @@ window.DM = window.DM || {};
   // empty, never below FLOOR). The caller decides where that HP goes (the survivor, or the run's player).
   F.tick = function (s, hp, now = Date.now()) {
     if (!s || !s.food) return hp;
-    const f = s.food, days = (now - f.at) / DAY;
-    if (!(days > 0)) { if (days < 0) f.at = now; return hp; }   // clock went backwards: just restart from now
+    const f = s.food, real = (now - f.at) / DAY;
+    if (!(real > 0)) { if (real < 0) f.at = now; return hp; }   // clock went backwards: just restart from now
+    const days = real * SKM(s);   // 0.13: Survival ranks slow the drain (starving HP loss runs on the same slowed clock)
     const empty = Math.min(f.h / F.RATE.h, f.t / F.RATE.t);      // days until the first bar hits 0
     f.h = Math.max(0, f.h - F.RATE.h * days);
     f.t = Math.max(0, f.t - F.RATE.t * days);
@@ -49,11 +50,13 @@ window.DM = window.DM || {};
   };
 
   const S = () => DM.S;
+  const SK = () => DM.Skills;
+  const SKM = s => (SK() ? SK().drainMul(s) : 1);
   F.hungry = (s = S()) => !!(s && s.food && s.food.h < F.LOW);
   F.thirsty = (s = S()) => !!(s && s.food && s.food.t < F.LOW);
   F.wellFed = (s = S()) => !!(s && s.food && s.food.h > F.FULL && s.food.t > F.FULL);
-  F.regenMul = (s = S()) => (F.hungry(s) ? .6 : 1);       // Hungry: stamina refills 40% slower
-  F.staMax = (s = S()) => (F.thirsty(s) ? 80 : 100);      // Thirsty: stamina max -20
+  F.regenMul = (s = S()) => (F.hungry(s) ? .6 : 1) * (SK() ? SK().regenMul(s) : 1);       // Hungry: stamina refills 40% slower (0.13: Survival ranks faster)
+  F.staMax = (s = S()) => (F.thirsty(s) ? 80 : 100) + (SK() ? SK().staBonus(s) : 0);      // Thirsty: stamina max -20 (0.13: Second wind +15)
   F.searchMul = (s = S()) => (F.thirsty(s) ? 1.2 : 1);    // Thirsty: searches take 20% longer
   // Well fed and hydrated: +10% scavenging XP. Fractions carry over so small gains still add up.
   F.xpBonus = function (n, s = S()) {
@@ -68,7 +71,7 @@ window.DM = window.DM || {};
     const a = Math.max(0, Math.min(dh, F.RUNCAP - r.h)), b = Math.max(0, Math.min(dt, F.RUNCAP - r.t));
     r.h += a; r.t += b; s.food.h = Math.max(0, s.food.h - a); s.food.t = Math.max(0, s.food.t - b);
   }
-  F.runDrain = (dt, running, G, s = S()) => drain(s, G, dt * (.0075 + (running ? .02 : 0)), dt * (.011 + (running ? .03 : 0)));
+  F.runDrain = (dt, running, G, s = S()) => { const m = SKM(s); drain(s, G, m * dt * (.0075 + (running ? .02 : 0)), m * dt * (.011 + (running ? .03 : 0))); };
   F.fight = (G, s = S()) => drain(s, G, .05, .07);
 
   // ---- items

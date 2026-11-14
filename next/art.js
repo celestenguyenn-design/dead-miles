@@ -116,6 +116,7 @@ const ART = (() => {
       }
     };
     pass('o'); pass('c');
+    if (pose.body) pose.body(ctx);   // 0.13: worn on the body (a riot vest, a bloated belly), rig coordinates
     if (pose.over) { // something worn on the head (the Krampus walker's Santa hat): drawn in rig coordinates, follows the head
       const hp = rig.parts.find(p => p.name === 'head'), t = pp.head; ctx.save();
       if (hp && t && t.r) { ctx.translate(hp.pivot[0], hp.pivot[1]); ctx.rotate(t.r); ctx.translate(-hp.pivot[0], -hp.pivot[1]); }

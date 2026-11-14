@@ -267,6 +267,7 @@
     for (const m of g.zs) if (m !== z && !m.dead) { m.st = 'idle'; m.target = null; }
     g.paused = kind !== 'down';
     const st = B.state(), after = Math.max(0, st.hp - F.dealt);
+    if (DM.Skills && F.dealt > 0) DM.Skills.addXP(6 + Math.min(14, Math.floor(F.dealt / 150)) + (kind === 'win' ? 20 : 0));   // 0.13: boss fights teach (6-20 xp, +20 for the last hit)
     setTimeout(() => {
       $('#cardBody').innerHTML = `<div class="kick${kind === 'down' ? ' red' : ''}">${kind === 'win' ? 'weekly boss · down!' : kind === 'down' ? 'knocked out' : 'fight over'}</div>
         <h2>${kind === 'win' ? `${esc(F.boss.name)} is finished` : kind === 'down' ? 'You went down' : 'Time is up'}</h2>

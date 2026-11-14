@@ -15,7 +15,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.11.1';
+const NEXT_VERSION = '0.13';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -60,6 +60,7 @@ const NEXT_VERSION = '0.11.1';
     if (v.survivor) migrateKeys(v.survivor);
     if (v.survivor && !v.run0111) { dropNotes(v.survivor); v.run0111 = 1; }   // notes carried home before 0.11.1
     if (v.survivor) DM.Food.norm(v.survivor);   // 0.8: hunger + thirst (older saves start at 80/80, draining from now)
+    if (v.survivor) DM.Skills.norm(v.survivor); // 0.13: skill points; old Lv 3/6/9 perks stay as free ranks
     DM.Crew.norm(v);                        // phase 5b: crew + strays (SV.crew, SV.pets)
     DM.Boss.norm(v);                        // phase 5b: the weekly boss (SV.boss)
     // 0.9: houses not started yet move to the v2 generator (walkways, open container fronts, rugs on open floor).
@@ -109,7 +110,7 @@ const NEXT_VERSION = '0.11.1';
     const J = D.JOBS[job];
     let xp = 0; try { const v = JSON.parse(localStorage.getItem('dm-next-skills') || '{}'); if (v.scav) xp = +v.scav.xp || 0; } catch (e) { /* none */ }
     const s = { name: name || 'Survivor', look, job, hp: 0, xp, pack: [], stash: [], hands: null, quiver: { n: 0 }, packBonus: 0, known: D.BASIC.concat(job === 'hunter' ? ['arrow'] : []), wardrobe: { own: {}, seen: {} } };
-    s.hp = maxHp(s); DM.Food.norm(s, true);
+    DM.Skills.norm(s); s.hp = maxHp(s); DM.Food.norm(s, true);
     for (const [k, n] of J.kit) {
       if (k === J.hands) { s.hands = { k, d: D.WEAPONS[D.ITEMS[k].w].dur }; continue; }
       if (k === 'arrow') { s.quiver = { n: Math.min(D.QUIVER, n) }; continue; }
@@ -123,7 +124,7 @@ const NEXT_VERSION = '0.11.1';
     while (left && list.length < slots) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; list.push(e); left -= t; }
     return n - left;
   }
-  const packSlots = () => 12 + (SV.survivor.packBonus || 0) + (D.scavLvl(SV.survivor.xp) >= 9 ? 2 : 0);
+  const packSlots = () => 12 + (SV.survivor.packBonus || 0) + DM.Skills.packBonus(SV.survivor);   // 0.13: Pack rat is a Scavenging rank
 
   // ---------------------------------------------------------------- steps -> houses
   const effective = d => d.phone + d.walk + d.typed * .5;
@@ -277,7 +278,7 @@ const NEXT_VERSION = '0.11.1';
     const stacks = D.toStacks(got, rnd), lost = [];
     for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, STASH_SLOTS, e.k, e.n, e.d); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k); }
     h.status = 'auto'; SV.stats.auto++;
-    SV.survivor.xp += 3;
+    DM.Skills.addXP(3);
     Game.save();
     showResult(L.name + ' · ' + L.address, stacks, lost, `Everything went to your stash. ${n ? `Your crew of ${n} brought back about ${Math.round(share * 100)}% of what was there` : `With no crew yet, a couple of neighbours helped: about ${Math.round(share * 100)}% of what was there`} - and never the hidden compartments.`);
     renderHome();
@@ -462,7 +463,7 @@ const NEXT_VERSION = '0.11.1';
     if (q.type === 'fetch') takeItems('parcel', 1);
     for (const [k, n] of opt.items) { const d = D.isWeapon(k) ? D.WEAPONS[D.ITEMS[k].w].dur : undefined; give(k, n, d); }
     if (opt.cos) Game.unlockCos('cos_' + opt.cos);
-    T.caps += q.reward.caps; SV.survivor.xp += q.reward.xp;
+    T.caps += q.reward.caps; DM.Skills.addXP(q.reward.xp);
     T.active = T.active.filter(x => x !== q);
     SV.houses = SV.houses.filter(h => h.quest !== q.id);
     const lv0 = traderLevel(); T.completed++;
@@ -616,7 +617,7 @@ const NEXT_VERSION = '0.11.1';
     for (const k in r.in) takeItems(k, r.in[k]);
     const [k, n] = r.out, d = D.isWeapon(k) ? D.WEAPONS[D.ITEMS[k].w].dur : undefined;
     const lost = give(k, n, d);
-    SV.survivor.xp += 2; Game.save(); SFX.play('open');
+    DM.Skills.addXP(2); Game.save(); SFX.play('open');
     toast(lost ? `Crafted ${D.ITEMS[k].n} - no room for ${lost}` : `Crafted ${D.ITEMS[k].n}${n > 1 ? ' x' + n : ''}`, 1.8);
     if (!benchHost) benchSel = null;
     reHost();
@@ -966,7 +967,7 @@ const NEXT_VERSION = '0.11.1';
     if (!SV || !SV.survivor || DM.scene) return;
     rollDay();
     foodTick();
-    const s = SV.survivor, d = SV.day, J = D.JOBS[s.job], Lv = D.scavLvl(s.xp);
+    const s = SV.survivor, d = SV.day, J = D.JOBS[s.job], xl = DM.Skills.xpLine(s), pts = DM.Skills.points(s);
     const eff = effective(d), nxt = nextHouseAt(d), w = worth(eff);
     $('#menu').className = '';
     const hands = s.hands ? `${icon(s.hands.k)}<span>${D.ITEMS[s.hands.k].n}<i class="dur"><i style="width:${Math.max(3, s.hands.d / D.WEAPONS[D.ITEMS[s.hands.k].w].dur * 100)}%"></i></i></span>` : '<span>Fists</span>';
@@ -980,7 +981,7 @@ const NEXT_VERSION = '0.11.1';
           <div class="sjob">${J.n} · <span>${J.stats.join(' · ')}</span></div>
           <div class="mbar hp"><i style="width:${s.hp / maxHp(s) * 100}%"></i><span>HP ${Math.ceil(s.hp)}/${maxHp(s)}</span></div>
           ${DM.Food.barsHTML(s)}${needStat(s)}
-          <div class="sline">Scavenging Lv ${Lv}<div class="mbar xp"><i style="width:${Lv >= 10 ? 100 : (s.xp - D.XPCUM(Lv)) / (D.XPCUM(Lv + 1) - D.XPCUM(Lv)) * 100}%"></i></div></div>
+          <button class="sline skbtn${pts ? ' pts' : ''}" id="mSkills"><span>Level ${xl.L}${pts ? ` · <b>${pts} skill point${pts > 1 ? 's' : ''}</b>` : ''}</span><em>Skills ›</em><div class="mbar xp"><i style="width:${xl.pct}%"></i></div></button>
           <div class="shands">${hands}</div>
         </div>
       </div>
@@ -1016,6 +1017,7 @@ const NEXT_VERSION = '0.11.1';
     };
     if ($('#mSyncG')) $('#mSyncG').onclick = () => { SFX.play('ui'); try { SYNC.open($('#mSyncG').dataset.m || undefined); } catch (e) { toast('Sync guide failed to open', 1.6); } };
     $('#mLook').onclick = () => { SFX.play('ui'); editLook(); };
+    $('#mSkills').onclick = () => { SFX.play('ui'); DM.Skills.open(() => renderHome()); };
     $('#mNeeds').onclick = () => { SFX.play('ui'); openFood(); };
     $('#mWard').onclick = () => { SFX.play('ui'); editLook('wardrobe'); };
     let vt = 0, vtT = 0; $('#mver').onclick = () => { const n = performance.now(); if (n - vtT > 1200) vt = 0; vtT = n; if (++vt >= 5) { vt = 0; if (DM_DEV_OK) openDev(); } };
@@ -1062,10 +1064,11 @@ const NEXT_VERSION = '0.11.1';
   function eatEntry(s, from, i) { // one bite from the pack or stash: hunger/thirst, plus the smaller HP heal
     const e = s[from][i], it = D.ITEMS[e.k];
     const fed = FD.eat(s, e.k);
-    if (it.hp) s.hp = Math.min(maxHp(s), s.hp + it.hp);
+    const hp = it.hp ? DM.Skills.heal(it.hp, s) : 0;   // 0.13: Field medic heals more
+    if (hp) s.hp = Math.min(maxHp(s), s.hp + hp);
     e.n--; if (!e.n) s[from].splice(i, 1);
     Game.save();
-    return [fed, it.hp ? `+${it.hp} HP` : ''].filter(Boolean).join(' · ');
+    return [fed, hp ? `+${hp} HP` : ''].filter(Boolean).join(' · ');
   }
   function renderHouses() {
     const list = [];
@@ -1086,7 +1089,9 @@ const NEXT_VERSION = '0.11.1';
       const tags = [h.nLocks ? `${h.nLocks} lock${h.nLocks > 1 ? 's' : ''}` : 'no locks', `${h.nZombies} zombie${h.nZombies === 1 ? '' : 's'}`];
       const bs = !done && !far ? EVS.bossFor(layoutOf(h)) : null;   // event mini-boss: scouts spot it from the street
       if (bs) tags.push(`<b class="evtag">${esc(bs.name.toLowerCase())} · ${bs.where}</b>`);
-      if (!done && !far && h.type !== 'tutorial') { const HL = layoutOf(h); if (HL.car) tags.push('<b class="keytag">🔑 locked car</b>'); if (HL.keyRoom) tags.push('<b class="keytag">🔑 locked room</b>'); }   // 0.8: brass-key spots
+      if (!done && !far && h.type !== 'tutorial') { const HL = layoutOf(h); if (HL.car) tags.push('<b class="keytag">🔑 locked car</b>'); if (HL.keyRoom) tags.push('<b class="keytag">🔑 locked room</b>');   // 0.8: brass-key spots
+        const ip = DM.Inf.plan(HL), ni = ip.kinds.filter(Boolean).length, nz = (HL.zombies || []).length + ip.extra;   // 0.13: special infected (danger 3+)
+        tags[1] = `${nz} zombie${nz === 1 ? '' : 's'}`; if (ni) tags.push(`<b class="inftag">☣ ${ni} special infected</b>`); }
       return `<div class="hcard${done ? ' done' : ''}${h.type === 'tutorial' ? ' tut' : ''}${q ? ' quest' : ''}">
         ${typeIcon(h.type)}
         <div class="hinfo"><div class="hname">${T.n} <em>${T.size}</em>${h.landmark ? ` <em class="first lmk">${PIN}landmark</em>` : ''}${h.type === 'tutorial' ? ' <em class="first">first house</em>' : ''}${q ? ` <em class="first">quest: ${D.QUESTS[q.type].n.toLowerCase()}</em>` : ''}</div>
@@ -1310,7 +1315,9 @@ const NEXT_VERSION = '0.11.1';
   }
   const HOWTO = [
     ['Steps & houses', 'All your daily steps count. About every 1,000 steps scouts another house (up to 10 a day; the more you walk, the better the odds of big places like police stations and mansions). Houses wait 3 days. Loot one yourself, or send your Crew - they bring back less and never find secrets.'],
-    ['Looting', 'Walk with the joystick (drag anywhere). Stand by furniture and tap the magnifier to search. Searching makes noise. Your pack has 12 slots; things stack. Leave by the front door - anything you dropped stays behind. Your Scavenging level makes searches faster and luckier.'],
+    ['Looting', 'Walk with the joystick (drag anywhere). Stand by furniture and tap the magnifier to search. Searching makes noise. Your pack has 12 slots; things stack. Leave by the front door - anything you dropped stays behind. Your level makes searches a little faster and luckier (up to level 10).'],
+    ['Levels & skills', 'Everything you do earns XP: searching, kills (special infected more), secrets, locks and keys, Dot\'s jobs, horde watch shifts and boss fights. Every level gives 1 skill point - early levels come every few houses, later ones slower. Tap Skills on the home card to spend them in five trees, 5 ranks each: Scavenging (faster searches, extra finds, Keen eye, Pack rat), Stealth (quieter steps and searches, zombies spot you later), Combat (melee and bow damage, longer dodge, more HP), Survival (slower hunger and thirst, better healing, more stamina) and Lockwork (wider sweet spots, picks last longer, quieter crowbar). Each rank needs the one before it; later ranks cost 2-3 points. Your job gives rank 1 of its tree free (Scavenger: Scavenging, Hunter: Stealth, Brawler: Combat, Mechanic: Survival, Thief: Lockwork). Survivors from before 0.13 kept Quiet hands, Keen eye and Pack rat for free and got every point their level earned. Once a week you can reset your skills for 150 caps.'],
+    ['Special infected', 'Danger 3+ places (pharmacies, schools, police stations, mansions; look for the ☣ tag on the house list) have a couple more zombies and some special infected. Armored (riot gear, police stations): slow and hits hard; melee barely dents it until the armour cracks, arrows do full damage. Runner: fast and fragile, sprints the moment it sees you - you can only outrun it at a sprint. Bloater (green and swollen, pharmacies): bursts into a toxic cloud when it dies - shoot it, or dodge straight out. Screamer (gaping mouth, schools and mansions): if it sees you it stops and shrieks, and when it finishes every zombie in the house comes for you - kill it fast or stay out of sight. They carry better loot (ammo and police cosmetics, meds, lockpicks) and give much more XP.'],
     ['Locks & secrets', 'Locked doors, safes and cages hold the best loot. Lockpicks are silent but snap; a crowbar always works but is loud. Brass keys open the two locks nothing else can: a locked car outside a few houses (one key opens the glove box and the trunk, and the trunk always holds something good) and a key-locked room (rare; it always holds a prize that fits the building - a gun cabinet at the police station, the back room at a pharmacy, a safe room in a mansion). Look for the 🔑 tag on the house list. Keys live on your keyring (no pack slot, never lost) and are used up. Some locked rooms hide their key somewhere else in the same house. After you search most of a house, hidden spots can open: a loose floorboard under a rug, a sliding bookshelf, an attic hatch (needs a hook pole), a cracked wall panel. Torn notes give hints about the house you find them in; they fall apart once you leave.'],
     ['Weapons & equipping', 'The weapon in your hand is what you fight with. At home: Pack & stash > tap a weapon > Equip. In a house: tap the Swap button (bottom right) to pick any weapon in your pack. Weapons wear out - repair them with scrap. Zombies hear noise; you can run (push the stick far) and dodge.'],
     ['Cosmetics & wardrobe', 'Cosmetics are earned: rare finds in houses and on zombies, better in mansions and police stations, plus Dot\'s shop and jobs, horde-night crates and events. They unlock straight into your Wardrobe and never use pack space. Wardrobe (home screen) > tap one to wear it. Spares are sold to Dot automatically.'],
@@ -1421,7 +1428,7 @@ const NEXT_VERSION = '0.11.1';
   }
   function chooseSave(local, remote) {
     return new Promise(res => {
-      const line = st => st && st.survivor ? `${esc(st.survivor.name)} · ${D.JOBS[st.survivor.job].n} · Lv ${D.scavLvl(st.survivor.xp)} · ${(st.stats || {}).runs || 0} runs${st.savedAt ? ' · saved ' + ago(st.savedAt) : ''}` : 'no survivor yet';
+      const line = st => st && st.survivor ? `${esc(st.survivor.name)} · ${D.JOBS[st.survivor.job].n} · Lv ${D.survLvl(st.survivor.xp)} · ${(st.stats || {}).runs || 0} runs${st.savedAt ? ' · saved ' + ago(st.savedAt) : ''}` : 'no survivor yet';
       sheetOpen(`<div class="kick">Two saves</div><h3>Which one is yours?</h3>
         <p class="mp">This phone and the cloud have different progress. Pick one - the other is replaced.</p>
         <button class="pick" id="pLocal"><b>This phone</b><span>${line(local)}</span></button>
@@ -1458,7 +1465,7 @@ const NEXT_VERSION = '0.11.1';
   function publish() {
     if (!window.NET || !SV.survivor) return;
     const s = SV.survivor;
-    try { NET.publish({ name: s.name, level: D.scavLvl(s.xp), job: s.job, scav: Math.round(s.xp), looted: SV.stats.runs, kills: SV.stats.kills, extra: { look: s.look, trader: traderLevel(), quests: SV.trader.completed, secrets: SV.stats.secrets, cosmetics: Object.keys(s.wardrobe.own).length } }); } catch (e) { /* offline */ }
+    try { NET.publish({ name: s.name, level: D.survLvl(s.xp), job: s.job, scav: Math.round(s.xp), looted: SV.stats.runs, kills: SV.stats.kills, extra: { look: s.look, trader: traderLevel(), quests: SV.trader.completed, secrets: SV.stats.secrets, cosmetics: Object.keys(s.wardrobe.own).length } }); } catch (e) { /* offline */ }
   }
   Game.onLevel = () => publish();
   // a newer release on the site: save, then reload once (no loop: one try per version per tab session)

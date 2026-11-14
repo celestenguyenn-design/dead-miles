@@ -682,6 +682,7 @@
     const g = House().G, sh = S.sh; if (sh.over) return; sh.over = true;
     const kills = g.stats.kills, def = B.defense();
     B.recordShift(S.week, kills, def);
+    if (DM.Skills) DM.Skills.addXP(down ? 4 : 8);   // 0.13: a watch shift is worth a little XP on top of the kills
     g.paused = !down;
     const st = SV().horde.weeks[S.week], n = H.next();
     const card = () => {
