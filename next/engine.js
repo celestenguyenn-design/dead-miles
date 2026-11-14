@@ -28,6 +28,27 @@ window.DM = window.DM || {};
         this.ac = new AC(); this.master = this.ac.createGain(); this.master.gain.value = .5; this.master.connect(this.ac.destination);
         const n = this.ac.sampleRate; this.nb = this.ac.createBuffer(1, n, n); const d = this.nb.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
       } catch (e) { this.ac = null; }
+      this.loadZ();
+    },
+    // 0.24.2 (owner: "that does not sound like zombies" -> picked prototype #5, the snarl): plain zombies now use a small
+    // bank of pre-rendered growls in that style (mockups/groans/bank.py), one mono sprite next/sfx/zombie.mp3 (~127 KB):
+    // 4 snarls (a zombie that spots you) + 6 longer groans. [kind, start s, length s]. The synth voices stay as the fallback
+    // until the file is in, and for the runner's pant, the bloater's gurgle, the screamer's wail and the turkey.
+    ZB: null, zLoading: false, zTries: 0,
+    ZCLIPS: [['snarl', .25, 1.05], ['snarl', 1.55, .95], ['snarl', 2.75, 1.15], ['snarl', 4.15, .85], ['groan', 5.25, 1.55], ['groan', 7.05, 1.75], ['groan', 9.05, 1.35], ['groan', 10.65, 1.65], ['groan', 12.55, 1.25], ['groan', 14.05, 1.45]],
+    loadZ() {
+      if (this.ZB || this.zLoading || !this.ac || this.zTries >= 3 || typeof fetch !== 'function') return;
+      this.zLoading = true; this.zTries++;
+      const v = typeof NEXT_VERSION !== 'undefined' ? NEXT_VERSION : '1';
+      fetch('sfx/zombie.mp3?v=' + v).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+        .then(b => new Promise((res, rej) => { const p = this.ac.decodeAudioData(b, res, rej); if (p && p.then) p.then(res, rej); }))
+        .then(buf => { this.ZB = buf; }).catch(() => { /* synth voices carry on */ }).then(() => { this.zLoading = false; });
+    },
+    zclip(t, out, kind, v, r) {
+      const L = this.ZCLIPS.filter(c => c[0] === kind), c = L[v % L.length], a = this.ac;
+      const s = a.createBufferSource(), g = a.createGain(); s.buffer = this.ZB; s.playbackRate.value = r; g.gain.value = kind === 'snarl' ? 1.25 : 1.05;
+      s.connect(g); g.connect(out); const off = Math.max(0, c[1] - .02), d = c[2] + .04; s.start(t, off, d);
+      return t + d / r;
     },
     noise(dur, type, f0, f1, g, q = 1, when = 0) {
       const a = this.ac; if (!a) return; const t = a.currentTime + when;
@@ -82,6 +103,7 @@ window.DM = window.DM || {};
       this.gAct = this.gAct.filter(e => e > now);
       if (!o.force) { if (this.gAct.length >= 2) return false; if (!o.snarl && now - this.gLast < .45) return false; }
       const gain = o.gain == null ? 1 : Math.max(0, Math.min(1, o.gain)), pan = Math.max(-1, Math.min(1, o.pan || 0)), k = o.kind || '';
+      this.loadZ();
       let r = o.rate || (.88 + Math.random() * .24);
       if (k === 'armored') r *= .82; else if (k === 'krampus') r *= .62; else if (o.boss) r *= .75;
       const v = o.v != null ? o.v % 4 : Math.floor(Math.random() * 4), V = this.VOW, fs = Math.sqrt(r);
@@ -100,6 +122,8 @@ window.DM = window.DM || {};
         end = t + .45;
       } else if (k === 'runner' && !o.snarl) {   // a raspy pant: four quick breaths, in and out
         for (let i = 0; i < 4; i++) end = this.vox(t + i * .27, out, { dur: .2, f: [[0, 175 * r], [1, 150 * r]], A: i % 2 ? V.ae : V.a, B: V.uh, fs, breath: 1.3, saw: .35, peak: .55, atk: .04, vib: 9 });
+      } else if (o.snarl && this.ZB && k !== 'runner' && k !== 'bloater' && k !== 'screamer') {
+        end = this.zclip(t, out, 'snarl', Math.floor(Math.random() * 4), Math.min(1.12, Math.max(.6, r)));
       } else if (o.snarl) {
         const S = k === 'runner' ? { dur: .55, f: [[0, 210 * r], [.3, 270 * r], [1, 150 * r]], trem: [28, .5] }
           : k === 'bloater' ? { dur: .9, f: [[0, 95 * r], [.3, 120 * r], [1, 70 * r]], trem: [13, .8] }
@@ -110,6 +134,8 @@ window.DM = window.DM || {};
         end = this.vox(t, out, { dur: 1.4, f: [[0, 64 * r], [.5, 72 * r], [1, 52 * r]], A: V.uh, B: V.o, fs, breath: .5, grit: .7, trem: [11 + Math.random() * 3, .85], peak: .9, atk: .12 });
       } else if (k === 'screamer') {   // a thin wail (its shriek is separate)
         end = this.vox(t, out, { dur: 1.2, f: [[0, 230 * r], [.4, 262 * r], [1, 170 * r]], A: V.ee, B: V.ae, fs, breath: .35, peak: .6, atk: .15, vib: 6.5 });
+      } else if (this.ZB) {
+        end = this.zclip(t, out, 'groan', (o.v != null ? o.v : 0) + Math.floor(Math.random() * 6), Math.min(1.1, Math.max(.6, .5 + r * .5)) * (k === 'armored' || o.boss ? .9 : 1));
       } else {
         const G = [
           { dur: 1.5, f: [[0, 90 * r], [.5, 78 * r], [1, 62 * r]], A: V.o, B: V.u, breath: .25, atk: .25 },                 // moan

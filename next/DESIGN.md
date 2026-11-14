@@ -560,3 +560,10 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - A bow with no arrows (quiver + pack) is swung as a club: "Bow bash", 15 dmg (x quality/skills), fists timing, reach 1.3, no
   bow wear; a one-time toast "Out of arrows - bashing with the bow".
 - The weapon swap sheet always offers Fists when she holds a weapon: the weapon goes back into the pack (needs a free slot).
+
+## Done in 0.24.2 (owner on the synth groans: "that does not sound like zombies" -> picked prototype #5, the snarl)
+- Plain zombies (and armored / bosses) now groan and snarl from a pre-rendered bank in the #5 style: vocal-fry growl source
+  (jittered glottal pulses + period doubling), pulse-gated rasp, sliding vowel formants, hard throat drive
+  (mockups/groans/growl.py + bank.py). One mono sprite next/sfx/zombie.mp3 (~127 KB): 4 snarls + 6 groans, loaded after the
+  first tap, played through the same positional chain (distance gain, pan, wall muffle), pitch varied per zombie.
+- The synth voices stay as the fallback until the file is in, and for the runner pant, bloater gurgle, screamer wail, turkey.
