@@ -313,8 +313,11 @@
       } else if (s.type === 'rug') {
         const R = rugRect(s), B = boardRect(s), onRug = p.x > R.x - 12 && p.x < R.x + R.w + 12 && p.y > R.y - 12 && p.y < R.y + R.h + 12;
         if (gate && s.st === 0 && onRug) out.push({ obj: s, act: 'Move', name: 'rug', rect: { x: p.x - 4, y: p.y - 4, w: 8, h: 8 }, noise: 1.5, dur: 1.3, secret: true, done: () => moveRug(s) });
-        if (s.st === 1) out.push({ obj: s, act: 'Pry', name: 'floorboard', rect: B, noise: 3.5, dur: 2.5, secret: true, done: () => pryBoard(s) });
-        if (s.st === 2 && s.loot0 && s.loot0.length) out.push({ obj: s, act: 'Open', name: 'Floor cache', rect: B, secret: true });
+        // Once the rug is moved the board can be worked from anywhere on the rug: in some houses the
+        // loose board sat partly under furniture where she could not stand, so prying never worked.
+        const atMe = { x: p.x - 4, y: p.y - 4, w: 8, h: 8 };
+        if (s.st === 1 && onRug) out.push({ obj: s, act: 'Pry', name: 'floorboard', rect: atMe, noise: 3.5, dur: 2.5, secret: true, done: () => pryBoard(s) });
+        if (s.st === 2 && s.loot0 && s.loot0.length && onRug) out.push({ obj: s, act: 'Open', name: 'Floor cache', rect: atMe, secret: true });
       } else if (s.type === 'attic') {
         const H = { x: px(s.hatch.x), y: px(s.hatch.y) }, O = { x: px(s.hole.x), y: px(s.hole.y) };
         const near = Math.hypot(p.x - H.x, p.y - H.y) < .75 * T, hr = { x: H.x - 10, y: H.y - 6, w: 20, h: 12 };

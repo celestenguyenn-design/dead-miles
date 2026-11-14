@@ -63,6 +63,10 @@ jobs:
           cp index.html style.css art.js street.js s2art.js s2.js s2house.js game.js sw.js icon.png icon-192.png icon-512.png icon-maskable-512.png manifest.json README.md _site/
           grep -o "const VERSION='[0-9.]*'" game.js | grep -o '[0-9.]*' > _site/version.txt
           cat _site/version.txt
+          # The new Dead Miles, in preview at /next/. Self-contained; the game above is untouched.
+          cp -r next _site/next
+          rm -f _site/next/*.md _site/next/nettest.html
+          ls _site/next
       - uses: actions/download-artifact@v4
         with:
           name: apk
