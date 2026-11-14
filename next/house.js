@@ -214,7 +214,7 @@
   // lamp post): top edge, bottom edge, and how wide its base is.
   const outCache = {};
   function drawnBox(f) {
-    const k = f.art + ':' + f.tw + 'x' + f.th + ':' + f.H;
+    const k = f.art + ':' + f.tw + 'x' + f.th + ':' + f.H + (f.car ? ':' + f.car.half + f.car.flip : '') + (f.vert ? ':v' : '') + (f.table ? ':t' : '');
     if (outCache[k]) return outCache[k];
     let o = { top: ART.geo(f).ty0 - f.y, bot: f.h, l: 0, r: f.w };
     try {
