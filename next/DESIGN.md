@@ -631,6 +631,14 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Deck the base (gacha.js, home card while the event runs): counts that event's decor placed at the base (SV.base.decor).
   2 / 5 / 8 placed -> 2 tokens + 40 caps / 3 tokens + 80 caps / ev.deckCos + 100 caps; SV.deck['<id>-<year>'] = claimed.
 
+## Done in 0.26.1 (owner: "Decorate should have a rotate not just a turn")
+- Decor edit bar: Rotate (quarter turn: front, side, back, other side) + Turn (mirror). Placed decor: r = facing 0-3,
+  m = mirrored, rv 2 (old saves: a 'flip' piece with r 1 becomes m 1). Side-on (r 1/3) turns the footprint of long pieces
+  (any non-wall piece now, not only rot 'swap'). Wall pieces only mirror.
+- Art (base.js): side views F.<art>S (armchair, sofa, bookshelf, bench, flower box, hay bale), back views F.<art>B
+  (armchair, sofa, bookshelf, gnome, scarecrow, snowman). Pieces without one: round ones mirror, the table draws itself in
+  the turned footprint. Facing 3 = facing 1 mirrored.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
