@@ -567,3 +567,8 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   (mockups/groans/growl.py + bank.py). One mono sprite next/sfx/zombie.mp3 (~127 KB): 4 snarls + 6 groans, loaded after the
   first tap, played through the same positional chain (distance gain, pan, wall muffle), pitch varied per zombie.
 - The synth voices stay as the fallback until the file is in, and for the runner pant, bloater gurgle, screamer wail, turkey.
+
+## Done in 0.24.3 (owner: "make it so that we can't get the same blueprints")
+- D.pickBP: every blueprint roll (loot tables, jackpots, deep runs, route caches, crates) skips blueprints she already knows,
+  carries (pack/stash/hands/run pack) or rolled in the last 30 min (no two of the same in one house). All known -> a pocket
+  watch. One rnd() per roll either way (seeded daily house stays in step). Dot's shop and quest rewards skip carried ones too.
