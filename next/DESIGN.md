@@ -206,3 +206,22 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   wallpaper colour + pattern, front brick, and 12 rug colourways x 4 patterns. The secret rug uses the same set, so it
   no longer stands out as "the red rug". Visual only. Base and tutorial keep the default look.
 - Second step correction for celeste on 2026-11-13 (c1113b): an older duplicate shortcut posted phone + ring until 23:51.
+
+## Done in 0.14 (floor plans, owner: "The layouts all look the same. It'll get boring quick.")
+- Generator v4 (GV 4, unstarted houses upgrade; a house with a run in progress keeps its layout). gen.js plan4 picks one of
+  several believable floor plans per building type, then mirrors it half the time:
+  - Rowhouses: side hall (kitchen band at the back, or not), centre hall, railroad (walk-through rooms, small rooms off
+    the side), open plan (kitchen + living in one front room, with a cross hall, side hall or rooms straight off it),
+    L-shaped hall, living room at the front with the hall behind. Sometimes a front porch and/or a back strip
+    (sunroom, laundry, pantry...).
+  - Apartments: studio (with or without an entry hall), corridor, walk into the living room, 2-bed with open kitchen,
+    galley kitchen.
+  - Shops: back rooms off a side hall, off a back corridor, straight off the shop floor, or a corner nook in the shop.
+  - School / police: centre spine, cross corridor, twin side halls.
+  - Mansion: central hall, foyer + gallery + two wings, grand foyer with rooms off it, rooms around a courtyard.
+- Rooms are assigned by size and number of doors (baths, closets, pantries never walk-through). New optional rooms
+  reuse existing art and loot tables: Kitchen & living, Studio, Front porch, Mudroom, Pantry, Laundry room, Kids' room,
+  Half bath, Den, Sunroom, Courtyard. Furniture comes in a seeded order with a few optional extras, and about a third of
+  rooms put their wall pieces along any wall, so the same room kind is not furnished the same way.
+- Same 0.9 guarantees (all checked again: 301 houses, nothing unreachable, nothing standing inside solids). Generator
+  v1-3 output is byte-identical. Random rolls are never made inside a sort (engines sort differently).
