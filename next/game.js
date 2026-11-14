@@ -179,13 +179,15 @@ const NEXT_VERSION = '0.8';
     const seq = SV.houseSeq++;
     const seed = D.hashStr(SV.seedBase + ':' + seq);
     const type = pickType(w, D.mulberry32(seed ^ 0x9e3779b9));
-    const L = layoutOf({ type, seed });
-    SV.houses.push({ id: 'h' + seq, type, seed, day: day || SV.day.key, status: 'new', address: L.address, danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies });
+    const L = layoutOf({ type, seed, gv: GV });
+    SV.houses.push({ id: 'h' + seq, type, seed, gv: GV, day: day || SV.day.key, status: 'new', address: L.address, danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies });
   }
   const cache = new Map();
+  const GV = 2;   // 0.9: generator version for newly scouted houses (older houses keep the layout they were scouted with)
+  Game.GV = GV;
   function layoutOf(h) {
-    const k = h.type + ':' + h.seed;
-    if (!cache.has(k)) cache.set(k, h.type === 'tutorial' ? DM.Gen.tutorial() : DM.Gen.generate(h.type, h.seed));
+    const k = h.type + ':' + h.seed + ':' + (h.gv || 1);
+    if (!cache.has(k)) cache.set(k, h.type === 'tutorial' ? DM.Gen.tutorial() : DM.Gen.generate(h.type, h.seed, { gv: h.gv || 1 }));
     return cache.get(k);
   }
   Game.layoutOf = layoutOf;
@@ -335,7 +337,7 @@ const NEXT_VERSION = '0.8';
     if (type === 'clear' || type === 'fetch') {
       const types = D.QUEST_HOUSE[tier]; q.htype = types[Math.floor(rnd() * types.length)];
       q.seed = D.hashStr(SV.seedBase + ':' + q.id); q.away = Math.round((800 + tier * 900 + rnd() * 600) / 100) * 100;
-      q.addr = layoutOf({ type: q.htype, seed: q.seed }).address;
+      q.gv = GV; q.addr = layoutOf({ type: q.htype, seed: q.seed, gv: GV }).address;
     }
     q.reward = { caps: 10 + tier * 12, xp: tier * 8 };
     return q;
@@ -349,7 +351,7 @@ const NEXT_VERSION = '0.8';
     T.active.push(q);
     if (q.type === 'clear' || q.type === 'fetch') {
       q.base = SV.walked || 0;
-      SV.houses.push({ id: 'q-' + q.id, quest: q.id, type: q.htype, seed: q.seed, day: SV.day.key, status: 'far', address: q.addr, danger: D.BTYPES[q.htype].danger, ...(() => { const L = layoutOf({ type: q.htype, seed: q.seed }); return { nLocks: L.nLocks, nZombies: L.nZombies }; })() });
+      SV.houses.push({ id: 'q-' + q.id, quest: q.id, type: q.htype, seed: q.seed, gv: q.gv || 1, day: SV.day.key, status: 'far', address: q.addr, danger: D.BTYPES[q.htype].danger, ...(() => { const L = layoutOf({ type: q.htype, seed: q.seed, gv: q.gv || 1 }); return { nLocks: L.nLocks, nZombies: L.nZombies }; })() });
       revealQuestHouses();
     }
     Game.save(); SFX.play('pick'); toast('Quest taken: ' + D.QUESTS[q.type].n, 1.6);
