@@ -569,7 +569,9 @@
         for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) { const x = tx + dx, y = ty + dy; if (x < 0 || y < 0 || x >= MW || y >= MH || solidCell[y * MW + x]) continue; const d = Math.hypot((x + .5) * T - wx, (y + .5) * T - wy); if (d < bd) { bd = d; bc = [x, y]; } }
         if (!bc || bd > T * 1.2) return; [tx, ty] = bc;
       }
-      p.auto = { gx: tx, gy: ty, px: wx, py: wy, field: bfs(tx, ty), t: 0 };
+      const field = bfs(tx, ty), [mx, my] = cellOf(p);
+      if (field[my * MW + mx] < 0) { toast('No way through from here', 1.2); return; }   // 0.9: e.g. inside a room that is still locked
+      p.auto = { gx: tx, gy: ty, px: wx, py: wy, field, t: 0 };
       G.tapMark = { x: wx, y: wy, t: 0 };
     }
   }
@@ -592,7 +594,9 @@
     const tgt = st.same ? { x: a.px, y: a.py } : st;
     const dx = tgt.x - p.x, dy = tgt.y - p.y, d = Math.hypot(dx, dy);
     if (st.same && d < 5) { p.auto = null; if (a.it && rectDist(p.x, p.y, a.it.rect) <= 44) startSearch(a.it); return null; }
-    if (a.t > 9) { p.auto = null; return null; }
+    // 0.9: long walks across a big house no longer give up after 9 s; she stops only if she is truly stuck
+    if (!a.chk || a.t - a.chk.t > 1.2) { if (a.chk && Math.hypot(p.x - a.chk.x, p.y - a.chk.y) < 4) { p.auto = null; return null; } a.chk = { t: a.t, x: p.x, y: p.y }; }
+    if (a.t > 40) { p.auto = null; return null; }
     return { x: dx / (d || 1), y: dy / (d || 1), m: st.same ? Math.min(1, d / 20 + .35) : 1, run: false };
   }
 
