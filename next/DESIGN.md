@@ -713,6 +713,15 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   beforeinstallprompt fires; Samsung Internet menu). iPhone warns the home-screen app keeps its own save. "Continue in
   the browser instead" (per session; iPhone asks to confirm). The tour's setup also starts with it when still needed.
 
+## Done in 0.26.10
+- Strays (owner: "we cant approach slowly because its auto run"): a normal walk no longer scares them (limit 1.9 -> 3.2
+  tiles/s; running, swinging and dodging still do), and within 4.2 tiles of a hiding stray she cannot run (crew.js sets
+  G.calmUntil, house.js checks it). Hints now say "just walk up to it".
+- Brass keys (owner: "brass keys have 0 use so far"): GV 5 (newly scouted + not-yet-started houses; the daily stays GV 4)
+  has more locked rooms (20% default; mansion/police 50%, pharmacy 35%, school 30%) and parked cars (32%); placement still
+  fails sometimes (rowhouses measured 13% rooms, 18% cars). House cards tag "🔑 locked room (· key inside)" and
+  "🔑 locked car". The key's item tag says what it opens.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
