@@ -805,6 +805,7 @@ way[building]->.b;.b out skel geom qt;
         li(em('📦'), `<b>Supply crates:</b> 3 a day at real places nearby. Walk to one to grab it. After 300 m walked an <b>air drop</b> lands, but only for 20 minutes.`),
         li(em('📻'), `<b>Radio calls:</b> a survivor names a place and a time limit. Get there in time for caps, XP and supplies.`),
         li(em('🚚'), `<b>Dot's deliveries:</b> pick up a package at one place, carry it to another.`),
+        li(em('🪖'), `<b>Strange places:</b> army checkpoints, crashed helicopters, survivor camps, zombie nests and more sit next to real buildings. They move every Monday. Up to 8 a day, so it never turns into a chore.`),
         li(em('🌫️'), `<b>Fog:</b> the map is foggy where you have never walked. Clearing it gives XP and small finds.`),
         li(em('🚶'), `<b>Pocket mode</b> (walking button, top right): a dark, battery-saving screen so you can walk with the phone in your pocket. Keep the screen on.`)]],
     ];

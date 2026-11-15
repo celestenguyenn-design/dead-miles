@@ -309,4 +309,5 @@ window.DM = window.DM || {};
     if (s.active && s.active.pt) mark(x, SX(wx(s.active.pt.lon)), SY(wy(s.active.pt.lat)), '❓', '#b98cf0', t, QUESTS[s.active.q].title);
   };
   Q._st = st; Q.QUESTS = QUESTS; Q.ENC = ENC;   // tests
+  Q.ui = { dlg, close, head, resultCard, choose, payout, hurt };   // 0.43: map points of interest (mappoi.js) reuse the dialogs
 })();

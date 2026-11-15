@@ -990,6 +990,16 @@ either more things to craft, more storage or stacks, and reduce certain drop per
 - crew.js: on watch shifts and base raids every fed crew member is in the yard fighting (R.fighters, roam: chase any
   zombie within 7 tiles; guards x1.5, medics heal once). Guard defence on horde night is unchanged.
 
+## Done in 0.43.0 (owner: "add army checkpoints or some unrealistic things to the map ... a lot more things to walk to
+... unlimited things to do but not so much it's a job")
+- mappoi.js (DM.MapPOI): ~1 in 14 real map places gets a made-up point of interest next to it, chosen by hash(place id
+  + Monday week key) - fixed for the week, the same for friends, reshuffled on Mondays. 9 kinds (KINDS, weights):
+  army checkpoint, survivor camp (rest +30 HP), vending machine, abandoned ambulance, quarantine tent, crashed
+  helicopter*, zombie nest* (marks a danger house on the list, or burn it), radio tower* (clears ~260 m of fog), weapons
+  cache* (a Solid/Fine weapon). * = once a week, others once a day. 8 a day max, then "done exploring for today".
+  Two choices each, outcomes seeded (MapQ.ui dialogs). Nearest one shown on the map card; used ones fade.
+- mapfx give() merges duplicate items in reward text. Map guide page 3 mentions them.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
