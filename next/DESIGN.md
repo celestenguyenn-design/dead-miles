@@ -931,6 +931,13 @@ people should be able to click a ? for help if they somehow skip it")
   Silencer (ranged: gun noise x0.4). Fit from the pack/stash item popup; the old mod goes to the stash. Shown in
   Gear > Equipped. Grip + nails known by everyone (BASIC + migrate); scope / silencer by blueprint, and as rare loot.
 
+## Done in 0.37.0 - 7 of 12: a crew member on runs
+- crew.js: one crew member can be marked m.mate ("Take on runs" in the crew sheet). In 'house' runs (normal + deep)
+  R.mate follows her (like the pet), walks to and swings at the nearest zombie near her (16 + 3/level, guards x1.5,
+  1.1 s cooldown, via House.hurtZombie so kills count). Medic: heals 12 + 3/level once per run under 40% HP.
+  Scavenger: +10% (+2%/level) extra-find chance (house.js extraChance). Hungry members stay home. Drawn with a bat
+  and a green name tag. Pets still come along as before (one pet + one crew member).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
