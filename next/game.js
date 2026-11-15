@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.28.6';
+const NEXT_VERSION = '0.28.7';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -240,20 +240,32 @@ const NEXT_VERSION = '0.28.6';
   const LM_DAY = 3;
   function lmState() { const m = SV.map = SV.map || { day: '', n: 0, ids: [] }; if (m.day !== SV.day.key) { m.day = SV.day.key; m.n = 0; } m.ids = m.ids || []; return m; }
   Game.landmarkKey = raw => String(D.hashStr(SV.seedBase + ':lm:' + raw));
+  // 0.28.7 (owner: "bigger better loots should replace the rowhouses" - automatically): with today's 3 landmarks
+  // found, reaching a better place swaps out the weakest one not started yet (status new, no run in progress)
+  const LM_RANK = { police: 9, mansion: 9, school: 8, pharmacy: 8, garage: 6, bodega: 5, apt: 4, laundro: 4, rowL: 3, rowS: 2 };
+  const lmRank = t => LM_RANK[t] || 1;
+  Game.landmarkRank = lmRank;
+  const lmVictim = type => { const r = lmRank(type); let v = null;
+    for (const h of SV.houses) if (h.landmark && h.day === SV.day.key && h.status === 'new' && !h.run && !h.quest && !h.npcq && lmRank(h.type) < r && (!v || lmRank(h.type) < lmRank(v.type))) v = h;
+    return v; };
+  Game.landmarkUpgrade = type => { rollDay(); return lmState().n >= LM_DAY ? lmVictim(type) : null; };
   Game.landmarkLeft = () => { rollDay(); return Math.max(0, LM_DAY - lmState().n); };
   Game.landmarkHave = key => lmState().ids.includes(key);
   Game.addLandmark = pl => {   // pl: { key, type, name, street }
     rollDay(); const m = lmState();
     if (m.ids.includes(pl.key)) return 'dup';
-    if (m.n >= LM_DAY) return 'cap';
+    let victim = null;
+    if (m.n >= LM_DAY) { victim = lmVictim(pl.type); if (!victim) return 'cap'; }
     if (!D.BTYPES[pl.type] || !D.BTYPES[pl.type].w) return 'bad';
     const seq = SV.houseSeq++, seed = D.hashStr(SV.seedBase + ':lmh:' + pl.key);
     const name = String(pl.name || D.BTYPES[pl.type].n).slice(0, 40), street = String(pl.street || '').slice(0, 40);
     const h = { id: 'lm' + seq, type: pl.type, seed, gv: GV, day: SV.day.key, status: 'new', landmark: 1, address: name + (street && street !== name ? ' · ' + street : '') };
     const L = layoutOf(h); Object.assign(h, { danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies });
-    SV.houses.push(h); m.n++; m.ids.push(pl.key); if (m.ids.length > 300) m.ids.splice(0, m.ids.length - 300);
+    h.lmKey = pl.key;
+    if (victim) { SV.houses = SV.houses.filter(x => x !== victim); Game.lastReplaced = victim.address; } else m.n++;
+    SV.houses.push(h); m.ids.push(pl.key); if (m.ids.length > 300) m.ids.splice(0, m.ids.length - 300);
     Game.save(); if (!DM.scene) renderHome();
-    return 'ok';
+    return victim ? 'upgrade' : 'ok';
   };
   Game.layoutOf = layoutOf;
   // 0.21 route: the daily route map (route.js) adds the house a stop leads to, and trades in one of today's scouted ones
@@ -1674,7 +1686,7 @@ const NEXT_VERSION = '0.28.6';
     ['Weapons & equipping', 'The weapon in your hand is what you fight with. At home: Gear > Backpack or Stash > tap a weapon > Equip. In a house: tap the Swap button (bottom right) to pick any weapon in your pack. Weapons wear out - repair them with scrap. Zombies hear noise; you can run (push the stick far) and dodge.'],
     ['Cosmetics & wardrobe', 'Cosmetics are earned: rare finds in houses and on zombies, better in mansions and police stations, plus Dot\'s shop and jobs, horde-night crates and events. They unlock straight into your Wardrobe and never use pack space. Wardrobe (home screen) > tap one to wear it. Spares are sold to Dot automatically.'],
     ['Food & water', 'Two bars under your HP: Hunger (drumstick) and Thirst (droplet). They drain with real time, even while the app is closed - about one and a half meals and two or three drinks a day - and a little faster during runs (sprinting and fighting most). Tap the bars, or a food in Gear > Backpack / Stash (or Gear > Equipped > Eat & drink), to eat or drink: beans and pie fill Hunger, water and soda fill Thirst, cranberry sauce and tomatoes a bit of both, coffee gives stamina. Garden crops are food, and a rain barrel at the base gives a drink (+50 thirst). Below 30: Hungry means slower stamina and no overnight healing; Thirsty means slower searches and max stamina 80. At 0 you lose 1 HP an hour, but never below 10 from hunger alone. Above 80 on both: +10% scavenging XP. Your crew eats from the stash separately.'],
-    ['Real-world map', 'Tap Map on the home screen: it is your real neighbourhood (OpenStreetMap), drawn like the game. Real places near you - a pharmacy, a corner store, the police station, a laundromat, a school, a gas station, some houses and apartment blocks - show up as round badges. Walk past one with the map open: when you get within about 35 m it glows, and you scout it as a bonus landmark house in your list, with its real name. Up to 3 a day, on foot only (it ignores you while you are moving faster than about 30 km/h), and you have to be walking: once you have walked about 80 m with the map open (any direction), every place counts - walk up to one and it is yours. The card at the bottom shows how many you found today and points to the nearest place. Tap ? on the map for a reminder. Your phone asks for your location only while the map is open; your position is never saved or sent to the game server. Streets you have seen before show up instantly, even offline. No location or no signal? The rest of the game works the same.'],
+    ['Real-world map', 'Tap Map on the home screen: it is your real neighbourhood (OpenStreetMap), drawn like the game. Real places near you - a pharmacy, a corner store, the police station, a laundromat, a school, a gas station, some houses and apartment blocks - show up as round badges. Walk past one with the map open: when you get within about 35 m it glows, and you scout it as a bonus landmark house in your list, with its real name. Up to 3 a day, on foot only (it ignores you while you are moving faster than about 30 km/h), and you have to be walking: once you have walked about 80 m with the map open (any direction), every place counts - walk up to one and it is yours. Once you have 3, a better place you reach (police station or mansion, then school or pharmacy, auto shop, bodega, apartments or laundromat, rowhouse) automatically replaces your weakest one you have not gone into yet. The card at the bottom shows how many you found today and points to the nearest place. Tap ? on the map for a reminder. Your phone asks for your location only while the map is open; your position is never saved or sent to the game server. Streets you have seen before show up instantly, even offline. No location or no signal? The rest of the game works the same.'],
     ['Base & farming', 'Your base is built with steps (the same steps also scout houses). Build walls, a gate, traps and garden beds; decorate with furniture you find. Plant seeds, water them with steps each day, and harvest real food. The stash chest lives here.'],
     ['Horde night', 'Every Sunday 9 PM New York time a horde hits. In the 24 hours before, do a watch shift (a 2-3 minute defence) - every kill thins the horde for your whole party. Strong bases hold and pay out a crate; weak ones lose something you repair with steps. Skip the shift and you get nothing.'],
     ['Seasonal events', 'Holidays switch on by themselves: Thanksgiving (from two weeks before to the Tuesday after) and Christmas (Dec 11 - Jan 2). Events bring holiday loot, a mini-boss in about 1 in 3 houses, a chain of event jobs from Dot, holiday capsules in the capsule machine, holiday decor and once-a-year cosmetics. Thanksgiving also has the Black Friday horde: a bigger Sunday horde with better crates.'],
