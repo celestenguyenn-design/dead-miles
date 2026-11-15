@@ -68,6 +68,8 @@ window.DM = window.DM || {};
     mod_scope: { n: 'Scope', i: 'mod_scope', mod: 'ranged', tag: 'ranged mod: aims 40% further, +10% damage' },
     mod_silencer: { n: 'Silencer', i: 'mod_silencer', mod: 'ranged', tag: 'ranged mod: guns 60% quieter' },
     knuckles: { n: 'Brass knuckles', i: 'knuckles', w: 'knuckles', tag: 'fast punches' },
+    pipegun: { n: 'Pipe pistol', i: 'pipegun', w: 'pipegun', tag: 'homemade - shoots 9mm rounds, loud' },   // 0.42: a use for all that 9mm
+    baton: { n: 'Shock baton', i: 'baton', w: 'baton', tag: 'zaps and stuns - runs on batteries' },        // 0.42: a use for batteries
     turkeysq: { n: 'Squeaky turkey', i: 'turkeysq', w: 'turkeysq', tag: 'SQUEAK. knocks them back' },
     xlights: { n: 'Light-string whip', i: 'xlights', w: 'xlights', tag: 'long reach, hits a wide arc' },
     pan: { n: 'Frying pan', i: 'pan', w: 'pan', tag: 'BONK - dazes them' },
@@ -150,6 +152,9 @@ window.DM = window.DM || {};
     armor_pad: { out: ['armor_pad', 1], in: { cloth: 5, tape: 2 }, n: 'Padded jacket (armor, -10% damage)' },   // 0.28
     bow: { out: ['bow', 1], in: { wood: 3, cloth: 2, tape: 1 }, n: 'Hunting bow' },   // 0.29.2: hunters know it from the start
     knuckles: { out: ['knuckles', 1], in: { scrap: 3, tape: 1 }, n: 'Brass knuckles' },   // 0.30: everyone knows it
+    pipegun: { out: ['pipegun', 1], in: { scrap: 6, tape: 2, wood: 1 }, n: 'Pipe pistol (shoots 9mm)' },   // 0.42: everyone knows it
+    baton: { out: ['baton', 1], in: { scrap: 3, battery: 4, tape: 1, cloth: 2 }, n: 'Shock baton (uses batteries)' },   // 0.42: everyone knows it
+    bandage2: { out: ['bandage', 5], in: { cloth: 5, tape: 1 }, n: 'Bandage roll (5 bandages)' },   // 0.42: a use for piles of cloth
     xlights: { out: ['xlights', 1], in: { battery: 2, cloth: 1, tape: 2 }, n: 'Light-string whip' },
     nailgun: { out: ['nailgun', 1], in: { scrap: 6, battery: 2, tape: 2 }, n: 'Nail gun (shoots nails)' },
     shells: { out: ['shells', 6], in: { scrap: 2, ammo: 4 }, n: 'Shotgun shells' },
@@ -158,7 +163,7 @@ window.DM = window.DM || {};
     mod_scope: { out: ['mod_scope', 1], in: { scrap: 3, tape: 1, battery: 1 }, n: 'Scope (ranged mod)' },
     mod_silencer: { out: ['mod_silencer', 1], in: { scrap: 4, cloth: 2, tape: 1 }, n: 'Silencer (ranged mod)' },
   };
-  D.BASIC = ['bandage', 'lockpick', 'knuckles', 'mod_grip', 'mod_nails'];
+  D.BASIC = ['bandage', 'lockpick', 'knuckles', 'mod_grip', 'mod_nails', 'pipegun', 'baton', 'bandage2'];
   // ---------------------------------------------------------------- 0.15: item categories (shown on pack / stash / loot cards)
   // owner: "inventory items should tell us 'materials' like for crafting or should be 'sold' - there's a lot of random shit like paperbacks"
   D.CATS = {
@@ -273,7 +278,7 @@ window.DM = window.DM || {};
   };
   D.COS_POOL = { 'cos_*': [], 'cosZ_*': ['corpse'], 'cosP_*': ['police'], 'cosM_*': ['mansion'], 'cosH_*': ['horde'] };
   // what the trader pays (caps each); she sells for about 4x
-  D.VALUE = { mod_grip: 6, mod_nails: 8, mod_scope: 20, mod_silencer: 25, pistol: 60, shotgun: 75, nailgun: 30, shells: 2, knuckles: 14, turkeysq: 10, xlights: 12, pan: 10, armor_pad: 10, armor_sport: 14, armor_riot: 25, armor_plate: 35, beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
+  D.VALUE = { pipegun: 25, baton: 20, mod_grip: 6, mod_nails: 8, mod_scope: 20, mod_silencer: 25, pistol: 60, shotgun: 75, nailgun: 30, shells: 2, knuckles: 14, turkeysq: 10, xlights: 12, pan: 10, armor_pad: 10, armor_sport: 14, armor_riot: 25, armor_plate: 35, beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
     lockpick: 3, gift: 8, candy: 1, cranberry: 3, stuffing: 3, pie: 4, turkey: 20, hat: 0, pole: 2, watch: 25, jewelry: 20, wood: 1, nails: .25, spikedbat: 20, machete: 22, prybar: 14, packplus: 15, backpack: 40, shoes: 10, lockset: 18, note: 0, parcel: 0, antibio: 12 };
   Object.assign(D.VALUE, { seed_tomato: 2, seed_potato: 2, seed_carrot: 2, seed_corn: 3, seed_herbs: 2, tomato: 2, potato: 2, carrot: 2, corn: 2, herbs: 3, coffee: 2 });
   for (const k in D.DECOR) D.VALUE[k] = D.DECOR[k].v;
@@ -281,8 +286,8 @@ window.DM = window.DM || {};
   D.valueOf = (k, d, q) => { if (k.startsWith('bp_')) return 25; let v = D.VALUE[k] || 1; if (D.ITEMS[k] && D.ITEMS[k].w) { const e = { k, q }; v *= 1 + .25 * (D.qOf(e) - 2); if (d != null) v = Math.max(1, Math.round(v * (.3 + .7 * Math.min(1, d / D.wMax(e))))); } return v; };
   // how many fit in one slot (anything not listed does not stack)
   // 0.26.3 (owner: "the storage sucks too much ... make the stacks higher?"): about double, and sell junk stacks too
-  D.STACK = { shells: 40, gift: 5, candy: 10, seed_tomato: 20, seed_potato: 20, seed_carrot: 20, seed_corn: 20, seed_herbs: 20, tomato: 6, potato: 6, carrot: 6, corn: 6, herbs: 6, wood: 20, nails: 40, lockpick: 10, arrow: 30, cranberry: 6, stuffing: 6, pie: 6, water: 6, beans: 6, snack: 6, drink: 6, coffee: 6, bandage: 10, meds: 10, antibio: 5, ammo: 60, scrap: 20, cloth: 10, tape: 6, battery: 8,
-    book: 5, watch: 5, jewelry: 5, wrench: 3, turkey: 2 };
+  D.STACK = { /* 0.42 (owner: "we really need to work on the stashing ... an overload of batteries, cloth rags, 9mm"): bigger stacks */ shells: 80, gift: 5, candy: 10, seed_tomato: 60, seed_potato: 60, seed_carrot: 60, seed_corn: 60, seed_herbs: 60, tomato: 12, potato: 12, carrot: 12, corn: 12, herbs: 12, wood: 40, nails: 80, lockpick: 20, arrow: 30, cranberry: 6, stuffing: 6, pie: 6, water: 6, beans: 6, snack: 6, drink: 6, coffee: 6, bandage: 10, meds: 10, antibio: 5, ammo: 150, scrap: 40, cloth: 30, tape: 15, battery: 25,
+    book: 10, watch: 5, jewelry: 5, wrench: 3, turkey: 2 };
   // merge partial stacks of the same thing (old saves had smaller stacks); entries with durability / quality never merge
   D.mergeStacks = function (list) {
     if (!Array.isArray(list)) return list;
@@ -317,6 +322,8 @@ window.DM = window.DM || {};
     shotgun: { n: 'Shotgun', ranged: 1, gun: 'shells', dmg: 30, pellets: 5, spread: .2, wind: .16, strike: .06, rec: .62, dur: 70, noise: 10, spd: 24, life: .3 },
     nailgun: { n: 'Nail gun', ranged: 1, gun: 'nails', dmg: 22, wind: .06, strike: .04, rec: .16, dur: 140, noise: 2.2, spd: 20, life: .5 },
     // 0.30 goofy melee: kb = extra knockback, stun = extra daze (s), arc = swing width (default 1.35), squeak/bonk/zap = sound
+    pipegun: { n: 'Pipe pistol', ranged: 1, gun: 'ammo', dmg: 42, wind: .14, strike: .05, rec: .4, dur: 45, noise: 8, spd: 26, life: .42 },
+    baton: { n: 'Shock baton', dmg: 26, wind: .1, strike: .09, rec: .2, reach: 1.4, dur: 90, noise: 2.5, stun: .6, zap: 1 },
     knuckles: { n: 'Brass knuckles', dmg: 20, wind: .05, strike: .06, rec: .1, reach: 1.15, dur: 160, noise: 1.2 },
     turkeysq: { n: 'Squeaky turkey', dmg: 15, wind: .08, strike: .08, rec: .16, reach: 1.35, dur: 300, noise: 3.5, kb: 1.7, squeak: 1 },
     xlights: { n: 'Light-string whip', dmg: 25, wind: .14, strike: .12, rec: .24, reach: 2.3, dur: 80, noise: 2.5, arc: 2.3, zap: 1 },
@@ -465,6 +472,9 @@ window.DM = window.DM || {};
   D.LOOT.giftbox = [[2, 3], { candy: 3, snack: 2, meds: 1.2, battery: 1, ammo: 1, lockpick: 1, 'decor_*': .8, d_lights: .6, 'bp_*': .35, 'cos_*': .25 }];
   // the Black Friday horde crate: more, better, and a taste of the holiday
   D.LOOT.hordecrate_bf = [[5, 6], { 'decor_*': 1, 'seed_*': 1, ammo: 2, meds: 2.5, bandage: 2, scrap: 1.5, nails: 1.5, wood: 1.5, tape: 1, battery: 1, 'bp_*': 1.2, 'cosH_*': .7, turkey: .5, pie: 1.5, cranberry: 1, lockset: .3, backpack: .15 }, ['meds']];
+  // 0.42 (owner: "seeds should be more limited ... an overload of batteries, cloth rags, a ton of 9mm"): those turn up
+  // less often everywhere (seeds -60%, batteries -40%, 9mm -40%, cloth -30%); jackpots are unchanged
+  for (const t in D.LOOT) { const w = D.LOOT[t][1]; for (const [k, m] of [['seed_*', .4], ['battery', .6], ['ammo', .6], ['cloth', .7]]) if (w[k]) w[k] = +(w[k] * m).toFixed(3); }
   // 0.10: the one guaranteed prize in a key-locked room / car trunk (gen.js jackpots). Each entry: [weight, items].
   D.JACK = {
     gun: [[3, ['pistol', 'ammo', 'ammo']], [2, ['shotgun', 'shells', 'shells']], [2, ['ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo']], [1, ['machete']], [1, ['spikedbat']], [1, ['axe']], [1, ['cosP_*']], [1, ['lockset']]],   // 0.30: real guns
