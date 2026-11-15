@@ -673,7 +673,7 @@
     const keys = it.corpse ? (o.raider ? o.drop.slice() : EVS.isBoss(o) ? EVS.bossLoot(o.kind, D.cosOwned()) : rollLoot('corpse', lr).concat(o.special ? INF.loot(o.kind, lr) : [])) : o.pre.slice();   // 0.13: special infected carry more
     if (keys.length && lr() < extraChance()) { const more = rollLoot(it.corpse ? 'corpse' : o.loot, lr); if (more.length) keys.push(more[0]); }
     // 0.19: a higher gamestage finds a rare thing a little more often (up to +6%: one rare item from the same table) - not in the daily house (fair scores)
-    if (!G.dly && !it.corpse && o.loot && D.LOOT[o.loot] && Math.random() < gsFx().rare) for (let i = 0; i < 4; i++) { const r = rollLoot(o.loot).find(k => ITEMS[k] && ITEMS[k].rare); if (r) { keys.push(r); break; } }
+    if (!G.dly && !it.corpse && o.loot && D.LOOT[o.loot] && Math.random() < gsFx().rare + SK.rareBonus()) for (let i = 0; i < 4; i++) { const r = rollLoot(o.loot).find(k => ITEMS[k] && ITEMS[k].rare); if (r) { keys.push(r); break; } }
     o.loot0 = toStacks(keys, lr, qualFor(o, it));   // 0.19: weapon quality by place
     // A torn note remembers the house it came from, so reading it somewhere else is not misleading.
     for (const e of o.loot0) if (e.k === 'note') e.d = { addr: L.address, text: L.note || '' };
@@ -959,7 +959,7 @@
           if (z.dead || z.st === 'rise' && z.stT < .3) continue;
           const dx = z.x - p.x, dy = (z.y - p.y) * 1.15, d = Math.hypot(dx, dy);
           if (d > W.reach * T) continue;
-          if (d > 18 && Math.abs(angDiff(Math.atan2(dy, dx), fa)) > (W.arc || 1.35)) continue;
+          if (d > 18 && Math.abs(angDiff(Math.atan2(dy, dx), fa)) > (W.arc || 1.35) * SK.arcMul()) continue;   // 0.34: Bruiser Cleave
           hitZombie(z, fa, W.dmg * qMul() * (job() === 'brawler' ? 1.3 : 1) * SK.meleeMul()); any = true;   // 0.19: qMul = weapon quality
           if (W.kb) { z.kbx *= W.kb; z.kby *= W.kb; }                       // 0.30 squeaky turkey: sends them flying
           if (W.stun && !z.dead && z.st === 'hurt') z.stT = -W.stun;        // 0.30 frying pan: dazed a bit longer
@@ -977,7 +977,7 @@
   // by: 0.15 - a raider (raiders.js) hitting a zombie: no sneak bonus, no xp or kill count for her
   function hitZombie(z, fa, base = 34, ranged, by) {
     const sneak = !by && (z.st === 'sleep' || z.st === 'idle' || z.st === 'search' || (z.raider && (z.st === 'loot' || z.st === 'goto') && !z.aggro)) && z.kind !== 'turkey';
-    let dmg = Math.round(base * (sneak ? (job() === 'hunter' ? 1.6 : 1.45) : 1) + Math.random() * 4);
+    let dmg = Math.round(base * (sneak ? (SK.sneakMul() || (job() === 'hunter' ? 1.6 : 1.45)) : 1) + Math.random() * 4);   // 0.34: Tracker Silent kill x2
     if (z.raider) { RA.damage(z, dmg, fa, by || null, sneak); return; }
     if (by) { z.foe = by; if (z.st === 'idle' || z.st === 'investigate' || z.st === 'search' || z.st === 'sleep') { z.st = 'chase'; z.stT = 0; z.lostT = 0; } }
     else if (ranged && z.st !== 'chase') alertZombie(z, G.p.x, G.p.y, true);
@@ -1020,6 +1020,7 @@
     dmg = Math.round(dmg * (z && z.dmgMul || 1));
     if (DM.Armor) dmg = DM.Armor.hit(S(), dmg);   // 0.28: worn armor takes part of the hit (and wears)
     p.hp = Math.max(0, p.hp - dmg); p.inv = .7; p.flash = .55;
+    if (p.hp > 0 && !G.lastStand && SK.lastStand() && p.hp < maxHp() * .25) { G.lastStand = 1; p.hp = Math.min(maxHp(), p.hp + 25); toast('Last stand! +25 HP', 1.6); SFX.play('alert'); }   // 0.34: Bruiser
     p.kbx = dx * 6 * T; p.kby = dy * 6 * T * .8;
     p.st = 'hurt'; p.stT = 0;
     G.shake = 12; G.redFlash = 1; G.hitstop = .06;
@@ -2380,6 +2381,7 @@
   // ---------------------------------------------------------------- weapons: durability, swapping, bow
   function wearWeapon(n = 1) {
     const h = S().hands; if (!h || h.d == null) return;
+    if (Math.random() < SK.wearSkip()) return;   // 0.34: Tinkerer Patch job
     h.d -= n;
     if (h.d <= 0) { toast(`Your ${ITEMS[h.k].n.toLowerCase()} broke!`, 2); SFX.play('break'); S().hands = null; lastHud = ''; }
   }
@@ -2433,7 +2435,7 @@
     const p = G.p;
     if (!arrowsLeft()) { toast('No arrows', 1.1); return false; }
     useArrow();
-    let best = null, bd = 8 * T;
+    let best = null, bd = 8 * T * SK.bowRange();   // 0.34: Tracker Eagle eye
     for (const z of G.zs) {
       if (z.dead) continue;
       const dx = z.x - p.x, dy = z.y - p.y, d = Math.hypot(dx, dy);
@@ -2443,6 +2445,7 @@
     if (best) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; ax = dx / d; ay = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; p.fx = ax; p.fy = ay; }
     const sp = 15 * T;
     G.arrows.push({ x: p.x + ax * 16, y: p.y + ay * 10, vx: ax * sp, vy: ay * sp, z: 36, life: 1.1, qm: qMul() });   // 0.19: the bow's quality
+    if (SK.volley()) { const a2 = Math.atan2(ay, ax) + .09; G.arrows.push({ x: p.x + Math.cos(a2) * 16, y: p.y + Math.sin(a2) * 10, vx: Math.cos(a2) * sp, vy: Math.sin(a2) * sp, z: 36, life: 1.1, qm: qMul() }); }   // 0.34: Tracker Volley
     SFX.play('bow'); emitNoise(p.x, p.y, WEAPONS.bow.noise * SK.allNoise(), false); wearWeapon();
     return true;
   }
@@ -2457,7 +2460,7 @@
   function fireGun(W) {
     const p = G.p;
     if (!packCount(W.gun)) return false;
-    usePack(W.gun); lastHud = '';
+    if (Math.random() >= SK.ammoSkip()) usePack(W.gun); lastHud = '';   // 0.34: Tinkerer Lean loads
     const range = W.spd * W.life * T;
     let best = null, bd = range;
     for (const z of G.zs) {
@@ -2485,7 +2488,7 @@
     return true;
   }
   function landArrow(x, y) {
-    if (Math.random() > .65) return; // some snap
+    if (!SK.noSnapArrow() && Math.random() > .65) return; // some snap (0.34: Tracker Retriever - none)
     const near = G.drops.find(d => d.k === 'arrow' && Math.hypot(d.x - x, d.y - y) < 26);
     if (near) near.n++; else G.drops.push({ k: 'arrow', n: 1, x, y, t: .7 });
   }

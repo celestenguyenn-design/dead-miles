@@ -49,8 +49,40 @@ window.DM = window.DM || {};
       { n: 'Locksmith', d: 'Sweet spots another 20% wider.', c: 2 },
       { n: 'Master', d: 'Picks break 35% less again, and prying never smashes loot.', c: 3 },
     ] },
+    // 0.34 (owner: "job-only skill trees"): one extra tree per job, only that job sees it (only: job id)
+    { id: 'jhunt', n: 'Tracker', col: '#c9a86a', only: 'hunter', blurb: 'Hunter only. The bow, mastered.', ranks: [
+      { n: 'Retriever', d: 'Arrows never snap - every one you shoot can be picked back up.', c: 1 },
+      { n: 'Eagle eye', d: 'The bow auto-aims from 40% further away and hits 10% harder.', c: 2 },
+      { n: 'Silent kill', d: 'Sneak hits x2 (instead of x1.6).', c: 2 },
+      { n: 'Volley', d: 'Every shot looses a second arrow for free.', c: 3 },
+    ] },
+    { id: 'jscav', n: 'Pack mule', col: '#d9b23a', only: 'scavenger', blurb: 'Scavenger only. Carry more, find more.', ranks: [
+      { n: 'Sharp eye', d: '+5% extra-find chance in every search.', c: 1 },
+      { n: 'Deep pockets', d: '+2 pack slots.', c: 2 },
+      { n: 'Treasure sense', d: '+5% chance a search turns up something rare.', c: 2 },
+      { n: 'Hoarder', d: '+10 stash slots.', c: 3 },
+    ] },
+    { id: 'jthief', n: 'Shadow', col: '#8f6ad9', only: 'thief', blurb: 'Thief only. In and out, unseen.', ranks: [
+      { n: 'Light fingers', d: 'Searches make 20% less noise.', c: 1 },
+      { n: 'Slippery', d: 'Dodges cost 25% less stamina.', c: 2 },
+      { n: 'Ghost hands', d: 'Lockpicks break 35% less often.', c: 2 },
+      { n: 'Vanish', d: 'Zombies spot you from 20% less far.', c: 3 },
+    ] },
+    { id: 'jbrawl', n: 'Bruiser', col: '#e0604a', only: 'brawler', blurb: 'Brawler only. Hit hard, stay standing.', ranks: [
+      { n: 'Thick skin', d: '+10 max HP.', c: 1 },
+      { n: 'Knockout', d: '+10% melee damage.', c: 2 },
+      { n: 'Last stand', d: 'Once per run, when you drop below 25% HP, you heal 25 HP.', c: 2 },
+      { n: 'Cleave', d: 'Melee swings hit a 30% wider arc.', c: 3 },
+    ] },
+    { id: 'jmech', n: 'Tinkerer', col: '#6ab0c9', only: 'mechanic', blurb: 'Mechanic only. Gear lasts, guns run lean.', ranks: [
+      { n: 'Patch job', d: 'Weapons wear out 25% slower.', c: 1 },
+      { n: 'Rigged yard', d: '+10 base defence (raids and horde night).', c: 2 },
+      { n: 'Lean loads', d: 'Guns and the nail gun skip using a round 25% of the time.', c: 2 },
+      { n: 'Master crafter', d: 'Weapons you craft come out one quality tier better.', c: 3 },
+    ] },
   ];
   SK.tree = id => SK.TREES.find(t => t.id === id);
+  SK.trees = (s = S()) => SK.TREES.filter(t => !t.only || (s && t.only === s.job));   // 0.34: what this survivor sees
   SK.RESET_CAPS = 150;   // one reset a week, paid in trader caps
 
   // ---------------------------------------------------------------- state
@@ -62,14 +94,14 @@ window.DM = window.DM || {};
     const k = fresh ? (s.skills = {}) : s.skills;
     k.got = k.got && typeof k.got === 'object' ? k.got : {};
     k.free = k.free && typeof k.free === 'object' ? k.free : {};
-    for (const id in k.got) { const [t, r] = id.split('.'); const T = SK.tree(t); if (!T || !T.ranks[+r - 1]) { delete k.got[id]; delete k.free[id]; } }
+    for (const id in k.got) { const [t, r] = id.split('.'); const T = SK.tree(t); if (!T || !T.ranks[+r - 1] || (T.only && T.only !== s.job)) { delete k.got[id]; delete k.free[id]; } }
     // migration (0.13): the old level perks stay, free; the points the level earned are all there to spend
     if (fresh) {
       const L = D.scavLvl(+s.xp || 0);
       for (const T of SK.TREES) T.ranks.forEach((R, i) => { if (R.legacy && L >= R.legacy) { k.got[key(T.id, i + 1)] = Date.now(); k.free[key(T.id, i + 1)] = 'legacy'; } });
     }
     // the job's own tree: rank 1 is free
-    const J = SK.TREES.find(T => T.job === s.job);
+    const J = SK.TREES.find(T => T.job === s.job && !T.only);
     if (J && !k.got[key(J.id, 1)]) { k.got[key(J.id, 1)] = Date.now(); k.free[key(J.id, 1)] = 'job'; }
     return k;
   };
@@ -121,21 +153,34 @@ window.DM = window.DM || {};
   const h = (t, r, s) => SK.has(t, r, s);
   // Scavenging
   SK.searchMul = (s = S()) => (h('scav', 1, s) ? .9 : 1) * (h('scav', 5, s) ? .9 : 1);
-  SK.extraFind = (s = S()) => (h('scav', 3, s) ? .08 : 0) + (h('scav', 5, s) ? .07 : 0);
+  SK.extraFind = (s = S()) => (h('scav', 3, s) ? .08 : 0) + (h('scav', 5, s) ? .07 : 0) + (h('jscav', 1, s) ? .05 : 0);
   SK.keen = (s = S()) => h('scav', 2, s);
-  SK.packBonus = (s = S()) => (h('scav', 4, s) ? 2 : 0);
+  SK.packBonus = (s = S()) => (h('scav', 4, s) ? 2 : 0) + (h('jscav', 2, s) ? 2 : 0);
+  SK.rareBonus = (s = S()) => (h('jscav', 3, s) ? .05 : 0);
+  SK.stashBonus = (s = S()) => (h('jscav', 4, s) ? 10 : 0);
   // Stealth
   SK.stepNoise = (s = S()) => (h('stealth', 1, s) ? .8 : 1) * SK.allNoise(s);
-  SK.searchNoise = (s = S()) => (h('stealth', 2, s) ? .75 : 1) * SK.allNoise(s);
+  SK.searchNoise = (s = S()) => (h('stealth', 2, s) ? .75 : 1) * (h('jthief', 1, s) ? .8 : 1) * SK.allNoise(s);
   SK.allNoise = (s = S()) => (h('stealth', 4, s) ? .85 : 1);
-  SK.sightMul = (s = S()) => (h('stealth', 3, s) ? .85 : 1) * (h('stealth', 5, s) ? .85 : 1);
+  SK.sightMul = (s = S()) => (h('stealth', 3, s) ? .85 : 1) * (h('stealth', 5, s) ? .85 : 1) * (h('jthief', 4, s) ? .8 : 1);
   SK.sleeperMul = (s = S()) => (h('stealth', 5, s) ? .7 : 1);
   // Combat
-  SK.meleeMul = (s = S()) => (h('combat', 1, s) ? 1.12 : 1) * (h('combat', 5, s) ? 1.1 : 1);
-  SK.bowMul = (s = S()) => (h('combat', 2, s) ? 1.15 : 1) * (h('combat', 5, s) ? 1.1 : 1);
+  SK.meleeMul = (s = S()) => (h('combat', 1, s) ? 1.12 : 1) * (h('combat', 5, s) ? 1.1 : 1) * (h('jbrawl', 2, s) ? 1.1 : 1);
+  SK.bowMul = (s = S()) => (h('combat', 2, s) ? 1.15 : 1) * (h('combat', 5, s) ? 1.1 : 1) * (h('jhunt', 2, s) ? 1.1 : 1);
   SK.dodgeDist = (s = S()) => (h('combat', 3, s) ? 1.25 : 1);
-  SK.dodgeCost = (s = S()) => (h('combat', 3, s) ? .8 : 1);
-  SK.hpBonus = (s = S()) => (h('combat', 4, s) ? 15 : 0) + (h('combat', 5, s) ? 10 : 0);
+  SK.dodgeCost = (s = S()) => (h('combat', 3, s) ? .8 : 1) * (h('jthief', 2, s) ? .75 : 1);
+  SK.hpBonus = (s = S()) => (h('combat', 4, s) ? 15 : 0) + (h('combat', 5, s) ? 10 : 0) + (h('jbrawl', 1, s) ? 10 : 0);
+  // 0.34 job trees
+  SK.noSnapArrow = (s = S()) => h('jhunt', 1, s);
+  SK.bowRange = (s = S()) => (h('jhunt', 2, s) ? 1.4 : 1);
+  SK.sneakMul = (s = S()) => (h('jhunt', 3, s) ? 2 : 0);   // 0 = the normal sneak multiplier
+  SK.volley = (s = S()) => h('jhunt', 4, s);
+  SK.lastStand = (s = S()) => h('jbrawl', 3, s);
+  SK.arcMul = (s = S()) => (h('jbrawl', 4, s) ? 1.3 : 1);
+  SK.wearSkip = (s = S()) => (h('jmech', 1, s) ? .25 : 0);
+  SK.defBonus = (s = S()) => (h('jmech', 2, s) ? 10 : 0);
+  SK.ammoSkip = (s = S()) => (h('jmech', 3, s) ? .25 : 0);
+  SK.craftTier = (s = S()) => (h('jmech', 4, s) ? 1 : 0);
   // Survival
   SK.drainMul = (s = S()) => (h('surv', 1, s) ? .85 : 1) * (h('surv', 4, s) ? .85 : 1);
   SK.healMul = (s = S()) => (h('surv', 2, s) ? 1.4 : 1);
@@ -145,7 +190,7 @@ window.DM = window.DM || {};
   SK.sprintMul = (s = S()) => (h('surv', 5, s) ? .75 : 1);
   // Lockwork
   SK.lockWide = (s = S()) => (h('lock', 1, s) ? 1.2 : 1) * (h('lock', 4, s) ? 1.2 : 1);
-  SK.snapMul = (s = S()) => (h('lock', 2, s) ? 1 / .65 : 1) * (h('lock', 5, s) ? 1 / .65 : 1);   // longer strain before a pick snaps
+  SK.snapMul = (s = S()) => (h('lock', 2, s) ? 1 / .65 : 1) * (h('lock', 5, s) ? 1 / .65 : 1) * (h('jthief', 3, s) ? 1 / .65 : 1);   // longer strain before a pick snaps
   SK.pryNoise = (s = S()) => (h('lock', 3, s) ? .65 : 1) * SK.allNoise(s);
   SK.noSmash = (s = S()) => h('lock', 5, s);
 
@@ -158,7 +203,8 @@ window.DM = window.DM || {};
     surv: '<path d="M12 21C5 16 2.5 12.5 2.5 9a4.6 4.6 0 0 1 9.5-2 4.6 4.6 0 0 1 9.5 2c0 3.5-2.5 7-9.5 12z" fill="#93a86c" stroke="#11142f" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v7M8.5 12.5h7" stroke="#f6e3bb" stroke-width="2.6" stroke-linecap="round"/>',
     lock: '<path d="M7 10V7.2a5 5 0 0 1 10 0V10" fill="none" stroke="#11142f" stroke-width="4.2"/><path d="M7 10V7.2a5 5 0 0 1 10 0V10" fill="none" stroke="#f6e3bb" stroke-width="1.8"/><rect x="3" y="9.5" width="18" height="13" rx="3" fill="#b98cf0" stroke="#11142f" stroke-width="2"/><circle cx="12" cy="14.6" r="2" fill="#11142f"/><path d="M12 15.5v3.4" stroke="#11142f" stroke-width="2" stroke-linecap="round"/>',
   };
-  SK.glyph = (t, size = 22) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" class="skg">${GL[t]}</svg>`;
+  const JGL = { jhunt: 'stealth', jscav: 'scav', jthief: 'lock', jbrawl: 'combat', jmech: 'surv' };   // 0.34: job trees borrow a glyph
+  SK.glyph = (t, size = 22) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" class="skg">${GL[t] || GL[JGL[t]] || ''}</svg>`;
   let cur = null, pend = null;
   SK.open = function (onClose) {
     const s = S(); if (!s) return; SK.norm(s);
@@ -179,7 +225,7 @@ window.DM = window.DM || {};
     el.innerHTML = `<div class="mcard skcard"><div class="kick">Survivor level ${xl.L}${gs ? ` · gamestage ${gs.gs}` : ''}</div><h3>Skills</h3>
       <div class="skhead"><div class="skpts${pts ? ' on' : ''}"><b>${pts}</b><span>point${pts === 1 ? '' : 's'}</span></div>
         <div class="skxp"><span>${xl.cur.toLocaleString('en-US')} / ${xl.need.toLocaleString('en-US')} xp to Lv ${xl.L + 1}</span><div class="mbar xp"><i style="width:${xl.pct}%"></i></div></div></div>
-      <div class="sktabs">${SK.TREES.map(t => `<button class="sktab${t.id === cur ? ' on' : ''}" data-t="${t.id}" style="--tc:${t.col}">${SK.glyph(t.id, 20)}<b>${esc(t.n)}</b><i>${SK.rank(t.id, s)}/${t.ranks.length}</i></button>`).join('')}</div>
+      <div class="sktabs">${SK.trees(s).map(t => `<button class="sktab${t.id === cur ? ' on' : ''}" data-t="${t.id}" style="--tc:${t.col}">${SK.glyph(t.id, 20)}<b>${esc(t.n)}</b><i>${SK.rank(t.id, s)}/${t.ranks.length}</i>${t.only ? '<em class="skjob">job</em>' : ''}</button>`).join('')}</div>
       <div class="skblurb" style="--tc:${T.col}">${SK.glyph(T.id, 26)}<span><b>${esc(T.n)}</b>${esc(T.blurb)}${T.job === s.job ? ` <em>${esc(J.n)}s get rank 1 free.</em>` : ''}</span></div>
       <div class="skranks">${rows}</div>
       ${gs ? `<p class="mp dim gsline"><b>Gamestage ${gs.gs}</b> · ${esc(gs.line)}</p>` : ''}
