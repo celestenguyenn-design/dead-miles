@@ -73,6 +73,11 @@ window.DM = window.DM || {};
     carrot: { n: 'Carrots', i: 'carrot', use: 'Eat', hp: 4, sta: 10, hu: 14, th: 4 },
     corn: { n: 'Corn', i: 'corn', use: 'Eat', hp: 5, hu: 20 },
     herbs: { n: 'Fresh herbs', i: 'herbs', use: 'Eat', hp: 10, hu: 8 },
+    // 0.28 armor (owner: "we have no armor system"): worn in the body slot, cuts zombie damage, wears down as it absorbs hits
+    armor_pad: { n: 'Padded jacket', i: 'armor_pad', armor: { red: .10, dur: 60 }, tag: 'armor · -10% damage' },
+    armor_sport: { n: 'Sports pads', i: 'armor_sport', armor: { red: .15, dur: 80 }, tag: 'armor · -15% damage' },
+    armor_riot: { n: 'Riot vest', i: 'armor_riot', armor: { red: .25, dur: 120, loud: 1.15 }, tag: 'armor · -25% damage, a bit louder' },
+    armor_plate: { n: 'Plate carrier', i: 'armor_plate', armor: { red: .35, dur: 160, loud: 1.25, slow: .93 }, tag: 'armor · -35% damage, louder, slower' },
   };
   // crops: watered days to grow, harvest yield
   D.CROPS = {
@@ -127,6 +132,7 @@ window.DM = window.DM || {};
     shoes: { out: ['shoes', 1], in: { cloth: 3, tape: 1 }, n: 'Quiet shoes (footsteps -30%)' },
     lockset: { out: ['lockset', 1], in: { lockpick: 2, scrap: 2, tape: 1 }, n: 'Lockpick set (easier locks)' },
     prybar: { out: ['prybar', 1], in: { scrap: 5, tape: 1 }, n: 'Pry bar (quiet prying)' },
+    armor_pad: { out: ['armor_pad', 1], in: { cloth: 5, tape: 2 }, n: 'Padded jacket (armor, -10% damage)' },   // 0.28
   };
   D.BASIC = ['bandage', 'lockpick'];
   // ---------------------------------------------------------------- 0.15: item categories (shown on pack / stash / loot cards)
@@ -143,7 +149,7 @@ window.DM = window.DM || {};
     if (it.cos) return 'cos'; if (it.decor) return 'decor'; if (it.seed) return 'seed'; if (it.quest) return 'quest'; if (k === 'key') return 'key';
     if (it.bp) return 'bp'; if (it.w) return 'weapon'; if (k === 'ammo' || k === 'arrow') return 'ammo'; if (it.gift || k === 'hat') return 'event';
     if (it.use === 'Drink') return 'drink'; if (it.use === 'Eat') return 'food'; if (it.hp || it.cure) return 'med'; if (k === 'note') return 'note';
-    if (it.slots || k === 'shoes' || k === 'lockset') return 'gear'; if (k === 'lockpick' || k === 'pole') return 'tool';
+    if (it.slots || it.armor || k === 'shoes' || k === 'lockset') return 'gear'; if (k === 'lockpick' || k === 'pole') return 'tool';
     return D.uses(k).length ? 'mat' : 'sell';
   };
   // what a material goes into: workbench recipes, then base building (base.js PIECES, if loaded)
@@ -243,7 +249,7 @@ window.DM = window.DM || {};
   };
   D.COS_POOL = { 'cos_*': [], 'cosZ_*': ['corpse'], 'cosP_*': ['police'], 'cosM_*': ['mansion'], 'cosH_*': ['horde'] };
   // what the trader pays (caps each); she sells for about 4x
-  D.VALUE = { beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
+  D.VALUE = { armor_pad: 10, armor_sport: 14, armor_riot: 25, armor_plate: 35, beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
     lockpick: 3, gift: 8, candy: 1, cranberry: 3, stuffing: 3, pie: 4, turkey: 20, hat: 0, pole: 2, watch: 25, jewelry: 20, wood: 1, nails: .25, spikedbat: 20, machete: 22, prybar: 14, packplus: 15, backpack: 40, shoes: 10, lockset: 18, note: 0, parcel: 0, antibio: 12 };
   Object.assign(D.VALUE, { seed_tomato: 2, seed_potato: 2, seed_carrot: 2, seed_corn: 3, seed_herbs: 2, tomato: 2, potato: 2, carrot: 2, corn: 2, herbs: 3, coffee: 2 });
   for (const k in D.DECOR) D.VALUE[k] = D.DECOR[k].v;
@@ -365,11 +371,11 @@ window.DM = window.DM || {};
     crate: [[4, 5], { 'bp_*': 1, nails: 2, ammo: 5, meds: 3, bandage: 2, battery: 1, key: 1, axe: 1 }, ['ammo', 'meds']],
     books: [[1, 1], { book: 4, key: .5 }],
     night: [[1, 2], { meds: 2, battery: 2, key: .5, book: 1 }],
-    wardrobe: [[1, 3], { cloth: 4, battery: 1 }],
+    wardrobe: [[1, 3], { armor_pad: .2,  cloth: 4, battery: 1 }],
     dresser: [[1, 3], { cloth: 3, battery: 1, ammo: 1, bandage: 1 }],
     desk: [[1, 2], { scrap: 2, battery: 2, key: .5, tape: 1, book: 1, lockpick: 1 }],
     tv: [[1, 2], { battery: 2, scrap: 2 }],
-    coat: [[1, 2], { cloth: 3, snack: .4, key: .5, battery: .6 }],
+    coat: [[1, 2], { armor_pad: .3,  cloth: 3, snack: .4, key: .5, battery: .6 }],
     hall: [[1, 1], { key: 1, battery: 1, snack: .25 }],
     hutch: [[1, 2], { jewelry: 1, cloth: 2, battery: 1 }],
     side: [[1, 1], { battery: 2, key: .5, snack: .4, tape: .6 }],
@@ -385,14 +391,14 @@ window.DM = window.DM || {};
     pharm: [[1, 3], { bandage: 3, meds: 2, water: 1, snack: 1 }],
     pharmstore: [[2, 3], { meds: 3, bandage: 3, cloth: 1 }],
     cage: [[3, 4], { meds: 5, bandage: 3 }, ['meds', 'meds']],
-    locker: [[1, 2], { ammo: 2, cloth: 2, bandage: 1, snack: .4, knife: 1 }],
+    locker: [[1, 2], { armor_riot: .3,  ammo: 2, cloth: 2, bandage: 1, snack: .4, knife: 1 }],
     evidence: [[1, 3], { 'bp_*': 1, ammo: 3, jewelry: 1, watch: 1, key: 1, knife: 1 }],
-    armory: [[3, 5], { ammo: 6, bat: 1, crowbar: 1, meds: 1 }, ['ammo', 'ammo']],
+    armory: [[3, 5], { armor_riot: .9, armor_plate: .35,  ammo: 6, bat: 1, crowbar: 1, meds: 1 }, ['ammo', 'ammo']],
     filing: [[0, 2], { key: 1, book: 1, battery: 1, lockpick: 1 }],
-    gym: [[1, 3], { wood: 1, bat: 2, arrow: 2, water: 1, cloth: 1 }],
+    gym: [[1, 3], { armor_sport: .6,  wood: 1, bat: 2, arrow: 2, water: 1, cloth: 1 }],
     nurse: [[2, 3], { bandage: 4, meds: 2 }],
     workbench: [[2, 3], { 'bp_*': 1, wood: 3, nails: 4, scrap: 4, tape: 2, wrench: 2, crowbar: 1, battery: 1 }],
-    garage: [[1, 3], { nails: 2, wood: 1, scrap: 3, tape: 2, battery: 2, crowbar: 1, axe: 1 }],
+    garage: [[1, 3], { armor_sport: .25,  nails: 2, wood: 1, scrap: 3, tape: 2, battery: 2, crowbar: 1, axe: 1 }],
     washer: [[0, 2], { cloth: 4, key: .5, jewelry: 1 }],
     wine: [[1, 2], { drink: 3, jewelry: 1 }],
     cellar: [[2, 3], { wood: 2, beans: 1.5, water: 1, axe: 1, ammo: 1 }],
@@ -403,7 +409,7 @@ window.DM = window.DM || {};
   // phase 4: decor and seeds turn up now and then (decor more often in mansions and apartments - see game.js loot())
   for (const [t, w] of [['dresser', .3], ['wardrobe', .25], ['hutch', .5], ['side', .3], ['books', .4], ['storage', .35], ['desk', .2], ['tv', .25], ['cellar', .4], ['washer', .3]]) D.LOOT[t][1]['decor_*'] = w;
   for (const [t, w] of [['pantry', .5], ['cabinet', .3], ['storage', .6], ['garage', .4], ['shelves', .4], ['store', .4], ['cellar', .6], ['trash', .3], ['workbench', .3]]) D.LOOT[t][1]['seed_*'] = w;
-  D.LOOT.hordecrate = [[3, 4], { 'decor_*': 1, 'seed_*': 1.2, ammo: 2, meds: 2, bandage: 2, scrap: 2, nails: 2, wood: 2, tape: 1, battery: 1, 'bp_*': .5, 'cosH_*': .35 }];
+  D.LOOT.hordecrate = [[3, 4], { armor_riot: .35, armor_sport: .4, 'decor_*': 1, 'seed_*': 1.2, ammo: 2, meds: 2, bandage: 2, scrap: 2, nails: 2, wood: 2, tape: 1, battery: 1, 'bp_*': .5, 'cosH_*': .35 }];
   // phase 5: cosmetics are rare finds - clothes-ish furniture, zombies a little more often, police lockers better (mansions: see game.js loot())
   for (const [t, w] of [['wardrobe', .1], ['dresser', .08], ['coat', .09], ['hutch', .06], ['washer', .07], ['night', .04], ['gym', .05]]) D.LOOT[t][1]['cos_*'] = w;
   D.LOOT.corpse[1]['cosZ_*'] = 1;   // ~4.5% per body vs ~2.5-3.7% per wardrobe or dresser
@@ -526,7 +532,8 @@ window.DM = window.DM || {};
     ['arrow', 10, 3, 1, .8], ['cloth', 4, 4, 1, .5], ['tape', 2, 8, 1, .5], ['nails', 12, 1, 1, .5], ['wood', 4, 4, 1, .5], ['crowbar', 1, 60, 1, .6], ['bat', 1, 45, 1, .5], ['knife', 1, 25, 1, .5],
     ['backpack', 1, 150, 2, 1], ['machete', 1, 90, 2, .5], ['ammo', 15, 2, 2, .6], ['prybar', 1, 65, 2, .5], ['axe', 1, 120, 3, .5], ['bow', 1, 130, 3, .4], ['lockset', 1, 80, 3, .5],
     ['key', 1, 30, 2, .35], ['bp_*', 1, 110, 2, .45], ['bp_*', 1, 110, 4, .6],
-    ['antibio', 1, 45, 2, .5],   // 0.18: Dot sells antibiotics from trader level 2 (about every other day)
+    ['antibio', 1, 45, 2, .5],
+    ['armor_pad', 1, 55, 2, .4], ['armor_sport', 1, 80, 3, .35], ['armor_riot', 1, 140, 4, .3],   // 0.28 armor   // 0.18: Dot sells antibiotics from trader level 2 (about every other day)
   ];
   D.STREETS = ['Halsey St', 'Bergen St', 'Dean St', 'Putnam Ave', 'Jefferson Ave', 'Macon St', 'Decatur St', 'Hancock St', 'Lafayette Ave', 'Greene Ave', 'Quincy St', 'Gates Ave', 'Madison St', 'Monroe St', 'Kosciuszko St', 'Stuyvesant Ave', 'Tompkins Ave', 'Marcy Ave', 'Nostrand Ave', 'Bedford Ave', 'Franklin Ave', 'Classon Ave', 'Atlantic Ave', 'Fulton St', 'Pacific St', 'Prospect Pl', 'Sterling Pl', 'St Marks Ave', 'Park Pl', 'Sterling St'];
 })();

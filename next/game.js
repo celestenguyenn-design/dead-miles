@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.27.0';
+const NEXT_VERSION = '0.28.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -712,6 +712,7 @@ const NEXT_VERSION = '0.27.0';
     gacha: ['Capsule machine', 'Pull for a random cosmetic. Tokens: 1 for every 4,000 steps (up to 3 a day) or 50 caps. At least one epic or better every 10 pulls, and Dot buys any duplicate.'],
     deck: ['Deck the base', 'Get this holiday\'s decor from Dot\'s holiday shelf, holiday houses or capsules, then place it at your base (Base > Decorate). 2, 5 and 8 pieces placed win prizes - claim them here.'],
     decor: ['Decorating', 'Decor box: pick a piece, then tap where it goes. Tap a placed piece to move it, Rotate it a quarter turn (front, side, back) or Turn it to mirror it. Store puts it back in the box.'],
+    walks: ['Walks', 'Three ways to get paid for walking: hit 5,000 steps a day to grow your streak, pick an expedition and let your steps carry you there (finds on the way, a crate at the end), and collect lifetime step milestones with titles.'],
     route: ['Daily route', 'Every 1,500 steps today opens the next row. Pick one stop per row, joined to your last pick: a house, a safehouse, Dot, a supply drop or an event. Each pick takes the place of one of today\'s scouted houses.'],
     lock: ['Locked', 'Lockpicks are silent but can snap - aim, then hold TURN and let go if it binds. A crowbar always works, but it is loud and may smash something.'],
   };
@@ -1156,7 +1157,7 @@ const NEXT_VERSION = '0.27.0';
         <div class="scard">
           <div class="portwrap"><canvas id="mPort" width="150" height="190"></canvas><div class="lookbtns"><button class="editlook" id="mLook">Edit look</button><button class="editlook ward" id="mWard">Wardrobe${newCos() ? `<i class="nbadge">${newCos()}</i>` : ''}</button></div></div>
           <div class="sinfo">
-            <div class="sname">${esc(s.name)}</div>
+            <div class="sname">${esc(s.name)}${DM.Walks && DM.Walks.title() ? ` <em class="stitle">${esc(DM.Walks.title())}</em>` : ''}</div>
             <div class="sjob">${J.n} · <span>${J.stats.join(' · ')}</span></div>
             <div class="mbar hp"><i style="width:${s.hp / maxHp(s) * 100}%"></i><span>HP ${Math.ceil(s.hp)}/${maxHp(s)}</span></div>
             ${DM.Food.barsHTML(s)}${needStat(s)}
@@ -1174,7 +1175,7 @@ const NEXT_VERSION = '0.27.0';
         </div>
       </div>
       ${gated ? homeTiles() : eventBanner()}
-      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Gacha ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}</div>
+      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Walks ? `<button data-t="walks">Walks${DM.Walks.claimable() && curTab !== 'walks' ? '<i class="tbadge">!</i>' : ''}</button>` : ''}${SV.tutorialDone && DM.Gacha ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}</div>
       <div id="mpane"></div>`;
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { SFX.play('ui'); if (b.dataset.t === 'map') { DM.Map.open(); return; } tab(b.dataset.t); }; });
     $('#mLog').onclick = () => {
@@ -1203,8 +1204,8 @@ const NEXT_VERSION = '0.27.0';
     let vt = 0, vtT = 0; $('#mver').onclick = () => { const n = performance.now(); if (n - vtT > 1200) vt = 0; vtT = n; if (++vt >= 5) { vt = 0; if (DM_DEV_OK) openDev(); } };
     $('#mset').onclick = openSettings;
     drawPortrait($('#mPort'), s.hands && s.hands.k, .78);
-    if ((curTab === 'gacha' && !(SV.tutorialDone && DM.Gacha)) || (curTab === 'event' && !(SV.tutorialDone && EVA))) curTab = 'houses';
-    if (curTab === 'houses') renderHouses(); else if (curTab === 'bench') renderBench(); else if (curTab === 'gacha') DM.Gacha.renderPane($('#mpane')); else if (curTab === 'event') renderEventTab(); else renderStash();
+    if ((curTab === 'walks' && !(SV.tutorialDone && DM.Walks)) || (curTab === 'gacha' && !(SV.tutorialDone && DM.Gacha)) || (curTab === 'event' && !(SV.tutorialDone && EVA))) curTab = 'houses';
+    if (curTab === 'houses') renderHouses(); else if (curTab === 'bench') renderBench(); else if (curTab === 'gacha') DM.Gacha.renderPane($('#mpane')); else if (curTab === 'walks') DM.Walks.renderPane($('#mpane')); else if (curTab === 'event') renderEventTab(); else renderStash();
     updateSync();
     if (cosQueue.length) setTimeout(showCosPop, 400); else { tip('home'); if (s.food.h < DM.Food.LOW || s.food.t < DM.Food.LOW) tip('food'); if (DM.Infect && DM.Infect.is(s)) tip('infect'); }
     const ic = document.querySelector('.nstat .inf'); if (ic) ic.onclick = () => { SFX.play('ui'); toast(DM.Infect.effects(s)[0], 5); };   // 0.18
@@ -1496,10 +1497,12 @@ const NEXT_VERSION = '0.27.0';
       const gear = [s.shoes && 'Quiet shoes', s.lockset && 'Lockpick set'].filter(Boolean), xl = DM.Skills.xpLine(s), pts = DM.Skills.points(s), f = s.food || { h: 0, t: 0 };
       body = `<div class="eqrow">
         <button class="eqslot${h ? ' wq q' + D.qOf(h) : ''}${sel && sel.from === 'hands' ? ' sel' : ''}" ${h ? `data-from="hands" data-i="0" style="--qc:${D.QUAL[D.qOf(h)].c}"` : 'id="eqFists"'}><i class="eqk">Weapon · hand</i>${h ? icon(h.k) : '<span class="eqnone">✊</span>'}<b>${h ? esc(hw.n) : 'Fists'}</b>${h ? qTag(h) : ''}<span>${hd} dmg${h && h.d != null ? ` · ${Math.round(Math.min(1, h.d / D.wMax(h)) * 100)}%` : ''}</span>${h && h.d != null ? `<i class="dur"><i style="width:${Math.max(4, Math.min(100, h.d / D.wMax(h) * 100))}%"></i></i>` : ''}</button>
+        ${(() => { const ar = s.armor && D.ITEMS[s.armor.k] && D.ITEMS[s.armor.k].armor ? s.armor : null, ad = ar && D.ITEMS[ar.k].armor;   // 0.28: the body armor slot
+          return `<button class="eqslot armor${sel && sel.from === 'armor' ? ' sel' : ''}" ${ar ? 'data-from="armor" data-i="0"' : 'id="eqNoArmor"'}><i class="eqk">Armor · body</i>${ar ? icon(ar.k) : '<span class="eqnone">🦺</span>'}<b>${ar ? esc(D.ITEMS[ar.k].n) : 'No armor'}</b><span>${ar ? `-${Math.round(ad.red * 100)}% damage · ${DM.Armor.dur(ar)}/${ad.dur}` : 'Find or craft some'}</span>${ar ? `<i class="dur"><i style="width:${Math.round(DM.Armor.dur(ar) / ad.dur * 100)}%"></i></i>` : ''}</button>`; })()}
         <button class="eqslot quiv${sel && sel.from === 'quiver' ? ' sel' : ''}" data-from="quiver" data-i="0"><i class="eqk">Quiver</i>${(s.quiver || {}).n ? icon('arrow') : `<img class="dim" alt="" src="${ART.iconURL.arrow}">`}<b>${(s.quiver || {}).n || 0} arrow${(s.quiver || {}).n === 1 ? '' : 's'}</b><span>max ${D.QUIVER} · no pack slot</span></button>
         <div class="eqslot"><i class="eqk">Backpack</i>${s.packBonus ? icon(s.packBonus >= 4 ? 'backpack' : 'packplus') : `<img class="dim" alt="" src="${ART.iconURL.backpack}">`}<b>${packSlots()} slots</b><span>${s.packBonus ? `+${s.packBonus} from upgrades` : 'No upgrade yet'}</span></div>
         <button class="eqslot cos" id="eqWard"><i class="eqk">Cosmetics</i><span class="eqcos">${worn.length ? worn.slice(0, 4).map(c => `<img alt="" src="${ART.iconURL['cos_' + c]}">`).join('') : '<img alt="" src="' + ART.iconURL.cosS_beanie + '">'}</span><b>Wardrobe →</b><span>${worn.length ? worn.length + ' worn' : 'Nothing worn'}${newCos() ? ` · <em class="newtxt">${newCos()} new</em>` : ''}</span></button>
-      </div>${A('hands')}${A('quiver')}
+      </div>${A('hands')}${A('armor')}${A('quiver')}
       <div class="kick sect">Always with you</div>
       <div class="gline"><span class="gi">🔑</span><div><b>Keyring · ${+s.keys || 0} brass key${(+s.keys || 0) === 1 ? '' : 's'}</b><span>Opens locked cars and key-locked rooms · no pack slot</span></div></div>
       ${gear.length ? `<div class="gline"><span class="gi">👟</span><div><b>${gear.join(' · ')}</b><span>${[s.shoes && 'footsteps -30%', s.lockset && 'wider sweet spots, picks snap less'].filter(Boolean).join(' · ')}</span></div></div>` : ''}
@@ -1521,6 +1524,7 @@ const NEXT_VERSION = '0.27.0';
     el.innerHTML = seg + body;
     el.querySelectorAll('#gtabs button').forEach(b => { b.classList.toggle('on', b.dataset.g === gTab); b.onclick = () => { if (gTab === b.dataset.g) return; gTab = b.dataset.g; sel = null; SFX.play('ui'); renderStash(); }; });
     if (el.querySelector('#eqWard')) el.querySelector('#eqWard').onclick = () => { SFX.play('ui'); sel = null; stashHost = null; if (DM.scene) { toast('The wardrobe is on the home screen', 1.6); return; } editLook('wardrobe'); };
+    if (el.querySelector('#eqNoArmor')) el.querySelector('#eqNoArmor').onclick = () => toast(s.pack.concat(s.stash).some(e => D.ITEMS[e.k] && D.ITEMS[e.k].armor) ? 'Open Backpack or Stash, tap the armor, then Wear' : 'Armor: coat closets, gym lockers, garages, police stations, horde crates, Dot - or craft a padded jacket', 2.6);
     if (el.querySelector('#eqFists')) el.querySelector('#eqFists').onclick = () => toast(s.pack.concat(s.stash).some(e => D.isWeapon(e.k)) ? 'Open Backpack or Stash, tap a weapon, then Equip' : 'No weapon yet - they turn up in kitchens, garages and lockers', 2);
     if (el.querySelector('#gSkills')) el.querySelector('#gSkills').onclick = () => { SFX.play('ui'); DM.Skills.open(() => renderHome()); };
     if (el.querySelector('#gFood')) el.querySelector('#gFood').onclick = () => { SFX.play('ui'); openFood(); };
@@ -1564,13 +1568,24 @@ const NEXT_VERSION = '0.27.0';
   function stashActions() {
     const s = SV.survivor, acts = (stashHost || $('#mpane')).querySelector('#sacts');
     if (sel.from === 'quiver') { quiverActions(s, acts); return; }
-    const e = sel.from === 'hands' ? { k: s.hands.k, n: 1, d: s.hands.d, q: D.qOf(s.hands) } : s[sel.from][sel.i];
+    const e = sel.from === 'hands' ? { k: s.hands.k, n: 1, d: s.hands.d, q: D.qOf(s.hands) } : sel.from === 'armor' ? (s.armor ? { k: s.armor.k, n: 1, d: DM.Armor.dur(s.armor) } : null) : s[sel.from][sel.i];
     if (!e) { sel = null; return; }
     const it = D.ITEMS[e.k], btns = [];
     const done = msg => { sel = null; Game.save(); reHost(); if (msg) toast(msg, 1.4); };
     if (it.w && sel.from !== 'hands') btns.push(['Equip' + (wDmg(e) > handsDmg() ? ` · +${wDmg(e) - handsDmg()} dmg` : ''), () => { const cur = s.hands; s.hands = { k: e.k, d: e.d, q: D.qOf(e) }; s[sel.from].splice(sel.i, 1); if (cur) addTo(s.pack, packSlots(), cur.k, 1, cur.d, D.qOf(cur)) || addTo(s.stash, stashSlots(), cur.k, 1, cur.d, D.qOf(cur)); Game.onEquip(); done('Equipped ' + it.n.toLowerCase() + ' - it is in your hand now'); }, 'big']);
     if (sel.from === 'pack') btns.push(['To stash', () => { const n = addTo(s.stash, stashSlots(), e.k, e.n, e.d, e.q); if (!n) return toast('Stash is full', 1.4); e.n -= n; if (!e.n) s.pack.splice(sel.i, 1); done(); }]);
     if (sel.from === 'stash') btns.push(['To pack', () => { const n = addTo(s.pack, packSlots(), e.k, e.n, e.d, e.q); if (!n) return toast('Pack is full', 1.4); e.n -= n; if (!e.n) s.stash.splice(sel.i, 1); done(); }]);
+    // 0.28 armor: Wear (from the pack / stash), Take off, Repair with cloth or scrap
+    if (it.armor && sel.from !== 'armor') btns.push([`Wear · -${Math.round(it.armor.red * 100)}% damage`, () => { const cur = s.armor; s.armor = { k: e.k, d: e.d == null ? it.armor.dur : e.d }; s[sel.from].splice(sel.i, 1); if (cur) addTo(s.pack, packSlots(), cur.k, 1, cur.d) || addTo(s.stash, stashSlots(), cur.k, 1, cur.d); done(`Wearing the ${it.n.toLowerCase()}`); }]);
+    if (sel.from === 'armor') {
+      btns.push(['Take off', () => { if (!addTo(s.pack, packSlots(), e.k, 1, e.d) && !addTo(s.stash, stashSlots(), e.k, 1, e.d)) return toast('No room', 1.4); s.armor = null; done(); }]);
+      const mat = DM.Armor.repairMat(e.k), cost = 2;
+      if (e.d < it.armor.dur) btns.push([`Repair (${cost} ${D.ITEMS[mat].n.toLowerCase()})`, () => {
+        if (countItem(mat) < cost) return toast(`Needs ${cost} ${D.ITEMS[mat].n.toLowerCase()}`, 1.6);
+        let need = cost; for (const list of [s.stash, s.pack]) for (let j = list.length - 1; j >= 0 && need; j--) if (list[j].k === mat) { const t = Math.min(need, list[j].n); list[j].n -= t; need -= t; if (!list[j].n) list.splice(j, 1); }
+        s.armor.d = Math.min(it.armor.dur, DM.Armor.dur(s.armor) + Math.round(it.armor.dur * .5)); done('Patched up');
+      }]);
+    }
     if (sel.from === 'hands') btns.push(['Unequip', () => { if (!addTo(s.pack, packSlots(), e.k, 1, e.d, e.q) && !addTo(s.stash, stashSlots(), e.k, 1, e.d, e.q)) return toast('No room', 1.4); s.hands = null; done(); }]);
     if (it.w) {
       const cost = s.job === 'mechanic' ? 1 : 2, max = D.wMax(e);   // 0.19: max durability by quality
@@ -1663,6 +1678,8 @@ const NEXT_VERSION = '0.27.0';
     ['Horde night', 'Every Sunday 9 PM New York time a horde hits. In the 24 hours before, do a watch shift (a 2-3 minute defence) - every kill thins the horde for your whole party. Strong bases hold and pay out a crate; weak ones lose something you repair with steps. Skip the shift and you get nothing.'],
     ['Seasonal events', 'Holidays switch on by themselves: Thanksgiving (from two weeks before to the Tuesday after) and Christmas (Dec 11 - Jan 2). Events bring holiday loot, a mini-boss in about 1 in 3 houses, a chain of event jobs from Dot, holiday capsules in the capsule machine, holiday decor and once-a-year cosmetics. Thanksgiving also has the Black Friday horde: a bigger Sunday horde with better crates.'],
     ['People who need help', 'About 1 house in 8 has someone inside who needs help (the house card says "🙋 someone inside needs help"; look for the "!" above their head). Talk to them: they ask for something - bandages, food, water, batteries, nails, lockpicks, antibiotics. Accept, find or craft it, then walk: after 1,500-3,000 more steps the house card shows Return, and you hand it over from your pack or stash for caps, XP and a reward (sometimes a capsule token or a cosmetic, and sometimes they ask to join your crew). Up to 3 at once; the house stays on your list until you are done.'],
+    ['Walks: streak, expeditions, milestones', 'The Walks tab. Daily streak: walk 5,000 steps (typed at half) and claim it - rewards grow every day in a row, with bonuses on day 3, 7, 14 and 30; one freeze a week covers a missed day. Expeditions: pick a Brooklyn destination (8,000 to 40,000 steps); your steps from then on carry you there, with a find at 25/50/75% and a crate at the end. Milestones: lifetime steps from 25k to 2.5M, each with caps, capsule tokens, sometimes a cosmetic, and a title to show under your name.'],
+    ['Armor', 'Wear one piece of armor (Gear > Equipped > Armor). It cuts the damage of every hit (padded jacket 10%, sports pads 15%, riot vest 25%, plate carrier 35%) and wears down as it does, until it falls apart. Repair it with cloth or scrap. The riot vest and plate carrier make your steps louder, and the plate carrier slows you a little. Find it in coat closets, wardrobes, gym lockers, garages and police stations, in horde crates, at Dot\'s, or craft a padded jacket.'],
     ['Capsule machine', 'The capsule machine (Capsules tab) gives a random cosmetic, hairstyle or eye style for a token (new hairstyles and eyes show up in Edit look, marked with a lock until you pull them). You get a token for every 4,000 steps (up to 3 a day), or buy one for 50 caps. Odds: common 55%, rare 30%, epic 12%, legendary 3%, and at least one epic or better every 10 pulls. Cosmetics you do not have yet come first; Dot buys any duplicate. During a holiday its capsules join the machine, and 1 pull in 4 is a piece of holiday decor.'],
     ['Deck the base', 'During Thanksgiving and Christmas, place that holiday\'s decor at your base (Base > Decor) for prizes: 2 pieces = 2 capsule tokens + 40 caps, 5 = 3 tokens + 80 caps, 8 = a legendary holiday hat + 100 caps. Holiday decor comes from Dot\'s holiday shelf, holiday houses (storage, pantries, closets) and the capsule machine.'],
     ['Workbench & crafting', 'Workbench (home tab, or at the base) lists every recipe you know with each material, what you have and what you need. Tap a recipe to see what it does, every material in full with where to find it, and a big Craft button. Materials come from the stash and the pack. New recipes come from blueprints: Dot trades them, and some turn up in hidden stashes and safes.'],

@@ -835,7 +835,7 @@
 
     if (p.st === 'free' || p.st === 'swing') {
       running = inp.run && inp.m > .5 && p.sta > 1 && !p.winded && p.st === 'free' && !(G.calmUntil > G.t);   // 0.26.10: no running next to a hiding stray (crew.js)
-      spd = (running ? 4.5 : 2.75) * T * inp.m * (p.st === 'swing' ? .35 : 1) * (G.wx ? G.wx.move : 1);   // 0.22: snow slows her a little
+      spd = (running ? 4.5 : 2.75) * T * inp.m * (p.st === 'swing' ? .35 : 1) * (G.wx ? G.wx.move : 1) * (DM.Armor ? DM.Armor.slow(S()) : 1);   // 0.28: heavy armor   // 0.22: snow slows her a little
       if (running) { p.sta = Math.max(0, p.sta - 24 * SK.sprintMul() * dt); p.staDelay = .7; }
       if (!G.over) F.runDrain(dt, running, G);   // a run makes you hungry and thirsty a little faster
       const tvx = inp.x * spd, tvy = inp.y * spd;
@@ -874,7 +874,7 @@
     const stepLen = running ? T * .72 : T * .58;
     if (p.stepAcc > stepLen) {
       p.stepAcc = 0; SFX.play(running ? 'run' : 'step');
-      const qn = (job() === 'thief' ? .6 : job() === 'hunter' ? .8 : 1) * (S().shoes ? .7 : 1) * (opts.quiet ? opts.quiet() : 1) * SK.stepNoise(); if (running) emitNoise(p.x, p.y, 3 * qn, false); else emitNoise(p.x, p.y, 1.1 * qn, false);
+      const qn = (job() === 'thief' ? .6 : job() === 'hunter' ? .8 : 1) * (S().shoes ? .7 : 1) * (opts.quiet ? opts.quiet() : 1) * SK.stepNoise() * (DM.Armor ? DM.Armor.loud(S()) : 1); if (running) emitNoise(p.x, p.y, 3 * qn, false); else emitNoise(p.x, p.y, 1.1 * qn, false);
       if (running) puff(p.x, p.y, 2, 2, 'rgba(157,144,191,.6)', 30, .4, 3);
     }
     if (moved < .05 && p.st === 'free') p.ph = lerp(p.ph, Math.round(p.ph / Math.PI) * Math.PI, .2);
@@ -990,6 +990,7 @@
     if (p.inv > 0 || p.st === 'down') return;
     cancelSearch(); p.auto = null; if (G.sheet) closeSheet(); if (LP.on) closeLock('You flinched - the pick slipped out');
     dmg = Math.round(dmg * (z && z.dmgMul || 1));
+    if (DM.Armor) dmg = DM.Armor.hit(S(), dmg);   // 0.28: worn armor takes part of the hit (and wears)
     p.hp = Math.max(0, p.hp - dmg); p.inv = .7; p.flash = .55;
     p.kbx = dx * 6 * T; p.kby = dy * 6 * T * .8;
     p.st = 'hurt'; p.stT = 0;

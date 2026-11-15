@@ -246,7 +246,19 @@
   .hcard.tut { box-shadow: 0 4px 0 var(--ora); }
   .hcard.done { opacity: .5; }
   .chip.locked { opacity: .5; border-style: dashed; }
-  .keytag { color: #e0b94a; font-weight: 800; } .nqtag { color: #7ee0d8; font-weight: 800; }
+  .keytag { color: #e0b94a; font-weight: 800; }
+  /* 0.28 Walks tab + armor */
+  body div#mtabs > button { flex: 1 1 22%; font-size: 13px; padding: 0 4px; letter-spacing: 0; } .stitle { display: inline-block; margin-left: 4px; padding: 1px 6px; border-radius: 8px; background: #3d2d61; color: #ffd27a; font-size: 10px; font-style: normal; vertical-align: middle; letter-spacing: .04em; }
+  .wk { display: grid; gap: 10px; } .mcard.wkcard { max-width: none; max-height: none; overflow: visible; padding: 14px; }
+  .wkrow { display: flex; gap: 12px; align-items: center; margin: 6px 0 10px; } .wkbig { font-size: 40px; font-weight: 900; color: #ffd27a; line-height: 1; text-align: center; min-width: 64px; } .wkbig small { display: block; font-size: 11px; color: var(--mute); }
+  .wkinfo { flex: 1; } .wkinfo b { display: block; font-size: 15px; } .wkinfo span { display: block; font-size: 12px; opacity: .8; margin: 2px 0 6px; }
+  .wkexp { position: relative; } .wkexp em { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #11142f; }
+  .wkdest { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; } .wkd { display: grid; gap: 2px; padding: 10px; border-radius: 12px; background: #1c1538; border: 2px solid var(--plum); color: var(--crm); text-align: left; }
+  .wkd span { font-size: 22px; } .wkd b { font-size: 14px; } .wkd i { font-style: normal; font-size: 11px; opacity: .7; }
+  .wkms { display: grid; gap: 6px; margin-top: 8px; } .wkm { display: grid; grid-template-columns: 52px 1fr auto; grid-template-rows: auto auto; column-gap: 8px; align-items: center; padding: 8px; border-radius: 12px; background: #1c1538; border: 2px solid var(--plum); opacity: .6; }
+  .wkm b { grid-row: span 2; font-size: 16px; color: #ffd27a; } .wkm span { font-weight: 800; } .wkm i { font-style: normal; font-size: 11px; opacity: .75; } .wkm .mbtn, .wkm em { grid-row: span 2; grid-column: 3; } .wkm em { font-style: normal; color: #93e06c; font-size: 18px; }
+  .wkm.got { opacity: 1; border-color: #93a86c; } .wkm.ready { opacity: 1; border-color: #ffd27a; } .wk .lnk { display: block; margin-top: 8px; background: none; border: 0; color: var(--mute); text-decoration: underline; font: inherit; font-size: 12px; }
+  .wkm .mbtn.sm { width: auto; margin: 0; padding: 0 14px; } .nqtag { color: #7ee0d8; font-weight: 800; }
   .logo .minilogo { display: block; height: 30px; width: auto; } .hometop .logo .minilogo { height: 24px; } .mhead .logo .minilogo { height: 34px; margin: 0 auto; }
   /* 0.26.5: up to 6 home tabs -> two rows of three */
   div#mtabs { flex-wrap: wrap; } div#mtabs > button { flex: 1 1 30%; } #mtabs .evtabb { color: var(--evc); border-color: var(--evc); display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
@@ -887,38 +899,40 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.27.0"></script>
-<script src="art.js?v=0.27.0"></script>
-<script src="net.js?v=0.27.0"></script>
-<script src="netpanel.js?v=0.27.0"></script>
-<script src="syncguide.js?v=0.27.0"></script>
-<script src="events.js?v=0.27.0"></script>
-<script src="data.js?v=0.27.0"></script>
-<script src="food.js?v=0.27.0"></script>
-<script src="skills.js?v=0.27.0"></script>
-<script src="infection.js?v=0.27.0"></script>
-<script src="infected.js?v=0.27.0"></script>
-<script src="engine.js?v=0.27.0"></script>
-<script src="music.js?v=0.27.0"></script>
-<script src="weather.js?v=0.27.0"></script>
-<script src="gen.js?v=0.27.0"></script>
-<script src="raiders.js?v=0.27.0"></script>
-<script src="house.js?v=0.27.0"></script>
-<script src="horde.js?v=0.27.0"></script>
-<script src="base.js?v=0.27.0"></script>
-<script src="npcq.js?v=0.27.0"></script>
-<script src="crew.js?v=0.27.0"></script>
-<script src="boss.js?v=0.27.0"></script>
-<script src="daily.js?v=0.27.0"></script>
-<script src="gacha.js?v=0.27.0"></script>
-<script src="tour.js?v=0.27.0"></script>
-<script src="deep.js?v=0.27.0"></script>
-<script src="route.js?v=0.27.0"></script>
-<script src="install.js?v=0.27.0"></script>
-<script src="logo.js?v=0.27.0"></script>
-<script src="title.js?v=0.27.0"></script>
-<script src="game.js?v=0.27.0"></script>
-<script src="mvt.js?v=0.27.0"></script>
-<script src="map.js?v=0.27.0"></script>
+<script src="s2art.js?v=0.28.0"></script>
+<script src="art.js?v=0.28.0"></script>
+<script src="net.js?v=0.28.0"></script>
+<script src="netpanel.js?v=0.28.0"></script>
+<script src="syncguide.js?v=0.28.0"></script>
+<script src="events.js?v=0.28.0"></script>
+<script src="data.js?v=0.28.0"></script>
+<script src="food.js?v=0.28.0"></script>
+<script src="skills.js?v=0.28.0"></script>
+<script src="infection.js?v=0.28.0"></script>
+<script src="infected.js?v=0.28.0"></script>
+<script src="engine.js?v=0.28.0"></script>
+<script src="music.js?v=0.28.0"></script>
+<script src="weather.js?v=0.28.0"></script>
+<script src="gen.js?v=0.28.0"></script>
+<script src="raiders.js?v=0.28.0"></script>
+<script src="house.js?v=0.28.0"></script>
+<script src="horde.js?v=0.28.0"></script>
+<script src="base.js?v=0.28.0"></script>
+<script src="armor.js?v=0.28.0"></script>
+<script src="walks.js?v=0.28.0"></script>
+<script src="npcq.js?v=0.28.0"></script>
+<script src="crew.js?v=0.28.0"></script>
+<script src="boss.js?v=0.28.0"></script>
+<script src="daily.js?v=0.28.0"></script>
+<script src="gacha.js?v=0.28.0"></script>
+<script src="tour.js?v=0.28.0"></script>
+<script src="deep.js?v=0.28.0"></script>
+<script src="route.js?v=0.28.0"></script>
+<script src="install.js?v=0.28.0"></script>
+<script src="logo.js?v=0.28.0"></script>
+<script src="title.js?v=0.28.0"></script>
+<script src="game.js?v=0.28.0"></script>
+<script src="mvt.js?v=0.28.0"></script>
+<script src="map.js?v=0.28.0"></script>
 </body>
 </html>
