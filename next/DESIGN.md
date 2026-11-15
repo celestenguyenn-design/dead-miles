@@ -902,6 +902,13 @@ people should be able to click a ? for help if they somehow skip it")
   companion on runs, multi-day + legendary map quests, weather/night bonus, party step goal, friends step race,
   friend gifts + trading.
 
+## Done in 0.33.0 - 2 of 12: base raids
+- base.js B.raid(): from 5 PM, once a day, a base with anything built has a 40% raid (seeded by day + seedBase).
+  3 hours to defend: a 2.5-minute watch-shift-style fight (S.raid) with 7-12 walkers (+1 per 8 gamestage, scaled by
+  gsFx); walls, spikes, wire and crew guards work as on a shift. Win: 25 + 3/kill caps, XP, a horde-crate roll.
+  Down or leaving with walkers left = one piece breaks (B.hordeDamage). Not defended in time: defence vs strength
+  (18 + 1.6 x gamestage + 2 x walkers) - held (+15 caps) or one piece breaks. Home tile "Base raid!" (first).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
