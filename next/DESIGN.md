@@ -762,6 +762,13 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Bug (owner: "when i click map and leave it, the map button gets squished"): map.js injected "#mtabs button.maptab
   { flex: .7 }" on first open (left from the one-row tabs); removed.
 
+## Done in 0.28.3 (owner: "there should be an option to sign in before character creation if you already have an acc" / "it still prompts me to do a mandatory step sync which my acc already has ... i cant leave it")
+- Create screen: "Already playing? Sign in" (opens the account panel). netpanel calls NET.onSignedIn after a sign-in;
+  game.js pullCloud() (shared with boot) loads the account's cloud save at once - before, only on the next start.
+- Setup: an account whose phone already synced (NET.steps.phone or a phone reading in the last 14 days of the step
+  ledger) counts as set up: the tour's sync step is done, the setup-only run is skipped, and the locked sync guide
+  unlocks at once (lockCheck on open + DM.Tour.syncedBefore).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

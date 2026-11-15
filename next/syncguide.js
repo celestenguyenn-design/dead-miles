@@ -515,6 +515,7 @@
   const CANT_MS = 180000;
   function lockCheck() {
     if (!LOCK.on || LOCK.ok) return;
+    if (DM.Tour && DM.Tour.syncedBefore && DM.Tour.syncedBefore()) { LOCK.ok = true; LOCK.n = (NET.steps && NET.steps.today) || 0; render(); return; }   // 0.28.3: already set up
     if (NET.lastPost && NET.lastPost > LOCK.since) {
       // 0.26.8: a phone that connects but sends 0 steps (Android: nothing writes steps into Health Connect) is not set up yet
       const posts = (NET.steps && NET.steps.posts) || [], newest = posts.reduce((a, x) => !a || x.t > a.t ? x : a, null);
@@ -604,7 +605,7 @@
       Object.assign(LOCK, { on: true, since: Date.now() - 5 * 60000, t0: Date.now(), cb, ok: false, n: 0 });
       clearInterval(LOCK.poll);
       LOCK.poll = setInterval(async () => { if (!LOCK.on) return; if (NET.ok) { try { await NET.pullSteps(); } catch (e) { /* ignore */ } } lockCheck(); render(); }, 8000);
-      render(); return true;
+      render(); lockCheck(); return true;
     },
     locked: () => LOCK.on,
     open(screen) {
