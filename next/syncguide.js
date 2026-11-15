@@ -245,6 +245,11 @@
     if (T.state === 'signed-out') return out + '<div class="res bad"><h4>You are not signed in.</h4><p class="help">Sign in first (top of this page), then test again.</p></div>';
     if (T.state === 'offline') return out + '<div class="res bad"><h4>Could not reach the server.</h4><p class="help">This is your connection, not your phone setup. Check your signal or Wi-Fi and tap Test again.</p></div>';
     const n = T.newest;
+    if (T.state === 'fresh' && n.n === 0 && kind !== 'iphone') {
+      out += '<div class="res bad"><h4 class="bad">Your phone connected - but it sent 0 steps.</h4>'
+        + '<p class="help">The app, your account and the server all work. The problem is that <b>Health Connect has no steps</b>: your step counter (Samsung Health, Google Fit, Fitbit...) is not sharing steps into it. Go back to <b>step 3</b> above, connect it, check today&rsquo;s steps show up in Health Connect, then tap <b>Send now</b> in the app and test again.</p>';
+      return out + '</div>';
+    }
     if (T.state === 'fresh') {
       out += '<div class="res ok"><h4 class="ok">Got ' + fmt(n.n) + ' steps from your phone ' + ago(n.t) + '.</h4>'
         + '<p class="help">It works. Today so far: <b>' + fmt(T.best) + '</b> steps, ' + T.today + (T.today === 1 ? ' update' : ' updates') + ' today. They are in your game now.</p>'
@@ -358,8 +363,13 @@
       + '<p><b>"Installs from this source are blocked"</b>: tap <b>Settings</b>, turn on <b>Allow from this source</b>, go back, tap <b>Install</b>.</p>'
       + '<p><b>Samsung phone and it STILL blocks it after you allow it?</b> That is Samsung <b>Auto Blocker</b>. Open <b>Settings &rarr; Security and privacy &rarr; Auto Blocker</b> and turn it <b>off</b>. Install the app, then you can turn Auto Blocker back on - the app keeps working.</p>'
       + '<p><b>"Blocked by Play Protect"</b>: tap <b>More details &rarr; Install anyway</b>. No such button? Open the <b>Play Store</b> &rarr; your profile picture &rarr; <b>Play Protect</b> &rarr; the gear &rarr; turn off <b>Scan apps with Play Protect</b>, install, then turn it back on.</p>');
-    h += step(3, 'Check your steps reach Health Connect', '<p>The app reads steps from <b>Health Connect</b>. Your step counter (Samsung Health, Google Fit, Fitbit...) has to share steps into it.</p>'
-      + '<p class="help">Samsung Health: <b>Settings &rarr; Health Connect</b> &rarr; allow <b>Steps</b>. Google Fit and others: look for <b>Health Connect</b> in their settings. Older phones: the Dead Miles app sends you to the Play Store to install Health Connect.</p>');
+    // 0.26.8 (a friend's Android sent 0 steps 11 times: nothing was writing steps into Health Connect)
+    h += step(3, 'Connect your step counter to Health Connect', '<p><b>Do not skip this - it is the #1 reason Android shows 0 steps.</b> The Dead Miles app reads steps from <b>Health Connect</b>, Android&rsquo;s shared health storage. Health Connect does NOT count steps by itself on most phones: your step counter app has to put them in.</p>'
+      + '<details><summary><b>Samsung phone (Samsung Health)</b></summary><ol><li>Open <b>Samsung Health</b>.</li><li>Tap <b>&#8942;</b> (or your profile) &rarr; <b>Settings</b> &rarr; <b>Health Connect</b>.</li><li>Turn on sharing, and make sure <b>Steps</b> is allowed to be <b>written</b> (shared) to Health Connect.</li><li>No Health Connect in Samsung Health&rsquo;s settings? Update Samsung Health in the Galaxy Store / Play Store first.</li></ol></details>'
+      + '<details><summary><b>Google Pixel or other phones (Google Fit)</b></summary><ol><li>Install <b>Google Fit</b> from the Play Store if you do not have it, open it once and let it track activity.</li><li><b>Profile</b> &rarr; <b>Settings</b> (gear) &rarr; <b>Manage connected apps</b> or <b>Health Connect</b> &rarr; turn on <b>Sync Fit with Health Connect</b>.</li><li>Newer Pixels may count steps in Health Connect directly - check below.</li></ol></details>'
+      + '<details><summary><b>Fitbit, Garmin, Oura or another watch</b></summary><ol><li>Open that app &rarr; Settings &rarr; look for <b>Health Connect</b>.</li><li>Turn it on and allow <b>Steps</b>.</li></ol></details>'
+      + '<p><b>Check it worked:</b> open <b>Health Connect</b> (Settings &rarr; <b>Health Connect</b>, or Settings &rarr; Security and privacy &rarr; Privacy &rarr; Health Connect) &rarr; <b>Data and access</b> / <b>Browse data</b> &rarr; <b>Activity</b> &rarr; <b>Steps</b>. You should see <b>today&rsquo;s steps</b> there. If it is empty or 0, the step counter is not sharing yet - go back over the steps above.</p>'
+      + '<p class="help">Older phones (Android 13 or below): Health Connect is a separate app. The Dead Miles app sends you to the Play Store to install it.</p>');
     h += step(4, 'Box 1: your handle', '<p>Open <b>Dead Miles Steps</b>. Paste this in box <b>1. Handle</b>:</p>'
       + (NET.ok ? copyBox('handle', (VALUES.handle = NET.handle), 'my handle', true) : '<p class="help">Sign in first to see it.</p>'));
     let tok = '<p>Paste your token in box <b>2. Token</b>.</p>';
@@ -505,12 +515,18 @@
   const CANT_MS = 180000;
   function lockCheck() {
     if (!LOCK.on || LOCK.ok) return;
-    if (NET.lastPost && NET.lastPost > LOCK.since) { LOCK.ok = true; LOCK.n = (NET.steps && NET.steps.today) || 0; render(); }
+    if (NET.lastPost && NET.lastPost > LOCK.since) {
+      // 0.26.8: a phone that connects but sends 0 steps (Android: nothing writes steps into Health Connect) is not set up yet
+      const posts = (NET.steps && NET.steps.posts) || [], newest = posts.reduce((a, x) => !a || x.t > a.t ? x : a, null);
+      if (newest && newest.n === 0 && new Date().getHours() >= 10) { if (!LOCK.zero) { LOCK.zero = true; render(); } return; }
+      LOCK.zero = false; LOCK.ok = true; LOCK.n = (NET.steps && NET.steps.today) || 0; render();
+    }
   }
   function lockBanner() {
     if (!LOCK.on) return '';
     if (LOCK.ok) return '<div class="sglock ok"><b>&#10003; Synced!</b><p>Your phone just sent its steps' + (LOCK.n ? ' (' + fmt(LOCK.n) + ' today)' : '') + '. Step sync is set up - from now on your steps come in by themselves.</p><button class="btn" data-a="lockdone">Continue</button></div>';
     const late = Date.now() - LOCK.t0 > CANT_MS;
+    if (LOCK.zero) return '<div class="sglock"><b>Your phone connected - but it sent 0 steps</b><p>Almost there! The app works, but <b>Health Connect has no steps</b>. Open the Android guide, do <b>step 3</b> (connect Samsung Health / Google Fit to Health Connect), then tap <b>Send now</b> in the app. This screen moves on as soon as real steps arrive.</p>' + (late ? '<button class="lnk" data-a="lockcant">My phone can\'t sync - type my steps instead</button>' : '') + '</div>';
     return '<div class="sglock"><b>Setup &middot; waiting for your first sync&hellip;</b><p>' + (NET.ok ? 'Pick your phone below and follow every step. When you get to the end, run the Shortcut (iPhone) or tap <b>Send now</b> in the app (Android). This screen moves on by itself the moment your steps arrive.' : 'Sign in first (the account button), then come back here.') + '</p>'
       + '<p class="help">Checking for your phone&hellip; last check ' + (NET.lastPull ? ago(NET.lastPull) : 'not yet') + '</p>'
       + (late ? '<button class="lnk" data-a="lockcant">My phone can\'t sync - type my steps instead</button>' : '') + '</div>';

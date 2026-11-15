@@ -45,7 +45,11 @@ class StepsWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx,
             if (ok) {
                 prefs.lastSync = System.currentTimeMillis()
                 prefs.lastSteps = steps
-                prefs.lastError = ""
+                // 0 steps after mid-morning almost always means no app is writing steps into Health Connect
+                val hour = java.time.LocalTime.now().hour
+                prefs.lastError = if (steps == 0L && hour >= 10)
+                    "Health Connect has 0 steps for today. Your step counter is not sharing into it: open Samsung Health (or Google Fit / Fitbit) > Settings > Health Connect and allow Steps, then tap Send now."
+                else ""
                 Result.success()
             } else {
                 prefs.lastError = "the server said the handle or token is wrong"
