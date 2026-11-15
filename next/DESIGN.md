@@ -722,6 +722,11 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   fails sometimes (rowhouses measured 13% rooms, 18% cars). House cards tag "🔑 locked room (· key inside)" and
   "🔑 locked car". The key's item tag says what it opens.
 
+## Done in 0.26.11 (owner: "i always forget to bring lockpicks on my run ... something should show if we dont carry any or a crowbar")
+- game.js lockCheck(h, go) before loot(): a house with locks (h.nLocks) and no lockpick / crowbar / pry bar in the pack or
+  hands opens "No lockpicks or crowbar": Take N lockpicks from the stash (up to a stack) / Take the crowbar / Go in anyway
+  / Cancel. With none in the stash it says where to get them. Not for the tutorial house. loot(h, checked).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

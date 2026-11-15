@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.26.10';
+const NEXT_VERSION = '0.26.11';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -313,8 +313,35 @@ const NEXT_VERSION = '0.26.10';
   }
 
   // ---------------------------------------------------------------- runs
-  function loot(h) {
+  // 0.26.11 (owner: "i always forget to bring lockpicks on my run ... something should show if we dont carry any or a
+  // crowbar"): a house with locks and nothing in the pack to open them asks first, and can grab them from the stash.
+  const PRY = ['crowbar', 'prybar'];
+  function lockCheck(h, go) {
+    const s = SV.survivor, has = k => s.pack.some(e => e.k === k) || (s.hands && s.hands.k === k);
+    if (h.type === 'tutorial' || !h.nLocks || has('lockpick') || PRY.some(has)) { go(); return; }
+    const sp = s.stash.filter(e => e.k === 'lockpick').reduce((a, e) => a + e.n, 0), sc = s.stash.find(e => PRY.includes(e.k));
+    const grab = (k, n) => {   // from the stash into the pack (one slot)
+      if (s.pack.length >= packSlots() && !s.pack.some(e => e.k === k && e.n < D.stackMax(k))) { toast('Your pack is full - make room first', 2); return false; }
+      let left = n;
+      for (let i = s.stash.length - 1; i >= 0 && left > 0; i--) { const e = s.stash[i]; if (e.k !== k) continue; const t = Math.min(left, e.n); e.n -= t; left -= t; if (!e.n) s.stash.splice(i, 1); }
+      const moved = n - left; if (!moved) return false;
+      const pe = s.pack.find(e => e.k === k && e.n < D.stackMax(k) && e.d == null); if (pe) pe.n += moved; else s.pack.push({ k, n: moved });
+      return true;
+    };
+    sheetOpen(`<div class="kick">Before you go in</div><h3>No lockpicks or crowbar</h3>
+      <p class="mp">This house has <b>${h.nLocks} lock${h.nLocks > 1 ? 's' : ''}</b>, and your pack has nothing to open ${h.nLocks > 1 ? 'them' : 'it'} with.</p>
+      ${sp ? `<button class="mbtn" id="lkPicks">Take ${Math.min(sp, D.stackMax('lockpick'))} lockpick${Math.min(sp, D.stackMax('lockpick')) > 1 ? 's' : ''} from the stash</button>` : ''}
+      ${sc ? `<button class="mbtn" id="lkBar">Take the ${esc(D.ITEMS[sc.k].n.toLowerCase())} from the stash</button>` : ''}
+      ${!sp && !sc ? '<p class="mp dim">None in your stash either - craft lockpicks at the Workbench (scrap + tape) or buy them from Dot.</p>' : ''}
+      <div class="btnrow"><button class="mbtn sm ghost" id="lkNo">Cancel</button><button class="mbtn sm ghost" id="lkGo">Go in anyway</button></div>`);
+    const done = () => { Game.save(); sheetClose(); go(); };
+    if ($('#lkPicks')) $('#lkPicks').onclick = () => { if (grab('lockpick', Math.min(sp, D.stackMax('lockpick')))) { SFX.play('pick'); done(); } };
+    if ($('#lkBar')) $('#lkBar').onclick = () => { const e = sc; const i = s.stash.indexOf(e); if (s.pack.length >= packSlots()) { toast('Your pack is full - make room first', 2); return; } s.stash.splice(i, 1); s.pack.push(e); SFX.play('pick'); done(); };
+    $('#lkNo').onclick = sheetClose; $('#lkGo').onclick = () => { sheetClose(); go(); };
+  }
+  function loot(h, checked) {
     if (SV.survivor.hp < 15) { toast('Too hurt to go in. Eat or patch up first.', 2.2); return; }
+    if (!checked) { lockCheck(h, () => loot(h, true)); return; }
     const L = Object.assign({}, layoutOf(h), { id: h.id });
     const q = h.quest && questById(h.quest);
     if (q && q.type === 'fetch' && !q.done) { // plant Dot's lockbox in one container of this house
