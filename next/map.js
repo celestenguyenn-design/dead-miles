@@ -655,7 +655,6 @@ way[building]->.b;.b out skel geom qt;
     .mvnext div { flex: 1; min-width: 0; } .mvnext #mvStat { display: block; font-size: 14.5px; font-weight: 900; line-height: 1.25; }
     .mvnext #mvSub2 { display: block; font-size: 11.5px; font-weight: 700; line-height: 1.3; color: var(--mute); }
     .mvnext em { flex: none; font-style: normal; font-size: 15px; font-weight: 900; color: var(--ora); }
-    #mtabs button.maptab { flex: .7; }
     .hname em.lmk { display: inline-flex; align-items: center; gap: 3px; } .hname em.lmk svg { color: var(--ink); }`;
     document.head.appendChild(st);
     const el = document.createElement('div'); el.id = 'mapv';

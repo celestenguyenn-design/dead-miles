@@ -754,6 +754,14 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - tour.js: handles on NET.cfg.trustedTyped (only 'isa') skip the setup steps (sign in / sync / typing); an existing save
   is just marked setupDone. Everyone else still has the required setup.
 
+## Done in 0.28.2
+- New app icon from the cute logo (regular colours - an installed icon cannot follow the seasons): next/icon-180 (iPhone
+  apple-touch-icon), icon-192, icon-512, icon-maskable-512 (manifest). Rendered from DM.Logo.full(false) by headless
+  Chromium. iPhone keeps the old icon until the home-screen app is removed and added again (the save comes back on
+  sign-in: handle + PIN).
+- Bug (owner: "when i click map and leave it, the map button gets squished"): map.js injected "#mtabs button.maptab
+  { flex: .7 }" on first open (left from the one-row tabs); removed.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
