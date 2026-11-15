@@ -591,11 +591,16 @@ way[building]->.b;.b out skel geom qt;
     // She has to WALK to a place: one only counts once she has been well away from it while the map was open,
     // so opening the map at home does not hand her the three houses next door.
     for (const pl of vis) if (pl.d > reach + 15) M.far[pl.id] = 1;
-    const near = vis.filter(pl => pl.d <= reach && walkedTo(pl) && !DM.Game.landmarkHave(keyOf(pl))).sort((a, b) => (a.house - b.house) || a.d - b.d);
-    if (!DM.Game.landmarkLeft()) { M.status = 'All 3 landmarks found today - more tomorrow'; return; }
+    const rank = t => DM.Game.landmarkRank ? DM.Game.landmarkRank(t) : 1;
+    let near = vis.filter(pl => pl.d <= reach && walkedTo(pl) && !DM.Game.landmarkHave(keyOf(pl))).sort((a, b) => rank(b.type) - rank(a.type) || a.d - b.d);   // 0.28.7: the best place first
+    if (!DM.Game.landmarkLeft()) {   // 0.28.7: all 3 found - a better place still replaces the weakest one
+      near = DM.Game.landmarkUpgrade ? near.filter(pl => DM.Game.landmarkUpgrade(pl.type)) : [];
+      if (!near.length) { M.status = 'All 3 found today - a better place you reach will replace your weakest'; return; }
+    }
     if (!near.length || M.jump) return;
     const pl = near[0], r = DM.Game.addLandmark({ key: keyOf(pl), type: pl.type, name: pl.name, street: pl.street });
-    if (r === 'ok') {
+    if (r === 'upgrade') pl.replaced = DM.Game.lastReplaced || 'your weakest';
+    if (r === 'ok' || r === 'upgrade') {
       DM.E.SFX && DM.E.SFX.play && DM.E.SFX.play('pick');
       if (navigator.vibrate) try { navigator.vibrate([60, 40, 90]); } catch (e) { /* ignore */ }
       showBanner(pl); M.burst = { id: pl.id, t: performance.now() };
@@ -731,7 +736,7 @@ way[building]->.b;.b out skel geom qt;
     if (!pl) { M.bOn = false; e.classList.remove('on'); return; }
     M.bOn = true;
     const place = pl.street && pl.street !== pl.name ? `${esc(pl.name)} &middot; ${esc(pl.street)}` : esc(pl.name);
-    e.innerHTML = `<span class="bdg"><img alt="" src="${iconURL(pl.type)}"></span><div><span class="kick">Added to your houses</span><b>${place}</b><span>${DM.D.BTYPES[pl.type].n} &middot; loot it from the Houses tab</span></div>`;
+    e.innerHTML = `<span class="bdg"><img alt="" src="${iconURL(pl.type)}"></span><div><span class="kick">${pl.replaced ? 'Upgraded! Replaced ' + esc(String(pl.replaced).split(' · ')[0]) : 'Added to your houses'}</span><b>${place}</b><span>${DM.D.BTYPES[pl.type].n} &middot; loot it from the Houses tab</span></div>`;
     e.classList.add('on'); clearTimeout(M.bannerT); M.bannerT = setTimeout(nextBanner, M.bq.length ? 3200 : 5000);
   }
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1067,12 +1072,12 @@ way[building]->.b;.b out skel geom qt;
     let hs = [];
     if (p) hs = all.filter(pl => pl.house).map(pl => [pl, dist(pl, p)]).filter(a => a[1] < 180).sort((a, b) => a[1] - b[1]).slice(0, HOUSE_BADGES).map(a => a[0]);
     const list = all.filter(pl => !pl.house).concat(hs), tgt = p ? target() : null, placed = [];
-    const can = p && DM.Game.landmarkLeft() > 0 && !driveLock() && p.acc <= MAX_ACC;
+    const left = DM.Game.landmarkLeft(), can = p && !driveLock() && p.acc <= MAX_ACC;   // 0.28.7: with 0 left, only upgrades glow
     for (const pl of list) {
       const sx = SX(wx(pl.lon)), sy = SY(wy(pl.lat));
       if (sx < -40 || sx > M.W + 40 || sy < -40 || sy > M.H + 40) continue;
       const have = DM.Game.landmarkHave(keyOf(pl)), d = p ? dist(pl, p) : 1e9;
-      const hot = !have && can && d <= reach && walkedTo(pl), near = !have && !hot && d <= reach * 2.2 && (!pl.house || pl === tgt);
+      const hot = !have && can && d <= reach && walkedTo(pl) && (left > 0 || !!(DM.Game.landmarkUpgrade && DM.Game.landmarkUpgrade(pl.type))), near = !have && !hot && d <= reach * 2.2 && (!pl.house || pl === tgt);
       const r = pl.house ? 11 : 17;
       if (pl.house && !hot && pl !== tgt && placed.some(q => Math.hypot(q[0] - sx, q[1] - sy) < q[2] + r + 4)) continue;
       placed.push([sx, sy, r]); drawn.push({ x: sx, y: sy, r, pl });

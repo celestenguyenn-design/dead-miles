@@ -790,6 +790,13 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   (fixes <= 40 m accuracy, steps 6-120 m); after 80 m every place counts (the old per-place rule still works too). The
   card says "walk N m more (anywhere) to scout it". Reset when the map closes.
 
+## Done in 0.28.7 (owner: "Auto claim kind of sucks because we walk past better areas ... The bigger better loots should replace the rowhouses" - automatically)
+- Landmarks: LM_RANK police/mansion 9, school/pharmacy 8, garage 6, bodega 5, apt/laundro 4, rowL 3, rowS 2. With today's
+  3 found, addLandmark replaces the lowest-ranked of today's landmark houses that is still new (no run, not a quest / NPC
+  house) when the new place ranks higher; returns 'upgrade' (Game.lastReplaced). The day's count does not change.
+  map.js picks the best-ranked place in reach first, and with 0 left only upgrades glow / get claimed; the banner says
+  "Upgraded! Replaced <name>". New landmark houses keep h.lmKey.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
