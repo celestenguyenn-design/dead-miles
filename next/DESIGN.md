@@ -678,6 +678,18 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   card, the event page (eventHTML, also used by the sheet), See Dot, Holiday capsules. The event banner opens the tab.
   Two rows of three (div#mtabs wraps). The capsule and Deck cards left the Houses list. Tour steps point at the new tabs.
 
+## Done in 0.26.6 (owner: "more character customizations, more hair unlocks somehow through gachapon, more clothes, more eyes" / "change the dead miles logo to a cuter one. With christmas theme")
+- Looks (art.js LOOK): hair styles 6-11 (Ponytail, Mohawk, Afro, Side swoop, Braids, Spiky; HAIR_BACK / FRINGE / BRAIDS),
+  eye styles (EYES 0-7 replace baked lines 97-100: Round, Sleepy, Happy, Wide, Sharp, Starry, Dot, Wink) + eyeC (8 iris
+  colours, free), +4 jackets (Cream, Forest, Wine, Lavender), +3 pants. look.eyes / look.eyeC (LOOK.def).
+- Unlocks: D.LOOKUN (data.js; D.LOOKS was already the old coat list) - hair 6-11 and eyes 1-5,7 are capsule unlocks
+  (wardrobe.looks[key]); free: hair 0-5, eyes Round + Dot. The machine adds unowned looks to its pool (never duplicates),
+  shows them with LOOK.previewURL head icons. Edit look shows them with a lock; tapping one says where to get it.
+- Capsule outfits: overalls (c), trench (r), labcoat (e), tux (l).
+- Logo (logo.js): bubbly monoline letters (ink + colour + shine strokes). Christmas season (Nov 15 - Jan 6): red/green
+  MILES, snow caps, Santa hat, holly, fairy lights, snowflakes. DM.Logo.full() on the title screen, DM.Logo.mini() in the
+  home header and the character screen. title.js keeps the old LOGO as a fallback.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

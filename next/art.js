@@ -164,12 +164,16 @@ const ART = (() => {
     skins: [['#f8dfc2', '#f08a6a'], ['#efc9a0', '#ea8a6a'], ['#d9a477', '#d97a5a'], ['#b97d52', '#c06650'], ['#8a5a3c', '#a8504a'], ['#5e3b27', '#8a4040']],
     hairs: ['#221d2e', '#5a3a28', '#e8c46a', '#c9602c', '#f07aa8', '#b39ae0', '#3fa7a0', '#ecebf2'],
     hairNames: ['Black', 'Brown', 'Blonde', 'Ginger', 'Pink', 'Lilac', 'Teal', 'White'],
-    styles: ['Bob', 'Long', 'Twin buns', 'Crop', 'Curls', 'Buzz'],
+    styles: ['Bob', 'Long', 'Twin buns', 'Crop', 'Curls', 'Buzz', 'Ponytail', 'Mohawk', 'Afro', 'Side swoop', 'Braids', 'Spiky'],   // 0.26.6: 6-11 unlock from capsules
+    eyes: ['Round', 'Sleepy', 'Happy', 'Wide', 'Sharp', 'Starry', 'Dot', 'Wink'],   // 0.26.6: Round + Dot free, the rest from capsules
+    eyeCols: [['#11142f', 'Dark'], ['#5a3a28', 'Brown'], ['#3f7a4a', 'Green'], ['#3a6ab8', 'Blue'], ['#6a6a80', 'Grey'], ['#7a4aa8', 'Violet'], ['#c9963a', 'Amber'], ['#a8323a', 'Red']],
     coats: [['#f07b3c', '#c95f2c', 'Ember'], ['#3fa7a0', '#2c7c77', 'Teal'], ['#9a62b8', '#744690', 'Plum'], ['#7c9a4c', '#5c7836', 'Moss'], ['#c94a4a', '#9e3434', 'Brick'], ['#e0b43c', '#b48a28', 'Mustard'],
-      ['#e8609a', '#b8457a', 'Pink'], ['#f4a6c4', '#d9809f', 'Blush'], ['#6aa8e0', '#4a84b8', 'Sky'], ['#3a4a8a', '#2a3668', 'Navy'], ['#3a3848', '#26242f', 'Black']],
-    pants: [['#2f3a72', 'Denim'], ['#2a2838', 'Black'], ['#a08a5a', 'Khaki'], ['#5c6a3a', 'Olive'], ['#8a3a3a', 'Red'], ['#b9bdcc', 'Grey']],
+      ['#e8609a', '#b8457a', 'Pink'], ['#f4a6c4', '#d9809f', 'Blush'], ['#6aa8e0', '#4a84b8', 'Sky'], ['#3a4a8a', '#2a3668', 'Navy'], ['#3a3848', '#26242f', 'Black'],
+      ['#efe6d2', '#cfc3a6', 'Cream'], ['#2f6a4a', '#225038', 'Forest'], ['#7a2a3a', '#5a1e2a', 'Wine'], ['#b39ae0', '#8a72bd', 'Lavender']],   // 0.26.6: +4
+    pants: [['#2f3a72', 'Denim'], ['#2a2838', 'Black'], ['#a08a5a', 'Khaki'], ['#5c6a3a', 'Olive'], ['#8a3a3a', 'Red'], ['#b9bdcc', 'Grey'], ['#6a4a3a', 'Brown'], ['#4a3a6a', 'Plum'], ['#d9cfb8', 'Cream']],   // 0.26.6: +3
   };
-  LOOK.def = { body: 'f', skin: 0, hair: 0, hairC: 0, hood: true, coat: 0, pants: 0 };
+  LOOK.def = { body: 'f', skin: 0, hair: 0, hairC: 0, hood: true, coat: 0, pants: 0, eyes: 0, eyeC: 0 };
+  LOOK.FREE_HAIR = 6; LOOK.FREE_EYES = [0, 6];   // 0.26.6: everything else is a capsule unlock (D.LOOKUN, wardrobe.looks)
   // cos: worn cosmetics by slot ({hat, face, neck, back, outfit} -> key in COS or null); always a fresh copy
   LOOK.norm = l => { const o = typeof l === 'number' ? Object.assign({}, LOOK.def, { coat: l }) : Object.assign({}, LOOK.def, l || {}); const c = {}; for (const k in (o.cos || {})) if (o.cos[k] && COS[o.cos[k]]) c[k] = o.cos[k]; o.cos = c; return o; };
   LOOK.random = () => { const r = a => Math.floor(Math.random() * a); return { body: r(2) ? 'm' : 'f', skin: r(6), hair: r(6), hairC: r(8), hood: Math.random() < .6, coat: r(LOOK.coats.length), pants: r(LOOK.pants.length), cos: {} }; };
@@ -183,7 +187,15 @@ const ART = (() => {
     3: 'M-17,-143 Q-17,-167 6,-168 Q24,-167 28,-154 L20,-153 Q6,-152 -6,-140 L-8,-132 Q-17,-132 -17,-143 Z',
     4: 'M-24,-140 Q-28,-148 -22,-156 Q-26,-166 -16,-170 Q-12,-180 0,-176 Q8,-182 16,-176 Q26,-178 28,-168 Q34,-160 28,-152 L20,-152 Q6,-150 -6,-140 L-6,-126 Q-12,-118 -20,-124 Q-28,-130 -24,-140 Z',
     5: 'M-15,-143 Q-15,-164 6,-165 Q22,-164 27,-155 L18,-154 Q6,-152 -6,-140 L-8,-134 Q-15,-134 -15,-143 Z',
+    // 0.26.6 capsule hairstyles
+    6: 'M-17,-143 Q-17,-167 6,-168 Q24,-167 28,-154 L20,-153 Q6,-152 -6,-140 L-8,-132 Q-17,-132 -17,-143 Z M-14,-156 Q-32,-150 -32,-128 Q-30,-110 -20,-102 Q-24,-118 -18,-138 Z',
+    7: 'M-15,-143 Q-15,-164 6,-165 Q22,-164 27,-155 L18,-154 Q6,-152 -6,-140 L-8,-134 Q-15,-134 -15,-143 Z M-14,-160 Q-12,-188 6,-190 Q24,-190 28,-168 Q16,-176 4,-174 Q-6,-172 -14,-160 Z',
+    8: 'M-24,-128 Q-38,-150 -24,-174 Q-6,-194 16,-188 Q38,-182 38,-158 Q38,-148 30,-146 L20,-152 Q6,-150 -6,-140 L-8,-126 Q-18,-118 -24,-128 Z',
+    9: 'M-20,-144 Q-21,-171 6,-171 Q26,-169 29,-152 L20,-152 Q6,-150 -6,-140 L-4,-122 Q-14,-117 -20,-124 Z',
+    10: 'M-20,-144 Q-21,-171 6,-171 Q26,-169 29,-152 L20,-152 Q6,-150 -6,-140 L-6,-128 Q-16,-126 -20,-144 Z',
+    11: 'M-18,-142 L-27,-156 L-17,-160 L-21,-175 L-7,-170 L-2,-185 L8,-172 L18,-183 L20,-168 L33,-170 L28,-154 L20,-152 Q6,-150 -6,-140 L-8,-130 Q-18,-130 -18,-142 Z',
   };
+  const BRAIDS = 'M-10,-128 q-5,4 0,8 q-5,4 0,8 q-5,4 0,8 q-5,4 0,8 l3,2 q4,-4 0,-8 q4,-4 0,-8 q4,-4 0,-8 q4,-4 0,-8 Z';
   const FRINGE = { // drawn over the forehead
     0: 'M-12,-148 Q-8,-171 14,-167 Q29,-163 30,-147 Q26,-152 22,-148 Q20,-156 13,-150 Q9,-158 2,-149 Q-4,-156 -12,-148 Z',
     1: 'M-12,-148 Q-8,-171 14,-167 Q29,-163 30,-147 Q26,-150 22,-147 Q18,-157 10,-151 Q4,-157 -2,-150 Q-6,-154 -12,-148 Z',
@@ -191,7 +203,35 @@ const ART = (() => {
     3: 'M-12,-150 Q-8,-170 12,-168 Q28,-166 30,-152 Q22,-160 10,-158 Q2,-158 -12,-150 Z',
     4: 'M-13,-148 Q-14,-158 -6,-160 Q-4,-170 6,-168 Q12,-174 20,-168 Q30,-168 30,-156 Q34,-150 30,-146 Q26,-152 22,-150 Q20,-156 13,-152 Q8,-158 2,-152 Q-4,-156 -8,-150 Q-11,-146 -13,-148 Z',
     5: 'M-12,-152 Q-6,-166 10,-166 Q26,-166 29,-154 Q18,-160 8,-160 Q-2,-160 -12,-152 Z',
+    6: 'M-12,-150 Q-8,-170 12,-168 Q28,-166 30,-152 Q22,-160 10,-158 Q2,-158 -12,-150 Z',
+    7: 'M-12,-152 Q-6,-166 10,-166 Q26,-166 29,-154 Q18,-160 8,-160 Q-2,-160 -12,-152 Z',
+    8: 'M-13,-148 Q-14,-158 -6,-160 Q-4,-170 6,-168 Q12,-174 20,-168 Q30,-168 30,-156 Q34,-150 30,-146 Q26,-152 22,-150 Q20,-156 13,-152 Q8,-158 2,-152 Q-4,-156 -8,-150 Q-11,-146 -13,-148 Z',
+    9: 'M-12,-148 Q-10,-172 14,-168 Q31,-164 31,-146 Q30,-138 24,-141 Q22,-150 12,-151 Q2,-152 -4,-149 Q-8,-148 -12,-148 Z',
+    10: 'M-12,-148 Q-8,-171 6,-168 L7,-152 Q0,-156 -12,-148 Z M8,-168 Q29,-166 30,-147 Q22,-156 9,-152 Z',
+    11: 'M-12,-148 L-10,-164 L-2,-158 L4,-171 L10,-160 L18,-171 L20,-158 L30,-163 L30,-147 Q24,-152 18,-148 Q12,-154 6,-148 Q0,-154 -6,-148 Q-9,-152 -12,-148 Z',
   };
+  // 0.26.6 eye styles: replace the baked eye lines 97-100 (left eye x 5, right eye x 20.4, y -139). c = iris colour.
+  const EYES = {
+    0: c => [`<ellipse cx="5" cy="-139" rx="4.3" ry="5.8" fill="${c}"/>`, `<ellipse cx="20.4" cy="-139" rx="4.1" ry="5.8" fill="${c}"/>`],
+    1: c => [SD('M0.6,-139 Q5,-132.6 9.4,-139 Z', c) + SL('M-.4,-139.4 L10.2,-139.4', P.INK, 2.2), SD('M16,-139 Q20.4,-132.6 24.8,-139 Z', c) + SL('M15.2,-139.4 L25.6,-139.4', P.INK, 2.2), '', ''],
+    2: c => [SL('M1,-137 Q5,-144 9,-137', P.INK, 2.8), SL('M16.4,-137 Q20.4,-144 24.4,-137', P.INK, 2.8), '', ''],
+    3: c => [`<ellipse cx="5" cy="-139" rx="5.4" ry="6.6" fill="#ffffff" stroke="${P.INK}" stroke-width="1.8"/><circle cx="6" cy="-138.4" r="3.2" fill="${c}"/>`, `<ellipse cx="20.4" cy="-139" rx="5.2" ry="6.6" fill="#ffffff" stroke="${P.INK}" stroke-width="1.8"/><circle cx="21.4" cy="-138.4" r="3.2" fill="${c}"/>`, '<circle cx="7" cy="-140" r="1.1" fill="#ffffff"/><circle cx="22.4" cy="-140" r="1.1" fill="#ffffff"/>', ''],
+    4: c => [SD('M0,-138 Q5,-145 10,-140.5 Q5,-134.5 0,-138 Z', c) + SL('M-.6,-139 Q5,-146 10.6,-141', P.INK, 1.8), SD('M15.4,-140.5 Q20.4,-145 25.4,-138 Q20.4,-134.5 15.4,-140.5 Z', c) + SL('M14.8,-141 Q20.4,-146 26,-139', P.INK, 1.8), '<circle cx="6.4" cy="-140" r="1.1" fill="#ffffff"/><circle cx="21.8" cy="-140" r="1.1" fill="#ffffff"/>', ''],
+    5: c => [`<ellipse cx="5" cy="-139" rx="4.4" ry="6" fill="${c}"/>`, `<ellipse cx="20.4" cy="-139" rx="4.2" ry="6" fill="${c}"/>`, SD('M6.4,-144 l.9,2.2 l2.3,.3 l-1.8,1.4 l.6,2.3 l-2,-1.3 l-2,1.3 l.6,-2.3 l-1.8,-1.4 l2.3,-.3 Z', '#ffffff') + SD('M21.8,-144 l.9,2.2 l2.3,.3 l-1.8,1.4 l.6,2.3 l-2,-1.3 l-2,1.3 l.6,-2.3 l-1.8,-1.4 l2.3,-.3 Z', '#ffffff'), '<circle cx="3.4" cy="-136" r=".9" fill="#ffffff"/><circle cx="18.8" cy="-136" r=".9" fill="#ffffff"/>'],
+    6: c => [`<circle cx="5.4" cy="-139" r="2.8" fill="${c}"/>`, `<circle cx="20.6" cy="-139" r="2.8" fill="${c}"/>`, '<circle cx="6.2" cy="-140" r=".8" fill="#ffffff"/><circle cx="21.4" cy="-140" r=".8" fill="#ffffff"/>', ''],
+    7: c => [`<ellipse cx="5" cy="-139" rx="4.3" ry="5.8" fill="${c}"/>`, SL('M16.4,-138 Q20.4,-142.6 24.4,-138', P.INK, 2.8), '<circle cx="6.6" cy="-141.4" r="1.8" fill="#ffffff"/>', '<circle cx="3.6" cy="-136.4" r=".85" fill="#ffffff"/>'],
+  };
+  // 0.26.6: a head-only preview for capsule hair / eye unlocks (and the look editor's locked chips)
+  LOOK.previewSVG = function (kind, v) {
+    const hc = '#5a3a28', sk = LOOK.skins[1][0], st = kind === 'hair' ? v : 3, ey = kind === 'eyes' ? v : 0;
+    let back = SP(HAIR_BACK[st] || HAIR_BACK[0], hc, 3.4); if (st === 2) back = SP('M-12,-168 a8,8 0 1 0 0.1,0 Z', hc, 3.4) + SP('M8,-174 a8,8 0 1 0 0.1,0 Z', hc, 3.4) + back;
+    if (st === 10) back += SP(BRAIDS, hc, 2.4);
+    const e = EYES[ey](LOOK.eyeCols[kind === 'eyes' ? 3 : 0][0]);
+    const body = back + `<ellipse cx="8" cy="-142" rx="20" ry="21" fill="${sk}" stroke="${P.INK}" stroke-width="3.4"/>` + SP(FRINGE[st] || FRINGE[0], hc, 3.4) + e.join('') + SL('M11.2,-127 Q13.6,-127.9 16,-126.8', P.INK, 1.5);
+    const vb = kind === 'eyes' ? '-16 -160 48 40' : '-42 -196 84 100';
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" width="96" height="96">${body}</svg>`;
+  };
+  LOOK.previewURL = (kind, v) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(LOOK.previewSVG(kind, v));
   LOOK.patch = function (lk) {
     lk = LOOK.norm(lk);
     const hc = LOOK.hairs[lk.hairC] || LOOK.hairs[0], sk = LOOK.skins[lk.skin] || LOOK.skins[0], m = lk.body === 'm', st = lk.hair;
@@ -202,19 +242,22 @@ const ART = (() => {
         let extra = '';
         if (st === 1) extra = SP('M-6,-130 Q-12,-118 -8,-104 L-2,-106 Q-4,-118 0,-128 Z', hc, 3.2);          // long: a lock out of the hood
         if (st === 4) extra = SP('M-10,-128 Q-16,-122 -12,-114 Q-6,-112 -4,-120 Z', hc, 3.2);
-        L[95] = SP(FRINGE[st], hc) + extra;
+        if (st === 6) extra = SP('M-8,-128 Q-16,-118 -12,-106 L-6,-108 Q-8,-118 -3,-126 Z', hc, 3.2);   // ponytail peeks out
+        if (st === 10) extra = SP(BRAIDS, hc, 3);
+        L[95] = SP(FRINGE[st] || FRINGE[0], hc) + extra;
         L[96] = st === 5 || st === 3 ? '' : SL(st === 4 ? 'M-11,-150 Q-16,-144 -12,-138 M29,-150 Q33,-144 30,-138' : 'M-11,-150 Q-17,-144 -14,-136 M29,-150 Q34,-143 30,-136 M10,-163 Q15,-156 11,-149', hc, 2.2);
       } else {
-        let back = SP(HAIR_BACK[st], hc);
+        let back = SP(HAIR_BACK[st] || HAIR_BACK[0], hc); if (st === 10) back += SP(BRAIDS, hc, 3);
         if (st === 2) back = SP('M-12,-168 a8,8 0 1 0 0.1,0 Z', hc) + SP('M8,-174 a8,8 0 1 0 0.1,0 Z', hc) + back;
         const shade = st === 5 ? '' : SD(st === 1 ? 'M-20,-130 Q-24,-112 -16,-104 L-8,-104 Q-14,-118 -12,-132 Z' : 'M-18,-140 Q-20,-150 -12,-158 Q-14,-146 -12,-136 Z', 'rgba(17,20,47,.22)');
         const hoodDown = SP('M-22,-124 Q-28,-110 -16,-106 Q2,-103 18,-108 Q22,-114 16,-118 Q-2,-112 -22,-124 Z', '#f07b3c');   // bunched hood at the neck
         const ear = `<ellipse cx="-9" cy="-138" rx="5" ry="6.4" fill="${sk[0]}" stroke="${P.INK}" stroke-width="3.2"/>`;
         L[91] = back + shade + hoodDown + ear;
         L[92] = ''; L[93] = '';
-        L[95] = SP(FRINGE[st], hc);
+        L[95] = SP(FRINGE[st] || FRINGE[0], hc);
         L[96] = st === 4 ? SL('M-4,-176 q4,-4 8,0 M14,-176 q4,-4 8,0 M-20,-160 q-2,-5 2,-8', 'rgba(17,20,47,.35)', 1.6) : st === 1 || st === 0 ? SL('M-11,-150 Q-17,-144 -14,-136 M10,-163 Q15,-156 11,-149', 'rgba(17,20,47,.3)', 1.6) : '';
       }
+      if (lk.eyes || lk.eyeC) { const ec = (LOOK.eyeCols[lk.eyeC] || LOOK.eyeCols[0])[0], E2 = (EYES[lk.eyes] || EYES[0])(ec); L[97] = E2[0]; L[98] = E2[1]; if (E2.length > 2) { L[99] = E2[2]; L[100] = E2[3]; } }   // 0.26.6
       if (m) {
         L[94] = SP('M-12,-146 Q-12,-163 8,-163 Q28,-163 28,-147 Q28,-130 20,-124 Q10,-119 -1,-123 Q-12,-128 -12,-146 Z', sk[0]);     // squarer jaw
         L[101] = SL('M-.4,-150.6 Q5,-151.6 10,-150.4', P.INK, 2.6) + SL('M15.4,-150.4 Q20.4,-151.8 25.4,-150.8', P.INK, 2.6);       // heavier brows
@@ -391,6 +434,15 @@ const ART = (() => {
     sweater: { slot: 'outfit', col: ['#2f7a4a', '#225c37', 'Ugly sweater'], svg: () => SL('M-28,-96 l6,-6 l6,6 l6,-6 l6,6 l6,-6 l6,6 l6,-6 l6,6 l6,-6', '#d9483a', 3) +
       SL('M-29,-88 Q-2,-82 24,-88', '#f4efe6', 2) + SP('M-2,-82 L-10,-64 L6,-64 Z', '#3fa04a', 2) + circ(-2, -84, 2.4, '#e0b94a', 1.2) + circ(-6, -70, 1.6, '#d9483a', .8) + circ(2, -74, 1.6, '#f4efe6', .8) +
       SP('M-30,-56 Q-2,-50 27,-56 L27,-49 Q-2,-44 -30,-50 Z', '#d9483a', 2.2), arm: SL('M15,-84 L25,-89', '#d9483a', 2.6) },
+    // 0.26.6 capsule outfits
+    overalls: { slot: 'outfit', col: ['#4a6aa8', '#36508a', 'Overalls'], svg: () => SP('M-24,-96 L-22,-58 L22,-58 L20,-96 Q-2,-90 -24,-96 Z', '#4a6aa8', 2.4) + SL('M-18,-120 L-20,-96 M14,-120 L16,-96', '#36508a', 3.4) +
+      circ(-19, -96, 2.2, '#e0b94a', 1.2) + circ(15, -96, 2.2, '#e0b94a', 1.2) + `<rect x="-8" y="-88" width="12" height="9" rx="1.5" fill="#36508a" stroke="${CI}" stroke-width="1.4"/>`, arm: '' },
+    trench: { slot: 'outfit', col: ['#b8945a', '#94743e', 'Trench coat'], svg: () => SL('M-2,-122 L-6,-48', '#94743e', 2) + [-108, -96, -84].map(y => circ(2, y, 2, '#6e5432', 1)).join('') +
+      SP('M-29,-76 Q-2,-70 25,-76 L25.6,-70 Q-2,-64 -29.6,-70 Z', '#6e5432', 2.2) + `<rect x="-6" y="-77" width="8" height="8" rx="1" fill="none" stroke="#e0b94a" stroke-width="1.8"/>`, arm: SL('M18,-86 L27,-90', '#94743e', 2.4) },
+    labcoat: { slot: 'outfit', col: ['#eef0f6', '#c9cedf', 'Lab coat'], svg: () => SL('M-2,-122 L-4,-48', '#aab0c4', 1.8) + `<rect x="8" y="-100" width="10" height="9" rx="1.5" fill="none" stroke="#aab0c4" stroke-width="1.8"/>` +
+      SL('M11,-104 L11,-96 M14,-104 L14,-97', '#3a6ab8', 1.6) + SP('M-24,-124 L-12,-104 L-2,-122 Z', '#c9cedf', 1.6) + SP('M20,-124 L8,-104 L-2,-122 Z', '#c9cedf', 1.6), arm: SL('M17,-83 L26,-87', '#c9cedf', 2) },
+    tux: { slot: 'outfit', col: ['#26242f', '#17161e', 'Tuxedo'], svg: () => SP('M-10,-124 L-2,-96 L6,-124 Z', '#f4efe6', 1.6) + SP('M-6,-120 L-2,-116 L2,-120 L-2,-112 Z', '#b53a2f', 1) +
+      [-104, -94, -84].map(y => `<circle cx="-2" cy="${y}" r="1.4" fill="#f4efe6"/>`).join('') + SL('M-18,-120 L-6,-96 M14,-120 L2,-96', '#3a3848', 2.4), arm: SL('M24,-87 L27,-84', '#f4efe6', 3) },
     leather: { slot: 'outfit', col: ['#3a3645', '#26222f', 'Biker'], svg: () => SP('M-9,-118 L-15,-99 L-4,-104 Z', '#4a4657', 2) + SP('M10,-118 L16,-101 L6,-104 Z', '#4a4657', 2) +
       SL('M-11,-108 L3,-56', '#c9cedf', 2) + SP('M-30,-58 Q-2,-53 27,-58 L27,-52 Q-2,-47 -30,-52 Z', '#26222f', 1.8) + `<rect x="-6" y="-58" width="8" height="6" rx="1" fill="none" stroke="#c9cedf" stroke-width="1.6"/>` +
       [[-22, -116], [-18, -118], [-14, -119]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.3" fill="#c9cedf"/>`).join(''), arm: SL('M18,-84 L26,-88', '#c9cedf', 1.8) },
