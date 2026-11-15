@@ -545,6 +545,12 @@ const ART = (() => {
     ring: `<ellipse cx="0" cy="6" rx="18" ry="14" fill="none" stroke="#11142f" stroke-width="9"/><ellipse cx="0" cy="6" rx="18" ry="14" fill="none" stroke="#e0b94a" stroke-width="5"/>
       <path d="M-8,-10 L0,-20 L8,-10 L0,-4 Z" fill="#9fe0e6" stroke="#11142f" stroke-width="2.4" stroke-linejoin="round"/>`,
   });
+  Object.assign(EXTRA_ICONS, {   // 0.36: weapon mods
+    mod_grip: `<g transform="rotate(-35)" stroke="#11142f" stroke-width="2.6"><rect x="-8" y="-28" width="16" height="56" rx="6" fill="#5a4a86"/>${[-18, -6, 6, 18].map(y => `<path d="M-8,${y - 4} L8,${y + 4}" stroke="#b98cf0" stroke-width="3"/>`).join('')}</g>`,
+    mod_nails: `<g stroke="#11142f" stroke-width="2.4">${[[-16, -8], [0, -14], [16, -8], [-8, 8], [8, 8]].map(([x, y]) => `<g transform="translate(${x} ${y}) rotate(${x})"><rect x="-2.5" y="-12" width="5" height="22" fill="#b9bdcc"/><rect x="-6" y="-14" width="12" height="4" rx="1.5" fill="#9aa0b4"/></g>`).join('')}</g>`,
+    mod_scope: `<g stroke="#11142f" stroke-width="2.6"><rect x="-26" y="-8" width="52" height="16" rx="6" fill="#3a3848"/><circle cx="-24" cy="0" r="10" fill="#5c5a6e"/><circle cx="-24" cy="0" r="5" fill="#9fe0e6"/><rect x="-6" y="8" width="12" height="8" fill="#3a3848"/></g>`,
+    mod_silencer: `<g transform="rotate(-20)" stroke="#11142f" stroke-width="2.6"><rect x="-28" y="-9" width="56" height="18" rx="8" fill="#4c4a5e"/>${[-14, 0, 14].map(x => `<path d="M${x},-9 v18" stroke="#2a2836" stroke-width="2"/>`).join('')}</g>`,
+  });
   Object.assign(EXTRA_ICONS, {   // 0.30: guns + goofy weapons
     pistol: `<g transform="rotate(-10)" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"><path d="M-26,-14 h44 v12 h-24 l-6,24 h-12 l4,-24 h-6 z" fill="#3a3848"/><rect x="-22" y="-12" width="36" height="4" fill="#5c5a6e" stroke="none"/></g>`,
     shotgun: `<g transform="rotate(-30)" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"><rect x="-6" y="-5" width="36" height="8" fill="#3a3848"/><path d="M-6,-6 L-32,-2 L-34,12 L-6,4 Z" fill="#8a5a34"/><rect x="6" y="2" width="14" height="6" fill="#8a5a34"/></g>`,

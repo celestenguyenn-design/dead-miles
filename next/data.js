@@ -62,6 +62,11 @@ window.DM = window.DM || {};
     shotgun: { n: 'Shotgun', i: 'shotgun', w: 'shotgun', rare: 1, tag: 'shoots shells - VERY loud' },
     nailgun: { n: 'Nail gun', i: 'nailgun', w: 'nailgun', tag: 'shoots nails, fairly quiet' },
     shells: { n: 'Shotgun shells', i: 'shells', rare: 1 },
+    // 0.36 weapon mods: fitted into a mod slot (one melee, one ranged); they work on whatever weapon you hold
+    mod_grip: { n: 'Grip wrap', i: 'mod_grip', mod: 'melee', tag: 'melee mod: swings 15% faster' },
+    mod_nails: { n: 'Nail studs', i: 'mod_nails', mod: 'melee', tag: 'melee mod: +15% damage' },
+    mod_scope: { n: 'Scope', i: 'mod_scope', mod: 'ranged', tag: 'ranged mod: aims 40% further, +10% damage' },
+    mod_silencer: { n: 'Silencer', i: 'mod_silencer', mod: 'ranged', tag: 'ranged mod: guns 60% quieter' },
     knuckles: { n: 'Brass knuckles', i: 'knuckles', w: 'knuckles', tag: 'fast punches' },
     turkeysq: { n: 'Squeaky turkey', i: 'turkeysq', w: 'turkeysq', tag: 'SQUEAK. knocks them back' },
     xlights: { n: 'Light-string whip', i: 'xlights', w: 'xlights', tag: 'long reach, hits a wide arc' },
@@ -148,8 +153,12 @@ window.DM = window.DM || {};
     xlights: { out: ['xlights', 1], in: { battery: 2, cloth: 1, tape: 2 }, n: 'Light-string whip' },
     nailgun: { out: ['nailgun', 1], in: { scrap: 6, battery: 2, tape: 2 }, n: 'Nail gun (shoots nails)' },
     shells: { out: ['shells', 6], in: { scrap: 2, ammo: 4 }, n: 'Shotgun shells' },
+    mod_grip: { out: ['mod_grip', 1], in: { cloth: 2, tape: 2 }, n: 'Grip wrap (melee mod)' },          // 0.36: everyone knows it
+    mod_nails: { out: ['mod_nails', 1], in: { nails: 10, tape: 1, scrap: 1 }, n: 'Nail studs (melee mod)' },   // 0.36: everyone knows it
+    mod_scope: { out: ['mod_scope', 1], in: { scrap: 3, tape: 1, battery: 1 }, n: 'Scope (ranged mod)' },
+    mod_silencer: { out: ['mod_silencer', 1], in: { scrap: 4, cloth: 2, tape: 1 }, n: 'Silencer (ranged mod)' },
   };
-  D.BASIC = ['bandage', 'lockpick', 'knuckles'];
+  D.BASIC = ['bandage', 'lockpick', 'knuckles', 'mod_grip', 'mod_nails'];
   // ---------------------------------------------------------------- 0.15: item categories (shown on pack / stash / loot cards)
   // owner: "inventory items should tell us 'materials' like for crafting or should be 'sold' - there's a lot of random shit like paperbacks"
   D.CATS = {
@@ -164,7 +173,7 @@ window.DM = window.DM || {};
     if (it.cos) return 'cos'; if (it.decor) return 'decor'; if (it.seed) return 'seed'; if (it.quest) return 'quest'; if (k === 'key') return 'key';
     if (it.bp) return 'bp'; if (it.w) return 'weapon'; if (k === 'ammo' || k === 'arrow' || k === 'shells') return 'ammo'; if (it.gift || k === 'hat') return 'event';
     if (it.use === 'Drink') return 'drink'; if (it.use === 'Eat') return 'food'; if (it.hp || it.cure) return 'med'; if (k === 'note') return 'note';
-    if (it.slots || it.armor || k === 'shoes' || k === 'lockset') return 'gear'; if (k === 'lockpick' || k === 'pole') return 'tool';
+    if (it.slots || it.armor || it.mod || k === 'shoes' || k === 'lockset') return 'gear'; if (k === 'lockpick' || k === 'pole') return 'tool';
     return D.uses(k).length ? 'mat' : 'sell';
   };
   // what a material goes into: workbench recipes, then base building (base.js PIECES, if loaded)
@@ -264,7 +273,7 @@ window.DM = window.DM || {};
   };
   D.COS_POOL = { 'cos_*': [], 'cosZ_*': ['corpse'], 'cosP_*': ['police'], 'cosM_*': ['mansion'], 'cosH_*': ['horde'] };
   // what the trader pays (caps each); she sells for about 4x
-  D.VALUE = { pistol: 60, shotgun: 75, nailgun: 30, shells: 2, knuckles: 14, turkeysq: 10, xlights: 12, pan: 10, armor_pad: 10, armor_sport: 14, armor_riot: 25, armor_plate: 35, beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
+  D.VALUE = { mod_grip: 6, mod_nails: 8, mod_scope: 20, mod_silencer: 25, pistol: 60, shotgun: 75, nailgun: 30, shells: 2, knuckles: 14, turkeysq: 10, xlights: 12, pan: 10, armor_pad: 10, armor_sport: 14, armor_riot: 25, armor_plate: 35, beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
     lockpick: 3, gift: 8, candy: 1, cranberry: 3, stuffing: 3, pie: 4, turkey: 20, hat: 0, pole: 2, watch: 25, jewelry: 20, wood: 1, nails: .25, spikedbat: 20, machete: 22, prybar: 14, packplus: 15, backpack: 40, shoes: 10, lockset: 18, note: 0, parcel: 0, antibio: 12 };
   Object.assign(D.VALUE, { seed_tomato: 2, seed_potato: 2, seed_carrot: 2, seed_corn: 3, seed_herbs: 2, tomato: 2, potato: 2, carrot: 2, corn: 2, herbs: 3, coffee: 2 });
   for (const k in D.DECOR) D.VALUE[k] = D.DECOR[k].v;
@@ -442,7 +451,7 @@ window.DM = window.DM || {};
     ['attic', 'xlights', .4], ['washer', 'turkeysq', .2], ['dresser', 'turkeysq', .12], ['store', 'turkeysq', .15], ['register', 'knuckles', .2],
     ['evidence', 'knuckles', .4], ['workbench', 'nailgun', .25], ['garage', 'nailgun', .2], ['toolbox', 'nailgun', .15],
     ['car', 'pistol', .08], ['night', 'pistol', .03], ['safe', 'pistol', .15], ['armory', 'shotgun', .3], ['armory', 'shells', 1.2], ['locker', 'pistol', .12],
-    ['evidence', 'pistol', .12], ['cellar', 'shotgun', .08], ['cellar', 'shells', .4], ['car', 'shells', .3], ['corpse', 'shells', .25]]) D.LOOT[t][1][k] = w;
+    ['evidence', 'pistol', .12], ['cellar', 'shotgun', .08], ['armory', 'mod_scope', .25], ['evidence', 'mod_silencer', .15], ['safe', 'mod_scope', .1], ['workbench', 'mod_nails', .2], ['gym', 'mod_grip', .3], ['cellar', 'shells', .4], ['car', 'shells', .3], ['corpse', 'shells', .25]]) D.LOOT[t][1][k] = w;
   D.LOOT.hordecrate = [[3, 4], { armor_riot: .35, armor_sport: .4, 'decor_*': 1, 'seed_*': 1.2, ammo: 2, meds: 2, bandage: 2, scrap: 2, nails: 2, wood: 2, tape: 1, battery: 1, 'bp_*': .5, 'cosH_*': .35 }];
   // phase 5: cosmetics are rare finds - clothes-ish furniture, zombies a little more often, police lockers better (mansions: see game.js loot())
   for (const [t, w] of [['wardrobe', .1], ['dresser', .08], ['coat', .09], ['hutch', .06], ['washer', .07], ['night', .04], ['gym', .05]]) D.LOOT[t][1]['cos_*'] = w;
