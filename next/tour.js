@@ -68,7 +68,7 @@ window.DM = window.DM || {};
     { f: loot, t: 'Loot a house', d: 'Loot to go in yourself: search furniture, pick locks, avoid or fight zombies, and leave with what you found. Crew sends a crew member instead.' },
     { s: '#mtabs [data-t="stash"]', t: 'Gear', d: 'Your backpack and stash: eat, equip weapons, move things to the stash so a bad run cannot cost them, sell or discard junk.' },
     { s: '#mtabs [data-t="bench"]', t: 'Workbench', d: 'Craft bandages, lockpicks, arrows, weapons and gear from materials. Blueprints unlock new recipes.' },
-    { s: '#mtabs [data-t="map"]', t: 'Real-world map', d: 'Your real streets. Walk within ~35 m of a marked place with the map open to claim it as a landmark house (3 a day, on foot).' },
+    { s: '#mtabs [data-t="map"]', t: 'Real-world map', d: 'Your real streets. Walk up to a marked place with the map open and it becomes a bonus house (3 a day, on foot). Crates, radio calls and Dot\'s deliveries pop up while you walk. The ? on the map explains it all.' },
     { s: '#mset', t: 'Settings and help', d: 'Sound, music, your save, How to play (every rule in detail) and this tour again. That\'s it - go walk!' },
   ];
   let on = false, pending = false, i = 0, list = [], el = null, pollT = null, autoed = false, setupN = 0;

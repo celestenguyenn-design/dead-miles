@@ -872,6 +872,15 @@ kind of changes on the weekend")
   per day; a square seen on 3+ different days counts as a home zone too. So a fake home far away does not free the real
   one for more than a couple of days. Learned zones draw as a fainter ring.
 
+## Done in 0.30.4 (owner: "explain the routes and map better for new players" / "the tutorial for the map should show and
+people should be able to click a ? for help if they somehow skip it")
+- Map: 3-page guide (places / home spots / map jobs + Pocket mode), shown once (key dm-next-mapintro2, so existing
+  players see it once too), ? in the map's top bar reopens it; the home-spot question waits until it is closed.
+- Route: route.js R.guide() - 5 steps in plain words + a legend of every stop kind; shown once the first time the Route
+  view opens (dm-route-guide), and from a ? in the route header.
+- Home tabs: a round ? at the end of the tab bar opens the help for the current tab (Houses/Route, Gear, Workbench,
+  Walks, Capsules, event) even if tips were seen or turned off (Game.help). New TIPS: gear, bench. Tour map step text.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

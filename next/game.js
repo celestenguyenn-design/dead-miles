@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.30.3';
+const NEXT_VERSION = '0.30.4';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -726,6 +726,8 @@ const NEXT_VERSION = '0.30.3';
     decor: ['Decorating', 'Decor box: pick a piece, then tap where it goes. Tap a placed piece to move it, Rotate it a quarter turn (front, side, back) or Turn it to mirror it. Store puts it back in the box.'],
     walks: ['Walks', 'Three ways to get paid for walking: hit 5,000 steps a day to grow your streak, pick an expedition and let your steps carry you there (finds on the way, a crate at the end), and collect lifetime step milestones with titles.'],
     route: ['Daily route', 'Every 1,500 steps today opens the next row. Pick one stop per row, joined to your last pick: a house, a safehouse, Dot, a supply drop or an event. Each pick takes the place of one of today\'s scouted houses.'],
+    gear: ['Gear', 'Equipped shows your weapon, armor and quiver. Backpack is what you carry into a house (limited slots, and you can drop it if you go down). Stash is safe at home. Tap any item for its buttons: Eat, Drink, Equip, Wear, move it, or Discard. Sell junk to Dot for caps.'],
+    bench: ['Workbench', 'Craft from materials in your pack and stash: bandages, lockpicks, brass knuckles, and anything you have a blueprint for. Blueprints turn up in safes, attics, workbenches and Dot\'s shop - tap one to learn it for good. Weapons can be upgraded in Gear.'],
     lock: ['Locked', 'Lockpicks are silent but can snap - aim, then hold TURN and let go if it binds. A crowbar always works, but it is loud and may smash something.'],
   };
   let tipQ = [], tipOn = false;
@@ -733,10 +735,20 @@ const NEXT_VERSION = '0.30.3';
     if (!SV || !SV.tips || SV.tips.off || SV.tips[id] || !TIPS[id] || tipQ.includes(id)) return;
     tipQ.push(id); showTip();
   }
+  // 0.30.4 (owner: "people should be able to click a ? for help if they somehow skip it"): the ? in the tab bar reopens the
+  // help for the tab you are on, even after the tip was seen or tips were turned off
+  let forceTip = null;
+  function help(id) { if (!TIPS[id]) return; if (tipOn) return; forceTip = id; tipQ = tipQ.filter(x => x !== id); tipQ.unshift(id); showTip(); }
+  Game.help = help;
+  function helpTab() {
+    SFX.play('ui');
+    if (curTab === 'houses' && SV.route && SV.route.view === 'route' && DM.Route && DM.Route.guide) { DM.Route.guide(); return; }
+    help({ houses: 'home', stash: 'gear', bench: 'bench', walks: 'walks', gacha: 'gacha', event: 'deck' }[curTab] || 'home');
+  }
   Game.tip = tip; Game.tipNext = () => showTip();
   function showTip() {
     if (tipOn || !tipQ.length || cosPopOn || (DM.Tour && DM.Tour.active())) return;   // 0.26.2: tips wait for the tour
-    const id = tipQ.shift(); if (SV.tips[id]) return showTip();
+    const id = tipQ.shift(), forced = forceTip === id; forceTip = null; if (SV.tips[id] && !forced) return showTip();
     SV.tips[id] = 1; Game.save(); tipOn = true;
     const G = DM.scene && DM.House && DM.House.G; let paused = false;   // in a run the world waits while you read
     if (G && !G.over && !G.paused) { G.paused = paused = true; }
@@ -1198,9 +1210,9 @@ const NEXT_VERSION = '0.30.3';
         </div>
       </div>
       ${gated ? homeTiles() : eventBanner()}
-      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Walks ? `<button data-t="walks">Walks${DM.Walks.claimable() && curTab !== 'walks' ? '<i class="tbadge">!</i>' : ''}</button>` : ''}${SV.tutorialDone && DM.Gacha ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}</div>
+      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Walks ? `<button data-t="walks">Walks${DM.Walks.claimable() && curTab !== 'walks' ? '<i class="tbadge">!</i>' : ''}</button>` : ''}${SV.tutorialDone && DM.Gacha ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}<button data-t="help" class="helptab" aria-label="Help for this tab">?</button></div>
       <div id="mpane"></div>`;
-    document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { SFX.play('ui'); if (b.dataset.t === 'map') { DM.Map.open(); return; } tab(b.dataset.t); }; });
+    document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { if (b.dataset.t === 'help') { helpTab(); return; } SFX.play('ui'); if (b.dataset.t === 'map') { DM.Map.open(); return; } tab(b.dataset.t); }; });
     $('#mLog').onclick = () => {
       const v = parseInt(String($('#mSteps').value).replace(/[^0-9]/g, ''), 10); /* "8,500" or "8 500" is 8500, not 8 */ if (!(v > 0)) { toast('Type your step total for today', 1.6); return; }
       // typed steps go through the step ledger so a phone catching up later never counts the same steps twice

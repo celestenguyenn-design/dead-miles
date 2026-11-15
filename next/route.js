@@ -308,7 +308,7 @@ window.DM = window.DM || {};
     const status = owed ? `<b class="hot">Walk on</b> - your next scouted house pays the stop you owe, then you can pick` : ready ? `<b class="hot">${ready > 1 ? ready + ' stops ready' : 'Pick your next stop'}</b> - the glowing one${cur.to.length > 1 ? 's' : ''} below`
       : done >= s.R ? '<b>Route done for today.</b> New map at midnight.'
       : u >= s.R ? '<b>You reached the end.</b>' : `Next stop in <b>${fmt(nin)}</b> steps`;
-    const head = `<div class="rthead"><div class="rtrow"><span class="kick">Today's route</span><span class="rtcount">${done}/${s.R} stops</span></div>
+    const head = `<div class="rthead"><div class="rtrow"><span class="kick">Today's route</span><span class="rtcount">${done}/${s.R} stops<button class="rthelp" id="rtHelp" aria-label="How the route works">?</button></span></div>
       <div class="rtstat">${status}</div>
       ${u < s.R ? `<div class="mbar rtbar"><i style="width:${Math.max(3, frac * 100)}%"></i></div><div class="rtsub">${ready ? `Next row in ${fmt(nin)} steps · ` : ''}a new row every ${fmt(R.STEP)} steps you walk today</div>` : ''}
       <div class="rtsub">Each stop takes the place of one of today's scouted houses.${s.debt && !owed ? ' <b class="hot">One stop is owed: your next scouted house pays it.</b>' : ''}${s.later.length ? ' Someone you helped is looking for you.' : ''}</div></div>`;
@@ -398,9 +398,30 @@ window.DM = window.DM || {};
   }
 
   let lastView = '';
+  // 0.30.4 (owner: "explain the routes and map better for new players"): a plain-language guide, opened by the ? in the
+  // route header and once by itself the first time the Route view is opened
+  const GUIDE_KEY = 'dm-route-guide';
+  R.guide = function () {
+    try { localStorage.setItem(GUIDE_KEY, '1'); } catch (e) { /* ignore */ }
+    const L = [['🏠', 'house'], ['☣️', 'danger'], ['⭐', 'elite'], ['🛏️', 'safe'], ['🛒', 'dot'], ['📦', 'supply'], ['🎁', 'cache'], ['❓', 'event']];
+    G().ui.sheetOpen(`<div class="kick">How it works</div><h3>Your daily route</h3>
+      <ol class="rtg">
+        <li><b>A new map every day.</b> It starts at the bottom and climbs row by row. The top row is the big prize.</li>
+        <li><b>Walk to open rows.</b> Every ${fmt(R.STEP)} steps you walk today opens the next row. Steps from your phone or watch count.</li>
+        <li><b>Pick one stop per row.</b> Tap a glowing stop. It has to be joined by a line to the stop you picked last, so think a row ahead.</li>
+        <li><b>It swaps a house.</b> Walking also scouts houses for your list. Each stop you pick takes the place of one of today's untouched scouted houses, so pick stops you want more than a plain house.</li>
+        <li><b>Midnight resets it.</b> Rows you didn't reach are gone, and a fresh route appears.</li>
+      </ol>
+      <div class="rtlegend">${L.map(([e, k]) => `<div><i>${e}</i><span><b>${esc(KIND[k].n)}</b> ${esc(KIND[k].d)}</span></div>`).join('')}</div>
+      <p class="mp dim">Tip: the Houses tab has two views. <b>List</b> is every house you can loot, and <b>Route</b> is this map.</p>
+      <div class="btnrow"><button class="mbtn" id="rtGuideOk">Got it</button></div>`);
+    $('#rtGuideOk').onclick = () => G().ui.sheetClose();
+  };
   R.bind = function (el, rr) {
     rerender = rr || rerender;
     const s = state();
+    { const h = el.querySelector('#rtHelp'); if (h) h.onclick = ev => { ev.stopPropagation(); SFX.play('ui'); R.guide(); }; }
+    if (s.view === 'route' && el.querySelector('#rtMap')) { let seen = 0; try { seen = localStorage.getItem(GUIDE_KEY); } catch (e) { /* ignore */ } if (!seen) setTimeout(() => R.guide(), 250); }
     el.querySelectorAll('[data-rv]').forEach(b => b.onclick = () => { SFX.play('ui'); s.view = b.dataset.rv; G().save(); rerender(); if (s.view === 'route' && DM.Game.tip) DM.Game.tip('route'); });
     el.querySelectorAll('[data-rn]').forEach(g => g.onclick = () => { SFX.play('ui'); const [r, i] = g.dataset.rn.split(':').map(Number); openNode(r, i); });
     const m = el.querySelector('#rtMap');
@@ -417,6 +438,10 @@ window.DM = window.DM || {};
   const css = document.createElement('style');
   css.textContent = `
   .rtseg { margin: 0 0 10px; }
+  .rthelp { margin-left: 8px; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ink); background: var(--plum); color: var(--crm); font: 900 13px Inter, system-ui, sans-serif; vertical-align: middle; cursor: pointer; }
+  .rtg { margin: 6px 0 10px; padding-left: 20px; font-size: 13.5px; font-weight: 700; line-height: 1.4; color: var(--mute); } .rtg li { margin: 0 0 7px; } .rtg b { color: var(--crm); }
+  .rtlegend { display: grid; gap: 6px; margin: 4px 0 10px; } .rtlegend div { display: flex; gap: 10px; align-items: flex-start; font-size: 12.5px; font-weight: 700; line-height: 1.35; color: var(--mute); }
+  .rtlegend i { font-style: normal; font-size: 19px; width: 26px; flex: none; text-align: center; } .rtlegend b { color: var(--crm); }
   .rthead { padding: 10px 12px; margin-bottom: 8px; border-radius: 18px; background: #1c1538; border: 3px solid var(--ink); box-shadow: 0 4px 0 var(--plum); }
   .rthead .rtrow { display: flex; align-items: baseline; justify-content: space-between; }
   .rthead .rtcount { font-size: 12px; font-weight: 900; color: var(--mute); }
