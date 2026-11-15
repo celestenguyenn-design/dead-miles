@@ -556,8 +556,31 @@
       else if (s.type === 'shelf') { const sh = G.furn[s.furn]; here = sh && !sh.slideState && p.x > sh.x + 4 && p.x < sh.x + sh.w - 4 && p.y - (sh.y + sh.h) < 24 && p.y > sh.y + sh.h - 4; msg = 'This shelf feels wrong... look around the rest of the house first.'; }
       else if (s.type === 'attic') { here = Math.hypot(p.x - px(s.hatch.x), p.y - px(s.hatch.y)) < .75 * T; msg = 'There is a hatch up there... look around the rest of the house first.'; }
       else if (s.type === 'panel') { const f = G.furn[s.furn]; here = f && !f.opened && Math.abs(p.x - (f.x + f.w / 2)) < f.w / 2 && p.y - (f.y + f.h) < 30 && p.y > f.y + f.h - 4; msg = 'This wall sounds hollow... look around the rest of the house first.'; }
-      if (here) { s.hintAt = now; toast(msg, 3); return; }
+      if (here) { s.hintAt = now; if (!s.noticed) s.noticed = { room: RN(G.room), what: SECNAME[s.type] || 'Hidden spot' }; toast(msg, 3); return; }
     }
+  }
+  // 0.26.7 (owner: "a prompt popped up briefly that said the wall sounds hollow but it never shows again ... i also cant
+  // find what its talking about"): a noticed secret is remembered for the run - a clue chip in the HUD says where it is
+  // and what is still needed, a "?" pulses on the minimap, and a toast says when enough has been searched to open it.
+  const SECNAME = { panel: 'Hollow wall', rug: 'Creaky floor', shelf: 'Odd shelf', attic: 'Attic hatch' };
+  function secretNeed(s) {
+    if (!gateOpen()) { const [a, b] = searchedCount(), n = Math.max(1, Math.ceil(b * gatePct()) - a); return `search ${n} more spot${n === 1 ? '' : 's'} first`; }
+    if (s.type === 'panel') return hasPry() ? 'face the wall and tap Pry' : 'pry it open - needs a crowbar or pry bar';
+    if (s.type === 'attic') return hasItem('pole') ? 'stand under it and Pull down' : 'needs a hook pole to pull it down';
+    if (s.type === 'rug') return 'stand on it - move the rug';
+    if (s.type === 'shelf') return 'stand at the shelf and push it';
+    return 'go back to it';
+  }
+  const noticedSecrets = () => (G.sec || []).filter(x => x.noticed && !x.found);
+  function secretChip() {
+    const list = noticedSecrets();
+    return list.map(x => `<div class="sc"><b>🔍 ${x.noticed.what}</b>${x.noticed.room ? ` · ${x.noticed.room.toLowerCase()}` : ''}<span>${secretNeed(x)}</span></div>`).join('');
+  }
+  function secretSpot(x) {   // tile coords of a secret, for the minimap
+    if (x.type === 'panel' || x.type === 'shelf') { const f = G.furn[x.furn]; return f ? { x: f.tx + (f.tw || 1) / 2, y: f.ty + (f.th || 1) - .5 } : null; }
+    if (x.type === 'rug') { const R = rugRect(x); return { x: (R.x + R.w / 2) / T, y: (R.y + R.h / 2) / T }; }
+    if (x.type === 'attic' && x.hatch) return { x: x.hatch.x, y: x.hatch.y };
+    return null;
   }
   function searchedCount() { const C = gateSet(); return [C.filter(f => f.searched).length, C.length]; }
   function foundSecret(s) { if (!s.found) { s.found = true; gainXP(8, G.p.x, G.p.y); if (DM.Game && DM.Game.onSecret) DM.Game.onSecret(); } }
@@ -1915,7 +1938,7 @@
   // ---------------------------------------------------------------- HUD (DOM)
   const hpFill = $('#hp i'), stFill = $('#st i'), hpVal = $('#hpv'), packEl = $('#pack b'), noiseBars = [...document.querySelectorAll('#noise span')];
   const useBtn = $('#bUse'), useLbl = $('#useLbl'), mini = $('#mini'), mctx = mini.getContext('2d');
-  let lastHud = '', lastQ = null;
+  let lastHud = '', lastQ = null, lastSec = null;
   function hud() {
     const p = G.p;
     hpFill.style.width = (p.hp / maxHp() * 100) + '%'; stFill.style.width = Math.min(100, p.sta / Math.max(100, F.staMax()) * 100) + '%';
@@ -1949,6 +1972,9 @@
         else useLbl.innerHTML = `${t.act} <b>${t.name}</b>${loud ? '<em>loud</em>' : ''}`;
       } else { useBtn.classList.remove('on'); useLbl.classList.remove('on'); }
     }
+    { const sc = secretChip(); if (sc !== lastSec) { lastSec = sc; $('#secchip').innerHTML = sc; $('#secchip').classList.toggle('on', !!sc); }
+      const go = gateOpen(); if (go && G.gateWas === false && noticedSecrets().length) { const x = noticedSecrets()[0]; toast(`You've searched enough - go back to the ${x.noticed.what.toLowerCase()}${x.noticed.room ? ' in the ' + x.noticed.room.toLowerCase() : ''}`, 4); }
+      G.gateWas = go; }
     const q = DM.Game && DM.Game.questChip ? DM.Game.questChip() : '';
     if (q !== lastQ) { lastQ = q; $('#qchip').innerHTML = q + '<span class="qcaret">▾ quests</span>' + (G.qOpen && DM.Game.questList ? '<div class="qlist">' + DM.Game.questList() + '</div>' : ''); $('#qchip').classList.toggle('on', !!q); $('#qchip').classList.toggle('open', !!G.qOpen); }
     $('#hp').classList.toggle('low', p.hp < maxHp() * .35);
@@ -1993,6 +2019,7 @@
     }
     for (const f of G.furn) if (f.lootable && !f.searched && G.visited[f.room]) { mctx.fillStyle = '#c95f2c'; mctx.fillRect(f.tx * s + 1, f.ty * s + 1, 2, 2); }
     for (const z of G.zs) if (z.raider && !z.dead && z.seen) { mctx.fillStyle = '#ff5a48'; mctx.beginPath(); mctx.arc(z.x / T * s, z.y / T * s, 2.6, 0, 6.3); mctx.fill(); }   // 0.15: raiders she has seen
+    for (const x of noticedSecrets()) { const q = secretSpot(x); if (!q) continue; const pu = 2.6 + Math.sin(performance.now() / 260) * 1.2; mctx.strokeStyle = '#ffd27a'; mctx.lineWidth = 1.6; mctx.beginPath(); mctx.arc(q.x * s, q.y * s, pu + 1.6, 0, 6.3); mctx.stroke(); mctx.fillStyle = '#ffd27a'; mctx.font = 'bold 7px sans-serif'; mctx.textAlign = 'center'; mctx.fillText('?', q.x * s, q.y * s + 2.5); }   // 0.26.7
     mctx.fillStyle = '#f07b3c'; mctx.beginPath(); mctx.arc(G.p.x / T * s, G.p.y / T * s, 3.2, 0, 6.3); mctx.fill();
   }
 
