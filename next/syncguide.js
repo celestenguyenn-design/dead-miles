@@ -103,6 +103,12 @@
 #sg h4{margin:0 0 6px;font-size:18px;font-weight:800;line-height:1.3}
 #sg p{margin:6px 0;font-size:16px;line-height:1.5}
 #sg .help{color:${C.mute};font-size:14px;line-height:1.45}
+#sg .sglock{margin:0 0 14px;padding:12px 14px;border-radius:14px;background:${C.wall};border:3px solid ${C.warn};position:sticky;top:0;z-index:2}
+#sg .sglock.ok{border-color:${C.ok}}
+#sg .sglock b{color:${C.warn};font-size:16px}
+#sg .sglock.ok b{color:${C.ok}}
+#sg .sglock p{margin:6px 0}
+#sg .sglock .lnk{background:none;border:0;color:${C.mute};text-decoration:underline;font:inherit;font-size:13px;padding:4px 0}
 #sg b{color:#fff3d6}
 #sg .btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:54px;border:0;border-radius:15px;background:${C.ora};color:#2a1308;font:800 17px Inter,system-ui,sans-serif;padding:0 16px;margin:8px 0 0;text-decoration:none;text-align:center;box-shadow:inset 0 -4px 0 rgba(0,0,0,.18)}
 #sg .btn.g{background:${C.wall};color:${C.crm};box-shadow:inset 0 0 0 2px ${C.lil}}
@@ -283,7 +289,7 @@
       + '<h3 style="margin:16px 4px 10px">Which phone do you have?</h3>'
       + '<button class="pick" data-go="iphone"><span class="ic">i</span><span><b>iPhone</b><span class="help">Uses the Shortcuts app</span></span></button>'
       + '<button class="pick" data-go="android"><span class="ic">A</span><span><b>Android</b><span class="help">Uses a small Dead Miles Steps app</span></span></button>'
-      + '<button class="pick" data-go="typed"><span class="ic">#</span><span><b>I\'ll type my steps</b><span class="help">If syncing will not work on your phone</span></span></button>'
+      + (LOCK.on ? '' : '<button class="pick" data-go="typed"><span class="ic">#</span><span><b>I\'ll type my steps</b><span class="help">If syncing will not work on your phone</span></span></button>')
       + '<h3 style="margin:18px 4px 10px">Already set up?</h3>'
       + '<button class="pick" data-go="fix"><span class="ic">?</span><span><b>Steps not showing up?</b><span class="help">Checklist and live status</span></span></button>';
   }
@@ -438,7 +444,7 @@
       + '<p class="help">Open the Shortcut, ask the <b>Shortcuts AI</b> (Apple Intelligence) to edit it, and paste this in. Your address and code are already in it.</p>'
       + (NET.ok ? (NET.stepKey ? '<textarea readonly id="sg-v-rebuild">' + esc((VALUES.rebuild = rebuildPrompt())) + '</textarea>' + btn('copy:rebuild', 'Copy the rebuild prompt', 'g') + msg('copy:rebuild') : keyBox('x', '', () => '')) : '<p class="help">Sign in first.</p>')
       + '<p class="help" style="margin-top:8px">Run it once, then tap <b>Test it</b> here to see your steps arrive (the Shortcut itself stays silent). No Apple Intelligence? Follow the iPhone guide again from step 2 in a new Shortcut.</p>'
-      + '<button class="btn g" data-go="iphone">iPhone guide</button><button class="btn g" data-go="android">Android guide</button><button class="btn g" data-go="typed">Type my steps instead</button></div>';
+      + '<button class="btn g" data-go="iphone">iPhone guide</button><button class="btn g" data-go="android">Android guide</button>' + (LOCK.on ? '' : '<button class="btn g" data-go="typed">Type my steps instead</button>') + '</div>';
     return h;
   }
 
@@ -490,6 +496,25 @@
   }
 
   /* ---------------- render / actions ---------------- */
+  // 0.26.4 setup mode (tour.js; owner: "i need the tutorial to SHOW them and wait for them to set it up before moving on,
+  // because thats the hardest part"): SYNC.setup(cb) opens the guide LOCKED - no close button - with a banner on top that
+  // waits for a real sync from the phone (a step post newer than when setup began, minus 5 min for clock drift; pulled
+  // every 8 s). When one lands: "Synced!" + Continue -> cb(true). Only after 3 minutes does a small "My phone can't sync"
+  // way out appear (some phones cannot install the app) -> cb(false); the tour then makes them log steps by hand.
+  const LOCK = { on: false, since: 0, t0: 0, cb: null, poll: null, ok: false, n: 0 };
+  const CANT_MS = 180000;
+  function lockCheck() {
+    if (!LOCK.on || LOCK.ok) return;
+    if (NET.lastPost && NET.lastPost > LOCK.since) { LOCK.ok = true; LOCK.n = (NET.steps && NET.steps.today) || 0; render(); }
+  }
+  function lockBanner() {
+    if (!LOCK.on) return '';
+    if (LOCK.ok) return '<div class="sglock ok"><b>&#10003; Synced!</b><p>Your phone just sent its steps' + (LOCK.n ? ' (' + fmt(LOCK.n) + ' today)' : '') + '. Step sync is set up - from now on your steps come in by themselves.</p><button class="btn" data-a="lockdone">Continue</button></div>';
+    const late = Date.now() - LOCK.t0 > CANT_MS;
+    return '<div class="sglock"><b>Setup &middot; waiting for your first sync&hellip;</b><p>' + (NET.ok ? 'Pick your phone below and follow every step. When you get to the end, run the Shortcut (iPhone) or tap <b>Send now</b> in the app (Android). This screen moves on by itself the moment your steps arrive.' : 'Sign in first (the account button), then come back here.') + '</p>'
+      + '<p class="help">Checking for your phone&hellip; last check ' + (NET.lastPull ? ago(NET.lastPull) : 'not yet') + '</p>'
+      + (late ? '<button class="lnk" data-a="lockcant">My phone can\'t sync - type my steps instead</button>' : '') + '</div>';
+  }
   const TITLES = { pick: 'Step sync guide', iphone: 'iPhone setup', android: 'Android setup', typed: 'Type my steps', fix: 'Steps not showing up?' };
   function render() {
     const root = document.getElementById('sg'); if (!root) return;
@@ -499,8 +524,8 @@
     const body = { pick: scrPick, iphone: scrIphone, android: scrAndroid, typed: scrTyped, fix: scrFix }[UI.screen]();
     root.innerHTML = '<div class="wrap"><div class="top">'
       + (UI.screen === 'pick' ? '' : '<button class="ib" data-a="back" aria-label="Back">&#8249;</button>')
-      + '<h2>' + TITLES[UI.screen] + '</h2><button class="ib" data-a="close" aria-label="Close">&times;</button></div>'
-      + body + '</div>';
+      + '<h2>' + TITLES[UI.screen] + '</h2>' + (LOCK.on ? '<span class="ib" style="visibility:hidden"></span>' : '<button class="ib" data-a="close" aria-label="Close">&times;</button>') + '</div>'
+      + lockBanner() + body + '</div>';
     for (const k in keep) { const i = document.getElementById(k); if (i && keep[k]) i.value = keep[k]; }
     root.querySelectorAll('details').forEach((x, i) => { if (openD[i]) x.open = true; });
     root.scrollTop = y;
@@ -532,7 +557,9 @@
   }
 
   function act(a) {
-    if (a === 'close') return SYNC.close();
+    if (a === 'close') { if (LOCK.on) return; return SYNC.close(); }
+    if (a === 'lockdone' && LOCK.on && LOCK.ok) return lockEnd(true);
+    if (a === 'lockcant' && LOCK.on) { if (!confirm("Type your steps by hand instead? Typed steps only count at half. You can set up sync later from the home screen.")) return; return lockEnd(false); }
     if (a === 'back') { UI.screen = UI.hist.pop() || 'pick'; UI.msg = {}; render(); document.getElementById('sg').scrollTop = 0; return; }
     if (a === 'signin') { if (NET.openPanel) NET.openPanel(); return; }
     if (a.indexOf('copy:') === 0) return copy(a.slice(5));
@@ -550,8 +577,20 @@
     }
   }
 
+  function lockEnd(ok) {
+    const cb = LOCK.cb; LOCK.on = false; LOCK.cb = null; clearInterval(LOCK.poll); LOCK.poll = null;
+    SYNC.close(); if (cb) try { cb(ok); } catch (e) { /* ignore */ }
+  }
   let listener = null;
   const SYNC = window.SYNC = {
+    setup(cb) {
+      SYNC.open();
+      Object.assign(LOCK, { on: true, since: Date.now() - 5 * 60000, t0: Date.now(), cb, ok: false, n: 0 });
+      clearInterval(LOCK.poll);
+      LOCK.poll = setInterval(async () => { if (!LOCK.on) return; if (NET.ok) { try { await NET.pullSteps(); } catch (e) { /* ignore */ } } lockCheck(); render(); }, 8000);
+      render(); return true;
+    },
+    locked: () => LOCK.on,
     open(screen) {
       css();
       let root = document.getElementById('sg');
@@ -563,7 +602,7 @@
           const b = e.target.closest('[data-a]'); if (b) act(b.getAttribute('data-a'));
         });
         // Sign-in happens in the account panel on top of this; re-render when it changes.
-        let t = 0; listener = () => { clearTimeout(t); t = setTimeout(() => { if (NET.ok && UI.screen !== 'pick' && UI.screen !== 'typed' && !NET.stepKey) ensureKey(); render(); }, 50); };
+        let t = 0; listener = () => { clearTimeout(t); t = setTimeout(() => { if (NET.ok && UI.screen !== 'pick' && UI.screen !== 'typed' && !NET.stepKey) ensureKey(); lockCheck(); render(); }, 50); };
         window.addEventListener('net:change', listener);
       }
       UI.hist = []; UI.screen = 'pick'; UI.msg = {}; UI.test = {}; UI.check = null; UI.showTok = false;
