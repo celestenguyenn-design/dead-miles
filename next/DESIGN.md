@@ -967,6 +967,11 @@ people should be able to click a ? for help if they somehow skip it")
   Last 20 in/out in SV.gifts.log, shown in Walk together. Trading = gifting each other.
 - All 12 ideas from the 2026-11-15 list are now built (0.32-0.41).
 
+## Done in 0.41.1 (owner: "she needs 1 painkiller. I already have one on me, I should be able to submit it")
+- npcq.js: talking to someone in a house who needs help, with the items already in the pack or stash: "Here - I have it
+  on me" helps them on the spot (no walk, no Return). Same for a quest accepted earlier when you are back in the house.
+  The reward shows in the in-run panel (reward(q, { panel, close })). A helped person just says thanks after that.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

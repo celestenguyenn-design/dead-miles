@@ -56,18 +56,30 @@ window.DM = window.DM || {};
   // ---------------------------------------------------------------- in the house: the offer (crew.js calls this from Talk)
   N.offer = function (h, spec, panel, close, onAccept) {
     const T = TYPES[spec.type], q = forHouseQ(h.id);
-    if (q) { panel(`<div class="kick">${esc(q.name)}</div><h3>"You came back?"</h3><p class="mp">"I still need ${esc(needText(q.need))}. ${left(q) ? `Go on - I'll be here. (Walk ${fmt(left(q))} more steps, then Return from your house list.)` : 'Bring it to me - use Return on your house list.'}"</p><button class="mbtn" id="nqOk">"I'm on it."</button>`); $('#nqOk').onclick = close; return; }
+    if (st().list.some(x => x.house === h.id && x.state === 'done')) { panel(`<div class="kick">${esc(spec.name)}</div><h3>"Thank you again."</h3><p class="mp">"We'll be okay now. Go on - others need you more."</p><button class="mbtn ghost" id="nqOk">Close</button>`); $('#nqOk').onclick = close; return; }   // 0.41.1: helped already
+    // 0.41.1 (owner: "she needs 1 painkiller. I already have one on me, I should be able to submit it"): if it is in her
+    // pack or stash, she can hand it over right here - no walking away and Return needed
+    const haveNow = need => need.every(([k, n]) => count(k) >= n);
+    if (q) {
+      if (haveNow(q.need)) { panel(`<div class="kick">${esc(q.name)}</div><h3>"You found it?"</h3><p class="mp">"I still need ${esc(needText(q.need))}." You have it on you.</p><button class="mbtn" id="nqHand">Hand it over now</button><button class="mbtn ghost" id="nqOk">"Not yet."</button>`);
+        $('#nqHand').onclick = () => { take(q.need); reward(q, { panel, close }); }; $('#nqOk').onclick = close; return; }
+      panel(`<div class="kick">${esc(q.name)}</div><h3>"You came back?"</h3><p class="mp">"I still need ${esc(needText(q.need))}. ${left(q) ? `Go on - I'll be here. (Walk ${fmt(left(q))} more steps, then Return from your house list.)` : 'Bring it to me - use Return on your house list.'}"</p><button class="mbtn" id="nqOk">"I'm on it."</button>`); $('#nqOk').onclick = close; return;
+    }
     const full = open().length >= MAX;
     panel(`<div class="kick">Someone needs help · ${esc(T.t)}</div><h3>${esc(spec.name)}</h3>
       <p class="mp">"${esc(T.ask)}"</p>
       <div class="perkline"><b>They need</b><span>${esc(needText(spec.need))}</span></div>
       <p class="mp small">Find or craft it, then walk about ${fmt(spec.back)} steps and come back (Return on the house card). Reward: ${spec.caps} caps, XP and something from their stash.</p>
       ${full ? `<p class="mp warn">You are already helping ${MAX} people. Finish one first.</p><button class="mbtn ghost" id="nqNo">"I can't right now."</button>`
-        : `<button class="mbtn" id="nqYes">"I'll be back with it."</button><button class="mbtn ghost" id="nqNo">"Sorry, I can't."</button>`}`);
+        : `${haveNow(spec.need) ? '<button class="mbtn" id="nqNow">"Here - I have it on me."</button>' : ''}<button class="mbtn${haveNow(spec.need) ? ' ghost' : ''}" id="nqYes">"I'll be back with it."</button><button class="mbtn ghost" id="nqNo">"Sorry, I can't."</button>`}`);
     if ($('#nqYes')) $('#nqYes').onclick = () => {
       const S = st(), v = SV();
       S.list.push({ id: 'n' + (++S.seq), house: h.id, addr: h.address || '', type: spec.type, name: spec.name, seed: spec.seed, need: spec.need, at: v.walked || 0, back: spec.back, caps: spec.caps, state: 'open', day: v.day.key });
       h.npcq = 'n' + S.seq; G().save(); SFX.play('pick'); close(); toast(`${spec.name}: "Thank you. I'll be here."`, 2.4); if (onAccept) onAccept();
+    };
+    if ($('#nqNow')) $('#nqNow').onclick = () => {   // 0.41.1: help right away
+      const S = st(), v = SV(), q2 = { id: 'n' + (++S.seq), house: h.id, addr: h.address || '', type: spec.type, name: spec.name, seed: spec.seed, need: spec.need, at: v.walked || 0, back: 0, caps: spec.caps, state: 'open', day: v.day.key };
+      S.list.push(q2); take(spec.need); reward(q2, { panel, close });
     };
     $('#nqNo').onclick = close;
   };
@@ -99,7 +111,7 @@ window.DM = window.DM || {};
   }
   function release(q) { const h = (SV().houses || []).find(x => x.id === q.house); if (h && h.npcq === q.id) delete h.npcq; }
   const BONUS = [['bandage', 3], ['meds', 2], ['ammo', 15], ['lockpick', 3], ['beans', 3], ['water', 3], ['battery', 2], ['tape', 2], ['arrow', 10]];
-  function reward(q) {
+  function reward(q, P) {   // P = { panel, close } inside a run (crew.js), else the home sheet
     const v = SV(), S = st(), r = D.mulberry32((q.seed ^ 0x7f4a7c15) >>> 0), U = G().ui;
     q.state = 'done'; S.done = (S.done || 0) + 1; release(q);
     v.trader.caps += q.caps; const xp = 20 + Math.round(q.caps / 3); DM.Skills.addXP(xp);
@@ -109,12 +121,13 @@ window.DM = window.DM || {};
     if (r() < .12) { const c = D.pickCos(['quest'], r); if (c) { G().unlockCos('cos_' + c); got.push('a cosmetic'); } }
     const join = r() < .2 && DM.Crew && DM.Crew.free && DM.Crew.free() > 0;
     G().save(); SFX.play('pick');
-    U.sheetOpen(`<div class="kick">Helped · ${esc(TYPES[q.type].t)}</div><h3>"I won't forget this."</h3>
+    const open1 = P ? P.panel : U.sheetOpen, shut = P ? P.close : U.sheetClose;
+    open1(`<div class="kick">Helped · ${esc(TYPES[q.type].t)}</div><h3>"I won't forget this."</h3>
       <p class="mp">${esc(q.name)} presses something into your hands.</p><div class="perkline"><b>You got</b><span>${esc(got.join(' · '))}</span></div>
       ${join ? `<p class="mp">"...Is there room where you're staying? I can pull my weight."</p><button class="mbtn" id="nqJoin">"Come to my base."</button>` : ''}
       <button class="mbtn ghost" id="nqOk">Close</button>`);
-    if ($('#nqJoin')) $('#nqJoin').onclick = () => { DM.Crew.joinHelped(q.name, q.seed); U.sheetClose(); toast(`${q.name} is heading to your base`, 2.2); G().renderHome(); };
-    $('#nqOk').onclick = () => { U.sheetClose(); G().renderHome(); };
+    if ($('#nqJoin')) $('#nqJoin').onclick = () => { DM.Crew.joinHelped(q.name, q.seed); shut(); toast(`${q.name} is heading to your base`, 2.2); if (!P) G().renderHome(); };
+    $('#nqOk').onclick = () => { shut(); if (!P) G().renderHome(); };
   }
   // ---------------------------------------------------------------- quest list / loot highlights (game.js)
   N.needs = function (add) { for (const q of open()) for (const [k, n] of q.need) add(k, `${q.name}: ${TYPES[q.type].t}`, n - count(k)); };
