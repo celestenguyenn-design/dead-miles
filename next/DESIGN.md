@@ -893,6 +893,15 @@ people should be able to click a ? for help if they somehow skip it")
 - Sync guide: Open URLs always opens Safari on iPhone (Apple limit); and "more steps than Health shows" = iPhone + Watch
   summed - set Group by: Day. (Owner's server log showed the shortcut itself posting 4,783.)
 
+## Done in 0.32.0 (owner, on the idea list: "i love all the ideas honestly") - 1 of 12: advent calendar
+- advent.js (DM.Advent): Dec 1-24, 24 doors; today's door after 3,000 effective steps; after it, each extra 3,000 today
+  opens one missed door (2 a day). Seeded prizes per year+door: small supplies, 6 = token, 12 = light-string whip,
+  18 = blueprint, 24 = Christmas cosmetic (first not owned) + 150 caps + 2 tokens; 20+ doors -> Masterwork whip too.
+  Home tile (first in This week) -> card sheet. SV.advent = { y, open, extra }.
+- Build order agreed for the rest: base raids, job skill trees, bestiary, achievements + titles, weapon mods,
+  companion on runs, multi-day + legendary map quests, weather/night bonus, party step goal, friends step race,
+  friend gifts + trading.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
