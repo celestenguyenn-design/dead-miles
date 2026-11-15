@@ -777,6 +777,13 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Bug (owner: Deep run / Weekly boss sheets overlapped by the tabs): #msheet / #mres had no z-index, so the sticky header
   (z 5) and tabs (z 4) painted over them once the page was scrolled. Now z-index 10 (title 20, tips 25, cospop 30).
 
+## Done in 0.28.5 (owner: "Houses aren't refreshing as i walk on the map" - the map's house icons)
+- Cause: from 0.25 a house needed a tile housenumber point; outside Brooklyn most buildings have none, so few icons.
+  map.js tileEls: unnumbered building footprints (35-2,500 m2, within 40 m of a named street, 1 in 3 by id) become
+  houses named "House on <street>" / "Apartments on <street>". CACHE_V 4 (squares refetched once).
+- The credit line had been garbled by a sed '&' in 0.25 (two overlapping lines, "copy;"); fixed. The map header now
+  says "N places · N houses nearby".
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
