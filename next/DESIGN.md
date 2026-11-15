@@ -917,6 +917,14 @@ people should be able to click a ? for help if they somehow skip it")
   base defence, guns skip a round 25%, crafted weapons +1 tier). Costs 1/2/2/3. Hooks: house.js, game.js
   (stashSlots, craftQuality), base.js (defense). Ranks from another job's tree are dropped in SK.norm.
 
+## Done in 0.35.0 - 4+5 of 12: bestiary + feats & titles (codex.js, DM.Codex)
+- Bestiary: kills per kind (walker = no kind, runner, bloater, screamer, armored, turkey, krampus) counted by wrapping
+  Game.onKill; 10/50/200 kills = +5/+10/+15% damage vs that kind (house.js hitZombie, her hits only). ??? until killed.
+- Feats (15, ACH): kills, runs, secrets, bestiary, pan / squeaky-turkey / gun kills (by weapon in hand), raids won
+  (base.js flag), map quests, the bodega cat (mapquest ENC flag), cosmetics, base tiers, advent. Each pays caps once and
+  unlocks a title; titles join the Walks title picker (W.titles). Checked on home render (+ every 5 kills). Home tile.
+- SV.codex = { kills, wk, flags, got }.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
