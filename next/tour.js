@@ -22,6 +22,8 @@ window.DM = window.DM || {};
   const cant = () => { const v = SV(); return !!(v && v.tourNoSync && !v.syncSetup); };
   const synced = () => { const v = SV(); return !!(v && v.syncSetup); };
   const STEPS = [
+    // 0.26.9 (owner: "that should be step 1 for iphones AND androids, homescreen app"): only while not opened from the icon
+    { t: 'First: put Dead Miles on your home screen', home: 1, d: () => (DM.Install ? 'It opens full screen like a real app, and step sync works best from it. On this phone:' : 'Add this page to your home screen from the browser menu.'), html: () => DM.Install ? DM.Install.html() : '' },
     { t: 'Set up first: your steps', d: 'Dead Miles runs on your REAL steps, so set them up before anything else. It takes a couple of minutes: 1) sign in, 2) turn on step sync so every step you walk comes in by itself. Synced steps count in full - typed ones only count at half.' },
     { s: '#mnet', t: 'Step 1 of 2 · Sign in', d: () => signedIn() ? `You're signed in as @${NET.handle} - step 1 done.` : 'Tap Sign in now to make your account. Step sync needs it, it backs up your save, and it lets you see your friends.',
       act: () => signedIn() ? null : ['Sign in now', () => { const b = $('#mnet'); if (b) b.click(); }], done: signedIn, need: 'Sign in to continue' },
@@ -54,9 +56,9 @@ window.DM = window.DM || {};
     { s: '#mtabs [data-t="map"]', t: 'Real-world map', d: 'Your real streets. Walk within ~35 m of a marked place with the map open to claim it as a landmark house (3 a day, on foot).' },
     { s: '#mset', t: 'Settings and help', d: 'Sound, music, your save, How to play (every rule in detail) and this tour again. That\'s it - go walk!' },
   ];
-  let on = false, pending = false, i = 0, list = [], el = null, pollT = null, autoed = false;
+  let on = false, pending = false, i = 0, list = [], el = null, pollT = null, autoed = false, setupN = 0;
   function setupDone() { const v = SV(); if (v && !v.setupDone) { v.setupDone = 1; DM.Game.save(); } }
-  const SETUP = 4;   // the first 4 steps are the setup
+  const SETUP = 5;   // the first 5 steps are the setup (the home-screen one is dropped when it is not needed)
   function visible(n) { if (!n) return false; const r = n.getBoundingClientRect(); return r.width > 0 && r.height > 0 && n.offsetParent !== null; }
   const txt = v => typeof v === 'function' ? v() : v;
   function target(st) { return st.f ? st.f() : st.s ? $(st.s) : null; }
@@ -102,15 +104,15 @@ window.DM = window.DM || {};
     const st = list[i], n = target(st);
     if (n && n.scrollIntoView) try { n.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); } catch (e) { n.scrollIntoView(); }
     const card = el.querySelector('.tourcard'), last = i === list.length - 1;
-    const act = st.act ? st.act() : null, ok = !st.done || st.done(), setup = i < SETUP, alt = st.alt && !ok ? st.alt : null;
-    card.innerHTML = `<div class="tourk">${i < SETUP ? 'Setup' : 'Tour'} · ${i + 1} of ${list.length}</div><h4>${esc(st.t)}</h4><p>${esc(txt(st.d))}</p>${act ? `<button class="mbtn touract" id="tAct">${esc(act[0])}</button>` : ''}${st.done ? `<div class="tourneed${ok ? ' ok' : ''}">${ok ? '✓ Done' : esc(st.need || 'Finish this step to continue')}</div>` : ''}${alt ? `<button class="touralt" id="tAlt">${esc(alt[0])}</button>` : ''}
+    const act = st.act ? st.act() : null, ok = !st.done || st.done(), setup = i < setupN, alt = st.alt && !ok ? st.alt : null;
+    card.innerHTML = `<div class="tourk">${i < setupN ? 'Setup' : 'Tour'} · ${i + 1} of ${list.length}</div><h4>${esc(st.t)}</h4><p>${esc(txt(st.d))}</p>${st.html ? st.html() : ''}${act ? `<button class="mbtn touract" id="tAct">${esc(act[0])}</button>` : ''}${st.done ? `<div class="tourneed${ok ? ' ok' : ''}">${ok ? '✓ Done' : esc(st.need || 'Finish this step to continue')}</div>` : ''}${alt ? `<button class="touralt" id="tAlt">${esc(alt[0])}</button>` : ''}
       <div class="tourdots">${list.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</div>
       <div class="tourbtns"><button class="tourskip" id="tSkip">${last || setup ? '' : 'Skip the rest'}</button>${i ? '<button class="mbtn sm ghost" id="tBack">Back</button>' : ''}<button class="mbtn sm" id="tNext"${ok ? '' : ' disabled'}>${last ? 'Done' : i ? 'Next' : 'Show me'}</button></div>`;
     const sfx = () => { try { DM.E.SFX.play('ui'); } catch (e) { /* ignore */ } };
     if (act) $('#tAct').onclick = () => { sfx(); pause(act[1]); };
     if (alt) $('#tAlt').onclick = () => { sfx(); alt[1](); i++; show(); };
     clearInterval(pollT); if (!ok) pollT = setInterval(() => { if (on && el.style.display !== 'none' && st.done()) show(); }, 1500);   // unlock Next once it is done
-    $('#tNext').onclick = () => { if (!(!st.done || st.done())) return; sfx(); if (last) end(); else { i++; while (i < list.length - 1 && list[i].skipIf && list[i].skipIf()) i++; if (i >= SETUP) setupDone(); show(); } };
+    $('#tNext').onclick = () => { if (!(!st.done || st.done())) return; sfx(); if (last) end(); else { i++; while (i < list.length - 1 && list[i].skipIf && list[i].skipIf()) i++; if (i >= setupN) setupDone(); show(); } };
     if (st.auto && act && !ok && !autoed) { autoed = true; setTimeout(() => { if (on && list[i] === st && !st.done()) pause(act[1]); }, 1400); }   // SHOW them: the guide opens by itself
     if ($('#tBack')) $('#tBack').onclick = () => { sfx(); i--; show(); };
     if (last || setup) $('#tSkip').style.visibility = 'hidden'; else $('#tSkip').onclick = () => { sfx(); end(); };
@@ -129,7 +131,7 @@ window.DM = window.DM || {};
   }
   function end() {
     on = false; pending = false; clearInterval(waitT); clearInterval(pollT); if (el) el.style.display = 'none';
-    const v = SV(); if (v) { v.tourDone = 1; if (i >= SETUP - 1) v.setupDone = 1; DM.Game.save(); }
+    const v = SV(); if (v) { v.tourDone = 1; if (i >= setupN - 1) v.setupDone = 1; DM.Game.save(); }
     if (DM.Game.tipNext) setTimeout(DM.Game.tipNext, 600);   // tips held back during the tour
     if (DM.E && DM.E.toast) DM.E.toast('Replay the tour any time: Settings > Game tour', 2.4);
   }
@@ -141,7 +143,9 @@ window.DM = window.DM || {};
     // setup steps always show and can never be skipped; the rest of the tour can be. A save that finished the tour
     // before setup was required gets the setup alone.
     const setupOnly = !replay && v.tourDone && !v.setupDone;
-    list = setupOnly ? STEPS.slice(0, SETUP).concat([FIN]) : STEPS.filter((st, k) => k < SETUP || !st.s && !st.f || visible(target(st)));
+    const keep = st => !st.home || (DM.Install && DM.Install.needed());
+    list = (setupOnly ? STEPS.slice(0, SETUP).concat([FIN]) : STEPS.filter((st, k) => k < SETUP || !st.s && !st.f || visible(target(st)))).filter(keep);
+    setupN = list.filter((st, k) => STEPS.indexOf(st) > -1 && STEPS.indexOf(st) < SETUP).length;
     show(); return true;
   };
   const FIN = { t: 'All set', d: 'Your steps are set up. Walk, scout houses and survive - replay the full tour any time from Settings > Game tour.' };

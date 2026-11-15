@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.26.8';
+const NEXT_VERSION = '0.26.9';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1705,7 +1705,7 @@ const NEXT_VERSION = '0.26.8';
   function boot2() {
     if (DM.Title && DM.Title.up) return;   // 0.22: the title's tap calls boot2 (a cloud save adopted meanwhile is picked up then)
     rollDay();
-    if (!SV.survivor) { cre = { name: '', look: ART.LOOK.random(), job: 'scavenger' }; creEdit = false; E.buildSurvivor(cre.look).then(renderCreate); return; }
+    if (!SV.survivor) { cre = { name: '', look: ART.LOOK.random(), job: 'scavenger' }; creEdit = false; E.buildSurvivor(cre.look).then(() => DM.Install ? DM.Install.gate(renderCreate) : renderCreate()); return; }   // 0.26.9: home screen first
     DM.S = SV.survivor;
     // 0.17: a deep run still going (the app was closed mid-run) drops her straight back in - no home screen in between (deep.js RESUME)
     E.buildSurvivor(SV.survivor.look).then(() => { if (DM.Deep && !DM.scene && DM.Deep.boot()) return; renderHome(); });
