@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.41.1';
+const NEXT_VERSION = '0.42.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -53,7 +53,7 @@ const NEXT_VERSION = '0.41.1';
     v.walked = v.walked || 0;
     v.base = DM.Base.norm(v.base, v);       // phase 4: the base (pool, pieces, garden, decor)
     v.horde = DM.Base.normHorde(v.horde);   // phase 4: horde night (shifts, reports waiting to send, results)
-    if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); if (s.job === 'hunter' && !s.known.includes('bow')) s.known.push('bow'); /* 0.29.2: hunters can always make a bow */ if (!s.known.includes('knuckles')) s.known.push('knuckles'); /* 0.30 */ for (const r of ['mod_grip', 'mod_nails']) if (!s.known.includes(r)) s.known.push(r); /* 0.36 */ s.packBonus = s.packBonus || 0; }
+    if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); if (s.job === 'hunter' && !s.known.includes('bow')) s.known.push('bow'); /* 0.29.2: hunters can always make a bow */ if (!s.known.includes('knuckles')) s.known.push('knuckles'); /* 0.30 */ for (const r of ['mod_grip', 'mod_nails', 'pipegun', 'baton', 'bandage2']) if (!s.known.includes(r)) s.known.push(r); /* 0.36, 0.42 */ if (!v.stack42 && s.stash && s.pack) { D.mergeStacks(s.stash); D.mergeStacks(s.pack); v.stack42 = 1; } /* 0.42: bigger stacks - merge the old small ones once */ s.packBonus = s.packBonus || 0; }
     if (v.survivor) { D.mergeStacks(v.survivor.pack); D.mergeStacks(v.survivor.stash); }   // 0.26.3: bigger stacks - fold old ones together
     v.trader.event = v.trader.event || null;   // phase 5a: Dot's seasonal job chain { key, step, kills, base }
     v.tips = v.tips || {};                  // phase 5: first-time tips already shown
@@ -964,10 +964,18 @@ const NEXT_VERSION = '0.41.1';
     // 0.29.3 (owner: "in dots shop we should have an option to auto sell junk with a button"): everything marked Sell
     // (no crafting / base use) from the pack and the stash, in one go - tap twice
     const junk = rows.filter(r => D.cat(r.e.k) === 'sell'), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(r.v * r.e.n)), 0);
+    const ex = extras(s);
     el.innerHTML = `<div class="kick sect">Sell to Dot · she pays low</div>`
+      + (ex.n ? `<button class="mbtn ghost" id="tExtra" style="margin:4px 0 6px;width:100%">Sell extras · ${ex.n} over ${KEEP} of each · ${icon('caps')}${ex.caps}</button><div class="mp dim" style="margin:-2px 0 8px;font-size:11.5px">Keeps ${KEEP} of every material, ammo and seed (pack + stash) and sells the rest: ${esc(ex.list.slice(0, 4).map(([k, n]) => n + ' ' + D.ITEMS[k].n.toLowerCase()).join(', '))}${ex.list.length > 4 ? '...' : ''}</div>` : '')
       + (junk.length ? `<button class="mbtn" id="tJunk" style="margin:4px 0 10px">Sell all junk · ${junk.length} item${junk.length === 1 ? '' : 's'} · ${icon('caps')}${jv}</button>` : '<div class="empty" style="margin-bottom:8px">No junk to sell - things marked Sell show up here.</div>')
       + (rows.length ? rows.map((r, j) => `<div class="shoprow">${icon(r.e.k)}<div><b>${D.ITEMS[r.e.k].n}${r.e.n > 1 ? ' x' + r.e.n : ''}</b><span>${r.from} · ${icon('caps')}${r.v >= 1 ? Math.floor(r.v) + ' each' : r.v === .5 ? '1 per 2' : '1 per ' + Math.round(1 / r.v)}</span></div>
       <button class="mbtn sm" data-sell="${j}">Sell ${r.e.n > 1 ? 'all' : ''} ${icon('caps')}${Math.max(1, Math.floor(r.v * r.e.n))}</button></div>`).join('') : '<div class="empty">Nothing to sell.</div>');
+    // 0.42 (owner: "an overload of batteries, cloth rags, 9mm"): sell everything above KEEP of each material / ammo / seed
+    if ($('#tExtra')) $('#tExtra').onclick = function () {
+      if (!this.dataset.sure) { this.dataset.sure = 1; this.innerHTML = `Tap again: sell ${ex.n} extra for ${icon('caps')}${ex.caps}`; return; }
+      for (const [k, n0] of ex.list) { let n = n0; for (const list of [s.stash, s.pack]) for (let i = list.length - 1; i >= 0 && n > 0; i--) { const e = list[i]; if (e.k !== k) continue; const t = Math.min(n, e.n); e.n -= t; n -= t; if (!e.n) list.splice(i, 1); } }
+      SV.trader.caps += ex.caps; SFX.play('pick'); Game.save(); toast(`Dot paid ${ex.caps} caps for your extras`, 1.8); renderTrader();
+    };
     if ($('#tJunk')) $('#tJunk').onclick = function () {
       if (!this.dataset.sure) { this.dataset.sure = 1; this.innerHTML = `Tap again to sell ${junk.length} item${junk.length === 1 ? '' : 's'} for ${icon('caps')}${jv}`; return; }
       for (const r of junk) { const list = s[r.from], idx = list.indexOf(r.e); if (idx >= 0) list.splice(idx, 1); }
@@ -1582,6 +1590,13 @@ const NEXT_VERSION = '0.41.1';
     };
     if (el.querySelector('#sJunk')) el.querySelector('#sJunk').onclick = () => { SFX.play('ui'); sellJunk(); };
     if (sel) { stashActions(); itemPop(el); } else itemPop(null);
+  }
+  // 0.42: what is over KEEP of each material / ammo / seed (counted over pack + stash)
+  const KEEP = 20;
+  function extras(s) {
+    const tot = {}; for (const e of s.pack.concat(s.stash)) { const c = D.cat(e.k); if (c === 'mat' || c === 'ammo' || c === 'seed') tot[e.k] = (tot[e.k] || 0) + e.n; }
+    const list = Object.keys(tot).filter(k => tot[k] > KEEP && k !== 'arrow').map(k => [k, tot[k] - KEEP]);
+    return { list, n: list.reduce((a, [, n]) => a + n, 0), caps: list.reduce((a, [k, n]) => a + Math.max(1, Math.floor(D.valueOf(k) * n)), 0) };
   }
   // 0.15: sell every "Sell" item in the stash to Dot in one go (she has to be in - it counts as a visit)
   function sellJunk() {

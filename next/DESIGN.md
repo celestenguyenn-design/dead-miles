@@ -972,6 +972,15 @@ people should be able to click a ? for help if they somehow skip it")
   on me" helps them on the spot (no walk, no Return). Same for a quest accepted earlier when you are back in the house.
   The reward shows in the in-run panel (reward(q, { panel, close })). A helped person just says thanks after that.
 
+## Done in 0.42.0 (owner: "seeds should be more limited ... an overload of batteries, cloth rags, a ton of 9mm ...
+either more things to craft, more storage or stacks, and reduce certain drop percentages")
+- Bigger stacks: seeds 60, crops 12, wood 40, nails 80, scrap 40, cloth 30, tape 15, batteries 25, 9mm 150,
+  shells 80, lockpicks 20, books 10. Old small stacks merge once on load (v.stack42).
+- Drops: every LOOT table (not jackpots): seeds x0.4, batteries x0.6, 9mm x0.6, cloth x0.7.
+- New recipes everyone knows: Pipe pistol (scrap 6, tape 2, wood 1; shoots 9mm, 42 dmg), Shock baton (scrap 3,
+  batteries 4, tape 1, cloth 2; 26 dmg, stuns 0.6 s, sparks), Bandage roll (cloth 5 + tape 1 -> 5 bandages).
+- Dot > Sell: "Sell extras" sells everything above 20 of each material / ammo / seed (pack + stash), tap twice.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
