@@ -938,6 +938,13 @@ people should be able to click a ? for help if they somehow skip it")
   Scavenger: +10% (+2%/level) extra-find chance (house.js extraChance). Hungry members stay home. Drawn with a bat
   and a green name tag. Pets still come along as before (one pet + one crew member).
 
+## Done in 0.38.0 - 8 of 12: story quests + the legendary Courier (mapquest.js)
+- "The Coast Signal" (Marisol, 📖): 3 chapters (coast1-3), one a day - the day's first survivor is the next chapter
+  if the last one was finished on an earlier day (s.story.coast, s.storyDay). Finale: caps, XP, token, Masterwork weapon.
+- The Courier (⭐, legend): once a week (s.legWeek set when accepted), appears after 300 m walked with the map open;
+  3 far drops (450-800 m apart); 200 caps, 120 XP, a token, a Masterwork weapon (payout r.master).
+- Codex feats: Signal Keeper (story done), Courier's Friend (legend done).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
