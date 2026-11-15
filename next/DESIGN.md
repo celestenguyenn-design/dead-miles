@@ -737,15 +737,25 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   Needs show as gold QUEST ITEMs in loot, in the quest list and the HUD chip.
 - Also fixed: 0.26.10 had doubled the 🔑 tags (the 0.8 ones already existed); the old tag now says "· key inside".
 
+## Done in 0.28 (owner: "yes build armor and the streaks + expeditions + milestones")
+- Armor (armor.js + data.js): survivor.armor = { k, d }; armor_pad (-10%, dur 60, craftable: cloth 5 + tape 2, blueprint),
+  armor_sport (-15%, 80), armor_riot (-25%, 120, steps x1.15 louder), armor_plate (-35%, 160, x1.25 louder, speed x.93).
+  house.js hurtPlayer -> DM.Armor.hit (damage x (1 - red), wear 60% of the raw hit, breaks at 0); speed and step noise
+  read slow / loud. Gear > Equipped has an Armor slot (Wear / Take off / Repair with 2 cloth or 2 scrap for +50%). Loot:
+  coat, wardrobe (pad), gym, garage (pads), locker, armory (vest, plate), horde crate; Dot level 2-4; icons via ART.addIcons.
+- Walks tab (walks.js): daily streak (5,000 effective steps, claim; consecutive days grow it; one freeze a week covers a
+  missed day; 10 + 2/day caps (max 40), bonuses day 3 / 7 / 14 / 30, every 7th after; "Iron Legs" title at 30),
+  expeditions (6 Brooklyn destinations 8k-40k steps of SV.walked; finds at 25/50/75%, a crate at 100%: horde-crate
+  rolls, caps = steps/100, 1-3 capsule tokens; repeatable, one at a time), milestones (lifetime SV.walked 25k ... 2.5M:
+  caps, tokens, halo at 500k, bat wings at 1M, a title; pick a title shown under your name). Tab badge "!" when
+  something can be claimed. Tabs: 4 per row now.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
 ### 2. Owner's list (2026-11-14), still to do, in this order
 - 5 job-only skill trees (the 5 current trees stay open to everyone).
-- Lifetime step milestones (badges / rewards).
-- Walking ideas offered (pick): daily streaks, expeditions (long trips with beats), party step goal, friends step race,
-  supply drops, weather/night bonus.
-- Armor system (owner: "we have no armor system").
+- Walking ideas not built yet: party step goal, friends step race, supply drops, weather/night bonus.
 ### 3. Other open items
 - A friend's Android blocks the step-sync app install: waiting on her handle or a screenshot (fallback: add her handle to
   NET.cfg.trustedTyped in net.js so typed steps count like phone steps).
