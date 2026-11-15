@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.40.0';
+const NEXT_VERSION = '0.41.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1389,6 +1389,7 @@ const NEXT_VERSION = '0.40.0';
     if (DM.Advent && SV.tutorialDone) { const at = DM.Advent.tile(); if (at) t.unshift(at); }   // 0.32: December 1-24
     if (BS.raidTile && SV.tutorialDone) { const rt = BS.raidTile(); if (rt) t.unshift(rt); }   // 0.33: base raids
     if (DM.Social && SV.tutorialDone) { const so = DM.Social.tile(); if (so) t.push(so); }   // 0.40: party walk + friends race
+    if (DM.Gifts) DM.Gifts.check();   // 0.41: gifts from friends land in the stash
     if (DM.Codex && SV.tutorialDone) { DM.Codex.check(); const ct = DM.Codex.tile(); if (ct) t.push(ct); }   // 0.35: bestiary + feats
     const gn = BS.gardenNote(); if (gn) t.push({ k: 'garden', c: '#93a86c', n: 'Garden', sub: gn, hot: '' });
     const ev = eventBanner();
@@ -1704,6 +1705,8 @@ const NEXT_VERSION = '0.40.0';
       for (const x of stacks) { const left = give(x.k, x.n, x.d, x.q); if (left) lost.push({ k: x.k, n: left }); }
       done(); showResult('Gift box', stacks, lost, 'Somebody wrapped this before it all went bad. It went into your pack (the stash if the pack is full).', 'Opened');
     }, 'big']);
+    // 0.41: gift it to a friend (gifts.js; signed-in players)
+    if ((sel.from === 'pack' || sel.from === 'stash') && !it.quest && DM.Gifts && DM.Gifts.can()) { const list = s[sel.from]; btns.push(['🎁 Gift to a friend', () => { sel = null; itemPop(null); DM.Gifts.open(e, list, () => reHost()); }]); }
     // 0.24.5 (owner: "make a discard button so we don't have to drop it"): throw it away from the pack or the stash, tap twice
     if ((sel.from === 'pack' || sel.from === 'stash') && !it.quest) { let sure = false; btns.push([e.n > 1 ? `Discard all ${e.n}` : 'Discard', function () { if (!sure) { sure = true; this.textContent = 'Tap again to throw away'; this.classList.add('warn'); return; } const from = sel.from; s[from].splice(sel.i, 1); done(`Threw away ${it.n.toLowerCase()}${e.n > 1 ? ' x' + e.n : ''}`); }, 'discard']); }
     acts.innerHTML = `<div class="sact"><span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}${it.tag ? ` <em>${it.tag}</em>` : ''}${it.w ? ` <i class="wst">${D.QUAL[D.qOf(e)].n} · ${wDmg(e)} dmg · ${Math.round(Math.min(1, (e.d != null ? e.d : D.wMax(e)) / D.wMax(e)) * 100)}% of ${D.wMax(e)}${sel.from === 'hands' ? ' · in your hand' : ''}</i>` : ''}<small class="cline" style="--cc:${D.CATS[D.cat(e.k)].c}">${esc(D.catLine(e.k, e.d))}</small></span></div>`;
