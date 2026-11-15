@@ -96,6 +96,8 @@
     M.lastSpd = v; M.fastRun = v >= VEHICLE_MS ? M.fastRun + 1 : 0;
     if (M.fastRun >= FAST_HITS) M.lastFast = t;
   }
+  const WALK_OK = 80;
+  const walkedTo = pl => !!M.far[pl.id] || (M.walkedM || 0) >= WALK_OK;
   const driveLock = () => { if (!M.lastFast) return 0; const l = SETTLE_MS - (Date.now() - M.lastFast); return l > 0 ? Math.ceil(l / 1000) : 0; };
 
   // ------------------------------------------------------------- local metre frame (x east, y south), fixed per session
@@ -589,7 +591,7 @@ way[building]->.b;.b out skel geom qt;
     // She has to WALK to a place: one only counts once she has been well away from it while the map was open,
     // so opening the map at home does not hand her the three houses next door.
     for (const pl of vis) if (pl.d > reach + 15) M.far[pl.id] = 1;
-    const near = vis.filter(pl => pl.d <= reach && M.far[pl.id] && !DM.Game.landmarkHave(keyOf(pl))).sort((a, b) => (a.house - b.house) || a.d - b.d);
+    const near = vis.filter(pl => pl.d <= reach && walkedTo(pl) && !DM.Game.landmarkHave(keyOf(pl))).sort((a, b) => (a.house - b.house) || a.d - b.d);
     if (!DM.Game.landmarkLeft()) { M.status = 'All 3 landmarks found today - more tomorrow'; return; }
     if (!near.length || M.jump) return;
     const pl = near[0], r = DM.Game.addLandmark({ key: keyOf(pl), type: pl.type, name: pl.name, street: pl.street });
@@ -753,7 +755,7 @@ way[building]->.b;.b out skel geom qt;
       else if (!t) { line = ld ? 'Scouting the area...' : 'No marked places close by'; sub = ld ? 'Looking up the real places around you' : 'Try another street'; }
       else {
         const reach = reachNow(); show = t; dd = fmtD(t.d); ang = bearing(M.pos, t);
-        line = t.name; sub = `${DM.D.BTYPES[t.type].n} - ` + (t.d <= reach && !M.far[t.id] ? 'right here - walk away and back to scout it' : t.d <= reach * 2.2 ? 'almost there - keep walking' : 'nearest place to scout');
+        line = t.name; sub = `${DM.D.BTYPES[t.type].n} - ` + (t.d <= reach && !walkedTo(t) ? `right here - walk ${Math.max(5, Math.ceil(WALK_OK - (M.walkedM || 0)))} m more (anywhere) to scout it` : t.d <= reach * 2.2 ? 'almost there - keep walking' : 'nearest place to scout');
       }
     }
     $('#mvStat').textContent = line; $('#mvSub2').textContent = sub; $('#mvDist').textContent = dd;
@@ -790,7 +792,7 @@ way[building]->.b;.b out skel geom qt;
     if (M.watch != null) { try { navigator.geolocation.clearWatch(M.watch); } catch (e) { /* ignore */ } M.watch = null; }
     if (M.wake) { try { M.wake.release(); } catch (e) { /* ignore */ } M.wake = null; }
     clearTimeout(M.retryT); M.retryT = null; clearInterval(M.cardT); cancelAnimationFrame(M.raf);
-    M.pos = null; M.guess = null; M.spd = []; M.far = {}; M.lastMe = null; M.zs = [];   // her position is forgotten as soon as the map closes
+    M.pos = null; M.guess = null; M.spd = []; M.far = {}; M.walkedM = 0; M.lastMe = null; M.zs = [];   // her position is forgotten as soon as the map closes
     for (const k in M.cells) if (M.cells[k] === 'queued' || M.cells[k] === 'fail' || M.cells[k] === 'part') delete M.cells[k];
     M.queue = [];
     if (DM.Game && DM.Game.renderHome && !DM.scene) DM.Game.renderHome();
@@ -816,7 +818,11 @@ way[building]->.b;.b out skel geom qt;
     if (!M.on) return;
     const pos = { lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy || 50 };
     noteSpeed(pos, p.coords.speed, p.timestamp || Date.now());
-    const first = !M.pos; M.pos = pos; M.gpsMsg = ''; M.guess = null;
+    const first = !M.pos;
+    // 0.28.6 (owner: "Nothing happens" at a bodega after walking away and back): count the distance she really walks
+    // with the map open (good fixes only, ignoring GPS wobble); after WALK_OK metres every place counts as walked-to
+    if (M.pos && pos.acc <= 40) { const d = dist(M.pos, pos); if (d > Math.max(6, pos.acc * .5) && d < 120) M.walkedM = (M.walkedM || 0) + d; }
+    M.pos = pos; M.gpsMsg = ''; M.guess = null;
     if (first && DM.Weather) DM.Weather.noteArea(pos.lat, pos.lon);   // 0.22: weather.js keeps only the 0.1-degree area (~10 km), on this phone
     setOrigin(pos.lat, pos.lon);
     if (first && M.msgKind === 'gps') message();
@@ -1066,7 +1072,7 @@ way[building]->.b;.b out skel geom qt;
       const sx = SX(wx(pl.lon)), sy = SY(wy(pl.lat));
       if (sx < -40 || sx > M.W + 40 || sy < -40 || sy > M.H + 40) continue;
       const have = DM.Game.landmarkHave(keyOf(pl)), d = p ? dist(pl, p) : 1e9;
-      const hot = !have && can && d <= reach && M.far[pl.id], near = !have && !hot && d <= reach * 2.2 && (!pl.house || pl === tgt);
+      const hot = !have && can && d <= reach && walkedTo(pl), near = !have && !hot && d <= reach * 2.2 && (!pl.house || pl === tgt);
       const r = pl.house ? 11 : 17;
       if (pl.house && !hot && pl !== tgt && placed.some(q => Math.hypot(q[0] - sx, q[1] - sy) < q[2] + r + 4)) continue;
       placed.push([sx, sy, r]); drawn.push({ x: sx, y: sy, r, pl });

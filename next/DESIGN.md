@@ -784,6 +784,12 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - The credit line had been garbled by a sed '&' in 0.25 (two overlapping lines, "copy;"); fixed. The map header now
   says "N places · N houses nearby".
 
+## Done in 0.28.6 (owner: "Nothing happens" at a bodega she walked to; "I walked here tho")
+- map.js: the walk-to rule was "a place counts once you were > reach + 15 m from it with the map open" (65 m with fuzzy
+  GPS) - easy to miss, and nothing on screen said when it was met. Now M.walkedM adds up real movement with the map open
+  (fixes <= 40 m accuracy, steps 6-120 m); after 80 m every place counts (the old per-place rule still works too). The
+  card says "walk N m more (anywhere) to scout it". Reset when the map closes.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
