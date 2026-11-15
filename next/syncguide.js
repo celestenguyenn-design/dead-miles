@@ -348,6 +348,7 @@
       + '<p>Add the action <b>Open URLs</b> (not Get Contents of URL) and paste this address. Right after the <b>=</b> at the end, tap the blue <b>Sum</b> bubble.</p>'
       + (NET.ok ? keyBox('open', 'the game address', openUrl) : '<p class="help">Sign in first to see it.</p>')
       + '<p class="help"><b class="warn">It opens the game every time it runs</b>, and it cannot run while your phone is locked, so automations with it fail with "took too long to run". Use it only when you tap it by hand.</p>'
+      + '<p class="help"><b>On iPhone it always opens Safari, not the home-screen game</b> (an Apple limit: shortcuts cannot open a home-screen web app). Your steps still reach your account, and they show up next time you open the game from your home screen. To keep Safari out of it, use Get Contents of URL (steps 5 and 6) instead.</p>'
       + '</div></details>';
     return h;
   }
@@ -445,6 +446,7 @@
       + '<li><b>Shortcut points at the right key.</b> The <b>p</b> field must be exactly your code from the iPhone guide, then the blue <b>Sum</b> bubble. Copy it again and paste over the old one. The address must start with ' + esc(NET.SB.url.replace('https://', '')) + ', not github.io.</li>'
       + '<li><b>Health permission.</b> iPhone: Settings &rarr; Health &rarr; Data Access &amp; Devices &rarr; Shortcuts &rarr; turn on Steps. Android: Health Connect &rarr; App permissions &rarr; Dead Miles Steps &rarr; Steps on. An iPhone update can turn this off.</li>'
       + '<li><b>The automation actually ran.</b> Shortcuts &rarr; Automation: is it on, with Run Immediately? A "took too long to run" message means turn <b>Fill Missing</b> OFF in Find Health Samples.</li>'
+      + '<li><b>More steps than the Health app shows?</b> Your shortcut is probably adding your iPhone and Apple Watch together. Open the shortcut and, in <b>both</b> Find Health Samples actions, set <b>Group by: Day</b> (or rebuild it with the copy-paste prompt above). The Health app counts overlapping steps once; a plain Sum counts them twice.</li>'
       + '<li><b>Low Power Mode</b> (yellow battery) can hold automations back. Turn it off, or tap the Shortcut by hand. Android: set the app\'s battery to Unrestricted.</li>'
       + '<li><b>Today\'s steps.</b> Find Health Samples must say <b>Start Date is Today</b>, and your phone\'s date and time must be set automatically.</li>'
       + '<li><b>Wait a few minutes, then Refresh.</b> The game checks every 5 minutes and every time you open it.</li>'

@@ -881,6 +881,18 @@ people should be able to click a ? for help if they somehow skip it")
 - Home tabs: a round ? at the end of the tab bar opens the help for the current tab (Houses/Route, Gear, Workbench,
   Walks, Capsules, event) even if tips were seen or turned off (Game.help). New TIPS: gear, bench. Tour map step text.
 
+## Done in 0.31.0 (owner: "add interactive questing on the map ... if you walk to a certain area, you can do a quest")
+- mapquest.js (DM.MapQ), driven from mapfx.js onPos; localStorage dm-next-mapq (phone only).
+  - Survivors (❗): 1 on the map at a time, 2 a day, at a real place 150-450 m away. Walk up -> dialog -> "I'll help".
+    5 quest chains (QUESTS): dog (clues -> choice -> back), meds (bring meds / antibiotics / 3 bandages), radio (bring 2
+    batteries -> choice), list (3 stops -> back), vex (a risky choice). Steps are real places picked when the step
+    starts (❓ marker + line on the map card). One quest at a time, kept across days; "Drop quest" on the map card.
+  - Encounters: first visit of the day to a marked (non-house) place, 45% (seeded per place + day), max 3 a day; two
+    choices per building type (ENC), outcomes seeded. Hurt = HP down to 10 minimum.
+- Fix: Dot > Sell "Sell all junk" showed a giant caps icon filling the button (img had no size).
+- Sync guide: Open URLs always opens Safari on iPhone (Apple limit); and "more steps than Health shows" = iPhone + Watch
+  summed - set Group by: Day. (Owner's server log showed the shortcut itself posting 4,783.)
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
