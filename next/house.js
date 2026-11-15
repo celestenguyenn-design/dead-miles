@@ -51,6 +51,7 @@
   }
   const weaponKey = () => (S().hands && S().hands.k) ? D.ITEMS[S().hands.k].w : 'fists';
   const weapon = () => WEAPONS[weaponKey()];
+  const modOn = k => { const m = S().mods; return !!m && (m.melee === k || m.ranged === k); };   // 0.36 weapon mods
   // 0.19: weapon quality (data.js D.QUAL) and the gamestage this run was started with (L.gs, snapshotted by game.js loot())
   const qMul = () => S().hands ? D.qDmgMul(D.qOf(S().hands)) : 1;
   const gsFx = () => D.gsFx((L && L.gs) || 0);
@@ -938,7 +939,7 @@
     let best = null, bd = 2.3 * T;
     for (const z of G.zs) { if (z.dead) continue; const d = Math.hypot(z.x - p.x, z.y - p.y); if (d < bd) { bd = d; best = z; } }
     if (best && !fightW().ranged) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; p.fx = dx / d; p.fy = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; }
-    const W = fightW(); SW_WIND = W.wind; SW_STRIKE = W.strike; SW_REC = W.rec; p.swRanged = !!W.ranged;
+    const W = fightW(), gm = !W.ranged && modOn('mod_grip') ? .85 : 1; SW_WIND = W.wind * gm; SW_STRIKE = W.strike; SW_REC = W.rec * gm; p.swRanged = !!W.ranged;   // 0.36: grip wrap
     if (W === BOWBASH && !G.bashTold) { G.bashTold = 1; toast('Out of arrows - bashing with the bow', 1.6); }
     if (W === GUNBASH && !G.gbashTold) { G.gbashTold = 1; toast(`Out of ${ITEMS[weapon().gun].n.toLowerCase()} - swinging the ${weapon().n.toLowerCase()} instead`, 1.8); }
     p.st = 'swing'; p.stT = 0; p.swingHit = false; p.swingQ = false; p.sta = Math.max(0, p.sta - (W.ranged ? 3 : 7)); p.staDelay = .5; F.fight(G);
@@ -960,7 +961,7 @@
           const dx = z.x - p.x, dy = (z.y - p.y) * 1.15, d = Math.hypot(dx, dy);
           if (d > W.reach * T) continue;
           if (d > 18 && Math.abs(angDiff(Math.atan2(dy, dx), fa)) > (W.arc || 1.35) * SK.arcMul()) continue;   // 0.34: Bruiser Cleave
-          hitZombie(z, fa, W.dmg * qMul() * (job() === 'brawler' ? 1.3 : 1) * SK.meleeMul()); any = true;   // 0.19: qMul = weapon quality
+          hitZombie(z, fa, W.dmg * qMul() * (job() === 'brawler' ? 1.3 : 1) * SK.meleeMul() * (modOn('mod_nails') ? 1.15 : 1)); any = true;   // 0.36: nail studs   // 0.19: qMul = weapon quality
           if (W.kb) { z.kbx *= W.kb; z.kby *= W.kb; }                       // 0.30 squeaky turkey: sends them flying
           if (W.stun && !z.dead && z.st === 'hurt') z.stT = -W.stun;        // 0.30 frying pan: dazed a bit longer
           if (W.zap) puff(z.x, z.y - 40, 50, 8, ['#ff5a5a', '#5aff7a', '#ffd23c', '#5ab4ff'][Math.floor(Math.random() * 4)], 140, .4, 3);
@@ -2435,7 +2436,7 @@
     const p = G.p;
     if (!arrowsLeft()) { toast('No arrows', 1.1); return false; }
     useArrow();
-    let best = null, bd = 8 * T * SK.bowRange();   // 0.34: Tracker Eagle eye
+    let best = null, bd = 8 * T * SK.bowRange() * (modOn('mod_scope') ? 1.4 : 1);   // 0.34: Tracker Eagle eye; 0.36 scope
     for (const z of G.zs) {
       if (z.dead) continue;
       const dx = z.x - p.x, dy = z.y - p.y, d = Math.hypot(dx, dy);
@@ -2444,7 +2445,7 @@
     let ax = p.fx, ay = p.fy;
     if (best) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; ax = dx / d; ay = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; p.fx = ax; p.fy = ay; }
     const sp = 15 * T;
-    G.arrows.push({ x: p.x + ax * 16, y: p.y + ay * 10, vx: ax * sp, vy: ay * sp, z: 36, life: 1.1, qm: qMul() });   // 0.19: the bow's quality
+    G.arrows.push({ x: p.x + ax * 16, y: p.y + ay * 10, vx: ax * sp, vy: ay * sp, z: 36, life: 1.1, qm: qMul() * (modOn('mod_scope') ? 1.1 : 1) });   // 0.19: the bow's quality
     if (SK.volley()) { const a2 = Math.atan2(ay, ax) + .09; G.arrows.push({ x: p.x + Math.cos(a2) * 16, y: p.y + Math.sin(a2) * 10, vx: Math.cos(a2) * sp, vy: Math.sin(a2) * sp, z: 36, life: 1.1, qm: qMul() }); }   // 0.34: Tracker Volley
     SFX.play('bow'); emitNoise(p.x, p.y, WEAPONS.bow.noise * SK.allNoise(), false); wearWeapon();
     return true;
@@ -2461,7 +2462,7 @@
     const p = G.p;
     if (!packCount(W.gun)) return false;
     if (Math.random() >= SK.ammoSkip()) usePack(W.gun); lastHud = '';   // 0.34: Tinkerer Lean loads
-    const range = W.spd * W.life * T;
+    const range = W.spd * W.life * T * (modOn('mod_scope') ? 1.4 : 1);   // 0.36: scope
     let best = null, bd = range;
     for (const z of G.zs) {
       if (z.dead) continue;
@@ -2470,7 +2471,7 @@
     }
     let ax = p.fx, ay = p.fy;
     if (best) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; ax = dx / d; ay = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; p.fx = ax; p.fy = ay; }
-    const a0 = Math.atan2(ay, ax), n = W.pellets || 1, sp = W.spd * T, dmg = W.dmg * qMul() * SK.meleeMul();
+    const a0 = Math.atan2(ay, ax), n = W.pellets || 1, sp = W.spd * T, dmg = W.dmg * qMul() * SK.meleeMul() * (modOn('mod_scope') ? 1.1 : 1);
     for (let i = 0; i < n; i++) {
       const a = a0 + (n > 1 ? (i / (n - 1) - .5) * 2 * W.spread + (Math.random() - .5) * .06 : 0);
       G.arrows.push({ x: p.x + Math.cos(a) * 18, y: p.y + Math.sin(a) * 12, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, z: 36, life: W.life, bullet: W.gun, dmg });
@@ -2482,7 +2483,8 @@
       else if (W.gun === 'ammo') { SFX.noise(.18, 'lowpass', 3200, 200, .45, 1); SFX.tone('square', 160, 40, .14, .12); }
       else { SFX.tone('square', 900, 500, .05, .06); SFX.noise(.05, 'highpass', 3000, 6000, .1, .6); }
     }
-    emitNoise(p.x, p.y, W.noise * SK.allNoise(), W.noise > 4);   // the catch: a gunshot brings the house running
+    const nz = W.noise * (modOn('mod_silencer') ? .4 : 1);   // 0.36: silencer
+    emitNoise(p.x, p.y, nz * SK.allNoise(), nz > 4);   // the catch: a gunshot brings the house running
     wearWeapon();
     if (!packCount(W.gun)) toast(`Last ${ITEMS[W.gun].n.toLowerCase()}!`, 1.2);
     return true;

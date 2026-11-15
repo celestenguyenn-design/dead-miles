@@ -925,6 +925,12 @@ people should be able to click a ? for help if they somehow skip it")
   unlocks a title; titles join the Walks title picker (W.titles). Checked on home render (+ every 5 kills). Home tile.
 - SV.codex = { kills, wk, flags, got }.
 
+## Done in 0.36.0 - 6 of 12: weapon mods
+- Mod slots on the survivor (s.mods = { melee, ranged }), not on weapons (so moving weapons around never loses one):
+  Grip wrap (melee: wind/recovery x0.85), Nail studs (melee: +15%), Scope (ranged: auto-aim range x1.4, +10%),
+  Silencer (ranged: gun noise x0.4). Fit from the pack/stash item popup; the old mod goes to the stash. Shown in
+  Gear > Equipped. Grip + nails known by everyone (BASIC + migrate); scope / silencer by blueprint, and as rare loot.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.35.0';
+const NEXT_VERSION = '0.36.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -53,7 +53,7 @@ const NEXT_VERSION = '0.35.0';
     v.walked = v.walked || 0;
     v.base = DM.Base.norm(v.base, v);       // phase 4: the base (pool, pieces, garden, decor)
     v.horde = DM.Base.normHorde(v.horde);   // phase 4: horde night (shifts, reports waiting to send, results)
-    if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); if (s.job === 'hunter' && !s.known.includes('bow')) s.known.push('bow'); /* 0.29.2: hunters can always make a bow */ if (!s.known.includes('knuckles')) s.known.push('knuckles'); /* 0.30 */ s.packBonus = s.packBonus || 0; }
+    if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); if (s.job === 'hunter' && !s.known.includes('bow')) s.known.push('bow'); /* 0.29.2: hunters can always make a bow */ if (!s.known.includes('knuckles')) s.known.push('knuckles'); /* 0.30 */ for (const r of ['mod_grip', 'mod_nails']) if (!s.known.includes(r)) s.known.push(r); /* 0.36 */ s.packBonus = s.packBonus || 0; }
     if (v.survivor) { D.mergeStacks(v.survivor.pack); D.mergeStacks(v.survivor.stash); }   // 0.26.3: bigger stacks - fold old ones together
     v.trader.event = v.trader.event || null;   // phase 5a: Dot's seasonal job chain { key, step, kills, base }
     v.tips = v.tips || {};                  // phase 5: first-time tips already shown
@@ -1546,6 +1546,7 @@ const NEXT_VERSION = '0.35.0';
         <button class="eqslot cos" id="eqWard"><i class="eqk">Cosmetics</i><span class="eqcos">${worn.length ? worn.slice(0, 4).map(c => `<img alt="" src="${ART.iconURL['cos_' + c]}">`).join('') : '<img alt="" src="' + ART.iconURL.cosS_beanie + '">'}</span><b>Wardrobe →</b><span>${worn.length ? worn.length + ' worn' : 'Nothing worn'}${newCos() ? ` · <em class="newtxt">${newCos()} new</em>` : ''}</span></button>
       </div>${A('hands')}${A('armor')}${A('quiver')}
       <div class="kick sect">Always with you</div>
+      ${(() => { const m = s.mods || {}, nm = k => k ? D.ITEMS[k].n : 'empty'; return `<div class="gline"><span class="gi">🔧</span><div><b>Mods · melee: ${esc(nm(m.melee))} · ranged: ${esc(nm(m.ranged))}</b><span>${m.melee || m.ranged ? 'They work on whatever weapon you hold. Fit another to swap.' : 'Craft grip wraps and nail studs at the Workbench, then tap one in your pack or stash and Fit it.'}</span></div></div>`; })()}
       <div class="gline"><span class="gi">🔑</span><div><b>Keyring · ${+s.keys || 0} brass key${(+s.keys || 0) === 1 ? '' : 's'}</b><span>Opens locked cars and key-locked rooms · no pack slot</span></div></div>
       ${gear.length ? `<div class="gline"><span class="gi">👟</span><div><b>${gear.join(' · ')}</b><span>${[s.shoes && 'footsteps -30%', s.lockset && 'wider sweet spots, picks snap less'].filter(Boolean).join(' · ')}</span></div></div>` : ''}
       <div class="kick sect">You</div>
@@ -1660,6 +1661,13 @@ const NEXT_VERSION = '0.35.0';
         s.armor.d = Math.min(it.armor.dur, DM.Armor.dur(s.armor) + Math.round(it.armor.dur * .5)); done('Patched up');
       }]);
     }
+    // 0.36 weapon mods: fit into the melee / ranged mod slot (the old one goes back to the stash)
+    if (it.mod && (sel.from === 'pack' || sel.from === 'stash')) btns.push([`Fit · ${it.mod} mod slot`, () => {
+      s.mods = s.mods || {}; const old = s.mods[it.mod];
+      e.n--; if (!e.n) s[sel.from].splice(sel.i, 1);
+      s.mods[it.mod] = e.k; if (old) addTo(s.stash, stashSlots(), old, 1) || addTo(s.pack, packSlots(), old, 1);
+      done(`${it.n} fitted${old ? ` (${D.ITEMS[old].n.toLowerCase()} back in the stash)` : ''}`);
+    }, 'big']);
     if (sel.from === 'hands') btns.push(['Unequip', () => { if (!addTo(s.pack, packSlots(), e.k, 1, e.d, e.q) && !addTo(s.stash, stashSlots(), e.k, 1, e.d, e.q)) return toast('No room', 1.4); s.hands = null; done(); }]);
     if (it.w) {
       const cost = s.job === 'mechanic' ? 1 : 2, max = D.wMax(e);   // 0.19: max durability by quality
