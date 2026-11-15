@@ -102,9 +102,25 @@
   // once (kept on this phone only, never synced). Places within HOME_R of it still need the walk (WALK_OK metres with the
   // map open, or having been away from them); everywhere else a place counts the moment she reaches it. With no home
   // set yet the walk rule applies everywhere, as before. Home can be moved once a week.
-  const HOME_KEY = 'dm-map-home', HOME_R = 250, HOME_MOVE_MS = 7 * 864e5;
-  const home = () => { try { const h = JSON.parse(localStorage.getItem(HOME_KEY) || 'null'); return h && isFinite(h.lat) && isFinite(h.lon) ? h : null; } catch (e) { return null; } };
-  const nearHome = pl => { const h = home(); return !h || dist(h, pl) < HOME_R; };
+  // 0.30.3 (owner: "how can we prevent people from cheating? ... I go to my boyfriend's every Friday, so my base kind of
+  // changes on the weekend"): up to 2 home spots (adding one only ever protects more ground, so it is always allowed;
+  // moving one is once a week), AND learned spots: any ~110 m square she opens the map in on 3+ different days is treated
+  // as a home zone too, whatever she set. So marking a fake home far away does not free up the real one for long.
+  const HOME_KEY = 'dm-map-home', SPOT_KEY = 'dm-map-spots', HOME_R = 250, HOME_MOVE_MS = 7 * 864e5, LEARN_DAYS = 3;
+  const lsGet = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } };
+  const okLL = h => h && isFinite(h.lat) && isFinite(h.lon);
+  const homes = () => { const v = lsGet(HOME_KEY, null); return (Array.isArray(v) ? v : v ? [v] : []).filter(okLL).slice(0, 2); };
+  const home = () => homes()[0] || null;
+  const learned = () => { const sp = lsGet(SPOT_KEY, {}); return Object.keys(sp).filter(k => (sp[k] || []).length >= LEARN_DAYS).map(k => { const [lat, lon] = k.split(',').map(Number); return { lat, lon, learned: 1 }; }); };
+  const zones = () => homes().concat(learned());
+  const nearHome = pl => !homes().length || zones().some(h => dist(h, pl) < HOME_R);
+  function learnSpot(pos) {   // once per map visit: note today in this ~110 m square (keeps the 40 most recent squares)
+    const k = pos.lat.toFixed(3) + ',' + pos.lon.toFixed(3), day = new Date().toDateString(), sp = lsGet(SPOT_KEY, {});
+    const d = sp[k] || []; if (!d.includes(day)) d.push(day); delete sp[k]; sp[k] = d.slice(-LEARN_DAYS);
+    const ks = Object.keys(sp); for (const x of ks.slice(0, Math.max(0, ks.length - 40))) delete sp[x];
+    lsSet(SPOT_KEY, sp);
+  }
   const walkedTo = pl => !nearHome(pl) || !!M.far[pl.id] || (M.walkedM || 0) >= WALK_OK;
   const driveLock = () => { if (!M.lastFast) return 0; const l = SETTLE_MS - (Date.now() - M.lastFast); return l > 0 ? Math.ceil(l / 1000) : 0; };
 
@@ -746,20 +762,26 @@ way[building]->.b;.b out skel geom qt;
     if (btn) $('#mvMsgBtn').onclick = fn;
   }
   function homeAsk(byTap) {
-    const h = home(), wait = h ? HOME_MOVE_MS - (Date.now() - (h.t || 0)) : 0;
-    if (!M.pos) { if (byTap) message('Home spot', 'Waiting for your location first.', 'OK', () => message(), 'home'); return; }
-    if (M.pos.acc > 60) { if (byTap) message('Home spot', `GPS is fuzzy right now (about ${Math.round(M.pos.acc)} m). Try again by a window.`, 'OK', () => message(), 'home'); return; }
-    if (h && wait > 0) {
-      const away = Math.round(dist(h, M.pos));
-      message('Your home spot', `${away < HOME_R ? 'You are in your home zone.' : `You are ${fmtD(away)} from home.`} Places within ${HOME_R} m of home need a ${WALK_OK} m walk with the map open. Everywhere else you scout a place the moment you reach it. You can move home again in ${Math.ceil(wait / 864e5)} day${Math.ceil(wait / 864e5) === 1 ? '' : 's'}.`, 'OK', () => message(), 'home');
+    const hs = homes(), ok = t => !t || Date.now() - t >= HOME_MOVE_MS, close = () => message();
+    if (!M.pos) { if (byTap) message('Home spots', 'Waiting for your location first.', 'OK', close, 'home'); return; }
+    if (M.pos.acc > 60) { if (byTap) message('Home spots', `GPS is fuzzy right now (about ${Math.round(M.pos.acc)} m). Try again by a window.`, 'OK', close, 'home'); return; }
+    const save = (list, msg) => { lsSet(HOME_KEY, list); message(); M.status = msg; M.dirty = true; renderCard(); claim(); };
+    const here = { lat: +M.pos.lat.toFixed(4), lon: +M.pos.lon.toFixed(4), t: Date.now() };
+    const rule = `Within ${HOME_R} m of a home spot you need a ${WALK_OK} m walk with the map open before places count. Everywhere else a place counts the moment you reach it.`;
+    if (!hs.length) {
+      message('Are you at home?', `Set your home spot here (it stays on this phone). ${rule} Spots where you open the map on ${LEARN_DAYS}+ different days count as home too.<br><button id="mvHomeNo" style="background:transparent;box-shadow:none;border:2px solid currentColor;color:inherit;opacity:.8">Not now</button>`,
+        'Yes, I\'m home - set it here', () => save([here], 'Home spot set - away from home, places count as soon as you reach them'), 'home');
+      const no = $('#mvHomeNo'); if (no) no.onclick = () => { M.homeNo = 1; message(); };
       return;
     }
-    message(h ? 'Move your home spot here?' : 'Are you at home?', `Set your home spot here (it stays on this phone). Places within ${HOME_R} m of it need a ${WALK_OK} m walk with the map open, so nobody can scout from the couch. Anywhere else you scout a place the moment you walk up to it. You can move it once a week.<br><button id="mvHomeNo" style="background:transparent;box-shadow:none;border:2px solid currentColor;color:inherit;opacity:.8">Not now</button>`,
-      'Yes, I\'m home - set it here', () => {
-        try { localStorage.setItem(HOME_KEY, JSON.stringify({ lat: +M.pos.lat.toFixed(4), lon: +M.pos.lon.toFixed(4), t: Date.now() })); } catch (e) { /* ignore */ }
-        message(); M.status = 'Home spot set - away from home you scout places as soon as you reach them'; M.dirty = true; renderCard(); claim();
-      }, 'home');
-    const no = $('#mvHomeNo'); if (no) no.onclick = () => { M.homeNo = 1; message(); };
+    const inZone = zones().find(h => dist(h, M.pos) < HOME_R), nearest = Math.min(...hs.map(h => dist(h, M.pos)));
+    const where = inZone ? (inZone.learned ? 'You are in a spot you open the map in a lot, so it counts as home.' : 'You are in a home zone.') : `You are ${fmtD(nearest)} from your nearest home spot.`;
+    const extra = [];
+    if (!inZone && hs.length < 2) extra.push(['mvHomeAdd', 'Add here as 2nd home', () => save(hs.concat([here]), '2nd home spot set')]);
+    if (!inZone && hs.length === 2) { const old = hs.reduce((a, b) => ((a.t || 0) < (b.t || 0) ? a : b)); if (ok(old.t)) extra.push(['mvHomeMove', 'Move my oldest home spot here', () => save(hs.filter(h => h !== old).concat([here]), 'Home spot moved')]); }
+    const wait = hs.length === 2 && !inZone && !extra.length ? ` You can move a home spot again in ${Math.ceil((HOME_MOVE_MS - (Date.now() - Math.min(...hs.map(h => h.t || 0)))) / 864e5)} days.` : '';
+    message('Your home spots', `${where} ${hs.length} of 2 home spots set. ${rule}${wait}${extra.map(([id, t]) => `<br><button id="${id}">${t}</button>`).join('')}`, 'OK', close, 'home');
+    for (const [id, , fn] of extra) { const b = $('#' + id); if (b) b.onclick = fn; }
   }
   function intro(force) {
     let seen = 0; try { seen = localStorage.getItem(INTRO_KEY); } catch (e) { /* ignore */ }
@@ -879,7 +901,7 @@ way[building]->.b;.b out skel geom qt;
     if (M.watch != null) { try { navigator.geolocation.clearWatch(M.watch); } catch (e) { /* ignore */ } M.watch = null; }
     if (M.wake) { try { M.wake.release(); } catch (e) { /* ignore */ } M.wake = null; }
     clearTimeout(M.retryT); M.retryT = null; clearInterval(M.cardT); cancelAnimationFrame(M.raf);
-    M.pos = null; M.guess = null; M.spd = []; M.far = {}; M.walkedM = 0; M.lastMe = null; M.zs = [];   // her position is forgotten as soon as the map closes
+    M.pos = null; M.guess = null; M.spd = []; M.far = {}; M.walkedM = 0; M.lastMe = null; M.zs = []; M.learnt = 0; M.homeAsked = 0;   // her position is forgotten as soon as the map closes
     for (const k in M.cells) if (M.cells[k] === 'queued' || M.cells[k] === 'fail' || M.cells[k] === 'part') delete M.cells[k];
     M.queue = [];
     if (DM.Game && DM.Game.renderHome && !DM.scene) DM.Game.renderHome();
@@ -913,6 +935,7 @@ way[building]->.b;.b out skel geom qt;
     if (first && DM.Weather) DM.Weather.noteArea(pos.lat, pos.lon);   // 0.22: weather.js keeps only the 0.1-degree area (~10 km), on this phone
     setOrigin(pos.lat, pos.lon);
     if (first && M.msgKind === 'gps') message();
+    if (pos.acc <= 60 && !M.learnt) { M.learnt = 1; learnSpot(pos); }   // 0.30.3: learned home zones
     if (!home() && !M.homeNo && !M.homeAsked && pos.acc <= 60 && !M.msgKind) { M.homeAsked = 1; homeAsk(false); }   // 0.30.2: once per map visit until set
     fetchAround(pos, true);
     claim(); renderCard();
@@ -1115,11 +1138,14 @@ way[building]->.b;.b out skel geom qt;
     if (S) { const k = c.s / S.s; x.drawImage(S.cv, M.W / 2 + (S.cx - c.x) * c.s - S.w / 2 * k, M.H / 2 + (S.cy - c.y) * c.s - S.h / 2 * k, S.w * k, S.h * k); }
     const SX = v => (v - c.x) * c.s + M.W / 2, SY = v => (v - c.y) * c.s + M.H / 2;
     if (DM.MapFX) DM.MapFX.drawFog(x, SX, SY, wx, wy, M.W, M.H);   // 0.29: fog of war (unwalked squares)
-    { const h = home(); if (h && O.set) {   // 0.30.2: the home zone - a dashed ring and a little house
+    if (O.set && homes().length) for (const h of zones()) {   // 0.30.2: home zones - a dashed ring (learned ones fainter) and a little house
       const hx = SX(wx(h.lon)), hy = SY(wy(h.lat)), hr = HOME_R * c.s;
-      x.save(); x.setLineDash([10, 8]); x.lineWidth = 3; x.strokeStyle = 'rgba(240,123,60,.7)'; x.fillStyle = 'rgba(240,123,60,.07)';
-      x.beginPath(); x.arc(hx, hy, hr, 0, 6.3); x.fill(); x.stroke(); x.setLineDash([]); x.font = '22px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('🏠', hx, hy); x.restore();
-    } }
+      if (hx < -hr || hy < -hr || hx > M.W + hr || hy > M.H + hr) continue;
+      x.save(); x.setLineDash([10, 8]); x.lineWidth = 3; x.strokeStyle = h.learned ? 'rgba(240,123,60,.35)' : 'rgba(240,123,60,.7)'; x.fillStyle = 'rgba(240,123,60,.06)';
+      x.beginPath(); x.arc(hx, hy, hr, 0, 6.3); x.fill(); x.stroke(); x.setLineDash([]);
+      if (!h.learned) { x.font = '22px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('🏠', hx, hy); }
+      x.restore();
+    }
     zombies(x, t, dt);
     const P = M.lastMe, px = P ? SX(P.x) : M.W / 2, py = P ? SY(P.y) : M.H / 2;
     // fog: her lamp makes a pool of light; the rest of the night closes in
