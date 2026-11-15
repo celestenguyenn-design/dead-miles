@@ -533,12 +533,14 @@
       } else if (s.type === 'attic') {
         const H = { x: px(s.hatch.x), y: px(s.hatch.y) }, O = { x: px(s.hole.x), y: px(s.hole.y) };
         const near = Math.hypot(p.x - H.x, p.y - H.y) < .75 * T, hr = { x: H.x - 10, y: H.y - 6, w: 20, h: 12 };
+        if (s.st === 0 && gate && near && !hasItem('pole')) out.push({ obj: s, act: 'NeedTool', name: 'Attic hatch', need: 'a hook pole (it is in this house)', rect: hr, secret: true });   // 0.29.1
         if (s.st === 0 && gate && near && hasItem('pole')) out.push({ obj: s, act: 'Pull down', name: 'attic hatch', rect: hr, noise: 3, dur: 1.2, secret: true, done: () => { s.st = 1; SFX.play('scrape'); } });
         if (s.st === 1 && near) out.push({ obj: s, act: 'Climb', name: 'into the attic', rect: hr, noise: 1, dur: .6, secret: true, done: () => climb(s, true) });
         if (G.room === s.room && Math.hypot(p.x - O.x, p.y - O.y) < .8 * T) out.push({ obj: s, act: 'Climb', name: 'down the ladder', rect: { x: O.x - 14, y: O.y - 8, w: 28, h: 16 }, noise: 1, dur: .5, secret: true, done: () => climb(s, false) });
       } else if (s.type === 'panel') {
         const f = G.furn[s.furn], r = { x: f.x + 6, y: f.y + f.h - 10, w: f.w - 12, h: 12 };
         const facing = p.fy < -.35 && Math.abs(p.x - (f.x + f.w / 2)) < f.w / 2 && p.y - (f.y + f.h) < 30 && p.y > f.y + f.h - 4;
+        if (gate && !f.opened && facing && !hasPry()) out.push({ obj: f, act: 'NeedTool', name: 'Hollow wall', need: 'a crowbar or pry bar', rect: r, secret: true });   // 0.29.1
         if (gate && !f.opened && facing && hasPry()) out.push({ obj: f, act: 'Pry', name: 'wall panel', rect: r, noise: 4, dur: 2.4, secret: true, done: () => pryPanel(s, f) });
         if (f.opened && f.loot0 && f.loot0.length) out.push({ obj: f, act: 'Open', name: 'Wall cache', rect: r, secret: true });
       }
@@ -566,7 +568,7 @@
   function secretNeed(s) {
     if (!gateOpen()) { const [a, b] = searchedCount(), n = Math.max(1, Math.ceil(b * gatePct()) - a); return `search ${n} more spot${n === 1 ? '' : 's'} first`; }
     if (s.type === 'panel') return hasPry() ? 'face the wall and tap Pry' : 'pry it open - needs a crowbar or pry bar';
-    if (s.type === 'attic') return hasItem('pole') ? 'stand under it and Pull down' : 'needs a hook pole to pull it down';
+    if (s.type === 'attic') return hasItem('pole') ? 'stand under the hatch and Pull down' : 'find the hook pole in this house first';
     if (s.type === 'rug') return 'stand on it - move the rug';
     if (s.type === 'shelf') return 'stand at the shelf and push it';
     return 'go back to it';
@@ -651,6 +653,7 @@
     if (it.act === 'Open') { openLoot(o, it); return; }
     if (it.drop) { pickUp(o); return; }
     if (it.act === 'Locked') { openLockChoice(it); return; }
+    if (it.act === 'NeedTool') { toast(`The ${it.name} - you need ${it.need}`, 2.6); return; }   // 0.29.1
     if (it.act === 'KeyLocked') { toast(it.name === 'car' ? 'Locked - needs a brass key on your keyring' : L.keyRoom && L.keyRoom.keyHere ? 'Locked tight. The key has to be around here somewhere...' : 'Key-locked door - needs a brass key on your keyring', 2.4); SFX.play('alert'); return; }
     if (it.act === 'Unlock') { useKey(it); return; }
     const dur = it.dur || (it.act === 'Push' ? 1.7 : (it.corpse ? 1.4 : o.time) * searchMul());
@@ -1968,13 +1971,18 @@
         useBtn.classList.add('on'); useLbl.classList.add('on');
         const loud = !t.corpse && t.act === 'Search' && t.noise >= 4;
         if (t.act === 'Locked') { const n = packCount('lockpick'), cb = hasPry(); useLbl.innerHTML = `Locked <b>${t.name}</b>` + (n || cb ? `<em class="opt">${[n ? `pick ${n}` : '', cb ? 'pry' : ''].filter(Boolean).join(' / ')}</em>` : ''); }
+        else if (t.act === 'NeedTool') useLbl.innerHTML = `<b>${t.name}</b><em class="opt">needs ${t.need}</em>`;
         else if (t.act === 'KeyLocked') useLbl.innerHTML = `Locked <b>${t.name}</b><em class="opt">needs a brass key</em>`;
         else if (t.act === 'Unlock') useLbl.innerHTML = `Unlock <b>${t.name}</b><em class="opt">uses a brass key</em>`;
         else useLbl.innerHTML = `${t.act} <b>${t.name}</b>${loud ? '<em>loud</em>' : ''}`;
       } else { useBtn.classList.remove('on'); useLbl.classList.remove('on'); }
     }
     { const sc = secretChip(); if (sc !== lastSec) { lastSec = sc; $('#secchip').innerHTML = sc; $('#secchip').classList.toggle('on', !!sc); }
-      const go = gateOpen(); if (go && G.gateWas === false && noticedSecrets().length) { const x = noticedSecrets()[0]; toast(`You've searched enough - go back to the ${x.noticed.what.toLowerCase()}${x.noticed.room ? ' in the ' + x.noticed.room.toLowerCase() : ''}`, 4); }
+      const go = gateOpen();
+      // 0.29.1 (owner: "a small room on the map, I can't get there" - an attic with no hint shown): once enough is
+      // searched, every hidden spot shows on the clue chip and the minimap, noticed or not
+      if (go) for (const x of G.sec || []) if (!x.found && !x.noticed) { const q = secretSpot(x); x.noticed = { room: q ? RN(roomAt(Math.floor(q.x), Math.floor(q.y))) : '', what: SECNAME[x.type] || 'Hidden spot' }; }
+      if (go && G.gateWas === false && noticedSecrets().length) { const x = noticedSecrets()[0]; toast(`You've searched enough - go back to the ${x.noticed.what.toLowerCase()}${x.noticed.room ? ' in the ' + x.noticed.room.toLowerCase() : ''}`, 4); }
       G.gateWas = go; }
     const q = DM.Game && DM.Game.questChip ? DM.Game.questChip() : '';
     if (q !== lastQ) { lastQ = q; $('#qchip').innerHTML = q + '<span class="qcaret">▾ quests</span>' + (G.qOpen && DM.Game.questList ? '<div class="qlist">' + DM.Game.questList() + '</div>' : ''); $('#qchip').classList.toggle('on', !!q); $('#qchip').classList.toggle('open', !!G.qOpen); }
