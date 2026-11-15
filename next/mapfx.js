@@ -38,7 +38,11 @@ window.DM = window.DM || {};
   function spots(pos, lo, hi) { const M = DM.Map && DM.Map._M; if (!M) return []; return Object.values(M.places).map(pl => [pl, dist(pl, pos)]).filter(([, d]) => d >= lo && d <= hi); }
   const pick = a => a[Math.floor(Math.random() * a.length)];
   // ---------------------------------------------------------------- rewards (into the save)
-  function give(items) { const out = []; const lost = G().routeApi.toStash(items.map(([k, n]) => ({ k, n }))); for (const [k, n] of items) if (DM.D.ITEMS[k] && !DM.D.ITEMS[k].cos) out.push(`${n > 1 ? n + ' ' : ''}${DM.D.ITEMS[k].n.toLowerCase()}`); return out.join(', ') + (lost && lost.length ? ' (stash full - some left behind)' : ''); }
+  function give(items) {   // 0.43: same items merged ("3 9mm rounds", not "9mm rounds, 9mm rounds, 9mm rounds")
+    const m = new Map(); for (const [k, n] of items) m.set(k, (m.get(k) || 0) + n);
+    const merged = [...m].map(([k, n]) => ({ k, n })), lost = G().routeApi.toStash(merged.map(e => Object.assign({}, e)));
+    return merged.filter(e => DM.D.ITEMS[e.k] && !DM.D.ITEMS[e.k].cos).map(e => `${e.n > 1 ? e.n + ' ' : ''}${DM.D.ITEMS[e.k].n.toLowerCase()}`).join(', ') + (lost && lost.length ? ' (stash full - some left behind)' : '');
+  }
   function rollItems(table, rolls) { const r = []; for (let i = 0; i < rolls; i++) for (const k of DM.D.rollLoot(table, Math.random)) r.push([k, 1]); return r; }
   function caps(n) { SV().trader.caps += n; }
   function xp(n) { if (DM.Skills && DM.Skills.addXP) DM.Skills.addXP(n); }
@@ -80,6 +84,7 @@ window.DM = window.DM || {};
     if (dv && !dv.got && dist(dv.a, pos) <= 30 + Math.min(15, pos.acc / 2)) { dv.got = 1; save(); sfx('pick'); buzz([60, 40, 60]); toast(`🚚 Picked up Dot's package. Now take it to ${dv.b.at} (${fmtD(dist(dv.b, pos))}).`, 3.6); }
     else if (dv && dv.got && dist(dv.b, pos) <= 30 + Math.min(15, pos.acc / 2)) { s.deliv = null; s.delivDone++; save(); const c = 45 + Math.round(dv.len / 40); caps(c); xp(25); const tk = token(.35); reward("🚚 Dot's delivery", dv.b.at, `${c} caps, 25 XP${tk ? ', a capsule token' : ''}`); }
     if (DM.MapQ) DM.MapQ.onPos(pos, walked);   // 0.31: quests and encounters
+    if (DM.MapPOI) DM.MapPOI.onPos(pos);   // 0.43: made-up places
   };
   // 0.31: map quests (mapquest.js) use these
   X.spots = (pos, lo, hi) => spots(pos, lo, hi); X.give = items => give(items); X.rollItems = (t, n) => rollItems(t, n);
@@ -100,10 +105,11 @@ window.DM = window.DM || {};
     if (s.radio) out.push({ t: `📻 ${s.radio.at}`, s: `${fmtD(dist(s.radio, pos))} · ${mmss(s.radio.until - now)} left`, hot: 1 });
     for (const d of s.drops) out.push({ t: `${d.air ? '✈️ Air drop' : '📦 Crate'} · ${d.at}`, s: fmtD(dist(d, pos)) + (d.air ? ` · ${mmss(d.until - now)} left` : ''), hot: d.air });
     if (s.deliv) { const tgt = s.deliv.got ? s.deliv.b : s.deliv.a; out.push({ t: `🚚 ${s.deliv.got ? 'Deliver to' : 'Pick up at'} ${tgt.at}`, s: fmtD(dist(tgt, pos)) }); }
-    if (DM.MapQ) return DM.MapQ.lines(pos).concat(out);   // 0.31: quests first
+    if (DM.MapQ) return DM.MapQ.lines(pos).concat(out, DM.MapPOI ? DM.MapPOI.lines(pos) : []);   // 0.31: quests first; 0.43 the nearest made-up place
     return out;
   };
   X.cells = () => st().nCells;
+  X.reveal = (pos, m) => { const s = st(), cy = Math.floor(pos.lat / CELL_LAT), cx = Math.floor(pos.lon / CELL_LON), ry = Math.ceil(m / 25), rx = Math.ceil(m / 25); let n = 0; for (let a = -ry; a <= ry; a++) for (let b = -rx; b <= rx; b++) { if (a * a + b * b > ry * ry) continue; const k = (cy + a) + ':' + (cx + b); if (!s.cells[k]) { s.cells[k] = 1; s.nCells++; n++; } } save(); return n; };   // 0.43: the radio tower clears the fog around it
   X.fogOn = () => st().fogOn;
   X.toggleFog = () => { st().fogOn = !st().fogOn; save(); };
   // ---------------------------------------------------------------- drawing (map.js calls these each frame)
@@ -136,6 +142,7 @@ window.DM = window.DM || {};
     for (const d of s.drops) mark(x, SX(wx(d.lon)), SY(wy(d.lat)), d.air ? '✈️' : '📦', d.air ? '#f0c23d' : '#93a86c', t, d.air ? mmss(d.until - now) : '');
     if (s.radio) mark(x, SX(wx(s.radio.lon)), SY(wy(s.radio.lat)), '📻', '#7ee0d8', t, mmss(s.radio.until - now));
     if (s.deliv) { const g = s.deliv.got ? s.deliv.b : s.deliv.a; mark(x, SX(wx(g.lon)), SY(wy(g.lat)), '🚚', '#f07b3c', t, s.deliv.got ? 'drop off' : 'pick up'); }
+    if (DM.MapPOI) DM.MapPOI.drawMarks(x, t, SX, SY, wx, wy);   // 0.43
     if (DM.MapQ) DM.MapQ.drawMarks(x, t, SX, SY, wx, wy);
   };
   X.mark = mark;
