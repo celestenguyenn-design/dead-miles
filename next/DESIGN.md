@@ -750,6 +750,10 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   caps, tokens, halo at 500k, bat wings at 1M, a title; pick a title shown under your name). Tab badge "!" when
   something can be claimed. Tabs: 4 per row now.
 
+## Done in 0.28.1 (owner: "can you let isabel bypass the tutorial" / "only her")
+- tour.js: handles on NET.cfg.trustedTyped (only 'isa') skip the setup steps (sign in / sync / typing); an existing save
+  is just marked setupDone. Everyone else still has the required setup.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
