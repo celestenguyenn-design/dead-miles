@@ -97,7 +97,8 @@ window.DM = window.DM || {};
     }
     h += `<div class="kick sect" style="margin-top:12px">Friends race · this week</div><p class="mp dim">Everyone signed in, ranked by this week's steps. Prizes on Monday: 1st 150 caps + 3 tokens, 2nd 100 + 2, 3rd 60 + 1, 20,000+ steps 20 caps.</p>
       <div class="solist race">${r.slice(0, 15).map((x, i) => `<div class="${x.me ? 'me' : ''}"><span>${['🥇', '🥈', '🥉'][i] || '#' + (i + 1)} ${esc(x.name)}${x.me ? ' (you)' : ''}</span><b>${fmt(x.s)}</b></div>`).join('')}</div>
-      <p class="mp dim">Steps show up for others when your game syncs (a few minutes).</p>`;
+      <p class="mp dim">Steps show up for others when your game syncs (a few minutes).</p>
+      <div class="kick sect" style="margin-top:12px">Gifts &amp; trades</div><p class="mp dim">Send anything from your pack or stash: tap it, then 🎁 Gift to a friend. Trading = gifting each other.</p>${DM.Gifts ? DM.Gifts.logHTML() : ''}`;
     return h;
   };
   S.bind = function (root, rerender) {

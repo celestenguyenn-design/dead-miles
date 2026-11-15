@@ -959,12 +959,20 @@ people should be able to click a ? for help if they somehow skip it")
   (SV.social.race) and pays last week's place on the next week (1st 150+3 tokens, 2nd 100+2, 3rd 60+1, 20k+ 20 caps).
   Home tile "Walk together" (signed-in players).
 
+## Done in 0.41.0 - 12 of 12: friend gifts & trading (gifts.js, DM.Gifts; SQL next/gifts.sql)
+- Supabase migration "next_gifts": table next_gifts (RLS on, no policies), next_gift_send (auth, recipient must exist,
+  1-5 stacks, n<=60, 15 sent/day, 40 waiting/recipient), next_gift_inbox (claim on read).
+- Item popup (pack/stash, signed in): "🎁 Gift to a friend" - pick from the board or type a handle, how many, a note.
+  Removed from her stash only after the server says ok. Inbox checked on home render (once a minute) -> stash + toast.
+  Last 20 in/out in SV.gifts.log, shown in Walk together. Trading = gifting each other.
+- All 12 ideas from the 2026-11-15 list are now built (0.32-0.41).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
 ### 2. Owner's list (2026-11-14), still to do, in this order
-- 5 job-only skill trees (the 5 current trees stay open to everyone).
-- Walking ideas not built yet: party step goal, friends step race, supply drops, weather/night bonus.
+- (Job-only skill trees: built in 0.34.)
+- (Walking ideas: all built - supply drops 0.29, weather/night 0.39, party goal + friends race 0.40.)
 ### 3. Other open items
 - A friend's Android blocks the step-sync app install: waiting on her handle or a screenshot (fallback: add her handle to
   NET.cfg.trustedTyped in net.js so typed steps count like phone steps).
