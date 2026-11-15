@@ -951,6 +951,14 @@ people should be able to click a ? for help if they somehow skip it")
   (not the daily house, base, or boss arena): house.js G.wxb at run start (+ a toast), gainXP, extraChance, gsZombie,
   canSee (z.sightMul). Weather chip shows the bonus; map supply crates at night hold one more thing.
 
+## Done in 0.40.0 - 10+11 of 12: party walk + friends race (social.js, DM.Social)
+- publish() adds pub.extra.wk = { k: Monday key, s: this calendar week's steps } (from NET._ledger). No SQL change:
+  next_get_board already returns pub.
+- Party walk: the horde party's members' week steps vs 40,000 x members; claim half (30 caps) and goal (80 caps +
+  2 tokens) once each per week. Friends race: board rows this week ranked; the phone keeps the latest standing
+  (SV.social.race) and pays last week's place on the next week (1st 150+3 tokens, 2nd 100+2, 3rd 60+1, 20k+ 20 caps).
+  Home tile "Walk together" (signed-in players).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

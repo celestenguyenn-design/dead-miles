@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.39.0';
+const NEXT_VERSION = '0.40.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1388,6 +1388,7 @@ const NEXT_VERSION = '0.39.0';
     }
     if (DM.Advent && SV.tutorialDone) { const at = DM.Advent.tile(); if (at) t.unshift(at); }   // 0.32: December 1-24
     if (BS.raidTile && SV.tutorialDone) { const rt = BS.raidTile(); if (rt) t.unshift(rt); }   // 0.33: base raids
+    if (DM.Social && SV.tutorialDone) { const so = DM.Social.tile(); if (so) t.push(so); }   // 0.40: party walk + friends race
     if (DM.Codex && SV.tutorialDone) { DM.Codex.check(); const ct = DM.Codex.tile(); if (ct) t.push(ct); }   // 0.35: bestiary + feats
     const gn = BS.gardenNote(); if (gn) t.push({ k: 'garden', c: '#93a86c', n: 'Garden', sub: gn, hot: '' });
     const ev = eventBanner();
@@ -1396,14 +1397,15 @@ const NEXT_VERSION = '0.39.0';
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
     cardSheet = k;
-    const html = k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
+    const html = k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
     sheetOpen(`<div class="cardsheet" data-cs="${k}">${html}</div><button class="mbtn ghost" id="csDone">Close</button>`);
     const el = $('#msheet'), root = el.querySelector('.cardsheet');
     el.onclick = e => { if (e.target === el) closeCardSheet(); };
     $('#csDone').onclick = () => { SFX.play('ui'); closeCardSheet(); };
     // actions that leave the menu (a fight, a shift, back into a run) close the sheet first
     root.addEventListener('click', e => { if (e.target.closest('[data-boss="go"],[data-deep="resume"],#hShift')) { cardSheet = null; sheetClose(); } }, true);
-    if (k === 'codex') DM.Codex.bind(root.querySelector('.cxwrap'));
+    if (k === 'social') { publish(); const w = root.querySelector('.sowrap'), re = () => { w.innerHTML = DM.Social.html(); DM.Social.bind(w, re); }; DM.Social.bind(w, re); }
+    else if (k === 'codex') DM.Codex.bind(root.querySelector('.cxwrap'));
     else if (k === 'raid') { const g = root.querySelector('#raidGo'); if (g) g.onclick = () => { SFX.play('ui'); cardSheet = null; sheetClose(); BS.raidDefend(); }; else { BS.raidSeen(); } }
     else if (k === 'advent') DM.Advent.bind(root.querySelector('.advwrap'));
     else if (k === 'boss') DM.Boss.bind(root);
@@ -1929,7 +1931,7 @@ const NEXT_VERSION = '0.39.0';
   function publish() {
     if (!window.NET || !SV.survivor) return;
     const s = SV.survivor;
-    try { NET.publish({ name: s.name, level: D.survLvl(s.xp), job: s.job, scav: Math.round(s.xp), looted: SV.stats.runs, kills: SV.stats.kills, extra: { look: s.look, trader: traderLevel(), quests: SV.trader.completed, secrets: SV.stats.secrets, cosmetics: Object.keys(s.wardrobe.own).length } }); } catch (e) { /* offline */ }
+    try { NET.publish({ name: s.name, level: D.survLvl(s.xp), job: s.job, scav: Math.round(s.xp), looted: SV.stats.runs, kills: SV.stats.kills, extra: { look: s.look, trader: traderLevel(), quests: SV.trader.completed, secrets: SV.stats.secrets, cosmetics: Object.keys(s.wardrobe.own).length, wk: DM.Social ? DM.Social.myWeek() : undefined } }); } catch (e) { /* offline */ }
   }
   Game.onLevel = () => publish();
   // a newer release on the site: save, then reload once (no loop: one try per version per tab session)
