@@ -16,26 +16,23 @@ window.DM = window.DM || {};
   // 0.26.2 (owner: "make sure the tutorial tells them how to set up FIRST before anything else, especially the steps"):
   // the tour opens with step setup - sign in, then step sync (with buttons that open them), then typing as the fallback.
   const signedIn = () => !!(window.NET && NET.handle);
-  // 0.26.3 (owner: "dont move on to the next steps until they complete the tutorial"): setup is required. Next stays
-  // locked until the step is really done: signed in; then synced steps arrived (any phone/watch reading in the last
-  // 14 days) - or, for a phone that cannot sync, "My phone can't sync" and then steps logged by hand.
-  const pad = n => String(n).padStart(2, '0');
-  function syncOk() {
-    if (!window.NET || !NET.stepsDay) return false;
-    if (NET.steps && NET.steps.phone > 0) return true;
-    for (let k = 0; k < 14; k++) { const d = new Date(Date.now() - k * 864e5), key = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); try { if ((NET.stepsDay(key) || {}).phone > 0) return true; } catch (e) { return false; } }
-    return false;
-  }
+  // 0.26.3 (owner: "dont move on to the next steps until they complete the tutorial"): setup is required - Next stays
+  // locked until each setup step is really done. A phone that cannot sync logs steps by hand instead.
   const logged = () => { const v = SV(); return !!(v && ((v.day && (v.day.typed > 0 || v.day.phone > 0)) || v.walked > 0)); };
-  const cant = () => { const v = SV(); return !!(v && v.tourNoSync); };
+  const cant = () => { const v = SV(); return !!(v && v.tourNoSync && !v.syncSetup); };
+  const synced = () => { const v = SV(); return !!(v && v.syncSetup); };
   const STEPS = [
     { t: 'Set up first: your steps', d: 'Dead Miles runs on your REAL steps, so set them up before anything else. It takes a couple of minutes: 1) sign in, 2) turn on step sync so every step you walk comes in by itself. Synced steps count in full - typed ones only count at half.' },
     { s: '#mnet', t: 'Step 1 of 2 · Sign in', d: () => signedIn() ? `You're signed in as @${NET.handle} - step 1 done.` : 'Tap Sign in now to make your account. Step sync needs it, it backs up your save, and it lets you see your friends.',
       act: () => signedIn() ? null : ['Sign in now', () => { const b = $('#mnet'); if (b) b.click(); }], done: signedIn, need: 'Sign in to continue' },
-    { s: '#mSyncG', t: 'Step 2 of 2 · Turn on step sync', d: 'Open the setup guide and follow it for your phone: iPhone uses a Shortcut (from Apple Health), Android uses the Dead Miles companion app. Once it is on, your steps arrive by themselves at full value - you never type them again.',
-      act: () => window.SYNC && !syncOk() ? ['Open the setup guide', () => SYNC.open()] : null, done: () => syncOk() || cant(),
-      need: 'Waiting for your first synced steps - finish the guide, then walk a little or run the Shortcut', alt: ["My phone can't sync", () => { const v = SV(); v.tourNoSync = 1; DM.Game.save(); }] },
-    { f: () => $('#mLog') && $('#mLog').parentElement, interact: 1, t: 'No sync yet? Type your steps', d: 'Until sync is on (or if it cannot work on your phone), type today\'s step TOTAL from your phone or watch here and tap Log. Typed steps count at half, up to 4,000 a day. Every ~1,000 steps scouts another house to loot.', done: () => syncOk() || logged(), need: 'Type your step total and tap Log to continue', skipIf: syncOk },
+    // 0.26.4 (owner: "the tutorial didnt make the steps mandatory ... SHOW them and wait for them to set it up before
+    // moving on ... thats the hardest part"): the guide opens by itself in setup mode (syncguide.js SYNC.setup) and stays
+    // open until a real sync arrives from the phone. Old phone data does not count - everyone does one fresh sync.
+    { s: '#mSyncG', t: 'Step 2 of 2 · Set up step sync', auto: 1,
+      d: () => synced() ? 'Step sync works - your phone sent its steps. You are all set.' : cant() ? 'You chose to type your steps for now. You can set up sync any time: How to sync steps on the home screen.' : 'This is the most important part. The setup guide opens next and shows you every step for your phone (iPhone: a Shortcut; Android: the Dead Miles Steps app). It stays open until your phone actually sends its first steps.',
+      act: () => window.SYNC && !synced() && !cant() ? ['Show me how to set it up', () => SYNC.setup(ok => { const v = SV(); if (ok) v.syncSetup = 1; else v.tourNoSync = 1; DM.Game.save(); })] : null,
+      done: () => synced() || cant(), need: 'Set up step sync to continue' },
+    { f: () => $('#mLog') && $('#mLog').parentElement, interact: 1, t: 'No sync yet? Type your steps', d: 'Until sync is on (or if it cannot work on your phone), type today\'s step TOTAL from your phone or watch here and tap Log. Typed steps count at half, up to 4,000 a day. Every ~1,000 steps scouts another house to loot.', done: () => synced() || logged(), need: 'Type your step total and tap Log to continue', skipIf: synced },
     { s: '#mNeeds', t: 'Hunger and thirst', d: 'These drain slowly, even with the app closed. Tap them to eat or drink. Below 30 you tire faster and search slower.' },
     { s: '#mSkills', t: 'Level and skills', d: 'Everything you do earns XP. Each level gives a skill point to spend in the skill trees here.' },
     { s: '#mWard', t: 'Wardrobe', d: 'Cosmetics you earn go straight here: hats, glasses, scarves, packs and jackets. Edit look changes your face and hair.' },
@@ -57,7 +54,8 @@ window.DM = window.DM || {};
     { s: '#mtabs [data-t="map"]', t: 'Real-world map', d: 'Your real streets. Walk within ~35 m of a marked place with the map open to claim it as a landmark house (3 a day, on foot).' },
     { s: '#mset', t: 'Settings and help', d: 'Sound, music, your save, How to play (every rule in detail) and this tour again. That\'s it - go walk!' },
   ];
-  let on = false, pending = false, i = 0, list = [], el = null, pollT = null, mayskip = false;
+  let on = false, pending = false, i = 0, list = [], el = null, pollT = null, autoed = false;
+  function setupDone() { const v = SV(); if (v && !v.setupDone) { v.setupDone = 1; DM.Game.save(); } }
   const SETUP = 4;   // the first 4 steps are the setup
   function visible(n) { if (!n) return false; const r = n.getBoundingClientRect(); return r.width > 0 && r.height > 0 && n.offsetParent !== null; }
   const txt = v => typeof v === 'function' ? v() : v;
@@ -107,14 +105,15 @@ window.DM = window.DM || {};
     const act = st.act ? st.act() : null, ok = !st.done || st.done(), setup = i < SETUP, alt = st.alt && !ok ? st.alt : null;
     card.innerHTML = `<div class="tourk">${i < SETUP ? 'Setup' : 'Tour'} · ${i + 1} of ${list.length}</div><h4>${esc(st.t)}</h4><p>${esc(txt(st.d))}</p>${act ? `<button class="mbtn touract" id="tAct">${esc(act[0])}</button>` : ''}${st.done ? `<div class="tourneed${ok ? ' ok' : ''}">${ok ? '✓ Done' : esc(st.need || 'Finish this step to continue')}</div>` : ''}${alt ? `<button class="touralt" id="tAlt">${esc(alt[0])}</button>` : ''}
       <div class="tourdots">${list.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</div>
-      <div class="tourbtns"><button class="tourskip" id="tSkip">${last || setup || !mayskip ? '' : 'Skip the rest'}</button>${i ? '<button class="mbtn sm ghost" id="tBack">Back</button>' : ''}<button class="mbtn sm" id="tNext"${ok ? '' : ' disabled'}>${last ? 'Done' : i ? 'Next' : 'Show me'}</button></div>`;
+      <div class="tourbtns"><button class="tourskip" id="tSkip">${last || setup ? '' : 'Skip the rest'}</button>${i ? '<button class="mbtn sm ghost" id="tBack">Back</button>' : ''}<button class="mbtn sm" id="tNext"${ok ? '' : ' disabled'}>${last ? 'Done' : i ? 'Next' : 'Show me'}</button></div>`;
     const sfx = () => { try { DM.E.SFX.play('ui'); } catch (e) { /* ignore */ } };
     if (act) $('#tAct').onclick = () => { sfx(); pause(act[1]); };
     if (alt) $('#tAlt').onclick = () => { sfx(); alt[1](); i++; show(); };
     clearInterval(pollT); if (!ok) pollT = setInterval(() => { if (on && el.style.display !== 'none' && st.done()) show(); }, 1500);   // unlock Next once it is done
-    $('#tNext').onclick = () => { if (!(!st.done || st.done())) return; sfx(); if (last) end(); else { i++; while (i < list.length - 1 && list[i].skipIf && list[i].skipIf()) i++; show(); } };
+    $('#tNext').onclick = () => { if (!(!st.done || st.done())) return; sfx(); if (last) end(); else { i++; while (i < list.length - 1 && list[i].skipIf && list[i].skipIf()) i++; if (i >= SETUP) setupDone(); show(); } };
+    if (st.auto && act && !ok && !autoed) { autoed = true; setTimeout(() => { if (on && list[i] === st && !st.done()) pause(act[1]); }, 1400); }   // SHOW them: the guide opens by itself
     if ($('#tBack')) $('#tBack').onclick = () => { sfx(); i--; show(); };
-    if (last || setup || !mayskip) $('#tSkip').style.visibility = 'hidden'; else $('#tSkip').onclick = () => { sfx(); end(); };
+    if (last || setup) $('#tSkip').style.visibility = 'hidden'; else $('#tSkip').onclick = () => { sfx(); end(); };
     place(); setTimeout(place, 350); setTimeout(place, 700);   // after the smooth scroll
   }
   // a setup button: hide the tour, open the panel / guide, and come back to the same step once it is closed
@@ -130,7 +129,7 @@ window.DM = window.DM || {};
   }
   function end() {
     on = false; pending = false; clearInterval(waitT); clearInterval(pollT); if (el) el.style.display = 'none';
-    const v = SV(); if (v) { v.tourDone = 1; DM.Game.save(); }
+    const v = SV(); if (v) { v.tourDone = 1; if (i >= SETUP - 1) v.setupDone = 1; DM.Game.save(); }
     if (DM.Game.tipNext) setTimeout(DM.Game.tipNext, 600);   // tips held back during the tour
     if (DM.E && DM.E.toast) DM.E.toast('Replay the tour any time: Settings > Game tour', 2.4);
   }
@@ -138,17 +137,21 @@ window.DM = window.DM || {};
     const v = SV(); if (!v || !v.survivor || DM.scene) return false;
     if ($('#msheet')) $('#msheet').classList.remove('on');
     const tab = $('#mtabs [data-t="houses"]'); if (tab && !tab.classList.contains('on')) tab.click();
-    build(); el.style.display = ''; on = true; pending = false; i = 0; mayskip = !!replay || !!SV().tourDone;   // the first time through cannot be skipped
-    list = STEPS.filter((st, k) => k < SETUP || !st.s && !st.f || visible(target(st)));   // setup steps always show
+    build(); el.style.display = ''; on = true; pending = false; i = 0; autoed = false;
+    // setup steps always show and can never be skipped; the rest of the tour can be. A save that finished the tour
+    // before setup was required gets the setup alone.
+    const setupOnly = !replay && v.tourDone && !v.setupDone;
+    list = setupOnly ? STEPS.slice(0, SETUP).concat([FIN]) : STEPS.filter((st, k) => k < SETUP || !st.s && !st.f || visible(target(st)));
     show(); return true;
   };
+  const FIN = { t: 'All set', d: 'Your steps are set up. Walk, scout houses and survive - replay the full tour any time from Settings > Game tour.' };
   TO.active = () => on || pending;
   // right after a new character is made: before the tutorial house and before any tip
   TO.queue = () => { pending = true; setTimeout(() => { if (!TO.start()) pending = false; }, 700); };
   // once by itself: after the tutorial house, when nothing else is on screen
   setInterval(() => {
     const v = SV();
-    if (on || pending || !v || !v.survivor || v.tourDone || DM.scene || document.hidden) return;
+    if (on || pending || !v || !v.survivor || (v.tourDone && v.setupDone) || DM.scene || document.hidden) return;
     if (($('#msheet') && $('#msheet').classList.contains('on')) || ($('#tipbox') && $('#tipbox').classList.contains('on')) || !visible($('#mtabs')) || ($('#menu') && $('#menu').className)) return;
     TO.start();
   }, 2500);

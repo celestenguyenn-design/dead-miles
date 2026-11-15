@@ -661,6 +661,14 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   "My phone can't sync" (SV.tourNoSync) and then steps logged (the step box is tappable through the overlay). Replays from
   Settings / How to play can skip.
 
+## Done in 0.26.4 (owner: "the tutorial didnt make the steps mandatory ... SHOW them and wait for them to set it up before moving on. everything else can be skipped ... thats the hardest part to set up")
+- syncguide.js SYNC.setup(cb): the guide opens LOCKED (no close, no "type my steps" options) with a sticky banner
+  "waiting for your first sync"; pulls NET every 8 s; a step post newer than setup start - 5 min (NET.lastPost) ->
+  "Synced!" + Continue -> cb(true). After 3 min a small "My phone can't sync - type my steps instead" (confirm) -> cb(false).
+- tour.js: the sync step opens that guide by itself and only unlocks with SV.syncSetup (a fresh sync - old phone data no
+  longer counts) or SV.tourNoSync (then the typing step requires logged steps). Setup can never be skipped; everything
+  after it can ("Skip the rest"). SV.setupDone; a save that finished the old tour gets the setup alone (+ "All set").
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
