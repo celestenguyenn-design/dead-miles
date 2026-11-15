@@ -832,6 +832,12 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Dot > Sell: "Sell all junk · N items · caps" at the top (tap twice): every pack + stash item with category 'sell'
   (D.cat - no crafting / base use) at her normal price. Single-item Sell rows unchanged.
 
+## Done in 0.29.4 (owner: "Cars should have an alarm system that activates with a 50% chance ... hordes of zombies
+should come but don't make it too hard")
+- house.js carAlarm(): when a parked car is unlocked with the brass key, 50% chance (seeded by L.seed, so a reload
+  does not reroll) the alarm wails ~8 s (SFX alert + noise radius 7, light shake) and 3-4 plain walkers (5 at
+  gamestage 20+) arrive from both ends of the street, 1.4 s apart, heading for the car. No specials, no runners.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
