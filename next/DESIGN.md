@@ -669,6 +669,15 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   longer counts) or SV.tourNoSync (then the typing step requires logged steps). Setup can never be skipped; everything
   after it can ("Skip the rest"). SV.setupDone; a save that finished the old tour gets the setup alone (+ "All set").
 
+## Done in 0.26.5 (owner: "make it so that people can see which parties to join" / "Capsule machine should be in its own tab" / "thanksgiving or any event should have their own tab")
+- Parties: new RPC next_party_list(h,t) (next/party.sql, applied to Supabase as migration next_party_list; read-only,
+  dm_check auth) -> every party with members. NET.partyList(). Horde > Party lists them with Join (or Switch, tap twice,
+  when already in one; full parties say Full) and still has "start your own" by name.
+- Home tabs: Houses, Gear, Workbench, Map, Capsules (the capsule machine draws inside the tab: GA.renderPane; the last pull
+  stays shown for 20 s across redraws), and an event tab (glyph + short name, only while an event runs): Deck the base
+  card, the event page (eventHTML, also used by the sheet), See Dot, Holiday capsules. The event banner opens the tab.
+  Two rows of three (div#mtabs wraps). The capsule and Deck cards left the Houses list. Tour steps point at the new tabs.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

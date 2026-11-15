@@ -65,7 +65,7 @@ window.DM = window.DM || {};
       const lost = G().routeApi.toStash([{ k: res.decor, n: 1 }]);
       res.lost = lost && lost.length;
     }
-    G().save(); SFX.play('pick'); sheet(res);
+    lastRes = res; lastAt = Date.now(); G().save(); SFX.play('pick'); sheet(res);
   }
   function buy() {
     const v = SV(), g = st(); if (!g) return;
@@ -84,19 +84,26 @@ window.DM = window.DM || {};
       <div class="hbtns"><button class="mbtn${g.tok ? '' : ' ghost'}" id="gaOpen">${g.tok ? 'Pull' : 'Look'}</button></div></div>`;
   };
   GA.bind = function (root) { const b = (root || document).querySelector('#gaOpen'); if (b) b.onclick = () => { SFX.play('ui'); sheet(); G().tip('gacha'); }; const d = (root || document).querySelector('#dkOpen'); if (d) d.onclick = () => { SFX.play('ui'); deckSheet(); G().tip('deck'); }; };
+  // 0.26.5 (owner: "Capsule machine should be in its own tab"): the machine draws inside the Capsules tab (host);
+  // anywhere else (e.g. opened from a card) it is a sheet as before.
+  let host = null;
+  let lastRes = null, lastAt = 0;   // the last pull stays on the tab while the page redraws (a new cosmetic redraws home)
+  GA.renderPane = function (el) { host = el; sheet(Date.now() - lastAt < 20000 ? lastRes : undefined); };
   function sheet(res) {
     const g = st(), v = SV(), P = pool(), w = own(), ev = EVA();
     const got = P.filter(k => w[k]).length;
     const resHTML = !res ? '' : res.cos
       ? `<div class="garesult" style="--rc:${RCOL[D.COS[res.cos].r]}"><div class="gaitem">${U().icon('cos_' + res.cos)}</div><div><i>${D.RARITY[D.COS[res.cos].r].n}</i><b>${esc(D.COS[res.cos].n)}</b><span>${res.dup ? 'You had it already - Dot bought the spare' : 'New! It is in your wardrobe'}</span></div></div>`
       : `<div class="garesult" style="--rc:#f07aa8"><div class="gaitem">${U().icon(res.decor)}</div><div><i>Holiday decor</i><b>${esc(D.ITEMS[res.decor].n)}</b><span>${res.lost ? 'Your stash is full - it was left behind' : 'In your stash - place it at the base'}</span></div></div>`;
-    U().sheetOpen(`<div class="kick">Capsule machine${ev && P.some(k => D.COS[k].ev) ? ' · ' + esc(ev.ev.name) + ' capsules in' : ''}</div>
+    const inTab = host && document.body.contains(host) && G().ui && document.querySelector('#mtabs [data-t="gacha"].on');
+    (inTab ? h => { host.innerHTML = `<div class="mcard gatab">${h}</div>`; } : U().sheetOpen)(`<div class="kick">Capsule machine${ev && P.some(k => D.COS[k].ev) ? ' · ' + esc(ev.ev.name) + ' capsules in' : ''}</div>
       <h3>${g.tok} token${g.tok === 1 ? '' : 's'}</h3>${resHTML}
       <p class="mp dim">1 token per ${fmt(STEP)} steps (up to ${DAY_MAX} a day${g.dayTok >= DAY_MAX ? ' - done for today' : `, next in ${fmt(nextIn(g))}`}), or ${PRICE} caps. Epic or better at least every ${PITY} pulls (${PITY - g.pity} to go).</p>
       <div class="gapool">${P.map(k => `<span class="gap${w[k] ? ' own' : ''}" style="--rc:${RCOL[D.COS[k].r]}" title="${esc(D.COS[k].n)}">${U().icon('cos_' + k)}</span>`).join('')}</div>
       <p class="mp dim">${got}/${P.length} collected${ev && ev.ev.decor ? ` · 1 pull in 4 is ${esc(ev.ev.name)} decor` : ''}</p>
-      <div class="btnrow"><button class="mbtn sm ghost" id="gaClose">Close</button><button class="mbtn sm ghost" id="gaBuy">Buy · ${PRICE} caps</button><button class="mbtn sm" id="gaPull"${g.tok ? '' : ' disabled'}>Pull</button></div>`);
-    $('#gaClose').onclick = () => { U().sheetClose(); G().renderHome(); };
+      <div class="btnrow">${inTab ? '' : '<button class="mbtn sm ghost" id="gaClose">Close</button>'}<button class="mbtn sm ghost" id="gaBuy">Buy · ${PRICE} caps</button><button class="mbtn sm" id="gaPull"${g.tok ? '' : ' disabled'}>Pull</button></div>`);
+    if ($('#gaClose')) $('#gaClose').onclick = () => { U().sheetClose(); G().renderHome(); };
+    if (inTab) G().tip('gacha');
     $('#gaBuy').onclick = buy; $('#gaPull').onclick = pull;
   }
   GA.open = sheet;

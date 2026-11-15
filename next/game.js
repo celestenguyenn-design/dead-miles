@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.26.4';
+const NEXT_VERSION = '0.26.5';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1070,21 +1070,32 @@ const NEXT_VERSION = '0.26.4';
       <span class="evt"><b>${esc(e.name)} event</b><em>${when}</em><small>${bits.filter(Boolean).map(esc).join(' · ')}</small></span><span class="evgo">›</span></button>`;
   }
   function hordeLine(a) { const n = HD.next(), sp = n && HD.special(n.week); return sp && sp.name && sp.ev === a.id ? sp.name + ' Sunday' : ''; }
-  function openEvent() {
-    const a = EVA, up = !a && EVS.upcoming(); const id = (a || up).id, e = (a || up).ev, w = SV.survivor.wardrobe.own;
+  // 0.26.5 (owner: "thanksgiving or any event should have their own tab"): the event's page is also the event tab
+  function eventHTML() {
+    const a = EVA, up = !a && EVS.upcoming(); if (!a && !up) return ''; const id = (a || up).id, e = (a || up).ev, w = SV.survivor.wardrobe.own;
     const st = a && evState(), cos = e.cos.filter(c => D.COS[c]);
     const fmt = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
     const n = HD.next(), sp = n && HD.special(n.week);
-    sheetOpen(`<div class="kick" style="color:${e.accent.c}">${a ? 'Event on now' : 'Coming soon'} · ${fmt((a || up).start)} - ${fmt((a || up).end)}</div><h3>${esc(e.name)} ${(a || up).y}</h3>
+    return `<div class="kick" style="color:${e.accent.c}">${a ? 'Event on now' : 'Coming soon'} · ${fmt((a || up).start)} - ${fmt((a || up).end)}</div><h3>${esc(e.name)} ${(a || up).y}</h3>
       <p class="mp">${esc(e.blurb)}</p>
       ${e.boss ? `<div class="evrow"><b>Mini-boss</b><span>${esc(e.boss.name)} · in about 1 in 3 houses (the house list shows where). Tough, and it carries something good.</span></div>` : ''}
       ${e.quests ? `<div class="evrow"><b>Dot's jobs</b><span>${e.quests.length} event jobs, one at a time${st ? ` · ${Math.min(st.step, e.quests.length)}/${e.quests.length} done` : ''}. Visit her shop.</span></div>` : ''}
       ${e.horde ? `<div class="evrow"><b>Horde night</b><span>${esc(e.horde((a || up).y).name)}: the Sunday horde is ${Math.round((e.horde((a || up).y).size - 1) * 100)}% bigger, with better crates${sp && sp.ev === id ? ' - this Sunday!' : '.'}</span></div>` : ''}
       <div class="kick sect">Limited cosmetics · ${cos.filter(c => w[c]).length}/${cos.length}</div>
-      <div class="evcos">${cos.map(c => `<span class="${w[c] ? 'own' : ''}"><img alt="" src="${ART.iconURL[(w[c] ? 'cos_' : 'cosS_') + c]}"><i>${esc(D.COS[c].n)}</i></span>`).join('')}</div>
-      <div class="btnrow"><button class="mbtn sm ghost" id="evClose">Close</button>${a && SV.tutorialDone ? '<button class="mbtn sm" id="evDot">See Dot</button>' : ''}</div>`);
+      <div class="evcos">${cos.map(c => `<span class="${w[c] ? 'own' : ''}"><img alt="" src="${ART.iconURL[(w[c] ? 'cos_' : 'cosS_') + c]}"><i>${esc(D.COS[c].n)}</i></span>`).join('')}</div>`;
+  }
+  function openEvent() {
+    if (EVA && $('#mtabs [data-t="event"]')) { tab('event'); return; }   // 0.26.5: the event has its own tab
+    sheetOpen(eventHTML() + `<div class="btnrow"><button class="mbtn sm ghost" id="evClose">Close</button></div>`);
     $('#evClose').onclick = sheetClose;
-    if ($('#evDot')) $('#evDot').onclick = () => { sheetClose(); openTrader(); };
+  }
+  function renderEventTab() {
+    const el = $('#mpane'); if (!EVA) { tab('houses'); return; }
+    el.innerHTML = `<div class="evtab">${DM.Gacha ? DM.Gacha.deckHTML() : ''}<div class="mcard evcard">${eventHTML()}
+      ${SV.tutorialDone ? '<div class="btnrow"><button class="mbtn sm" id="evDot">See Dot</button><button class="mbtn sm ghost" id="evCaps">Holiday capsules</button></div>' : ''}</div></div>`;
+    if (DM.Gacha) DM.Gacha.bind(el);
+    if ($('#evDot')) $('#evDot').onclick = () => { SFX.play('ui'); openTrader(); };
+    if ($('#evCaps')) $('#evCaps').onclick = () => { SFX.play('ui'); tab('gacha'); };
   }
 
   // ---- home
@@ -1124,7 +1135,7 @@ const NEXT_VERSION = '0.26.4';
         </div>
       </div>
       ${gated ? homeTiles() : eventBanner()}
-      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}</div>
+      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Gacha ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}</div>
       <div id="mpane"></div>`;
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { SFX.play('ui'); if (b.dataset.t === 'map') { DM.Map.open(); return; } tab(b.dataset.t); }; });
     $('#mLog').onclick = () => {
@@ -1153,7 +1164,8 @@ const NEXT_VERSION = '0.26.4';
     let vt = 0, vtT = 0; $('#mver').onclick = () => { const n = performance.now(); if (n - vtT > 1200) vt = 0; vtT = n; if (++vt >= 5) { vt = 0; if (DM_DEV_OK) openDev(); } };
     $('#mset').onclick = openSettings;
     drawPortrait($('#mPort'), s.hands && s.hands.k, .78);
-    if (curTab === 'houses') renderHouses(); else if (curTab === 'bench') renderBench(); else renderStash();
+    if ((curTab === 'gacha' && !(SV.tutorialDone && DM.Gacha)) || (curTab === 'event' && !(SV.tutorialDone && EVA))) curTab = 'houses';
+    if (curTab === 'houses') renderHouses(); else if (curTab === 'bench') renderBench(); else if (curTab === 'gacha') DM.Gacha.renderPane($('#mpane')); else if (curTab === 'event') renderEventTab(); else renderStash();
     updateSync();
     if (cosQueue.length) setTimeout(showCosPop, 400); else { tip('home'); if (s.food.h < DM.Food.LOW || s.food.t < DM.Food.LOW) tip('food'); if (DM.Infect && DM.Infect.is(s)) tip('infect'); }
     const ic = document.querySelector('.nstat .inf'); if (ic) ic.onclick = () => { SFX.play('ui'); toast(DM.Infect.effects(s)[0], 5); };   // 0.18
@@ -1222,7 +1234,7 @@ const NEXT_VERSION = '0.26.4';
         : `<div class="hdays">Safe zone · ${icon('caps')} ${T.caps} caps${dotVisits() ? ` · visit ${dotVisits() + 1} of ${DOT_DAY} today` : ''}</div>`}</div>
       <div class="hbtns"><button class="mbtn${away || shut ? ' ghost' : ''}" id="hTrader">${away || shut ? 'Away' : 'Visit'}</button></div></div>` : '';
     const dailyCard = (SV.tutorialDone && DM.Daily ? DM.Daily.cardHTML() : '')   // 0.18: the daily challenge house (daily.js)
-      + (SV.tutorialDone && DM.Gacha ? DM.Gacha.deckHTML() + DM.Gacha.cardHTML() : '');   // 0.26: Deck the base + capsule machine (gacha.js)
+      ;   // 0.26.5: the capsule machine and Deck the base moved to their own tabs (Capsules, the event tab)
     if (!list.length) { el.innerHTML = rseg + traderCard + dailyCard + `<div class="empty big">No houses scouted yet.<br>Walk - every ~1,000 steps turns up another door.</div>`; if ($('#hTrader')) $('#hTrader').onclick = openTrader; if (dailyCard) { if (DM.Daily) DM.Daily.bind(el); if (DM.Gacha) DM.Gacha.bind(el); } if (rseg) DM.Route.bind(el, () => renderHome()); return; }
     const bossCard = '';   // 0.23 ui: the weekly boss lives on its home tile only (was shown twice)
     const gstage = gamestage().gs;   // 0.19: the house list's special-infected tag uses your gamestage
@@ -1361,11 +1373,24 @@ const NEXT_VERSION = '0.26.4';
   function partySheet() {
     const N = window.NET, p = N && N.party;
     if (!N || !N.ok) { sheetOpen(`<div class="kick">Horde night</div><h3>Party</h3><p class="mp">Up to 6 friends share one horde. Sign in first (Account & friends), then everyone types the same party code.</p><button class="mbtn" id="pAcc">Account &amp; friends</button><button class="mbtn ghost" id="pClose">Close</button>`); $('#pAcc').onclick = () => { sheetClose(); openAccount(); }; $('#pClose').onclick = sheetClose; return; }
-    sheetOpen(`<div class="kick">Horde night</div><h3>Party</h3>${p && p.code ? `<p class="mp">You are in <b>${esc(p.code)}</b> (${(p.members || []).length}/6): ${(p.members || []).map(m => '@' + esc(m)).join(', ')}.</p><p class="mp">Everyone's watch-shift kills thin the same horde. Each base is checked against what is left.</p><button class="mbtn ghost" id="pLeave">Leave party</button>`
-      : `<p class="mp">Up to 6 friends share one horde, with one deadline: Sunday 9 PM New York time. Everyone types the same code.</p><input id="pCode" placeholder="party code, e.g. brooklyn" maxlength="20" autocapitalize="off" autocorrect="off" spellcheck="false" style="display:block;width:100%;box-sizing:border-box;height:50px;margin:10px 0 8px;padding:0 14px;border-radius:14px;border:2.5px solid #5a4a86;background:#11142f;color:#f6e3bb;font:800 16px Inter,system-ui,sans-serif;-webkit-user-select:text;user-select:text"><button class="mbtn" id="pJoin">Join party</button><div class="mp" id="pMsg"></div>`}
+    // 0.26.5 (owner: "make it so that people can see which parties to join ... they can always leave the party and make
+    // their own"): the parties with members are listed with a Join (or Switch) button; a new code still starts your own.
+    const mine = p && p.code;
+    sheetOpen(`<div class="kick">Horde night</div><h3>Party</h3>${mine ? `<p class="mp">You are in <b>${esc(p.code)}</b> (${(p.members || []).length}/6): ${(p.members || []).map(m => '@' + esc(m)).join(', ')}.</p><p class="mp">Everyone's watch-shift kills thin the same horde. Each base is checked against what is left.</p><button class="mbtn ghost" id="pLeave">Leave party</button>`
+      : `<p class="mp">Up to 6 friends share one horde, with one deadline: Sunday 9 PM New York time. Join a party below, or start your own.</p>`}
+      <div class="kick sect" style="margin-top:12px">${mine ? 'Other parties' : 'Parties to join'}</div><div id="pList" class="plist"><div class="mp dim">Loading parties...</div></div>
+      <div class="kick sect" style="margin-top:12px">Start your own</div><input id="pCode" placeholder="new party name, e.g. brooklyn" maxlength="20" autocapitalize="off" autocorrect="off" spellcheck="false" style="display:block;width:100%;box-sizing:border-box;height:50px;margin:6px 0 8px;padding:0 14px;border-radius:14px;border:2.5px solid #5a4a86;background:#11142f;color:#f6e3bb;font:800 16px Inter,system-ui,sans-serif;-webkit-user-select:text;user-select:text"><button class="mbtn${mine ? ' ghost' : ''}" id="pJoin">${mine ? 'Switch to this party' : 'Start / join by name'}</button><div class="mp" id="pMsg"></div>
       <button class="mbtn ghost" id="pClose">Close</button>`);
     $('#pClose').onclick = sheetClose;
-    if ($('#pJoin')) $('#pJoin').onclick = async () => { const r = await N.partyJoin($('#pCode').value); if (r.ok) { sheetClose(); renderHome(); toast('Joined the party', 1.6); } else $('#pMsg').textContent = r.error || 'Could not join'; };
+    const join = async code => { $('#pMsg').textContent = 'Joining...'; const r = await N.partyJoin(code); if (r.ok) { sheetClose(); renderHome(); toast(mine ? `Switched to ${r.code}` : `Joined ${r.code}`, 1.8); } else $('#pMsg').textContent = r.error || 'Could not join'; };
+    if ($('#pJoin')) $('#pJoin').onclick = () => join($('#pCode').value);
+    N.partyList().then(list => {
+      const el = $('#pList'); if (!el) return;
+      const rows = (list || []).filter(x => !x.mine);
+      el.innerHTML = list == null ? '<div class="mp dim">Could not load the parties - check your connection.</div>' : !rows.length ? `<div class="mp dim">${mine ? 'No other parties yet.' : 'No parties yet - start one below and your friends will see it here.'}</div>`
+        : rows.map(x => `<div class="prow"><div><b>${esc(x.code)}</b><span>${x.n}/6 · ${x.members.map(m => '@' + esc(m)).join(', ')}</span></div>${x.n >= 6 ? '<em>Full</em>' : `<button class="mbtn sm" data-pj="${esc(x.code)}">${mine ? 'Switch' : 'Join'}</button>`}</div>`).join('');
+      el.querySelectorAll('[data-pj]').forEach(b => b.onclick = () => { if (mine && !b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Tap to switch'; return; } join(b.dataset.pj); });
+    });
     if ($('#pLeave')) $('#pLeave').onclick = async b => { const el = $('#pLeave'); if (!el.dataset.sure) { el.dataset.sure = 1; el.textContent = 'Tap again to leave'; return; } await N.partyLeave(); sheetClose(); renderHome(); };
   }
   // After the deadline: resolve last week's horde once, on this phone, from the party record (or solo).
@@ -1596,7 +1621,7 @@ const NEXT_VERSION = '0.26.4';
     ['Base & farming', 'Your base is built with steps (the same steps also scout houses). Build walls, a gate, traps and garden beds; decorate with furniture you find. Plant seeds, water them with steps each day, and harvest real food. The stash chest lives here.'],
     ['Horde night', 'Every Sunday 9 PM New York time a horde hits. In the 24 hours before, do a watch shift (a 2-3 minute defence) - every kill thins the horde for your whole party. Strong bases hold and pay out a crate; weak ones lose something you repair with steps. Skip the shift and you get nothing.'],
     ['Seasonal events', 'Holidays switch on by themselves: Thanksgiving (from two weeks before to the Tuesday after) and Christmas (Dec 11 - Jan 2). Events bring holiday loot, a mini-boss in about 1 in 3 houses, a chain of event jobs from Dot, holiday capsules in the capsule machine, holiday decor and once-a-year cosmetics. Thanksgiving also has the Black Friday horde: a bigger Sunday horde with better crates.'],
-    ['Capsule machine', 'The capsule machine (Houses tab) gives a random cosmetic for a token. You get a token for every 4,000 steps (up to 3 a day), or buy one for 50 caps. Odds: common 55%, rare 30%, epic 12%, legendary 3%, and at least one epic or better every 10 pulls. Cosmetics you do not have yet come first; Dot buys any duplicate. During a holiday its capsules join the machine, and 1 pull in 4 is a piece of holiday decor.'],
+    ['Capsule machine', 'The capsule machine (Capsules tab) gives a random cosmetic for a token. You get a token for every 4,000 steps (up to 3 a day), or buy one for 50 caps. Odds: common 55%, rare 30%, epic 12%, legendary 3%, and at least one epic or better every 10 pulls. Cosmetics you do not have yet come first; Dot buys any duplicate. During a holiday its capsules join the machine, and 1 pull in 4 is a piece of holiday decor.'],
     ['Deck the base', 'During Thanksgiving and Christmas, place that holiday\'s decor at your base (Base > Decor) for prizes: 2 pieces = 2 capsule tokens + 40 caps, 5 = 3 tokens + 80 caps, 8 = a legendary holiday hat + 100 caps. Holiday decor comes from Dot\'s holiday shelf, holiday houses (storage, pantries, closets) and the capsule machine.'],
     ['Workbench & crafting', 'Workbench (home tab, or at the base) lists every recipe you know with each material, what you have and what you need. Tap a recipe to see what it does, every material in full with where to find it, and a big Craft button. Materials come from the stash and the pack. New recipes come from blueprints: Dot trades them, and some turn up in hidden stashes and safes.'],
     ['Crew', 'About 1 house in 25 has a survivor hiding in a closet or a secret room (more in mansions and police stations). Talk to them: with a free bunk they move into your base (2 bunks, build up to 4). Each has a role - Scavenger (crew searches bring back more), Guard (horde-night defence), Medic (heals you each morning), Gardener (waters a plant a day), Tinkerer (cheaper repairs) - and levels up slowly. Each eats 1 food a day from your STASH; three hungry days and they leave a note (they never take anything). The more crew you have, the more a Crew search brings back.'],
