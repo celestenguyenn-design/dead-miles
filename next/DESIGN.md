@@ -822,6 +822,12 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   minimap "?" + "go back" toast) with its room; and standing at a hatch / hollow wall without the tool shows a NeedTool
   label ("Attic hatch · needs a hook pole (it is in this house)", "Hollow wall · needs a crowbar or pry bar").
 
+## Done in 0.29.2 (owner: "my bow broke. Now i don't have any way of making one as a hunter" / "or even upgrading it")
+- Recipe bow (wood 3, cloth 2, tape 1); hunters know it from the start (new saves and migrate()); others need bp_bow.
+- Gear item actions: "Upgrade to <next tier>" for any weapon (pack, stash or hands): Rusty->Worn 2 scrap; Worn->Solid
+  3 scrap + 1 tape; Solid->Fine 5 scrap + 2 tape + 40 caps; Fine->Masterwork 8 scrap + 3 tape + 100 caps. Sets q + 1
+  and refills durability to the new max (+8% damage, +15% durability per tier).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
