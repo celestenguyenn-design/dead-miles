@@ -727,13 +727,25 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   hands opens "No lockpicks or crowbar": Take N lockpicks from the stash (up to a stack) / Take the crowbar / Go in anyway
   / Cancel. With none in the stash it says where to get them. Not for the tutorial house. loot(h, checked).
 
+## Done in 0.27 (owner: "add npcs to houses that require aid or help, we can go back to those houses to submit a quest but will take steps")
+- npcq.js: 1 house in 8 (deterministic per seed; not tutorial / daily / Dot quest / route houses, never with a hiding
+  survivor; the antibiotics request at half rate) has someone standing inside with a "!" bubble (crew.js draws them with a
+  survivor rig and adds Talk). 7 requests (wound, family, thirst, radio, barricade, fever, lock), each with item options.
+  Accept -> SV.npcq.list (max 3 open); the house keeps h.npcq and stays on the list (rollDay keeps it). After 1,500-3,000
+  more steps of SV.walked the card shows Return: hand the items over from pack + stash -> caps (25-90), XP, a supply bundle,
+  30% a capsule token, 12% a quest cosmetic, 20% they ask to join the crew (bunk free). Give up from the Return sheet.
+  Needs show as gold QUEST ITEMs in loot, in the quest list and the HUD chip.
+- Also fixed: 0.26.10 had doubled the 🔑 tags (the 0.8 ones already existed); the old tag now says "· key inside".
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
 ### 2. Owner's list (2026-11-14), still to do, in this order
-- NPCs in houses who need help: a quest found inside a house; walk back (steps) to that house to turn it in.
 - 5 job-only skill trees (the 5 current trees stay open to everyone).
 - Lifetime step milestones (badges / rewards).
+- Walking ideas offered (pick): daily streaks, expeditions (long trips with beats), party step goal, friends step race,
+  supply drops, weather/night bonus.
+- Armor system (owner: "we have no armor system").
 ### 3. Other open items
 - A friend's Android blocks the step-sync app install: waiting on her handle or a screenshot (fallback: add her handle to
   NET.cfg.trustedTyped in net.js so typed steps count like phone steps).
