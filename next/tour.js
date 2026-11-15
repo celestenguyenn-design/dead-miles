@@ -19,6 +19,10 @@ window.DM = window.DM || {};
   // 0.26.3 (owner: "dont move on to the next steps until they complete the tutorial"): setup is required - Next stays
   // locked until each setup step is really done. A phone that cannot sync logs steps by hand instead.
   const logged = () => { const v = SV(); return !!(v && ((v.day && (v.day.typed > 0 || v.day.phone > 0)) || v.walked > 0)); };
+  // 0.28.1 (owner: "can you let isabel bypass the tutorial"): handles on NET.cfg.trustedTyped (typed steps count like a
+  // phone's) skip the setup - there is nothing for them to set up
+  const trusted = () => !!(window.NET && NET.handle && NET.cfg && (NET.cfg.trustedTyped || []).includes(String(NET.handle).toLowerCase()));
+  TO.trusted = trusted;
   const cant = () => { const v = SV(); return !!(v && v.tourNoSync && !v.syncSetup); };
   const synced = () => { const v = SV(); return !!(v && v.syncSetup); };
   const STEPS = [
@@ -138,13 +142,14 @@ window.DM = window.DM || {};
   }
   TO.start = function (replay) {
     const v = SV(); if (!v || !v.survivor || DM.scene) return false;
+    if (!replay && trusted() && v.tourDone) { v.setupDone = 1; DM.Game.save(); return false; }   // nothing to set up
     if ($('#msheet')) $('#msheet').classList.remove('on');
     const tab = $('#mtabs [data-t="houses"]'); if (tab && !tab.classList.contains('on')) tab.click();
     build(); el.style.display = ''; on = true; pending = false; i = 0; autoed = false;
     // setup steps always show and can never be skipped; the rest of the tour can be. A save that finished the tour
     // before setup was required gets the setup alone.
     const setupOnly = !replay && v.tourDone && !v.setupDone;
-    const keep = st => !st.home || (DM.Install && DM.Install.needed());
+    const keep = st => (!st.home || (DM.Install && DM.Install.needed())) && !(trusted() && STEPS.indexOf(st) > -1 && STEPS.indexOf(st) < SETUP);   // trusted: no setup steps
     list = (setupOnly ? STEPS.slice(0, SETUP).concat([FIN]) : STEPS.filter((st, k) => k < SETUP || !st.s && !st.f || visible(target(st)))).filter(keep);
     setupN = list.filter((st, k) => STEPS.indexOf(st) > -1 && STEPS.indexOf(st) < SETUP).length;
     show(); return true;
@@ -157,6 +162,7 @@ window.DM = window.DM || {};
   setInterval(() => {
     const v = SV();
     if (on || pending || !v || !v.survivor || (v.tourDone && v.setupDone) || DM.scene || document.hidden) return;
+    if (trusted() && v.tourDone) { v.setupDone = 1; DM.Game.save(); return; }
     if (($('#msheet') && $('#msheet').classList.contains('on')) || ($('#tipbox') && $('#tipbox').classList.contains('on')) || !visible($('#mtabs')) || ($('#menu') && $('#menu').className)) return;
     TO.start();
   }, 2500);
