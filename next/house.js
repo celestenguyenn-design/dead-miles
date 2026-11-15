@@ -702,7 +702,25 @@
       setTimeout(() => SFX.play('creak'), 220);
       emitNoise(o.x + o.w / 2, o.y + o.h, 3);
       toast('Unlocked the car - glove box and trunk are open to search', 2.2); gainXP(3, G.p.x, G.p.y);
+      carAlarm(o);
     }
+  }
+  // 0.29.4 (owner: "Cars should have an alarm that activates with a 50% chance ... hordes of zombies should come but
+  // don't make it too hard"): opening a parked car sets its alarm off half the time (seeded per house, so a reload
+  // does not reroll). It wails for ~8 s - loud enough to wake the house - and 3-4 plain walkers (5 at gamestage 20+) shamble in from both ends of the street toward the car.
+  function carAlarm(o) {
+    if (G.alarmDone) return; G.alarmDone = true;
+    const rnd = D.mulberry32(((L.seed || 0) ^ 0xa1a3) >>> 0);
+    if (rnd() >= .5) return;
+    const cx = o.x + o.w / 2, cy = o.y + o.h;
+    toast('WEE-OO WEE-OO - the car alarm! Something is coming up the street...', 3.2);
+    let n = 0; const wail = setInterval(() => { if (!G || G.over || ++n > 13) { clearInterval(wail); return; } SFX.play('alert'); emitNoise(cx, cy, 7, n % 3 === 1); G.shake = Math.max(G.shake || 0, 3); }, 600);
+    const many = 3 + (rnd() < .5 ? 1 : 0) + (((L && L.gs) || 0) >= 20 ? 1 : 0);
+    for (let i = 0; i < many; i++) setTimeout(() => {
+      if (!G || G.over) return;
+      const left = i % 2 === 0, x = (left ? 1.2 : MW - 1.2) * T, y = (L.streetY + .9 + (i % 3) * .5) * T;
+      const z = mkZombie(x, y, 'investigate', streetRoom()); z.target = { x: cx, y: cy }; z.hunter = true; gsZombie(z); G.zs.push(z);
+    }, 900 + i * 1400);
   }
   function cancelSearch() { const p = G.p; if (p.st === 'search') { p.st = 'free'; p.search = null; } }
 
