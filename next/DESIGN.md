@@ -690,6 +690,12 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   MILES, snow caps, Santa hat, holly, fairy lights, snowflakes. DM.Logo.full() on the title screen, DM.Logo.mini() in the
   home header and the character screen. title.js keeps the old LOGO as a fallback.
 
+## Done in 0.26.7 (owner: "a prompt popped up briefly that said the wall sounds hollow but it never shows again ... i also cant find what its talking about")
+- house.js: a secret hint (hollow wall / creaky floor / odd shelf / attic hatch) marks the secret noticed {room, what} for
+  the run. #secchip (under the quest chip) lists noticed, unfound secrets with what is still needed: "search N more spots
+  first" (the gate), then the tool ("needs a crowbar or pry bar" / "a hook pole") or the action. A gold "?" pulses on the
+  minimap there, and when the gate opens a toast says to go back to it.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

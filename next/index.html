@@ -308,6 +308,9 @@
   .job .kit i { position: relative; } .job .kit img { width: 28px; height: 28px; } .job .kit em { position: absolute; right: -2px; bottom: -2px; font-style: normal; font-size: 9px; font-weight: 900; color: var(--ora); }
   .job.on { border-color: var(--ora); box-shadow: 0 3px 0 var(--ora); background: #2a1f4a; } .job.on span { color: var(--crm); }
   #qchip { display: none; max-width: 150px; padding: 5px 8px; border-radius: 10px; background: rgba(17,20,47,.9); border: 2px solid var(--ora); font-size: 10px; font-weight: 800; line-height: 1.35; color: var(--crm); text-align: right; }
+  #secchip { display: none; max-width: 170px; margin-top: 6px; padding: 5px 8px; border-radius: 10px; background: rgba(17,20,47,.9); border: 2px solid #ffd27a; font-size: 10px; font-weight: 800; line-height: 1.35; color: var(--crm); pointer-events: none; }
+  #secchip.on { display: block; } #secchip .sc + .sc { margin-top: 5px; } #secchip b { color: #ffd27a; } #secchip span { display: block; font-weight: 700; opacity: .9; }
+  body.atbase #secchip, body.bossfight #secchip { display: none !important; }
   #qchip.on { display: block; } #qchip b { color: var(--ora); } #qchip i { display: block; height: 3px; }
   /* 0.19.1: tap the chip for the full quest list; quest items glow on the loot sheet */
   #qchip { pointer-events: auto; cursor: pointer; } #qchip .qcaret { display: block; margin-top: 3px; font-size: 9px; font-weight: 900; letter-spacing: .08em; color: var(--ora); opacity: .85; }
@@ -843,6 +846,7 @@
       <div id="deepchip"></div>
       <canvas id="mini" width="144" height="180"></canvas>
       <div id="qchip"></div>
+      <div id="secchip"></div>
     </div>
   </div>
   <div id="basehud"><div class="bchips"><div class="bchip" id="bpool"></div><div class="bchip" id="bdef"></div></div>
@@ -878,36 +882,36 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.26.6"></script>
-<script src="art.js?v=0.26.6"></script>
-<script src="net.js?v=0.26.6"></script>
-<script src="netpanel.js?v=0.26.6"></script>
-<script src="syncguide.js?v=0.26.6"></script>
-<script src="events.js?v=0.26.6"></script>
-<script src="data.js?v=0.26.6"></script>
-<script src="food.js?v=0.26.6"></script>
-<script src="skills.js?v=0.26.6"></script>
-<script src="infection.js?v=0.26.6"></script>
-<script src="infected.js?v=0.26.6"></script>
-<script src="engine.js?v=0.26.6"></script>
-<script src="music.js?v=0.26.6"></script>
-<script src="weather.js?v=0.26.6"></script>
-<script src="gen.js?v=0.26.6"></script>
-<script src="raiders.js?v=0.26.6"></script>
-<script src="house.js?v=0.26.6"></script>
-<script src="horde.js?v=0.26.6"></script>
-<script src="base.js?v=0.26.6"></script>
-<script src="crew.js?v=0.26.6"></script>
-<script src="boss.js?v=0.26.6"></script>
-<script src="daily.js?v=0.26.6"></script>
-<script src="gacha.js?v=0.26.6"></script>
-<script src="tour.js?v=0.26.6"></script>
-<script src="deep.js?v=0.26.6"></script>
-<script src="route.js?v=0.26.6"></script>
-<script src="logo.js?v=0.26.6"></script>
-<script src="title.js?v=0.26.6"></script>
-<script src="game.js?v=0.26.6"></script>
-<script src="mvt.js?v=0.26.6"></script>
-<script src="map.js?v=0.26.6"></script>
+<script src="s2art.js?v=0.26.7"></script>
+<script src="art.js?v=0.26.7"></script>
+<script src="net.js?v=0.26.7"></script>
+<script src="netpanel.js?v=0.26.7"></script>
+<script src="syncguide.js?v=0.26.7"></script>
+<script src="events.js?v=0.26.7"></script>
+<script src="data.js?v=0.26.7"></script>
+<script src="food.js?v=0.26.7"></script>
+<script src="skills.js?v=0.26.7"></script>
+<script src="infection.js?v=0.26.7"></script>
+<script src="infected.js?v=0.26.7"></script>
+<script src="engine.js?v=0.26.7"></script>
+<script src="music.js?v=0.26.7"></script>
+<script src="weather.js?v=0.26.7"></script>
+<script src="gen.js?v=0.26.7"></script>
+<script src="raiders.js?v=0.26.7"></script>
+<script src="house.js?v=0.26.7"></script>
+<script src="horde.js?v=0.26.7"></script>
+<script src="base.js?v=0.26.7"></script>
+<script src="crew.js?v=0.26.7"></script>
+<script src="boss.js?v=0.26.7"></script>
+<script src="daily.js?v=0.26.7"></script>
+<script src="gacha.js?v=0.26.7"></script>
+<script src="tour.js?v=0.26.7"></script>
+<script src="deep.js?v=0.26.7"></script>
+<script src="route.js?v=0.26.7"></script>
+<script src="logo.js?v=0.26.7"></script>
+<script src="title.js?v=0.26.7"></script>
+<script src="game.js?v=0.26.7"></script>
+<script src="mvt.js?v=0.26.7"></script>
+<script src="map.js?v=0.26.7"></script>
 </body>
 </html>
