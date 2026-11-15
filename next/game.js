@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.26.1';
+const NEXT_VERSION = '0.26.2';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -676,6 +676,12 @@ const NEXT_VERSION = '0.26.1';
     base: ['Your base', 'Build steps come from walking (half of every step). Tap BUILD for walls, traps and garden beds, DECORATE to place furniture you found. The stash chest is here too.'],
     food: ['Hungry or thirsty', 'Your Hunger and Thirst bars drain slowly, even with the app closed. Below 30 you tire faster and search slower. Tap the bars to eat or drink - beans, water, soda, garden food, or a rain barrel at the base.'],
     infect: DM.Infect ? DM.Infect.NOTE : ['Infected', ''],   // 0.18 (infection.js)
+    // 0.26.2 (owner: "pls add instructions to the game"): first-time tips for the newer parts
+    trader: ['Auntie Dot', 'Quests: take up to 2 jobs and turn them in for caps and a reward. Shop: supplies, blueprints, cosmetics (and holiday decor during events). Sell: trade junk for caps. After this visit she heads off for about 3,000 steps, up to 3 visits a day.'],
+    gacha: ['Capsule machine', 'Pull for a random cosmetic. Tokens: 1 for every 4,000 steps (up to 3 a day) or 50 caps. At least one epic or better every 10 pulls, and Dot buys any duplicate.'],
+    deck: ['Deck the base', 'Get this holiday\'s decor from Dot\'s holiday shelf, holiday houses or capsules, then place it at your base (Base > Decorate). 2, 5 and 8 pieces placed win prizes - claim them here.'],
+    decor: ['Decorating', 'Decor box: pick a piece, then tap where it goes. Tap a placed piece to move it, Rotate it a quarter turn (front, side, back) or Turn it to mirror it. Store puts it back in the box.'],
+    route: ['Daily route', 'Every 1,500 steps today opens the next row. Pick one stop per row, joined to your last pick: a house, a safehouse, Dot, a supply drop or an event. Each pick takes the place of one of today\'s scouted houses.'],
     lock: ['Locked', 'Lockpicks are silent but can snap - aim, then hold TURN and let go if it binds. A crowbar always works, but it is loud and may smash something.'],
   };
   let tipQ = [], tipOn = false;
@@ -683,9 +689,9 @@ const NEXT_VERSION = '0.26.1';
     if (!SV || !SV.tips || SV.tips.off || SV.tips[id] || !TIPS[id] || tipQ.includes(id)) return;
     tipQ.push(id); showTip();
   }
-  Game.tip = tip;
+  Game.tip = tip; Game.tipNext = () => showTip();
   function showTip() {
-    if (tipOn || !tipQ.length || cosPopOn) return;
+    if (tipOn || !tipQ.length || cosPopOn || (DM.Tour && DM.Tour.active())) return;   // 0.26.2: tips wait for the tour
     const id = tipQ.shift(); if (SV.tips[id]) return showTip();
     SV.tips[id] = 1; Game.save(); tipOn = true;
     const G = DM.scene && DM.House && DM.House.G; let paused = false;   // in a run the world waits while you read
@@ -821,7 +827,7 @@ const NEXT_VERSION = '0.26.1';
     const left = dotLeft();
     if (left) { toast(`Dot's on the road - back in ${fmtN(left)} steps`, 2); SFX.play('alert'); return; }
     if (dotDone()) { toast(DOT_SHUT, 2.4); SFX.play('alert'); return; }
-    refreshTrader(); dotVisit(); Game.save(); tTab = 'quests'; tSel = null; renderTrader();
+    refreshTrader(); dotVisit(); Game.save(); tTab = 'quests'; tSel = null; renderTrader(); tip('trader');
   }
   function renderTrader() {
     const T = SV.trader, L = traderLevel(), lines = D.TRADER.lines[L - 1];
@@ -1004,6 +1010,7 @@ const NEXT_VERSION = '0.26.1';
     } else $('#cGo').onclick = async () => {
       SV.survivor = createSurvivor(cre.name.trim(), LK.norm(cre.look), cre.job);
       DM.S = SV.survivor; Game.save(); publish();
+      if (DM.Tour) DM.Tour.queue();   // 0.26.2: setup (steps) first, before the tutorial house and any tip
       await E.buildSurvivor(cre.look);
       renderHome();
     };
@@ -1531,7 +1538,7 @@ const NEXT_VERSION = '0.26.1';
   const TRACK_NOTE = { lantern: 'home', rust: 'map', brown: 'looting', radio: 'base', horde: 'fights', carol: 'winter', eerie: 'live, speeds up with danger' };
   function openSettings() {
     const MC = DM.Music ? DM.Music.cfg() : null;
-    sheetOpen(`<div class="kick">Settings</div><button class="mbtn" id="mHow">How to play</button>
+    sheetOpen(`<div class="kick">Settings</div><button class="mbtn" id="mHow">How to play</button>${SV.survivor && DM.Tour ? '<button class="mbtn ghost" id="mTour" style="margin-top:8px">Game tour</button>' : ''}
       ${MC ? `<h3 class="sndh">Sound</h3><div class="btnrow tipsrow"><span>Music <small>· ${MC.track === 'auto' ? 'changes with where you are' : 'one track everywhere'}</small></span><button class="mbtn sm${MC.music ? '' : ' ghost'}" id="mMus">${MC.music ? 'On' : 'Off'}</button></div>
       <label class="volrow"><span>Track</span><select id="mTrack"${MC.music ? '' : ' disabled'}><option value="auto"${MC.track === 'auto' ? ' selected' : ''}>Auto (by area)</option>${DM.Music.ORDER.map(k => `<option value="${k}"${MC.track === k ? ' selected' : ''}>${esc(DM.Music.TRACKS[k].n)}${TRACK_NOTE[k] ? ' · ' + TRACK_NOTE[k] : ''}</option>`).join('')}</select></label>
       ${MC.music && DM.Music.nowName() ? `<div class="mp dim nowmus">Now playing: ${esc(DM.Music.nowName())}</div>` : ''}
@@ -1555,6 +1562,7 @@ const NEXT_VERSION = '0.26.1';
       $('#mSfx').onchange = () => SFX.play('pick');
     }
     $('#mHow').onclick = () => { SFX.play('ui'); openHowTo(); };
+    if ($('#mTour')) $('#mTour').onclick = () => { SFX.play('ui'); sheetClose(); DM.Tour.start(); };   // 0.26.2: the guided tour (tour.js)
     if (DM.Weather) DM.Weather.bindSettings($('#msheet'));   // 0.22: weather area
     $('#mTips').onclick = () => { if (SV.tips.off) { SV.tips = {}; toast('Tips back on - you will see each one again', 1.8); } else { SV.tips.off = 1; toast('Tips off', 1.2); } Game.save(); openSettings(); };
     $('#mCopy').onclick = () => { const t = $('#mExp'); t.select(); try { navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand('copy'); } toast('Copied', 1); };
@@ -1597,7 +1605,8 @@ const NEXT_VERSION = '0.26.1';
     sheetOpen(`<div class="kick">Dead Miles</div><h3>How to play</h3>
       ${HOWTO.map(([t, d], i) => `<details class="howto"${i ? '' : ' open'}><summary>${t}</summary><p>${esc(d)}</p></details>`).join('')}
       <details class="howto"><summary>Step sync</summary><p>Your phone can send steps by itself: an iPhone Shortcut or the Android companion app. Sign in first (Account &amp; friends), then follow the guide.</p>${window.SYNC ? '<button class="mbtn sm" id="hSync">Open the step sync guide</button>' : ''}</details>
-      <div class="btnrow"><button class="mbtn sm ghost" id="hBack">Back</button><button class="mbtn sm" id="hClose">Close</button></div>`);
+      <div class="btnrow"><button class="mbtn sm ghost" id="hBack">Back</button>${SV.survivor && DM.Tour && !DM.scene ? '<button class="mbtn sm ghost" id="hTour">Game tour</button>' : ''}<button class="mbtn sm" id="hClose">Close</button></div>`);
+    if ($('#hTour')) $('#hTour').onclick = () => { sheetClose(); DM.Tour.start(); };
     if ($('#hSync')) $('#hSync').onclick = () => { sheetClose(); try { SYNC.open(); } catch (e) { toast('Sync guide failed to open', 1.6); } };
     $('#hBack').onclick = openSettings; $('#hClose').onclick = sheetClose;
   }

@@ -639,6 +639,17 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   (armchair, sofa, bookshelf, gnome, scarecrow, snowman). Pieces without one: round ones mirror, the table draws itself in
   the turned footprint. Facing 3 = facing 1 mirrored.
 
+## Done in 0.26.2 (owner: "pls add instructions to the game" / "a tutorial" / "tell them how to set up FIRST, especially the steps")
+- tour.js: a guided spotlight tour of the home screen (dim + hole over each part, card with Back / Next / Skip; parts not on
+  screen are skipped). It OPENS WITH SETUP: 1) why steps matter, 2) Sign in (button opens the account panel), 3) Step sync
+  (button opens the sync guide; the tour waits while a panel / guide is open, then comes back to the same step), 4) typing
+  as the fallback. Then ~19 parts: needs, skills, wardrobe, horde, base, event, boss / deep / crew tiles, Houses, Route,
+  Dot, daily, Deck the base, capsules, a house's Loot, Gear, Workbench, Map, Settings.
+- Starts by itself right after a new character is made (before the tutorial house; tips wait: showTip skips while
+  DM.Tour.active(), Game.tipNext() after), and once for existing saves when home is idle. SV.tourDone. Replay: Settings >
+  Game tour, How to play > Game tour.
+- New first-time tips: trader, gacha, deck, decor (edit mode), route (Route view). The map keeps its own intro.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
