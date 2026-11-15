@@ -298,6 +298,7 @@
     if (R.init) return; R.init = true;
     const p = g.p;
     if (R.petRec) R.pet = { rec: R.petRec, x: p.x - 30, y: p.y + 8, vx: 0, vy: 0, hw: 7, hh: 5, ph: 0, flip: false, st: 'follow', heart: 0, barkT: 0 };
+    if (R.kind === 'house' && !R.extra.noMate) { const m = crew().find(x => x.mate && !x.hungry); if (m) { C.ensureRig(m.id, m.look); R.mate = { m, x: p.x + 30, y: p.y + 8, vx: 0, vy: 0, hw: 10, hh: 7, ph: 0, flip: false, cd: 1, swing: 0, healed: 0 }; } }
     if (R.npcSpec) {
       const f = g.furn[R.npcSpec.fi];
       if (f) {
@@ -351,10 +352,31 @@
         if (R.pet && pe.rec.kind === 'dog' && R.kind === 'house') sniff(dt, g, pe);
       }
     }
+    if (R.mate) mateTick(dt, g);
     if (R.npc) npcTick(dt, g);
     if (R.stray) strayTick(dt, g);
     for (const e of R.ents) baseWander(e, dt, g);
   }
+  // 0.37 the run companion: follows like the pet, swings at the nearest zombie in reach. Guards hit harder, medics
+  // patch her up once per run when she is low, scavengers sometimes pocket an extra find when she searches.
+  function mateTick(dt, g) {
+    const e = R.mate, p = g.p, lv = C.lv(e.m), role = e.m.role;
+    e.cd = Math.max(0, e.cd - dt); e.swing = Math.max(0, e.swing - dt);
+    let tgt = null, bd = 1e9;
+    for (const z of g.zs) { if (z.dead || z.raider || (z.st === 'rise' && z.stT < .3) || z.st === 'sleep') continue; const dz = dist(z, e); if (dz < bd && (dz < 1.6 * T || dist(z, p) < 4 * T)) { bd = dz; tgt = z; } }
+    const d = dist(e, p);
+    if (d > 10 * T) { e.x = p.x - p.fx * 30; e.y = p.y - p.fy * 20; e.vx = e.vy = 0; }
+    else if (tgt && dist(tgt, e) > 1.1 * T && dist(tgt, p) < 4 * T) walkTo(e, tgt.x, tgt.y, 2.6 * T, dt);
+    else if (d > 1.6 * T) { const see = DM.House.los(e.x, e.y - 10, p.x, p.y - 10); const st = see ? { x: p.x + p.fx * -30 + 20, y: p.y - p.fy * 16 } : DM.House.stepToPlayer(e); walkTo(e, st.x, st.y, Math.min(4.6 * T, 1.5 * T + d * 1.6), dt); }
+    else { e.vx *= Math.exp(-8 * dt); e.vy *= Math.exp(-8 * dt); e.ph = E.lerp(e.ph, 0, .1); }
+    if (tgt && dist(tgt, e) < 1.4 * T && !e.cd) {
+      e.cd = 1.1; e.swing = .25; e.flip = tgt.x < e.x;
+      const dmg = (16 + 3 * lv) * (role === 'guard' ? 1.5 : 1);
+      DM.House.hurtZombie(tgt, dmg, Math.atan2(tgt.y - e.y, tgt.x - e.x), true); SFX.play('swing');
+    }
+    if (role === 'medic' && !e.healed && p.hp > 0 && p.hp < DM.D.maxHp(DM.S) * .4) { e.healed = 1; p.hp = Math.min(DM.D.maxHp(DM.S), p.hp + 12 + 3 * lv); toast(`${e.m.name} patches you up (+${12 + 3 * lv} HP)`, 2); SFX.play('pick'); }
+  }
+  C.mateFind = () => R && R.mate && R.mate.m.role === 'scavenger' ? .1 + .02 * C.lv(R.mate.m) : 0;   // house.js: extra-find chance
   function petRunsOff(pe, z) {
     const r = pe.rec; r.away = dayNo(); G().save(); yelp();
     pe.st = 'flee'; pe.t = 0; const a = Math.atan2(pe.y - z.y, pe.x - z.x); pe.fx = pe.x + Math.cos(a) * 6 * T; pe.fy = pe.y + Math.sin(a) * 6 * T;
@@ -504,6 +526,13 @@
         } else drawPet(c, s.pet, s.x, s.y, { t: g.t, alpha: s.a, happy: true, heart: 1, stray: true, sc: 1.1 });
       } });
     }
+    if (R.mate) { const e = R.mate; out.push({ k: e.y, draw: c => {
+      const rn = C.rigName(e.m.id); if (!ART.rigs[rn]) return;
+      const amp = Math.min(1, Math.hypot(e.vx, e.vy) / (.95 * T)), s = Math.sin(e.ph * 2);
+      c.fillStyle = 'rgba(8,6,22,.4)'; c.beginPath(); c.ellipse(e.x, e.y + 1, 16, 5.5, 0, 0, 6.28); c.fill();
+      ART.drawRig(c, rn, e.x, e.y - Math.abs(Math.cos(e.ph * 2)) * 2 * amp, E.PSCALE, e.flip, { weapon: 'bat', parts: { legB: { r: s * .45 * amp }, legF: { r: -s * .45 * amp }, bat: { r: e.swing > 0 ? -1.2 + (1 - e.swing / .25) * 2.2 : 0 } } });
+      c.font = '900 10px Inter, sans-serif'; c.fillStyle = '#7fd49a'; c.textAlign = 'center'; c.fillText(e.m.name, e.x, e.y - 100); c.textAlign = 'left';
+    } }); }
     for (const e of R.ents) {
       if (R.kind === 'shift') continue;
       if (e.pet) out.push({ k: e.y, draw: c => drawPet(c, e.pet, e.x, e.y, { t: t + e.x, ph: e.ph, move: Math.min(1, Math.hypot(e.vx, e.vy) / (1.3 * T)), flip: e.flip, sit: e.wait > 0, heart: e.heart, sc: 1.1 }) });
@@ -557,6 +586,7 @@
           <div class="cbars"><span>Mood · ${moodWord(m)}</span><i class="cbar"><i style="width:${m.mood}%;background:${m.mood >= 45 ? '#93a86c' : m.mood >= 25 ? '#e0b94a' : '#ff6b5a'}"></i></i>
           <span>${nx ? `Lv ${lv + 1}: ${Math.floor(m.xp)}/${nx}` : 'Max level'}</span><i class="cbar"><i style="width:${nx ? Math.min(100, (m.xp - LVX[lv - 1]) / (nx - LVX[lv - 1]) * 100) : 100}%"></i></i></div>
           <div class="cpast">${esc(m.name)} ${esc(m.past)}.${m.hungry ? ` <b class="bad">Hungry ${m.hungry} day${m.hungry > 1 ? 's' : ''}${m.hungry >= 2 ? ' - leaves tomorrow without food!' : ''}</b>` : ''}</div>
+          ${m.mate ? '<span class="pactive">Comes along on runs</span> <button class="linkbtn" data-mate="">Leave at base</button>' : `<button class="mbtn sm ghost" data-mate="${m.id}">Take on runs</button>`}
           <button class="linkbtn" data-dis="${m.id}">Dismiss</button></div></div>`; }).join('')
         : '<div class="empty">No crew yet. About 1 house in 25 has someone hiding in a closet or a secret room - more in mansions and police stations.</div>'}
       <div class="kick sect">Strays · ${pl.length}/${C.MAX_PETS}</div>
@@ -577,6 +607,8 @@
       if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Tap again: send them away?'; return; }
       const m = crew().find(x => x.id === b.dataset.dis); v.crew.list = v.crew.list.filter(x => x !== m); G().save(); toast(`${m.name} packs a bag and heads off. "Good luck."`, 2.2); C.openSheet();
     });
+    // 0.37 (owner liked "companion on runs"): one crew member can follow her into houses and fight beside her
+    el.querySelectorAll('[data-mate]').forEach(b => b.onclick = () => { for (const m of crew()) m.mate = !!b.dataset.mate && m.id === b.dataset.mate; G().save(); SFX.play('ui'); if (b.dataset.mate) toast(`${crew().find(m => m.mate).name} will come along on your runs`, 2); C.openSheet(); });
     el.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { for (const p of pets()) p.active = p.id === b.dataset.act; G().save(); SFX.play('ui'); C.openSheet(); });
     el.querySelectorAll('[data-ren]').forEach(b => b.onclick = () => { const p = pets().find(x => x.id === b.dataset.ren); renameSheet(p); });
   };

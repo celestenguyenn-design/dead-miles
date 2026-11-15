@@ -36,7 +36,7 @@
   const job = () => (S() && S().job) || 'scavenger';
   const scavLvl = () => D.scavLvl(S() ? S().xp : 0);
   const searchMul = () => 1.5 * (1 - .06 * (scavLvl() - 1)) * (job() === 'scavenger' ? .85 : 1) * F.searchMul() * SK.searchMul();   // slow at first, faster with skill; thirsty = slower
-  const extraChance = () => .04 * (scavLvl() - 1) + (job() === 'scavenger' ? .1 : 0) + SK.extraFind();
+  const extraChance = () => .04 * (scavLvl() - 1) + (job() === 'scavenger' ? .1 : 0) + SK.extraFind() + (DM.Crew && DM.Crew.mateFind ? DM.Crew.mateFind() : 0);   // 0.37: a scavenger companion
   const packSlots = () => 12 + (S().packBonus || 0) + SK.packBonus();   // 0.13: Pack rat is a Scavenging rank
   const keen = () => SK.keen();                                         // 0.13: Keen eye is a Scavenging rank
   const gatePct = () => job() === 'scavenger' ? .65 : .75;
