@@ -27,6 +27,7 @@
 #np .card{background:${C.plum};border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
 #np p{margin:4px 0 8px;font-size:15px;line-height:1.45}
 #np .mut{color:rgba(246,227,187,.7);font-size:13px}
+#np .np-confirm{margin-top:8px;padding:12px;border-radius:14px;background:#2a1f4a;border:2px solid #f0c23c}#np .np-confirm b{color:#f0c23c;font-size:16px}#np .np-confirm .row{margin-top:8px}
 #np .row{display:flex;gap:8px;align-items:center}
 #np .row>*{flex:1}
 #np .btn{min-height:50px;border:0;border-radius:14px;background:${C.ora};color:#2a1308;font:800 16px Inter,system-ui,sans-serif;padding:0 14px;box-shadow:inset 0 -4px 0 rgba(0,0,0,.18)}
@@ -93,7 +94,7 @@
       + '<div class="tabs"><button data-tab="new" class="' + (t === 'new' ? 'on' : '') + '">New player</button><button data-tab="old" class="' + (t === 'old' ? 'on' : '') + '">I already play</button></div>'
       + (t === 'new'
         ? '<input id="np-h" placeholder="handle (e.g. brooklyn)" autocapitalize="off" autocomplete="off" maxlength="20" value="' + esc(UI.h || '') + '"><input id="np-n" placeholder="your name" maxlength="24" value="' + esc(UI.n || '') + '">' + msg('acct') + '<button class="btn" style="width:100%" data-a="register">Create my account</button>'
-        : '<input id="np-h" placeholder="handle" autocapitalize="off" autocomplete="username" maxlength="20" value="' + esc(UI.h || NET.handle || '') + '"><input id="np-s" placeholder="6-digit PIN or account key" autocapitalize="off" autocomplete="current-password">' + msg('acct') + '<button class="btn" style="width:100%" data-a="signin">Sign in</button><p class="mut">Same handle as the old Dead Miles. Your phone\'s step syncing keeps working.</p>')
+        : '<input id="np-h" placeholder="handle" autocapitalize="off" autocomplete="username" maxlength="20" value="' + esc(UI.h || NET.handle || '') + '"><input id="np-s" placeholder="6-digit PIN or account key" autocapitalize="off" autocomplete="current-password">' + msg('acct') + (UI.confirm ? '<div class="np-confirm"><b>Sign in as @' + esc(UI.confirm) + '?</b><p class="mut">This phone will switch to that account and load its saved game. Make sure it is yours.</p><div class="row"><button class="btn g" data-a="signinNo">Cancel</button><button class="btn" data-a="signinYes">Yes, sign in</button></div></div>' : '<button class="btn" style="width:100%" data-a="signin">Sign in</button>') + '<p class="mut">Same handle as the old Dead Miles. Your phone\'s step syncing keeps working.</p>')
       + '</div>';
   }
 
@@ -185,7 +186,11 @@
     if (a === 'close') return NET.closePanel();
     if (a === 'guide') { NET.closePanel(); if (window.SYNC) window.SYNC.open(); return; }
     if (a === 'register') { UI.h = val('np-h'); UI.n = val('np-n'); const r = await NET.register(UI.h, UI.n || UI.h); if (!r.ok) say('acct', r.message || r.error); else { await NET.board(); render(); } return; }
-    if (a === 'signin') { UI.h = val('np-h'); const r = await NET.signIn(UI.h, val('np-s')); if (!r.ok) say('acct', r.error); else { await Promise.all([NET.board(), NET.partyGet()]); render(); if (NET.onSignedIn) { try { await NET.onSignedIn(); } catch (e) { /* ignore */ } } } return; }
+    // 0.28.4 (owner: "it should say are you sure you want to sign in to this acc ... what if someone accidentally clicks the wrong acc"):
+    // the first tap asks to confirm the handle; only "Yes, sign in" signs in (the PIN / key is kept in UI.sec meanwhile)
+    if (a === 'signin') { UI.h = val('np-h'); UI.sec = val('np-s'); if (!String(UI.h).trim()) return say('acct', 'Type your handle.'); if (!String(UI.sec).trim()) return say('acct', 'Type your account key or 6-digit PIN.'); UI.confirm = String(UI.h).trim().toLowerCase(); return render(); }
+    if (a === 'signinNo') { UI.confirm = null; UI.sec = ''; return render(); }
+    if (a === 'signinYes') { const sec = UI.sec; UI.confirm = null; UI.sec = ''; const r = await NET.signIn(UI.h, sec); if (!r.ok) say('acct', r.error); else { await Promise.all([NET.board(), NET.partyGet()]); render(); if (NET.onSignedIn) { try { await NET.onSignedIn(); } catch (e) { /* ignore */ } } } return; }
     if (a === 'signout') { if (confirm('Sign out of @' + NET.handle + ' on this device? Your game stays saved on the server.')) NET.signOut(); return render(); }
     if (a === 'showPin') { UI.showPin = !UI.showPin; return render(); }
     if (a === 'pickPin') { const i = document.getElementById('np-pin'); if (i) i.value = NET.makePin(); return; }
@@ -203,8 +208,8 @@
     if (a === 'keepRemote') { const r = await NET.resolve('remote'); if (r && r.state && NET.onRemoteAdopted) NET.onRemoteAdopted(r.state); return render(); }
   }
 
-  NET.openPanel = function () {
-    css();
+  NET.openPanel = function (tab) {   // 0.28.4: tab 'old' opens straight on the sign-in form
+    css(); if (tab) UI.tab = tab;
     let root = document.getElementById('np');
     if (!root) {
       root = document.createElement('div'); root.id = 'np'; document.body.appendChild(root);

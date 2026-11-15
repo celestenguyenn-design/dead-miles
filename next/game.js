@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.28.3';
+const NEXT_VERSION = '0.28.4';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1048,7 +1048,7 @@ const NEXT_VERSION = '0.28.3';
     if (creEdit) {
       $('#cSave').onclick = async () => { commitSeen(); SV.survivor.look = LK.norm(cre.look); Game.save(); publish(); creEdit = false; await E.buildSurvivor(SV.survivor.look); renderHome(); toast('Looking good', 1.2); };
       if ($('#cCancel')) $('#cCancel').onclick = async () => { commitSeen(); creEdit = false; await E.buildSurvivor(SV.survivor.look); renderHome(); };
-    } else { if ($('#cSignIn')) $('#cSignIn').onclick = () => { SFX.play('ui'); openAccount(); };   // 0.28.3: an existing account loads its save instead
+    } else { if ($('#cSignIn')) $('#cSignIn').onclick = () => { SFX.play('ui'); if (window.NET && NET.openPanel) NET.openPanel('old'); else openAccount(); };   // 0.28.3: an existing account loads its save instead
     $('#cGo').onclick = async () => {
       SV.survivor = createSurvivor(cre.name.trim(), LK.norm(cre.look), cre.job);
       DM.S = SV.survivor; Game.save(); publish();
