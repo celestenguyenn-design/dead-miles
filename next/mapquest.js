@@ -42,6 +42,7 @@ window.DM = window.DM || {};
     let items = (r.items || []).map(([k, n]) => [k === 'bp_*' ? DM.D.pickBP(Math.random) : k, n]); if (r.loot) items = items.concat(X.rollItems(r.loot[0], r.loot[1]));
     if (items.length) { const t = X.give(items); if (t) parts.push(t); }
     if (r.token && DM.Gacha && Math.random() < r.token) { DM.Gacha.state().tok++; parts.push('a capsule token'); }
+    if (r.master) { const k = ['machete', 'axe', 'spikedbat', 'pistol', 'shotgun', 'xlights', 'pan', 'bow'][Math.floor(Math.random() * 8)], e = { k, n: 1, q: 5 }; e.d = DM.D.wMax(e); G().routeApi.toStash([e]); parts.push(`a Masterwork ${DM.D.ITEMS[k].n.toLowerCase()}`); }
     G().save(); sfx('pick'); setTimeout(() => sfx('open'), 200); buzz([80, 50, 120]);
     return parts.join(', ');
   }
@@ -91,6 +92,36 @@ window.DM = window.DM || {};
         { k: 'choice', lo: 250, hi: 500, goal: 'Find the stash before the Tin Cans', arrive: 'A loose vent cover, a bag behind it. Footsteps somewhere close.',
           opts: [{ t: 'Grab it and go', p: .55, win: 'You\'re around the corner before they show.', lose: 'They spot you. A bottle catches you on the way out, but you keep the bag.', hurt: 18, r: { caps: 30, xp: 35, loot: ['safe', 1] } },
                  { t: 'Wait them out', p: .8, win: 'They give up and leave. You take your time.', lose: 'They take half before they go. Better than nothing.', r: { caps: 20, xp: 30, loot: ['wallcache', 1] } }] },
+      ] },
+    // 0.38 (owner liked "quest chains that run over several days with a small story, plus rare legendary survivors"):
+    // The Coast Signal - 3 chapters, one a day (story: 'coast', ch). Each chapter's survivor shows up the day after the last.
+    coast1: { who: 'Marisol', face: '👩‍🚒', title: 'The Coast Signal · 1/3', story: 'coast', ch: 1,
+      ask: 'I hear a voice on channel 9 every night. Says there\'s a boat on the coast taking people. I need proof it\'s real before I tell anyone. Help me?',
+      steps: [
+        { k: 'go', lo: 200, hi: 420, goal: 'Find the old radio shack', arrive: 'A dead man\'s radio, still warm. A logbook: "Boat leaves when the bridge lights go green."' },
+        { k: 'back', goal: 'Tell Marisol what you found', arrive: '"Green lights. That\'s the old drawbridge." She looks at you hard. "Come find me tomorrow."', r: { caps: 40, xp: 35 } },
+      ] },
+    coast2: { who: 'Marisol', face: '👩‍🚒', title: 'The Coast Signal · 2/3', story: 'coast', ch: 2,
+      ask: 'The bridge lights run on an old generator. If we can get it running, the boat will know we\'re here. I need batteries - and someone to watch my back.',
+      steps: [
+        { k: 'item', lo: 250, hi: 500, goal: 'Bring 2 batteries to the generator shed', need: [['battery', 2]], arrive: 'A rusted shed by the water. The generator coughs.', gave: 'It catches! A string of bulbs flickers green across the water.', missing: 'The generator needs 2 batteries (pack or stash).' },
+        { k: 'choice', lo: 200, hi: 400, goal: 'Hold the bridge while the lights warm up', arrive: 'The light drew more than boats. Walkers on the bridge ramp.',
+          opts: [{ t: 'Hold the ramp', p: .6, win: 'You hold. The lights stay green all night.', lose: 'You hold - barely. A bite on the shoulder to remember it by.', hurt: 16, r: { caps: 50, xp: 50, loot: ['hordecrate', 1] } },
+                 { t: 'Fall back and watch', p: 1, win: 'From the shadows you see a boat\'s lamp blink twice. Real.', r: { caps: 35, xp: 35 } }] },
+      ] },
+    coast3: { who: 'Marisol', face: '👩‍🚒', title: 'The Coast Signal · 3/3', story: 'coast', ch: 3,
+      ask: 'The boat answered. They\'ll take supplies for the people still here, but someone has to meet them at the pier. You\'ve earned it.',
+      steps: [
+        { k: 'go', lo: 300, hi: 600, goal: 'Meet the boat at the pier', arrive: 'A woman in a yellow slicker hands you a crate. "For whoever is still fighting. Tell them the coast is open."' },
+        { k: 'back', goal: 'Bring the news back to Marisol', arrive: 'Marisol laughs for the first time. "Then we keep going." She gives you her old jacket and a handshake you\'ll remember.', r: { caps: 120, xp: 100, token: 1, loot: ['lockedroom', 2], master: 1 } },
+      ] },
+    // the legendary survivor: once a week, far walking, a Masterwork weapon
+    legend: { who: 'The Courier', face: '🧳', title: 'The long delivery', legend: 1,
+      ask: 'They call me the Courier. I run messages between the last safe blocks. I need someone who can really walk. Three drops, far apart. Pay is the best you\'ll see all week.',
+      steps: [
+        { k: 'go', lo: 450, hi: 800, goal: 'Courier drop 1', arrive: 'A dead drop behind a loose brick. You leave the first envelope.' },
+        { k: 'go', lo: 450, hi: 800, goal: 'Courier drop 2', arrive: 'A mailbox nobody has opened in a year. Envelope two.' },
+        { k: 'go', lo: 450, hi: 800, goal: 'Courier drop 3', arrive: 'The last drop. A rooftop flag goes up a block away - message received.', r: { caps: 200, xp: 120, token: 1, master: 1 } },
       ] },
   };
   // encounters at marked places (by building type), two choices each
@@ -169,13 +200,13 @@ window.DM = window.DM || {};
     const s = st(); s.givers = s.givers.filter(x => x !== g);
     const a = { q: g.q, giver: { lat: g.lat, lon: g.lon, at: g.at }, i: 0, used: [g.id], pt: null, seed: hash(g.id + s.day) };
     if (!placeStep(a)) { toast('No good spot for this nearby - try again in a bit', 2.4); s.givers.push(g); return; }
-    s.active = a; save(); sfx('pick');
+    s.active = a; if (QUESTS[g.q].legend) s.legWeek = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toDateString(); })(); save(); sfx('pick');
     toast(`❓ ${QUESTS[a.q].steps[0].goal}: ${a.pt.at}`, 3.4);
   }
   function arrive(a, pos) {
     const q = QUESTS[a.q], sp = q.steps[a.i], s = st(), last = a.i === q.steps.length - 1;
     const next = extra => {
-      if (last) { s.active = null; s.done++; s.total++; save(); return; }
+      if (last) { const qq = QUESTS[a.q]; if (qq.story) { s.story = s.story || {}; s.story[qq.story] = Math.max(s.story[qq.story] || 0, qq.ch); s.storyDay = s.day; } if (qq.legend) s.legDone = (s.legDone || 0) + 1; s.active = null; s.done++; s.total++; save(); return; }
       a.i++; a.pt = a.i < q.steps.length && q.steps[a.i].k === 'back' ? null : a.pt;
       if (!placeStep(a)) { a.pt = null; a.wait = 1; }   // no place yet: retried on the next fix
       save(); if (extra !== false) setTimeout(() => toast(`❓ ${q.steps[a.i].goal}: ${a.pt ? a.pt.at : 'keep walking'}`, 3.2), 600);
@@ -226,11 +257,20 @@ window.DM = window.DM || {};
     // survivors with quests: 1 on the map at a time, 2 a day
     if (!s.givers.length && s.made < 2 && !s.active) {
       const sp = FX().spots(pos, 150, 450); if (sp.length) {
-        const [pl] = sp[Math.floor(Math.random() * sp.length)], ks = Object.keys(QUESTS), last = s.lastQ;
-        const q = ks.filter(k => k !== last)[Math.floor(Math.random() * (ks.length - 1))];
+        const [pl] = sp[Math.floor(Math.random() * sp.length)], last = s.lastQ, story = s.story || {};
+        const ks = Object.keys(QUESTS).filter(k => !QUESTS[k].story && !QUESTS[k].legend && k !== last);
+        const nextCh = (story.coast || 0) + 1, chQ = QUESTS['coast' + nextCh];   // 0.38: the story's next chapter, one a day
+        const q = chQ && s.storyDay !== s.day ? 'coast' + nextCh : ks[Math.floor(Math.random() * ks.length)];
         s.givers.push({ id: pl.id, lat: pl.lat, lon: pl.lon, at: pl.name, q }); s.made++; s.lastQ = q; save();
         toast(`❗ ${QUESTS[q].who} is waving from ${pl.name}. Walk over to talk.`, 3.6);
       }
+    }
+    // 0.38: the legendary survivor - once a week, after 300 m walked with the map open
+    const wk = (() => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toDateString(); })();
+    if (s.legWeek !== wk && walked >= 300 && !s.givers.some(g => g.leg) && !(s.active && QUESTS[s.active.q].legend)) {
+      const sp = FX().spots(pos, 200, 500); if (sp.length) { const [pl] = sp[Math.floor(Math.random() * sp.length)];
+        s.givers.push({ id: pl.id, lat: pl.lat, lon: pl.lon, at: pl.name, q: 'legend', leg: 1 }); save(); buzz([200, 80, 200, 80, 300]);
+        toast(`⭐ A legendary survivor - the Courier - is at ${pl.name}. Once a week. Don't miss it.`, 4.2); }
     }
     for (const g of s.givers) if (dist(g, pos) <= reach && !g.met) { meetGiver(g); return; }
     for (const g of s.givers) if (g.met && dist(g, pos) > reach * 2) g.met = 0;   // walked off: she asks again next time
@@ -260,12 +300,12 @@ window.DM = window.DM || {};
   Q.lines = function (pos) {
     const s = st(), out = []; if (!pos) return out; newDay();
     const a = s.active; if (a) { const sp = QUESTS[a.q].steps[a.i]; out.push({ t: `❓ ${sp.goal}${a.pt ? ' · ' + a.pt.at : ''}`, s: a.pt ? fmtD(dist(a.pt, pos)) : 'keep walking', hot: 1 }); }
-    for (const g of s.givers) out.push({ t: `❗ ${QUESTS[g.q].who} · ${g.at}`, s: fmtD(dist(g, pos)) });
+    for (const g of s.givers) out.push({ t: `${g.leg ? '⭐' : QUESTS[g.q].story ? '📖' : '❗'} ${QUESTS[g.q].who} · ${g.at}`, s: fmtD(dist(g, pos)), hot: g.leg });
     return out;
   };
   Q.drawMarks = function (x, t, SX, SY, wx, wy) {
     const s = st(), mark = FX().mark;
-    for (const g of s.givers) mark(x, SX(wx(g.lon)), SY(wy(g.lat)), '❗', '#f0c23d', t, QUESTS[g.q].who.split(' ')[0]);
+    for (const g of s.givers) mark(x, SX(wx(g.lon)), SY(wy(g.lat)), g.leg ? '⭐' : QUESTS[g.q].story ? '📖' : '❗', g.leg ? '#ffd23c' : '#f0c23d', t, QUESTS[g.q].who.split(' ')[g.leg ? 1 : 0]);
     if (s.active && s.active.pt) mark(x, SX(wx(s.active.pt.lon)), SY(wy(s.active.pt.lat)), '❓', '#b98cf0', t, QUESTS[s.active.q].title);
   };
   Q._st = st; Q.QUESTS = QUESTS; Q.ENC = ENC;   // tests
