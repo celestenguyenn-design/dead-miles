@@ -754,7 +754,11 @@
   }
   function tick(dt, g) {
     if (!S.shift) { if ((S.hudT -= dt) <= 0) { S.hudT = 1; hudSync(); } return; }
-    const sh = S.sh; if (sh.over) return;
+    const sh = S.sh;
+    if (sh.over) {   // 0.42.1 (owner: "it kicked me out before I could loot the zombies"): a minute to search the bodies
+      if (sh.loot > 0) { sh.loot -= dt; const k = Math.ceil(sh.loot); if (k !== S.hk) { S.hk = k; $('#shiftbar').innerHTML = `<b>${Math.floor(sh.loot / 60)}:${String(Math.max(0, Math.floor(sh.loot % 60))).padStart(2, '0')}</b><span>LOOT THE BODIES</span><em>Leave = go inside</em>`; } if (sh.loot <= 0) House().exit('leave'); }
+      return;
+    }
     sh.t += dt;
     const alive = g.zs.filter(z => !z.dead).length;
     if (sh.t > 3 && S.spawned < sh.total && sh.t >= sh.next && alive < 7) { spawnWave(Math.min(sh.total - S.spawned, 2 + Math.floor(Math.random() * 3))); sh.next = sh.t + 8 + Math.random() * 6; }
@@ -777,11 +781,18 @@
         <p>${down ? 'You went down, but every kill still counts against the horde.' : 'Good shift. Every kill thins the whole horde before it reaches the bases.'}</p>
         <div class="stats"><div><b>${kills}</b>kills</div><div><b>${st.k}</b>this week</div><div><b>${def}</b>defence</div><div><b>${st.n}/${H.MAX_SHIFTS}</b>shifts</div></div>
         <p class="mp">${H.partyCode() ? `Reported to party <b>${esc(H.partyCode())}</b>${window.NET && NET.ok ? '' : ' when you are back online'}.` : 'Solo horde: no party yet.'} The horde hits at ${n ? when(n.at) : 'the deadline'}.</p>
-        <div class="btnrow"><button id="cNew">Head inside</button></div>`;
-      $('#card').classList.add('on');
-      $('#cNew').onclick = () => { $('#card').classList.remove('on'); House().exit(down ? 'down' : 'leave'); };
+        ${cardBtns(down)}`;
+      $('#card').classList.add('on'); bindCard(down);
     };
     setTimeout(card, down ? 300 : 600);
+  }
+  // 0.42.1: after a shift or raid that did not end with her down: search the bodies for 60 s, or head straight in
+  const LOOT_S = 60;
+  function cardBtns(down) { return down ? '<div class="btnrow"><button id="cNew">Head inside</button></div>' : `<div class="btnrow"><button id="cLoot">Search the bodies (${LOOT_S} s)</button><button id="cNew" class="ghost">Head inside</button></div>`; }
+  function bindCard(down) {
+    const g = House().G;
+    $('#cNew').onclick = () => { $('#card').classList.remove('on'); House().exit(down ? 'down' : 'leave'); };
+    const l = $('#cLoot'); if (l) l.onclick = () => { $('#card').classList.remove('on'); S.sh.loot = LOOT_S; S.hk = null; g.zs = g.zs.filter(z => z.dead); g.paused = false;   /* the rest retreat */ for (const f of g.furn) if (f.piece === 'gate' && f.solid) { f.solid = 0; f._key = null; f.open = 1; } House().refresh(); toast('The gate is open - the bodies are outside the walls', 2.2); g.banners.push({ text: 'ALL CLEAR', sub: 'search the bodies', t: 0 }); };
   }
   B.recordShift = function (week, kills, def) {
     const h = SV().horde, w = h.weeks[week] = h.weeks[week] || { k: 0, n: 0, d: 0 };
@@ -811,7 +822,7 @@
     const O = {
       hint: o.raid ? 'Walkers at the fence! Hold the yard - your traps and walls help.' : shift ? 'Hold the yard! Zombies come from every side.' : 'Your base · tap BUILD to add walls, beds and more',
       noFog: true, noExit: true, acts, tick, ztick, zslow, tap: tapEdit, drawUnder, drawOver,
-      onDown: () => { if (shift) endShift(true); else House().exit('down'); },
+      onDown: () => { if (shift && !S.sh.over) endShift(true); else House().exit('down'); },
       onExit: res => {
         document.body.classList.remove('atbase', 'shift', 'editing'); $('#editbar').innerHTML = ''; $('#shiftbar').innerHTML = '';
         const was = S; S = null; panelClose();
@@ -836,7 +847,7 @@
 
   // HUD buttons (DOM in index.html)
   const bind = (id, fn) => { const el = $('#' + id); if (el) el.addEventListener('click', e => { e.stopPropagation(); SFX.init(); SFX.play('ui'); fn(); }); };
-  bind('bHome', () => { if (S && !S.shift) House().exit('leave'); else if (S && S.shift && confirmQuit()) endShift(false, true); });
+  bind('bHome', () => { if (S && !S.shift) House().exit('leave'); else if (S && S.shift && S.sh.over && S.sh.loot > 0) House().exit('leave'); else if (S && S.shift && confirmQuit()) endShift(false, true); });
   bind('bBuild', () => { if (S && !S.shift) { setEdit(false); openBuild(); } });
   bind('bEdit', () => { if (S && !S.shift) setEdit(!S.edit); });
   let quitT = 0;
@@ -894,9 +905,9 @@
     const card = () => {
       $('#cardBody').innerHTML = `<div class="kick">${down && !quit ? 'down · base raid' : 'base raid'}</div><h2>${down ? 'They got in' : all ? 'Raid crushed!' : 'Raid driven off'}</h2>
         <p>${esc(r.res)}</p><div class="stats"><div><b>${kills}</b>kills</div><div><b>${B.defense()}</b>defence</div></div>
-        <div class="btnrow"><button id="cNew">Head inside</button></div>`;
-      $('#card').classList.add('on');
-      $('#cNew').onclick = () => { $('#card').classList.remove('on'); House().exit(down && !quit ? 'down' : 'leave'); };
+        ${cardBtns(down)}`;
+      $('#card').classList.add('on'); bindCard(down && !quit ? true : false);
+      if (down && quit) { const l = $('#cLoot'); if (l) l.remove(); }
     };
     setTimeout(card, down ? 300 : 600);
   }
