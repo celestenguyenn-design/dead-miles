@@ -746,6 +746,7 @@
       const tough = Math.random() < .2 + .02 * H.weekIndex(S.week);
       const z = House().spawn(x * T, y * T, { target: { x: 10 * T, y: 17 * T }, hunter: true, hp: tough ? 150 : 100, maxHp: tough ? 150 : 100 });
       if (tough) z.dmgMul = 1.2;
+      if (S.raid && DM.D.gsFx) { const fx = DM.D.gsFx(S.raid.gs || 0); z.hp = z.maxHp = Math.round(z.hp * fx.hp); z.dmgMul = (z.dmgMul || 1) * fx.dmg; z.spdMul = fx.spd || 1; }   // 0.33: raids scale with gamestage
     }
     S.spawned += n; SFX.play('groan');
     toast(['Movement to the north...', 'Groaning from the south wall!', 'Shapes coming from the west...', 'They are at the east side!'][side], 1.6);
@@ -756,13 +757,15 @@
     sh.t += dt;
     const alive = g.zs.filter(z => !z.dead).length;
     if (sh.t > 3 && S.spawned < sh.total && sh.t >= sh.next && alive < 7) { spawnWave(Math.min(sh.total - S.spawned, 2 + Math.floor(Math.random() * 3))); sh.next = sh.t + 8 + Math.random() * 6; }
-    if (sh.t >= H.SHIFT_MS / 1000 || (S.spawned >= sh.total && !alive && sh.t > 20) || g.p.st === 'down') endShift(g.p.st === 'down');
-    const left = Math.max(0, H.SHIFT_MS / 1000 - sh.t), kills = g.stats.kills;
+    const LEN = S.raid ? RAID_S : H.SHIFT_MS / 1000;
+    if (sh.t >= LEN || (S.spawned >= sh.total && !alive && sh.t > 20) || g.p.st === 'down') endShift(g.p.st === 'down');
+    const left = Math.max(0, LEN - sh.t), kills = g.stats.kills;
     const k = Math.ceil(left) + '|' + kills;
-    if (k !== S.hk) { S.hk = k; $('#shiftbar').innerHTML = `<b>${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}</b><span>WATCH SHIFT</span><em>${kills} kill${kills === 1 ? '' : 's'}</em>`; }
+    if (k !== S.hk) { S.hk = k; $('#shiftbar').innerHTML = `<b>${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}</b><span>${S.raid ? 'BASE RAID' : 'WATCH SHIFT'}</span><em>${kills} kill${kills === 1 ? '' : 's'}</em>`; }
   }
-  function endShift(down) {
+  function endShift(down, quit) {
     const g = House().G, sh = S.sh; if (sh.over) return; sh.over = true;
+    if (S.raid) { raidEnd(g, down || (quit && g.zs.some(z => !z.dead)), quit); return; }
     const kills = g.stats.kills, def = B.defense();
     B.recordShift(S.week, kills, def);
     if (DM.Skills) DM.Skills.addXP(down ? 4 : 8);   // 0.13: a watch shift is worth a little XP on top of the kills
@@ -797,7 +800,7 @@
   B.start = function (o = {}) {
     if (DM.scene) return;
     const shift = !!o.shift, w = H.next();
-    S = { shift, edit: false, sel: null, pend: null, hudT: 0, spawned: 0, week: o.week || (w && w.week), traps: {}, sh: { t: 0, total: Math.round((14 + 2 * Math.min(6, H.weekIndex((w && w.week) || H.FIRST_WEEK))) * H.special(o.week || (w && w.week)).size), next: 3.5, over: false } };
+    S = { shift, raid: !!o.raid, edit: false, sel: null, pend: null, hudT: 0, spawned: 0, week: o.week || (w && w.week), traps: {}, sh: { t: 0, total: o.raid ? o.raid.n : Math.round((14 + 2 * Math.min(6, H.weekIndex((w && w.week) || H.FIRST_WEEK))) * H.special(o.week || (w && w.week)).size), next: 3.5, over: false } };
     const b = base(); barrels();
     for (const k of ['spikes', 'wire']) if (b.built[k] && !b.broken[k]) for (const [x, y] of trapTiles(k, b.built[k])) S.traps[x + ',' + y] = k;
     const L = layout();
@@ -805,7 +808,7 @@
     if (shift) L.start = { x: 10, y: 17.5 };
     document.body.classList.add('atbase'); document.body.classList.toggle('shift', shift);
     const O = {
-      hint: shift ? 'Hold the yard! Zombies come from every side.' : 'Your base · tap BUILD to add walls, beds and more',
+      hint: o.raid ? 'Walkers at the fence! Hold the yard - your traps and walls help.' : shift ? 'Hold the yard! Zombies come from every side.' : 'Your base · tap BUILD to add walls, beds and more',
       noFog: true, noExit: true, acts, tick, ztick, zslow, tap: tapEdit, drawUnder, drawOver,
       onDown: () => { if (shift) endShift(true); else House().exit('down'); },
       onExit: res => {
@@ -818,7 +821,7 @@
     const g = House().G;
     for (const f of g.furn) { thin(f); if (shift && f.fence) f.maxHp = f.hp = (f.piece === 'gate' ? PIECES.gate : PIECES.walls).tiers[f.tier - 1].hp; }
     House().refresh();
-    if (shift) { g.cam.y = g.p.y - 60; g.banners.push({ text: 'WATCH SHIFT', sub: 'they are coming', t: 0 }); }
+    if (shift) { g.cam.y = g.p.y - 60; g.banners.push(o.raid ? { text: 'BASE RAID', sub: 'walkers at the fence', t: 0 } : { text: 'WATCH SHIFT', sub: 'they are coming', t: 0 }); }
     hudSync();
   };
   B.barrelCharges = () => barrels().n;
@@ -832,11 +835,86 @@
 
   // HUD buttons (DOM in index.html)
   const bind = (id, fn) => { const el = $('#' + id); if (el) el.addEventListener('click', e => { e.stopPropagation(); SFX.init(); SFX.play('ui'); fn(); }); };
-  bind('bHome', () => { if (S && !S.shift) House().exit('leave'); else if (S && S.shift && confirmQuit()) endShift(false); });
+  bind('bHome', () => { if (S && !S.shift) House().exit('leave'); else if (S && S.shift && confirmQuit()) endShift(false, true); });
   bind('bBuild', () => { if (S && !S.shift) { setEdit(false); openBuild(); } });
   bind('bEdit', () => { if (S && !S.shift) setEdit(!S.edit); });
   let quitT = 0;
   function confirmQuit() { const n = performance.now(); if (n - quitT < 2500) return true; quitT = n; toast('Tap again to end the shift early', 1.8); return false; }
+
+  // ---------------------------------------------------------------- 0.33 base raids (owner: "Base raids: some nights a small
+  // horde attacks your base. The walls and traps you built actually fight back, and your crew and strays help")
+  // From 5 PM, once a day, a base with at least one piece built may be raided (40%, seeded by the day). She has 3 hours to
+  // go defend it (a 2.5-minute fight like a watch shift: 7-12 walkers, scaled by gamestage, her traps and walls work, her
+  // crew helps). Win: caps, XP and a crate. If she does not show up, the base defends itself: defence vs the raid's
+  // strength - held (a small reward) or one piece breaks (like horde night). SV.base.raid = { day, at, until, n, str, gs, st, res, seen }.
+  const RAID_S = 150;
+  const dayKey = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+  const anyBuilt = b => Object.keys(b.built).some(k => b.built[k] > 0);
+  B.raid = function () {
+    const b = base(), now = Date.now(), d = new Date(), k = dayKey();
+    let r = b.raid;
+    if (r && (r.st === 'pending' || r.st === 'fighting') && now > r.until && !(S && S.raid)) raidAuto(r);
+    if ((!r || r.day !== k) && d.getHours() >= 17 && anyBuilt(b) && G().gamestage) {
+      const rnd = D.mulberry32((DM.D.hashStr ? DM.D.hashStr('raid' + k + (SV().seedBase || '')) : now) >>> 0);
+      if (!r || r.day !== k) {
+        const roll = rnd(), gs = G().gamestage().gs, n = 7 + Math.min(5, Math.floor(gs / 8));
+        r = b.raid = roll < .4 ? { day: k, at: now, until: now + 3 * 3600e3, n, gs, str: 18 + gs * 1.6 + n * 2, st: 'pending' } : { day: k, st: 'none' };
+        G().save();
+      }
+    }
+    return r && r.st !== 'none' ? r : null;
+  };
+  function raidAuto(r) {
+    const def = B.defense(), held = def >= r.str;
+    r.st = held ? 'held' : 'broke'; r.seen = 0;
+    if (held) { SV().trader.caps += 15; r.res = `Your defences held (${def} vs ${Math.round(r.str)}). +15 caps for the scrap they left behind.`; }
+    else { const what = B.hordeDamage(Math.random); r.res = `You were not there and the raid got in (${def} defence vs ${Math.round(r.str)}).${what ? ' ' + what + ' got wrecked - rebuild it from Build.' : ''}`; }
+    G().save();
+  }
+  B.raidDefend = function () {
+    const r = B.raid(); if (!r || (r.st !== 'pending' && r.st !== 'fighting')) return false;
+    if (SV().survivor.hp < 15) { toast('Too hurt to fight. Eat or patch up first.', 2.2); return false; }
+    r.st = 'fighting'; G().save();
+    G().goBase({ shift: true, raid: r });
+    return true;
+  };
+  function raidEnd(g, down, quit) {
+    const r = base().raid, kills = g.stats.kills, all = kills >= r.n;
+    g.paused = !down;
+    let rew = '';
+    if (down) { r.st = 'broke'; const what = B.hordeDamage(Math.random); r.res = `${quit ? 'You left with walkers still in the yard.' : 'You went down.'} ${what ? what + ' got wrecked.' : ''}`; }
+    else {
+      r.st = 'won'; const caps = 25 + kills * 3; SV().trader.caps += caps; if (DM.Skills) DM.Skills.addXP(15 + kills * 2);
+      const keys = DM.D.rollLoot('hordecrate', Math.random), lost = G().routeApi.toStash(keys.map(k => ({ k, n: k === 'ammo' ? 8 : 1 })));
+      rew = `${caps} caps, ${15 + kills * 2} XP, ${keys.map(k => DM.D.ITEMS[k] ? DM.D.ITEMS[k].n.toLowerCase() : k).join(', ')}${lost && lost.length ? ' (stash full - some left behind)' : ''}`;
+      r.res = `You drove them off: ${kills} kill${kills === 1 ? '' : 's'}. ${rew}.`;
+    }
+    r.seen = 1; G().save();
+    const card = () => {
+      $('#cardBody').innerHTML = `<div class="kick">${down && !quit ? 'down · base raid' : 'base raid'}</div><h2>${down ? 'They got in' : all ? 'Raid crushed!' : 'Raid driven off'}</h2>
+        <p>${esc(r.res)}</p><div class="stats"><div><b>${kills}</b>kills</div><div><b>${B.defense()}</b>defence</div></div>
+        <div class="btnrow"><button id="cNew">Head inside</button></div>`;
+      $('#card').classList.add('on');
+      $('#cNew').onclick = () => { $('#card').classList.remove('on'); House().exit(down && !quit ? 'down' : 'leave'); };
+    };
+    setTimeout(card, down ? 300 : 600);
+  }
+  B.raidTile = function () {
+    const r = B.raid(); if (!r) return null;
+    if (r.st === 'pending' || r.st === 'fighting') return { k: 'raid', c: '#ff6b5a', n: 'Base raid!', sub: `Walkers at your fence · ${until(r.until)} to defend`, hot: 'Defend' };
+    if (!r.seen) return { k: 'raid', c: r.st === 'broke' ? '#ff6b5a' : '#93a86c', n: 'Base raid', sub: r.st === 'broke' ? 'They got in' : 'Your base held', hot: 'See' };
+    return null;
+  };
+  B.raidHTML = function () {
+    const r = B.raid(), def = B.defense(); if (!r) return '<p class="mp">No raid right now.</p>';
+    if (r.st === 'pending' || r.st === 'fighting') return `<div class="kick">Base raid</div><h3>Walkers at your fence!</h3>
+      <p class="mp">About ${r.n} walkers are pushing on your base. Go fight them off: your walls hold them, spike traps and wire hurt and slow them, and your crew guards help. Win for caps, XP and a crate.</p>
+      <p class="mp dim">Not coming? In ${until(r.until)} the base defends itself: your defence <b>${def}</b> vs the raid's <b>${Math.round(r.str)}</b>. ${def >= r.str ? 'It should hold.' : 'It will probably break something.'}</p>
+      <button class="mbtn" id="raidGo">Defend the base</button>`;
+    return `<div class="kick">Base raid</div><h3>${r.st === 'broke' ? 'They got in' : 'Your base held'}</h3><p class="mp">${esc(r.res || '')}</p>`;
+  };
+  B.raidSeen = () => { const r = base().raid; if (r && r.st !== 'pending' && r.st !== 'fighting') { r.seen = 1; G().save(); } };
+  B.raidDev = () => { const b = base(); b.raid = { day: dayKey(), at: Date.now(), until: Date.now() + 3 * 3600e3, n: 8, gs: 1, str: 30, st: 'pending' }; G().save(); };
 
   // ---------------------------------------------------------------- horde night resolution (after the deadline)
   B.hordeDamage = function (rnd) { // one random built piece breaks

@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.32.0';
+const NEXT_VERSION = '0.33.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -709,6 +709,7 @@ const NEXT_VERSION = '0.32.0';
     return { gs, lvl, days, bq, fx, line };
   }
   Game.gamestage = gamestage;
+  Game.goBase = o => goBase(o);   // 0.33: base raids (base.js)
 
   // ---------------------------------------------------------------- first-time tips (each once; stored in the save)
   const TIPS = {
@@ -1386,6 +1387,7 @@ const NEXT_VERSION = '0.32.0';
       t.push({ k: 'crew', c: '#3fa7a0', n: 'Crew & strays', sub: cr.length || pl.length ? `${cr.length}/${DM.Crew.bunks()} crew · ${pl.length} pet${pl.length === 1 ? '' : 's'}${hungry ? ' · hungry!' : ''}` : 'Nobody yet', hot: notes ? 'Note' : mo ? 'News' : '' });
     }
     if (DM.Advent && SV.tutorialDone) { const at = DM.Advent.tile(); if (at) t.unshift(at); }   // 0.32: December 1-24
+    if (BS.raidTile && SV.tutorialDone) { const rt = BS.raidTile(); if (rt) t.unshift(rt); }   // 0.33: base raids
     const gn = BS.gardenNote(); if (gn) t.push({ k: 'garden', c: '#93a86c', n: 'Garden', sub: gn, hot: '' });
     const ev = eventBanner();
     return `<div class="hsect"><span class="kick">This week</span></div>${ev}<div class="tiles">${t.map(x => `<button class="tile" data-tile="${x.k}" style="--tc:${x.c}"><span class="tn">${esc(x.n)}</span><span class="ts">${esc(x.sub)}</span>${x.bar != null ? `<i class="tbar"><i style="width:${Math.max(0, Math.min(100, x.bar))}%"></i></i>` : ''}${x.hot ? `<b class="thot">${esc(x.hot)}</b>` : ''}</button>`).join('')}</div>`;
@@ -1393,14 +1395,15 @@ const NEXT_VERSION = '0.32.0';
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
     cardSheet = k;
-    const html = k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
+    const html = k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
     sheetOpen(`<div class="cardsheet" data-cs="${k}">${html}</div><button class="mbtn ghost" id="csDone">Close</button>`);
     const el = $('#msheet'), root = el.querySelector('.cardsheet');
     el.onclick = e => { if (e.target === el) closeCardSheet(); };
     $('#csDone').onclick = () => { SFX.play('ui'); closeCardSheet(); };
     // actions that leave the menu (a fight, a shift, back into a run) close the sheet first
     root.addEventListener('click', e => { if (e.target.closest('[data-boss="go"],[data-deep="resume"],#hShift')) { cardSheet = null; sheetClose(); } }, true);
-    if (k === 'advent') DM.Advent.bind(root.querySelector('.advwrap'));
+    if (k === 'raid') { const g = root.querySelector('#raidGo'); if (g) g.onclick = () => { SFX.play('ui'); cardSheet = null; sheetClose(); BS.raidDefend(); }; else { BS.raidSeen(); } }
+    else if (k === 'advent') DM.Advent.bind(root.querySelector('.advwrap'));
     else if (k === 'boss') DM.Boss.bind(root);
     else if (k === 'deep') DM.Deep.bind(root);
     else if (k === 'crew') DM.Crew.bindCard(() => renderHome());
