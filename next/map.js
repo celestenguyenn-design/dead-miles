@@ -681,6 +681,7 @@ way[building]->.b;.b out skel geom qt;
     .mvmsg button { margin-top: 12px; height: 44px; padding: 0 18px; border-radius: 13px; font: 900 15px Inter, system-ui, sans-serif; background: var(--ora); color: var(--ink); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); }
     .mvintro { position: absolute; inset: 0; z-index: 9; display: none; align-items: flex-end; background: rgba(9,8,26,.55); }
     .mvintro.on { display: flex; }
+    .mvintro .mvicard { max-height: 100%; overflow-y: auto; }
     .mvicard { width: 100%; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); background: #1c1538; border-top: 3px solid var(--ink); border-radius: 22px 22px 0 0; box-shadow: 0 -4px 0 var(--plum); }
     .mvicard h3 { margin: 4px 0 8px; font-size: 22px; font-weight: 900; line-height: 1.15; }
     .mvicard p { margin: 0 0 10px; font-size: 14.5px; font-weight: 700; line-height: 1.4; color: var(--crm); }
@@ -783,19 +784,39 @@ way[building]->.b;.b out skel geom qt;
     message('Your home spots', `${where} ${hs.length} of 2 home spots set. ${rule}${wait}${extra.map(([id, t]) => `<br><button id="${id}">${t}</button>`).join('')}`, 'OK', close, 'home');
     for (const [id, , fn] of extra) { const b = $('#' + id); if (b) b.onclick = fn; }
   }
+  // 0.30.4 (owner: "explain the routes and map better for new players"): a 3-page guide - places, home spots, map jobs.
+  // Shown once (new key, so players who saw the old 1-page intro see this once too); the ? button reopens it.
   function intro(force) {
-    let seen = 0; try { seen = localStorage.getItem(INTRO_KEY); } catch (e) { /* ignore */ }
+    let seen = 0; try { seen = localStorage.getItem(INTRO_KEY + '2'); } catch (e) { /* ignore */ }
     if (seen && !force) return;
-    const e = $('#mvIntro');
-    e.innerHTML = `<div class="mvicard"><div class="kick">Your real streets</div><h3>This is your real neighbourhood</h3>
-      <p>Walk past real places with the map open, and you'll scout them as bonus houses to loot.</p>
-      <ul><li><i><img alt="" src="${iconURL('pharmacy')}"></i><span><b>A pharmacy, a corner store, the police station</b> - real places near you show up as badges.</span></li>
-      <li><i class="o"><img alt="" src="${iconURL('bodega')}"></i><span><b>Get within about ${CLAIM_M} m</b> and it glows - it joins your houses with its real name. Loot it later from the Houses tab.</span></li>
-      <li><i>3</i><span><b>Up to 3 a day, on foot.</b> Cars and buses don't count, and you have to walk up to a place - it won't count from your couch.</span></li>
-      <li><i><svg width="20" height="20" viewBox="0 0 20 20"><rect x="4" y="9" width="12" height="9" rx="2" fill="#f6e3bb"/><path d="M6.5 9V6.5a3.5 3.5 0 0 1 7 0V9" fill="none" stroke="#f6e3bb" stroke-width="2.4"/></svg></i><span><b>Your location stays on this phone</b>, only while the map is open. It is never saved.</span></li></ul>
-      <button class="mbtn" id="mvIntroGo">Let's walk</button></div>`;
-    e.classList.add('on');
-    $('#mvIntroGo').onclick = () => { try { localStorage.setItem(INTRO_KEY, '1'); } catch (x) { /* ignore */ } e.classList.remove('on'); DM.E.SFX && DM.E.SFX.play && DM.E.SFX.play('ui'); };
+    const e = $('#mvIntro'), li = (ic, t) => `<li><i${ic.o ? ' class="o"' : ''}>${ic.h}</i><span>${t}</span></li>`, img = k => ({ h: `<img alt="" src="${iconURL(k)}">` }), em = c => ({ h: c });
+    const pages = [
+      ['Your real streets', 'This is your real neighbourhood', 'Walk to real places with the map open and they become bonus houses to loot.', [
+        li(img('pharmacy'), `<b>Real places show up as badges:</b> pharmacies, corner stores, schools, the police station. Small house icons are homes on your street.`),
+        li(Object.assign(img('bodega'), { o: 1 }), `<b>Get within about ${CLAIM_M} m</b> and it glows, then joins your Houses tab with its real name. Go loot it whenever you like.`),
+        li(em('3'), `<b>3 a day, on foot.</b> Cars and buses don't count. Once you have 3, a better place you reach replaces your weakest one.`),
+        li(em('🔒'), `<b>Your location stays on this phone,</b> only while the map is open. It is never saved or sent.`)]],
+      ['Home spots', 'No scouting from the couch', 'The map asks once if you are at home. That keeps it fair.', [
+        li(em('🏠'), `<b>Near home (${HOME_R} m):</b> you need to walk about ${WALK_OK} m with the map open before places count.`),
+        li(em('🚶'), `<b>Away from home:</b> a place counts the moment you walk up to it.`),
+        li(em('2'), `<b>Two home spots,</b> for example your place and a partner's. Tap 🏠 at the top to add or check them.`),
+        li(em('⭕'), `<b>The game also learns:</b> a spot you open the map in on ${LEARN_DAYS} different days counts as home too (faint ring).`)]],
+      ['While you walk', 'Jobs on the map', 'Keep the map open on a walk and things happen. Everything goes to your stash.', [
+        li(em('📦'), `<b>Supply crates:</b> 3 a day at real places nearby. Walk to one to grab it. After 300 m walked an <b>air drop</b> lands, but only for 20 minutes.`),
+        li(em('📻'), `<b>Radio calls:</b> a survivor names a place and a time limit. Get there in time for caps, XP and supplies.`),
+        li(em('🚚'), `<b>Dot's deliveries:</b> pick up a package at one place, carry it to another.`),
+        li(em('🌫️'), `<b>Fog:</b> the map is foggy where you have never walked. Clearing it gives XP and small finds.`),
+        li(em('🚶'), `<b>Pocket mode</b> (walking button, top right): a dark, battery-saving screen so you can walk with the phone in your pocket. Keep the screen on.`)]],
+    ];
+    let pg = 0;
+    const draw = () => {
+      const [k, h, p, items] = pages[pg], last = pg === pages.length - 1;
+      e.innerHTML = `<div class="mvicard"><div class="kick">${k} · ${pg + 1}/${pages.length}</div><h3>${h}</h3><p>${p}</p><ul>${items.join('')}</ul>
+        <div style="display:flex;gap:10px;margin-top:12px">${pg ? '<button class="mbtn ghost" id="mvIntroBack" style="flex:1">Back</button>' : ''}<button class="mbtn" id="mvIntroGo" style="flex:2">${last ? 'Let\'s walk' : 'Next'}</button></div></div>`;
+      $('#mvIntroGo').onclick = () => { DM.E.SFX && DM.E.SFX.play && DM.E.SFX.play('ui'); if (!last) { pg++; draw(); return; } try { localStorage.setItem(INTRO_KEY + '2', '1'); localStorage.setItem(INTRO_KEY, '1'); } catch (x) { /* ignore */ } e.classList.remove('on'); if (M.pos && !home() && !M.homeNo && !M.msgKind) { M.homeAsked = 1; homeAsk(false); } };
+      if ($('#mvIntroBack')) $('#mvIntroBack').onclick = () => { pg--; draw(); };
+    };
+    draw(); e.classList.add('on');
   }
   function scoutPill() {
     const e = $('#mvPill'); if (!e) return;
@@ -936,7 +957,7 @@ way[building]->.b;.b out skel geom qt;
     setOrigin(pos.lat, pos.lon);
     if (first && M.msgKind === 'gps') message();
     if (pos.acc <= 60 && !M.learnt) { M.learnt = 1; learnSpot(pos); }   // 0.30.3: learned home zones
-    if (!home() && !M.homeNo && !M.homeAsked && pos.acc <= 60 && !M.msgKind) { M.homeAsked = 1; homeAsk(false); }   // 0.30.2: once per map visit until set
+    if (!home() && !M.homeNo && !M.homeAsked && pos.acc <= 60 && !M.msgKind && !$('#mvIntro').classList.contains('on')) { M.homeAsked = 1; homeAsk(false); }   // 0.30.2: once per map visit until set
     fetchAround(pos, true);
     claim(); renderCard();
     if (DM.MapFX) { DM.MapFX.onPos(pos, M.walkedM || 0); pocketCard(); }   // 0.29: drops, radio calls, deliveries, fog
