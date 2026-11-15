@@ -945,6 +945,12 @@ people should be able to click a ? for help if they somehow skip it")
   3 far drops (450-800 m apart); 200 caps, 120 XP, a token, a Masterwork weapon (payout r.master).
 - Codex feats: Signal Keeper (story done), Courier's Friend (legend done).
 
+## Done in 0.39.0 - 9 of 12: weather + night bonus
+- weather.js W.bonus(): bad weather (rain/storm/snow/fog) +15% XP, +6% extra-find; night (8 PM-5 AM, or dark per the
+  API near dusk/dawn) +20% XP, +8% extra-find, zombies +15% HP and +10% sight. Stack. House/deep floor 1 runs only
+  (not the daily house, base, or boss arena): house.js G.wxb at run start (+ a toast), gainXP, extraChance, gsZombie,
+  canSee (z.sightMul). Weather chip shows the bonus; map supply crates at night hold one more thing.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

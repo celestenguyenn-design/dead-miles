@@ -65,7 +65,7 @@ window.DM = window.DM || {};
     for (const d of s.drops.slice()) if (dist(d, pos) <= 25 + Math.min(15, pos.acc / 2)) {
       s.drops = s.drops.filter(x => x !== d); save();
       if (d.air) { caps(30); const tk = token(.5); reward('✈️ Air drop', d.at, give(rollItems('hordecrate', 2)) + ', 30 caps' + (tk ? ', a capsule token' : '')); }
-      else reward('📦 Supply crate', d.at, give(rollItems('storage', 1).concat(rollItems('crate', 1))));
+      else reward('📦 Supply crate', d.at, give(rollItems('storage', 1).concat(rollItems('crate', 1)).concat(DM.Weather && DM.Weather.night && DM.Weather.night() ? rollItems('storage', 1).slice(0, 1) : [])));   // 0.39: night crates hold one more
     }
     // radio call
     if (s.radio && s.radio.until < now) { toast(`📻 The radio goes quiet. You did not make it to ${s.radio.at} in time.`, 3.4); s.radio = null; save(); }
