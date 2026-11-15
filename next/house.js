@@ -834,7 +834,7 @@
     }
 
     if (p.st === 'free' || p.st === 'swing') {
-      running = inp.run && inp.m > .5 && p.sta > 1 && !p.winded && p.st === 'free';
+      running = inp.run && inp.m > .5 && p.sta > 1 && !p.winded && p.st === 'free' && !(G.calmUntil > G.t);   // 0.26.10: no running next to a hiding stray (crew.js)
       spd = (running ? 4.5 : 2.75) * T * inp.m * (p.st === 'swing' ? .35 : 1) * (G.wx ? G.wx.move : 1);   // 0.22: snow slows her a little
       if (running) { p.sta = Math.max(0, p.sta - 24 * SK.sprintMul() * dt); p.staDelay = .7; }
       if (!G.over) F.runDrain(dt, running, G);   // a run makes you hungry and thirsty a little faster

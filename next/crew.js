@@ -390,17 +390,20 @@
     };
     $('#dNo').onclick = () => { close(); n.st = 'leave'; toast(`${m.name} slips out the back`, 1.6); };
   }
-  // ---- the stray: approach slowly (small joystick push) to win its trust, or offer food
+  // ---- the stray: walk up to it and wait a moment to win its trust, or offer food
   function strayTick(dt, g) {
     const s = R.stray, p = g.p; s.t += dt;
     if (s.st === 'leave') { s.a = Math.max(0, s.a - dt * .7); if (s.a <= 0) R.stray = null; return; }
     s.scaredT = Math.max(0, s.scaredT - dt);
     const vis = DM.House.fogOf(s.room) < .55; if (!vis) return;
     const d = dist(s, p), spd = Math.hypot(p.vx, p.vy);
+    // 0.26.10 (owner: "we cant approach slowly because its auto run"): near a hiding stray she walks instead of running
+    // (house.js reads G.calmUntil), and a normal walk is fine - only running, swinging or dodging scares it
+    if (s.st === 'hide' && d < 4.2 * T) g.calmUntil = g.t + .3;
     if (d < 3.4 * T) {
-      if (p.running || spd > 1.9 * T || p.st === 'swing' || p.st === 'dodge') {
+      if (p.running || spd > 3.2 * T || p.st === 'swing' || p.st === 'dodge') {
         if (s.trust > 0 || !s.scaredT) { s.trust = Math.max(0, s.trust - dt * 1.2); s.scaredT = 1.4; }
-        R.hintT -= dt; if (R.hintT <= 0) { R.hintT = 6; toast(`Too fast - the ${s.pet.kind} shrinks back. Ease the joystick, move slowly.`, 2.4); }
+        R.hintT -= dt; if (R.hintT <= 0) { R.hintT = 6; toast(`Easy - the ${s.pet.kind} shrinks back. Just walk up to it, no swinging or dodging.`, 2.4); }
       } else if (!s.scaredT && d < 2.8 * T) {
         const t0 = s.trust; s.trust = Math.min(1, s.trust + dt * (spd > .3 * T ? .32 : .2));
         if (t0 < .6 && s.trust >= .6) { toast(`The ${s.pet.kind} is watching you. Tap to coax it out.`, 2); if (s.pet.kind === 'cat') meow(); }
@@ -409,7 +412,7 @@
   }
   function coax(food) {
     const s = R.stray; if (!s) return;
-    if (!food && s.trust < .6) { s.scaredT = 1; toast(`It backs further under. Get close slowly${hasFood() ? '' : ' - or bring food'}.`, 2.2); return; }
+    if (!food && s.trust < .6) { s.scaredT = 1; toast(`It backs further under. Stand next to it for a moment first${hasFood() ? ' - or offer food' : ' - or bring food'}.`, 2.2); return; }
     if (food) { const i = DM.House.G.pack.findIndex(e => D.ITEMS[e.k].use === 'Eat'); if (i >= 0) { const e = DM.House.G.pack[i], nm = D.ITEMS[e.k].n.toLowerCase(); if (!--e.n) DM.House.G.pack.splice(i, 1); toast(`You set down some ${nm}...`, 1.4); } }
     if (s.pet.kind === 'cat') meow(); else bark();
     s.st = 'out'; s.y += 10;
@@ -541,7 +544,7 @@
           <div class="cbars"><span>${nx ? `Lv ${lv + 1}: ${Math.floor(p.xp).toLocaleString('en-US')}k/${nx}k of your steps` : 'Max level'}</span><i class="cbar"><i style="width:${nx ? Math.min(100, (p.xp - PLV[lv - 1]) / (nx - PLV[lv - 1]) * 100) : 100}%"></i></i></div>
           ${away ? '<div class="cpast"><b class="bad">Ran off after a zombie scare - back tomorrow.</b></div>' : ''}
           ${p.active ? '<span class="pactive">Comes along on runs</span>' : `<button class="mbtn sm ghost" data-act="${p.id}">Take along</button>`}</div></div>`; }).join('')
-        : '<div class="empty">No strays yet. Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Approach slowly, or offer food.</div>'}
+        : '<div class="empty">No strays yet. Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Walk up to one and stand close for a moment, or offer food.</div>'}
       <button class="mbtn ghost" id="csClose">Close</button></div>`;
     el.classList.add('on'); el.onclick = e => { if (e.target === el) closeSheet(); };
     for (const n of notes) n.seen = true; if (v.crew.morning) v.crew.morning.seen = true; G().save();

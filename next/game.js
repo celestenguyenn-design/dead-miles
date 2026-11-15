@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.26.9';
+const NEXT_VERSION = '0.26.10';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -226,7 +226,7 @@ const NEXT_VERSION = '0.26.9';
     SV.houses.push({ id: 'h' + seq, type, seed, gv: GV, day: day || SV.day.key, status: 'new', address: L.address, danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies });
   }
   const cache = new Map();
-  const GV = 4;   // 0.10: rarer key spots with prizes. 0.9: generator version for newly scouted houses (older houses keep the layout they were scouted with)
+  const GV = 5;   // 0.26.10: more key spots (locked rooms, parked cars). 0.10: rarer key spots with prizes. 0.9: generator version for newly scouted houses (older houses keep the layout they were scouted with)
   Game.GV = GV;
   function layoutOf(h) {
     const k = h.type + ':' + h.seed + ':' + (h.gv || 1);
@@ -1251,6 +1251,9 @@ const NEXT_VERSION = '0.26.9';
       const T = D.BTYPES[h.type], left = 3 - (dayNum(SV.day.key) - dayNum(h.day)), done = h.status !== 'new' && h.status !== 'far';
       const q = h.quest && questById(h.quest), far = h.status === 'far';
       const tags = [h.nLocks ? `${h.nLocks} lock${h.nLocks > 1 ? 's' : ''}` : 'no locks', `${h.nZombies} zombie${h.nZombies === 1 ? '' : 's'}`];
+      { const L = h.type !== 'tutorial' && h.status === 'new' ? layoutOf(h) : null;   // 0.26.10: where a brass key opens something
+        if (L && L.keyRoom) tags.push(`<b class="keytag">🔑 locked room${L.keyRoom.keyHere ? ' · key inside' : ''}</b>`);
+        if (L && L.car) tags.push('<b class="keytag">🔑 locked car</b>'); }
       const bs = !done && !far ? EVS.bossFor(layoutOf(h)) : null;   // event mini-boss: scouts spot it from the street
       if (bs) tags.push(`<b class="evtag">${esc(bs.name.toLowerCase())} · ${bs.where}</b>`);
       if (!done && !far && h.type !== 'tutorial') { const HL = layoutOf(h); if (HL.car) tags.push('<b class="keytag">🔑 locked car</b>'); if (HL.keyRoom) tags.push('<b class="keytag">🔑 locked room</b>');   // 0.8: brass-key spots

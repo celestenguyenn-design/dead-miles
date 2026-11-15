@@ -867,7 +867,9 @@
       const kshuf = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(kr() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
       const V3 = (opts.gv || 1) >= 3;
       // 0.10: rarer, but each one is worth a key (owner: "less common")
-      const pRoom = V3 ? ({ mansion: .3, police: .3, pharmacy: .2, school: .15 }[type] || .1) : ({ mansion: .5, police: .5, school: .3 }[type] || .2), pCar = V3 ? .2 : .42;
+      // 0.26.10 (owner: "brass keys have 0 use so far"): GV 5 has about twice the locked rooms and more parked cars
+      const V5 = (opts.gv || 1) >= 5;
+      const pRoom = V5 ? ({ mansion: .5, police: .5, pharmacy: .35, school: .3 }[type] || .2) : V3 ? ({ mansion: .3, police: .3, pharmacy: .2, school: .15 }[type] || .1) : ({ mansion: .5, police: .5, school: .3 }[type] || .2), pCar = V5 ? .32 : V3 ? .2 : .42;
       const wantRoom = kr() < pRoom, wantCar = kr() < pCar;
       if (wantRoom) lockedRoom();
       if (wantCar) parkedCar();

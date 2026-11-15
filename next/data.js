@@ -31,7 +31,7 @@ window.DM = window.DM || {};
     arrow: { n: 'Arrows', i: 'arrow' },
     crowbar: { n: 'Crowbar', i: 'crowbar', w: 'crowbar' },
     ammo: { n: '9mm rounds', i: 'ammo', rare: 1 },
-    key: { n: 'Brass key', i: 'key', rare: 1, tag: 'car & door key' },
+    key: { n: 'Brass key', i: 'key', rare: 1, tag: 'opens a locked room or car' },
     cloth: { n: 'Cloth rags', i: 'cloth' },
     battery: { n: 'Batteries', i: 'battery' },
     tape: { n: 'Duct tape', i: 'tape' },
