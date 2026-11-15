@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.29.1';
+const NEXT_VERSION = '0.29.2';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -53,7 +53,7 @@ const NEXT_VERSION = '0.29.1';
     v.walked = v.walked || 0;
     v.base = DM.Base.norm(v.base, v);       // phase 4: the base (pool, pieces, garden, decor)
     v.horde = DM.Base.normHorde(v.horde);   // phase 4: horde night (shifts, reports waiting to send, results)
-    if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); s.packBonus = s.packBonus || 0; }
+    if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); if (s.job === 'hunter' && !s.known.includes('bow')) s.known.push('bow'); /* 0.29.2: hunters can always make a bow */ s.packBonus = s.packBonus || 0; }
     if (v.survivor) { D.mergeStacks(v.survivor.pack); D.mergeStacks(v.survivor.stash); }   // 0.26.3: bigger stacks - fold old ones together
     v.trader.event = v.trader.event || null;   // phase 5a: Dot's seasonal job chain { key, step, kills, base }
     v.tips = v.tips || {};                  // phase 5: first-time tips already shown
@@ -120,7 +120,7 @@ const NEXT_VERSION = '0.29.1';
   function createSurvivor(name, look, job) {
     const J = D.JOBS[job];
     let xp = 0; try { const v = JSON.parse(localStorage.getItem('dm-next-skills') || '{}'); if (v.scav) xp = +v.scav.xp || 0; } catch (e) { /* none */ }
-    const s = { name: name || 'Survivor', look, job, hp: 0, xp, gsDays: 0, pack: [], stash: [], hands: null, quiver: { n: 0 }, packBonus: 0, known: D.BASIC.concat(job === 'hunter' ? ['arrow'] : []), wardrobe: { own: {}, seen: {} } };
+    const s = { name: name || 'Survivor', look, job, hp: 0, xp, gsDays: 0, pack: [], stash: [], hands: null, quiver: { n: 0 }, packBonus: 0, known: D.BASIC.concat(job === 'hunter' ? ['arrow', 'bow'] : []), wardrobe: { own: {}, seen: {} } };
     DM.Skills.norm(s); s.hp = maxHp(s); DM.Food.norm(s, true);
     for (const [k, n] of J.kit) {
       if (k === J.hands) { s.hands = { k, d: D.wMax({ k, q: 2 }), q: 2 }; continue; }   // 0.19: the starting kit is Worn
@@ -1610,6 +1610,18 @@ const NEXT_VERSION = '0.29.1';
         if (sel.from === 'hands') s.hands.d = nd; else e.d = nd;
         done('Repaired');
       }]);
+      // 0.29.2 (owner: "my bow broke ... or even upgrading it"): raise a weapon one quality tier (more damage and
+      // durability; fully repaired). Costs grow with the tier; the top two also cost caps.
+      const q = D.qOf(e), UP = { 1: [['scrap', 2]], 2: [['scrap', 3], ['tape', 1]], 3: [['scrap', 5], ['tape', 2], 0, 40], 4: [['scrap', 8], ['tape', 3], 0, 100] }[q];
+      if (UP) { const mats = UP.filter(x => Array.isArray(x)), cp = UP[3] || 0;
+        btns.push([`Upgrade to ${D.QUAL[q + 1].n} (${mats.map(([k, n]) => n + ' ' + D.ITEMS[k].n.toLowerCase()).join(', ')}${cp ? `, ${cp} caps` : ''})`, () => {
+          for (const [k, n] of mats) if (countItem(k) < n) return toast(`Needs ${n} ${D.ITEMS[k].n.toLowerCase()}`, 1.8);
+          if (cp && SV.trader.caps < cp) return toast(`Needs ${cp} caps`, 1.6);
+          for (const [k, n] of mats) { let need = n; for (const list of [s.stash, s.pack]) for (let j = list.length - 1; j >= 0 && need; j--) if (list[j].k === k) { const t = Math.min(need, list[j].n); list[j].n -= t; need -= t; if (!list[j].n) list.splice(j, 1); } }
+          SV.trader.caps -= cp;
+          const tgt = sel.from === 'hands' ? s.hands : e; tgt.q = q + 1; tgt.d = D.wMax({ k: e.k, q: q + 1 }); SFX.play('pick');
+          done(`${it.n} is now ${D.QUAL[q + 1].n} · ${D.wDmg({ k: e.k, q: q + 1 })} dmg`);
+        }]); }
     }
     if (it.use && it.use !== 'Read' && (it.hp || it.sta || FD.isFood(e.k)) && !it.slots) btns.push([it.use, () => { if (FD.isFood(e.k)) { const m = eatEntry(s, sel.from, sel.i); done(`${FD.verb(e.k)} ${it.n.toLowerCase()} · ${m}`); return; } s.hp = Math.min(maxHp(s), s.hp + (it.hp || 0)); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(`${it.n}: +${it.hp || 0} HP`); }]);
     if (it.cure && DM.Infect) btns.push([it.use, () => { if (!DM.Infect.is(s)) return toast('You are not infected - keep them for a bite', 1.8); const m = DM.Infect.cure(s); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(m); renderHome(); }, 'big']);   // 0.18: antibiotics

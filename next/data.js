@@ -133,6 +133,7 @@ window.DM = window.DM || {};
     lockset: { out: ['lockset', 1], in: { lockpick: 2, scrap: 2, tape: 1 }, n: 'Lockpick set (easier locks)' },
     prybar: { out: ['prybar', 1], in: { scrap: 5, tape: 1 }, n: 'Pry bar (quiet prying)' },
     armor_pad: { out: ['armor_pad', 1], in: { cloth: 5, tape: 2 }, n: 'Padded jacket (armor, -10% damage)' },   // 0.28
+    bow: { out: ['bow', 1], in: { wood: 3, cloth: 2, tape: 1 }, n: 'Hunting bow' },   // 0.29.2: hunters know it from the start
   };
   D.BASIC = ['bandage', 'lockpick'];
   // ---------------------------------------------------------------- 0.15: item categories (shown on pack / stash / loot cards)
