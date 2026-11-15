@@ -769,6 +769,14 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   ledger) counts as set up: the tour's sync step is done, the setup-only run is skipped, and the locked sync guide
   unlocks at once (lockCheck on open + DM.Tour.syncedBefore).
 
+## Done in 0.28.4
+- Sign-in confirmation (owner: "it should say are you sure you want to sign in to this acc ... what if someone
+  accidentally clicks the wrong acc"): netpanel's Sign in now asks "Sign in as @handle? This phone will switch to that
+  account and load its saved game" with Cancel / Yes, sign in. NET.openPanel(tab): the create screen's "Already playing?
+  Sign in" opens straight on the "I already play" form.
+- Bug (owner: Deep run / Weekly boss sheets overlapped by the tabs): #msheet / #mres had no z-index, so the sticky header
+  (z 5) and tabs (z 4) painted over them once the page was scrolled. Now z-index 10 (title 20, tips 25, cospop 30).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
