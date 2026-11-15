@@ -650,6 +650,17 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   Game tour, How to play > Game tour.
 - New first-time tips: trader, gacha, deck, decor (edit mode), route (Route view). The map keeps its own intro.
 
+## Done in 0.26.3
+- Storage (owner: "the storage sucks too much ... some way to sell besides the trader ... make the stacks higher?"):
+  D.STACK about doubled (food/drink 6, bandage/meds 10, scrap/wood 20, nails 40, cloth 10, tape 6, battery 8, ammo 60,
+  arrows 30, seeds 20, crops 6...), and sell junk now stacks (book/watch/jewelry 5, wrench 3). D.mergeStacks folds partial
+  stacks together on load and on Sort (durability / quality items never merge). Quick sell: with Dot away or closed for
+  the day, Stash > Quick sell junk pays half her price (a scrap dealer; not a Dot visit). Stash slots unchanged (40-80).
+- Tour (owner: "dont move on to the next steps until they complete the tutorial"): the first run cannot be skipped, and
+  setup steps lock Next until done: signed in (NET.handle); synced steps seen (NET phone reading in the last 14 days) or
+  "My phone can't sync" (SV.tourNoSync) and then steps logged (the step box is tappable through the overlay). Replays from
+  Settings / How to play can skip.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

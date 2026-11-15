@@ -238,7 +238,24 @@ window.DM = window.DM || {};
   // 0.19: q = weapon quality (+25% a tier above Worn, -25% for Rusty)
   D.valueOf = (k, d, q) => { if (k.startsWith('bp_')) return 25; let v = D.VALUE[k] || 1; if (D.ITEMS[k] && D.ITEMS[k].w) { const e = { k, q }; v *= 1 + .25 * (D.qOf(e) - 2); if (d != null) v = Math.max(1, Math.round(v * (.3 + .7 * Math.min(1, d / D.wMax(e))))); } return v; };
   // how many fit in one slot (anything not listed does not stack)
-  D.STACK = { gift: 3, candy: 5, seed_tomato: 10, seed_potato: 10, seed_carrot: 10, seed_corn: 10, seed_herbs: 10, tomato: 3, potato: 3, carrot: 3, corn: 3, herbs: 3, wood: 10, nails: 20, lockpick: 5, arrow: 20, cranberry: 3, stuffing: 3, pie: 3, water: 3, beans: 3, snack: 3, drink: 3, coffee: 3, bandage: 5, meds: 5, antibio: 5, ammo: 30, scrap: 10, cloth: 5, tape: 3, battery: 4 };
+  // 0.26.3 (owner: "the storage sucks too much ... make the stacks higher?"): about double, and sell junk stacks too
+  D.STACK = { gift: 5, candy: 10, seed_tomato: 20, seed_potato: 20, seed_carrot: 20, seed_corn: 20, seed_herbs: 20, tomato: 6, potato: 6, carrot: 6, corn: 6, herbs: 6, wood: 20, nails: 40, lockpick: 10, arrow: 30, cranberry: 6, stuffing: 6, pie: 6, water: 6, beans: 6, snack: 6, drink: 6, coffee: 6, bandage: 10, meds: 10, antibio: 5, ammo: 60, scrap: 20, cloth: 10, tape: 6, battery: 8,
+    book: 5, watch: 5, jewelry: 5, wrench: 3, turkey: 2 };
+  // merge partial stacks of the same thing (old saves had smaller stacks); entries with durability / quality never merge
+  D.mergeStacks = function (list) {
+    if (!Array.isArray(list)) return list;
+    const out = [];
+    for (const e of list) {
+      if (!e) continue;
+      const m = D.STACK[e.k];
+      if (m && e.d == null && e.q == null) {
+        for (const o of out) { if (e.n <= 0) break; if (o.k === e.k && o.d == null && o.q == null && o.n < m) { const t = Math.min(m - o.n, e.n); o.n += t; e.n -= t; } }
+        while (e.n > 0) { const t = Math.min(m, e.n); out.push(Object.assign({}, e, { n: t })); e.n -= t; }
+      } else out.push(e);
+    }
+    list.length = 0; for (const e of out) list.push(e);
+    return list;
+  };
   D.stackMax = k => D.STACK[k] || 1;
   D.QUIVER = 60;   // 0.7: arrows live in a quiver (survivor.quiver.n), not in a pack slot
 
