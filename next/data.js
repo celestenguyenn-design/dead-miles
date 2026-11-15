@@ -197,6 +197,9 @@ window.DM = window.DM || {};
     tracksuit: { n: 'Track jacket', slot: 'outfit', r: 'c', src: 'gacha' }, crown: { n: 'Paper crown', slot: 'hat', r: 'r', src: 'gacha' },
     starshades: { n: 'Star shades', slot: 'face', r: 'r', src: 'gacha' }, cape: { n: 'Hero cape', slot: 'back', r: 'r', src: 'gacha' },
     halo: { n: 'Glow halo', slot: 'hat', r: 'e', src: 'gacha' }, batwings: { n: 'Bat wings', slot: 'back', r: 'l', src: 'gacha' },
+    // 0.26.6 (owner: "more clothes"): capsule outfits
+    overalls: { n: 'Overalls', slot: 'outfit', r: 'c', src: 'gacha' }, trench: { n: 'Trench coat', slot: 'outfit', r: 'r', src: 'gacha' },
+    labcoat: { n: 'Lab coat', slot: 'outfit', r: 'e', src: 'gacha' }, tux: { n: 'Tuxedo', slot: 'outfit', r: 'l', src: 'gacha' },
     // 0.26 holiday capsules (only in the machine while their event runs) + the Deck the base top prizes
     leafcrown: { n: 'Autumn-leaf crown', slot: 'hat', r: 'r', src: 'gacha', ev: 'thanksgiving' }, flannel: { n: 'Flannel shirt', slot: 'outfit', r: 'r', src: 'gacha', ev: 'thanksgiving' },
     turkeyhat: { n: 'Roast-turkey hat', slot: 'hat', r: 'e', src: 'gacha', ev: 'thanksgiving' }, cornback: { n: 'Corn-stalk bundle', slot: 'back', r: 'e', src: 'gacha', ev: 'thanksgiving' },
@@ -205,6 +208,15 @@ window.DM = window.DM || {};
     elfhat: { n: 'Elf hat', slot: 'hat', r: 'e', src: 'gacha', ev: 'christmas' }, giftpack: { n: 'Present pack', slot: 'back', r: 'e', src: 'gacha', ev: 'christmas' },
     starhat: { n: 'Tree-topper star', slot: 'hat', r: 'l', src: 'festive', ev: 'christmas' },
   };
+  // 0.26.6 (owner: "more hair unlocks somehow through gachapon ... more eyes"): look unlocks from the capsule machine.
+  // Stored in wardrobe.looks[key]; free: hair 0-5, eyes Round (0) and Dot (6).
+  D.LOOKUN = {
+    hair6: { n: 'Ponytail', kind: 'hair', v: 6, r: 'c' }, hair10: { n: 'Braids', kind: 'hair', v: 10, r: 'c' }, hair9: { n: 'Side swoop', kind: 'hair', v: 9, r: 'r' },
+    hair11: { n: 'Spiky', kind: 'hair', v: 11, r: 'r' }, hair7: { n: 'Mohawk', kind: 'hair', v: 7, r: 'e' }, hair8: { n: 'Afro', kind: 'hair', v: 8, r: 'e' },
+    eyes1: { n: 'Sleepy eyes', kind: 'eyes', v: 1, r: 'c' }, eyes2: { n: 'Happy eyes', kind: 'eyes', v: 2, r: 'c' }, eyes7: { n: 'Wink', kind: 'eyes', v: 7, r: 'r' },
+    eyes4: { n: 'Sharp eyes', kind: 'eyes', v: 4, r: 'r' }, eyes3: { n: 'Wide eyes', kind: 'eyes', v: 3, r: 'r' }, eyes5: { n: 'Starry eyes', kind: 'eyes', v: 5, r: 'e' },
+  };
+  D.lookKey = (kind, v) => Object.keys(D.LOOKUN).find(k => D.LOOKUN[k].kind === kind && D.LOOKUN[k].v === v) || null;
   D.cosHint = k => { const c = D.COS[k]; return { loot: 'Found in houses', corpse: 'Found on zombies', police: 'Police stations', mansion: 'Mansions', horde: 'Horde-night crates', quest: "Dot's quest rewards", trader: 'Trader level ' + c.lv, event: D.EVHINT[k] || 'Seasonal event', gacha: 'Capsule machine', festive: 'Deck the base', boss: D.BOSSHINT[k] || 'Weekly boss' }[c.src]; };
   D.BOSSHINT = { apron: 'Weekly boss: the Butcher of Bed-Stuy', ashcrown: 'Weekly boss: Mother Ash', wardencap: 'Weekly boss: the Bridge Warden', stetho: 'Weekly boss: the Night Nurse' };
   // where each event cosmetic comes from (the wardrobe also tags them "Thanksgiving 2026" etc.)

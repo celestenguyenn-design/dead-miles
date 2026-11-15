@@ -73,7 +73,7 @@ window.DM = window.DM || {};
     document.body.classList.add('titleon');
     el = document.createElement('div'); el.id = 'title'; if (st.reduced) el.classList.add('still');
     el.innerHTML = `<canvas id="tcv"></canvas>
-      <div class="tltop">${LOGO}<div class="tltag">walk · loot · survive</div></div>
+      <div class="tltop">${DM.Logo ? DM.Logo.full() : LOGO}<div class="tltag">walk · loot · survive</div></div>
       <div class="tlbot"><button class="tlgo" id="tlGo">${opt.isNew ? 'TAP TO BEGIN' : 'TAP TO START'}</button>
         <div class="tllinks"><button id="tlSet">Settings</button><i>·</i><button id="tlHow">How to play</button></div>
         <div class="tlver">${opt.version || ''}</div></div>`;

@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.26.5';
+const NEXT_VERSION = '0.26.6';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -75,7 +75,7 @@ const NEXT_VERSION = '0.26.5';
   }
   // phase 5: cosmetics live in the wardrobe, not the pack. The 0.4 'Pilgrim hat' pack item (and any stray cosmetic item) moves in.
   function migrateCos(s) {
-    const w = s.wardrobe = s.wardrobe || {}; w.own = w.own || {}; w.seen = w.seen || {};
+    const w = s.wardrobe = s.wardrobe || {}; w.own = w.own || {}; w.seen = w.seen || {}; w.looks = w.looks || {};   // 0.26.6: hair / eye unlocks
     for (const list of [s.pack || [], s.stash || []]) for (let i = list.length - 1; i >= 0; i--) {
       const it = D.ITEMS[list[i].k], k = it && it.cos; if (!k) continue;
       list.splice(i, 1);
@@ -952,20 +952,29 @@ const NEXT_VERSION = '0.26.5';
   // ---- character creation / edit look
   let cre = { name: '', look: ART.LOOK.norm(null), job: 'scavenger' }, creEdit = false, idleRAF = 0;
   const LK = ART.LOOK;
+  // 0.26.6: capsule hair / eye unlocks (D.LOOKUN); the free ones always open
+  const hasLook = (kind, v) => { if (kind === 'hair' ? v < LK.FREE_HAIR : LK.FREE_EYES.includes(v)) return true; const k = D.lookKey(kind, v), w = SV.survivor && SV.survivor.wardrobe; return !!(k && w && w.looks && w.looks[k]); };
+  Game.hasLook = hasLook;
+  function lookChips(kind, key, names, lk) {
+    return `<div class="chips">${names.map((n, i) => { const ok = hasLook(kind, i); return `<button class="chip${lk[key] === i ? ' on' : ''}${ok ? '' : ' locked'}" data-k="${key}" data-v="${i}"${ok ? '' : ' data-lock="1"'}>${ok ? '' : '🔒 '}${n}</button>`; }).join('')}</div>`;
+  }
   function lookRows(lk) {
     const sw = (key, list, colOf, labelOf) => `<div class="swatches">${list.map((v, i) => `<button class="sw${lk[key] === i ? ' on' : ''}" data-k="${key}" data-v="${i}" style="background:${colOf(v)}" aria-label="${labelOf(v, i)}"></button>`).join('')}</div>`;
     return `
       <div class="lrow"><div class="kick">Body</div><div class="chips">${[['f', 'Female'], ['m', 'Male']].map(([v, n]) => `<button class="chip${lk.body === v ? ' on' : ''}" data-k="body" data-v="${v}">${n}</button>`).join('')}</div></div>
       <div class="lrow"><div class="kick">Skin</div>${sw('skin', LK.skins, v => v[0], (v, i) => 'Skin ' + (i + 1))}</div>
-      <div class="lrow"><div class="kick">Hair</div><div class="chips">${LK.styles.map((n, i) => `<button class="chip${lk.hair === i ? ' on' : ''}" data-k="hair" data-v="${i}">${n}</button>`).join('')}</div></div>
+      <div class="lrow"><div class="kick">Hair <span class="lnote">· 🔒 = from the Capsules tab</span></div>${lookChips('hair', 'hair', LK.styles, lk)}</div>
       <div class="lrow"><div class="kick">Hair colour</div>${sw('hairC', LK.hairs, v => v, (v, i) => LK.hairNames[i])}</div>
       <div class="lrow"><div class="kick">Hood${lk.cos && lk.cos.hat ? ' <span class="lnote">· your hat keeps it down</span>' : ''}</div><div class="chips"><button class="chip${lk.hood ? ' on' : ''}" data-k="hood" data-v="1">Up</button><button class="chip${!lk.hood ? ' on' : ''}" data-k="hood" data-v="0">Down</button></div></div>
+      <div class="lrow"><div class="kick">Eyes</div>${lookChips('eyes', 'eyes', LK.eyes, lk)}</div>
+      <div class="lrow"><div class="kick">Eye colour</div>${sw('eyeC', LK.eyeCols, v => v[0], v => v[1])}</div>
       <div class="lrow"><div class="kick">Jacket</div>${sw('coat', LK.coats, v => v[0], v => v[2])}</div>
       <div class="lrow"><div class="kick">Pants</div>${sw('pants', LK.pants, v => v[0], v => v[1])}</div>`;
   }
   function bindLook(lk, rerender) {
     document.querySelectorAll('.cform [data-k]').forEach(b => b.onclick = async () => {
       const k = b.dataset.k, v = b.dataset.v;
+      if (b.dataset.lock) { SFX.play('alert'); toast(`${b.textContent.replace('🔒 ', '')} is a capsule unlock - try the Capsules tab`, 2.4); return; }
       lk[k] = k === 'body' ? v : k === 'hood' ? v === '1' : +v;
       SFX.play('ui'); await E.buildSurvivor(lk); rerender();
     });
@@ -987,7 +996,7 @@ const NEXT_VERSION = '0.26.5';
     $('#menu').className = 'create';
     const lk = cre.look, ward = creEdit && creTab === 'wardrobe', nn = creEdit ? newCos() : 0;
     $('#mbody').innerHTML = `
-      <div class="mhead"><div class="logo">DEAD MILES</div><div class="kick">${ward ? 'your wardrobe' : creEdit ? 'edit your look' : 'a new survivor'}</div></div>
+      <div class="mhead"><div class="logo">${DM.Logo ? DM.Logo.mini() : 'DEAD MILES'}</div><div class="kick">${ward ? 'your wardrobe' : creEdit ? 'edit your look' : 'a new survivor'}</div></div>
       ${creEdit ? `<div id="ltabs"><button data-lt="look" class="${ward ? '' : 'on'}">Look</button><button data-lt="wardrobe" class="${ward ? 'on' : ''}">Wardrobe${nn ? `<i class="nbadge">${nn}</i>` : ''}</button></div>` : ''}
       <div class="ccard">
         <div class="cprev"><canvas id="cPort" width="260" height="320"></canvas>${ward ? '' : '<button class="mbtn sm ghost" id="cRand">Randomise</button>'}</div>
@@ -1110,7 +1119,7 @@ const NEXT_VERSION = '0.26.5';
     const hands = s.hands ? `${icon(s.hands.k)}<span style="color:${D.qOf(s.hands) > 2 ? D.QUAL[D.qOf(s.hands)].c : 'inherit'}">${D.ITEMS[s.hands.k].n}<i class="dur"><i style="width:${Math.max(3, Math.min(100, s.hands.d / D.wMax(s.hands) * 100))}%"></i></i></span>` : '<span>Fists</span>';   // 0.19: tier colour
     const gated = SV.tutorialDone || SV.stats.runs;   // 0.23 ui: base/horde/boss/deep/crew only after the first house, as before
     $('#mbody').innerHTML = `
-      <div class="mtop hometop"><div class="mbrand"><div class="logo">DEAD MILES</div><button id="mver" class="ver">${VERSION}</button></div>${gated ? hordePill() : ''}<span class="mtsp"></span>
+      <div class="mtop hometop"><div class="mbrand"><div class="logo">${DM.Logo ? DM.Logo.mini() : 'DEAD MILES'}</div><button id="mver" class="ver">${VERSION}</button></div>${gated ? hordePill() : ''}<span class="mtsp"></span>
         ${gated ? `<button id="hBase" class="gear tbase${BS.gardenNote() ? ' dot' : ''}" aria-label="Go to base"><svg viewBox="0 0 24 24"><path d="M3.5 11.2 12 4l8.5 7.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.8 9.6V20h4.4v-5.4h3.6V20h4.4V9.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>` : ''}<button id="mnet" class="gear" aria-label="Account and friends"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.8 19.5c.6-3.6 3.2-5.6 6.2-5.6s5.6 2 6.2 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16.5 13.6c2.6.1 4.4 1.8 4.9 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><button id="mset" class="gear" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 4.6.1-1.1-.1-1.1 2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.9-1.1L15.8 3h-4l-.4 2.6a8 8 0 0 0-1.9 1.1l-2.4-1-2 3.4 2 1.6-.1 1.1.1 1.1-2 1.6 2 3.4 2.4-1c.6.5 1.2.8 1.9 1.1l.4 2.6h4l.4-2.6a8 8 0 0 0 1.9-1.1l2.4 1 2-3.4z" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></button></div>
       ${DM.Weather ? DM.Weather.chipHTML() : ''}   <!-- 0.22: weather chip -->
       <div class="hero">
@@ -1621,7 +1630,7 @@ const NEXT_VERSION = '0.26.5';
     ['Base & farming', 'Your base is built with steps (the same steps also scout houses). Build walls, a gate, traps and garden beds; decorate with furniture you find. Plant seeds, water them with steps each day, and harvest real food. The stash chest lives here.'],
     ['Horde night', 'Every Sunday 9 PM New York time a horde hits. In the 24 hours before, do a watch shift (a 2-3 minute defence) - every kill thins the horde for your whole party. Strong bases hold and pay out a crate; weak ones lose something you repair with steps. Skip the shift and you get nothing.'],
     ['Seasonal events', 'Holidays switch on by themselves: Thanksgiving (from two weeks before to the Tuesday after) and Christmas (Dec 11 - Jan 2). Events bring holiday loot, a mini-boss in about 1 in 3 houses, a chain of event jobs from Dot, holiday capsules in the capsule machine, holiday decor and once-a-year cosmetics. Thanksgiving also has the Black Friday horde: a bigger Sunday horde with better crates.'],
-    ['Capsule machine', 'The capsule machine (Capsules tab) gives a random cosmetic for a token. You get a token for every 4,000 steps (up to 3 a day), or buy one for 50 caps. Odds: common 55%, rare 30%, epic 12%, legendary 3%, and at least one epic or better every 10 pulls. Cosmetics you do not have yet come first; Dot buys any duplicate. During a holiday its capsules join the machine, and 1 pull in 4 is a piece of holiday decor.'],
+    ['Capsule machine', 'The capsule machine (Capsules tab) gives a random cosmetic, hairstyle or eye style for a token (new hairstyles and eyes show up in Edit look, marked with a lock until you pull them). You get a token for every 4,000 steps (up to 3 a day), or buy one for 50 caps. Odds: common 55%, rare 30%, epic 12%, legendary 3%, and at least one epic or better every 10 pulls. Cosmetics you do not have yet come first; Dot buys any duplicate. During a holiday its capsules join the machine, and 1 pull in 4 is a piece of holiday decor.'],
     ['Deck the base', 'During Thanksgiving and Christmas, place that holiday\'s decor at your base (Base > Decor) for prizes: 2 pieces = 2 capsule tokens + 40 caps, 5 = 3 tokens + 80 caps, 8 = a legendary holiday hat + 100 caps. Holiday decor comes from Dot\'s holiday shelf, holiday houses (storage, pantries, closets) and the capsule machine.'],
     ['Workbench & crafting', 'Workbench (home tab, or at the base) lists every recipe you know with each material, what you have and what you need. Tap a recipe to see what it does, every material in full with where to find it, and a big Craft button. Materials come from the stash and the pack. New recipes come from blueprints: Dot trades them, and some turn up in hidden stashes and safes.'],
     ['Crew', 'About 1 house in 25 has a survivor hiding in a closet or a secret room (more in mansions and police stations). Talk to them: with a free bunk they move into your base (2 bunks, build up to 4). Each has a role - Scavenger (crew searches bring back more), Guard (horde-night defence), Medic (heals you each morning), Gardener (waters a plant a day), Tinkerer (cheaper repairs) - and levels up slowly. Each eats 1 food a day from your STASH; three hungry days and they leave a note (they never take anything). The more crew you have, the more a Crew search brings back.'],

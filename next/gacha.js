@@ -39,23 +39,31 @@ window.DM = window.DM || {};
     return Object.keys(D.COS).filter(k => D.COS[k].src === 'gacha' && (!D.COS[k].ev || D.COS[k].ev === ev));
   }
   GA.pool = pool;
+  // 0.26.6: hair / eye unlocks (D.LOOKUN) are in the machine too, until you have them all (never a duplicate)
+  const looksOwned = () => (SV().survivor.wardrobe.looks = SV().survivor.wardrobe.looks || {});
+  const lookPool = () => Object.keys(D.LOOKUN || {});
+  const lookIcon = k => `<img alt="" src="${ART.LOOK.previewURL(D.LOOKUN[k].kind, D.LOOKUN[k].v)}">`;
   const own = () => SV().survivor.wardrobe.own;
   function roll(g) {
     const ev = EVA(), decor = ev && ev.ev.decor;
     if (decor && Math.random() < .25) return { decor: decor[Math.floor(Math.random() * decor.length)] };
-    const P = pool(), forced = g.pity >= PITY - 1;
+    const P = pool().map(k => ({ cos: k, r: D.COS[k].r })).concat(lookPool().filter(k => !looksOwned()[k]).map(k => ({ look: k, r: D.LOOKUN[k].r }))), forced = g.pity >= PITY - 1;
     const odds = forced ? { e: 80, l: 20 } : ODDS;
-    const rs = Object.keys(odds).filter(r => P.some(k => D.COS[k].r === r));
+    const rs = Object.keys(odds).filter(r => P.some(x => x.r === r));
     let v = Math.random() * rs.reduce((a, r) => a + odds[r], 0), r = rs[rs.length - 1];
     for (const x of rs) { v -= odds[x]; if (v <= 0) { r = x; break; } }
-    let pick = P.filter(k => D.COS[k].r === r); const fresh = pick.filter(k => !own()[k]); if (fresh.length) pick = fresh;
-    return { cos: pick[Math.floor(Math.random() * pick.length)] };
+    let pick = P.filter(x => x.r === r); const fresh = pick.filter(x => x.look || !own()[x.cos]); if (fresh.length) pick = fresh;
+    const c = pick[Math.floor(Math.random() * pick.length)];
+    return c.look ? { look: c.look } : { cos: c.cos };
   }
   function pull() {
     const g = st(); if (!g || g.tok < 1) return;
     g.tok--; g.pulls++;
     const res = roll(g);
-    if (res.cos) {
+    if (res.look) {
+      const L = D.LOOKUN[res.look]; looksOwned()[res.look] = Date.now();
+      g.pity = L.r === 'e' || L.r === 'l' ? 0 : g.pity + 1;
+    } else if (res.cos) {
       const C = D.COS[res.cos], had = !!own()[res.cos];
       g.pity = C.r === 'e' || C.r === 'l' ? 0 : g.pity + 1;
       G().unlockCos('cos_' + res.cos);   // a duplicate is sold to Dot there (with its own toast)
@@ -92,7 +100,9 @@ window.DM = window.DM || {};
   function sheet(res) {
     const g = st(), v = SV(), P = pool(), w = own(), ev = EVA();
     const got = P.filter(k => w[k]).length;
-    const resHTML = !res ? '' : res.cos
+    const resHTML = !res ? '' : res.look
+      ? `<div class="garesult" style="--rc:${RCOL[D.LOOKUN[res.look].r]}"><div class="gaitem">${lookIcon(res.look)}</div><div><i>${D.RARITY[D.LOOKUN[res.look].r].n} ${D.LOOKUN[res.look].kind === 'hair' ? 'hairstyle' : 'eyes'}</i><b>${esc(D.LOOKUN[res.look].n)}</b><span>New! Pick it in Edit look</span></div></div>`
+      : res.cos
       ? `<div class="garesult" style="--rc:${RCOL[D.COS[res.cos].r]}"><div class="gaitem">${U().icon('cos_' + res.cos)}</div><div><i>${D.RARITY[D.COS[res.cos].r].n}</i><b>${esc(D.COS[res.cos].n)}</b><span>${res.dup ? 'You had it already - Dot bought the spare' : 'New! It is in your wardrobe'}</span></div></div>`
       : `<div class="garesult" style="--rc:#f07aa8"><div class="gaitem">${U().icon(res.decor)}</div><div><i>Holiday decor</i><b>${esc(D.ITEMS[res.decor].n)}</b><span>${res.lost ? 'Your stash is full - it was left behind' : 'In your stash - place it at the base'}</span></div></div>`;
     const inTab = host && document.body.contains(host) && G().ui && document.querySelector('#mtabs [data-t="gacha"].on');
@@ -100,7 +110,9 @@ window.DM = window.DM || {};
       <h3>${g.tok} token${g.tok === 1 ? '' : 's'}</h3>${resHTML}
       <p class="mp dim">1 token per ${fmt(STEP)} steps (up to ${DAY_MAX} a day${g.dayTok >= DAY_MAX ? ' - done for today' : `, next in ${fmt(nextIn(g))}`}), or ${PRICE} caps. Epic or better at least every ${PITY} pulls (${PITY - g.pity} to go).</p>
       <div class="gapool">${P.map(k => `<span class="gap${w[k] ? ' own' : ''}" style="--rc:${RCOL[D.COS[k].r]}" title="${esc(D.COS[k].n)}">${U().icon('cos_' + k)}</span>`).join('')}</div>
-      <p class="mp dim">${got}/${P.length} collected${ev && ev.ev.decor ? ` · 1 pull in 4 is ${esc(ev.ev.name)} decor` : ''}</p>
+      <div class="kick sect" style="margin-top:8px">Hairstyles &amp; eyes · ${lookPool().filter(k => looksOwned()[k]).length}/${lookPool().length}</div>
+      <div class="gapool">${lookPool().map(k => `<span class="gap${looksOwned()[k] ? ' own' : ''}" style="--rc:${RCOL[D.LOOKUN[k].r]}" title="${esc(D.LOOKUN[k].n)}">${lookIcon(k)}</span>`).join('')}</div>
+      <p class="mp dim">Cosmetics ${got}/${P.length} collected${ev && ev.ev.decor ? ` · 1 pull in 4 is ${esc(ev.ev.name)} decor` : ''}</p>
       <div class="btnrow">${inTab ? '' : '<button class="mbtn sm ghost" id="gaClose">Close</button>'}<button class="mbtn sm ghost" id="gaBuy">Buy · ${PRICE} caps</button><button class="mbtn sm" id="gaPull"${g.tok ? '' : ' disabled'}>Pull</button></div>`);
     if ($('#gaClose')) $('#gaClose').onclick = () => { U().sheetClose(); G().renderHome(); };
     if (inTab) G().tip('gacha');
