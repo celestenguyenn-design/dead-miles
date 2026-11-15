@@ -83,7 +83,7 @@ window.DM = window.DM || {};
         <div class="hmeta"><span><b>${g.tok}</b> token${g.tok === 1 ? '' : 's'}</span><span>${n ? `next in ${fmt(n)} steps` : 'Step tokens done for today'}</span></div></div>
       <div class="hbtns"><button class="mbtn${g.tok ? '' : ' ghost'}" id="gaOpen">${g.tok ? 'Pull' : 'Look'}</button></div></div>`;
   };
-  GA.bind = function (root) { const b = (root || document).querySelector('#gaOpen'); if (b) b.onclick = () => { SFX.play('ui'); sheet(); }; const d = (root || document).querySelector('#dkOpen'); if (d) d.onclick = () => { SFX.play('ui'); deckSheet(); }; };
+  GA.bind = function (root) { const b = (root || document).querySelector('#gaOpen'); if (b) b.onclick = () => { SFX.play('ui'); sheet(); G().tip('gacha'); }; const d = (root || document).querySelector('#dkOpen'); if (d) d.onclick = () => { SFX.play('ui'); deckSheet(); G().tip('deck'); }; };
   function sheet(res) {
     const g = st(), v = SV(), P = pool(), w = own(), ev = EVA();
     const got = P.filter(k => w[k]).length;

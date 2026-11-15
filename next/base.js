@@ -664,7 +664,7 @@
     on('eFlip', () => { sel.m = sel.m ? 0 : 1; G().save(); syncDecor(); });
     on('eStore', () => { const b = base(); b.decor = b.decor.filter(o => o !== sel); b.box[sel.k] = (b.box[sel.k] || 0) + 1; S.sel = null; G().save(); syncDecor(); editBar(); toast('Stored in the decor box', 1.2); });
   }
-  function setEdit(on) { S.edit = on; S.sel = null; S.pend = null; document.body.classList.toggle('editing', on); if (on) editBar(); else $('#editbar').innerHTML = ''; hudSync(); }
+  function setEdit(on) { S.edit = on; S.sel = null; S.pend = null; document.body.classList.toggle('editing', on); if (on) { editBar(); G().tip('decor'); } else $('#editbar').innerHTML = ''; hudSync(); }
 
   // ---------------------------------------------------------------- drawing hooks
   function drawUnder(c, g) {

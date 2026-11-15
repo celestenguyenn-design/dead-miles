@@ -401,7 +401,7 @@ window.DM = window.DM || {};
   R.bind = function (el, rr) {
     rerender = rr || rerender;
     const s = state();
-    el.querySelectorAll('[data-rv]').forEach(b => b.onclick = () => { SFX.play('ui'); s.view = b.dataset.rv; G().save(); rerender(); });
+    el.querySelectorAll('[data-rv]').forEach(b => b.onclick = () => { SFX.play('ui'); s.view = b.dataset.rv; G().save(); rerender(); if (s.view === 'route' && DM.Game.tip) DM.Game.tip('route'); });
     el.querySelectorAll('[data-rn]').forEach(g => g.onclick = () => { SFX.play('ui'); const [r, i] = g.dataset.rn.split(':').map(Number); openNode(r, i); });
     const m = el.querySelector('#rtMap');
     if (m) {   // scroll the map so her next row is in view (only when the view opens, not on every refresh)
