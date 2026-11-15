@@ -18,13 +18,23 @@ window.DM = window.DM || {};
   const signedIn = () => !!(window.NET && NET.handle);
   // 0.26.3 (owner: "dont move on to the next steps until they complete the tutorial"): setup is required - Next stays
   // locked until each setup step is really done. A phone that cannot sync logs steps by hand instead.
+  // 0.28.3 (owner: "it still prompts me to do a mandatory step sync which my acc already has"): an account whose phone
+  // already synced (any phone/watch reading in the last 14 days, from the cloud step ledger) has nothing to set up
+  const pad = n => String(n).padStart(2, '0');
+  function syncedBefore() {
+    if (!window.NET || !NET.ok || !NET.stepsDay) return false;
+    if (NET.steps && NET.steps.phone > 0) return true;
+    for (let k = 0; k < 14; k++) { const d = new Date(Date.now() - k * 864e5), key = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); try { if ((NET.stepsDay(key) || {}).phone > 0) return true; } catch (e) { return false; } }
+    return false;
+  }
+  TO.syncedBefore = syncedBefore;
   const logged = () => { const v = SV(); return !!(v && ((v.day && (v.day.typed > 0 || v.day.phone > 0)) || v.walked > 0)); };
   // 0.28.1 (owner: "can you let isabel bypass the tutorial"): handles on NET.cfg.trustedTyped (typed steps count like a
   // phone's) skip the setup - there is nothing for them to set up
   const trusted = () => !!(window.NET && NET.handle && NET.cfg && (NET.cfg.trustedTyped || []).includes(String(NET.handle).toLowerCase()));
   TO.trusted = trusted;
   const cant = () => { const v = SV(); return !!(v && v.tourNoSync && !v.syncSetup); };
-  const synced = () => { const v = SV(); return !!(v && v.syncSetup); };
+  const synced = () => { const v = SV(); return !!(v && (v.syncSetup || syncedBefore())); };
   const STEPS = [
     // 0.26.9 (owner: "that should be step 1 for iphones AND androids, homescreen app"): only while not opened from the icon
     { t: 'First: put Dead Miles on your home screen', home: 1, d: () => (DM.Install ? 'It opens full screen like a real app, and step sync works best from it. On this phone:' : 'Add this page to your home screen from the browser menu.'), html: () => DM.Install ? DM.Install.html() : '' },
@@ -142,7 +152,7 @@ window.DM = window.DM || {};
   }
   TO.start = function (replay) {
     const v = SV(); if (!v || !v.survivor || DM.scene) return false;
-    if (!replay && trusted() && v.tourDone) { v.setupDone = 1; DM.Game.save(); return false; }   // nothing to set up
+    if (!replay && (trusted() || (signedIn() && syncedBefore())) && v.tourDone) { v.setupDone = 1; if (!trusted()) v.syncSetup = 1; DM.Game.save(); return false; }   // nothing to set up
     if ($('#msheet')) $('#msheet').classList.remove('on');
     const tab = $('#mtabs [data-t="houses"]'); if (tab && !tab.classList.contains('on')) tab.click();
     build(); el.style.display = ''; on = true; pending = false; i = 0; autoed = false;
@@ -162,7 +172,7 @@ window.DM = window.DM || {};
   setInterval(() => {
     const v = SV();
     if (on || pending || !v || !v.survivor || (v.tourDone && v.setupDone) || DM.scene || document.hidden) return;
-    if (trusted() && v.tourDone) { v.setupDone = 1; DM.Game.save(); return; }
+    if ((trusted() || (signedIn() && syncedBefore())) && v.tourDone) { v.setupDone = 1; DM.Game.save(); return; }
     if (($('#msheet') && $('#msheet').classList.contains('on')) || ($('#tipbox') && $('#tipbox').classList.contains('on')) || !visible($('#mtabs')) || ($('#menu') && $('#menu').className)) return;
     TO.start();
   }, 2500);

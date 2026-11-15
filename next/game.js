@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.28.2';
+const NEXT_VERSION = '0.28.3';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1039,7 +1039,7 @@ const NEXT_VERSION = '0.28.2';
       ${ward ? '<button class="mbtn big" id="cSave">Done</button>' : creEdit ? '<button class="mbtn big" id="cSave">Save look</button><button class="mbtn big ghost" id="cCancel">Cancel</button>' : `<div class="kick sect">Job</div>
       <div class="jobs">${Object.keys(D.JOBS).map(k => { const J = D.JOBS[k]; return `<button class="job${k === cre.job ? ' on' : ''}" data-j="${k}">
         <b>${J.n}</b><span>${J.perk}</span><div class="kit">${J.kit.map(([it, n]) => `<i>${icon(it)}${n > 1 ? `<em>${n}</em>` : ''}</i>`).join('')}</div></button>`; }).join('')}</div>
-      <button class="mbtn big" id="cGo">Start walking</button>`}`;
+      <button class="mbtn big" id="cGo">Start walking</button>${window.NET ? '<button class="mbtn big ghost" id="cSignIn" style="margin-top:8px">Already playing? Sign in</button>' : ''}`}`;
     if ($('#cName')) $('#cName').oninput = e => cre.name = e.target.value;
     if (ward) bindWardrobe(lk); else bindLook(lk, renderCreate);
     document.querySelectorAll('#ltabs button').forEach(b => b.onclick = () => { commitSeen(); creTab = b.dataset.lt; SFX.play('ui'); renderCreate(); $('#menu').scrollTo(0, 0); });
@@ -1048,13 +1048,14 @@ const NEXT_VERSION = '0.28.2';
     if (creEdit) {
       $('#cSave').onclick = async () => { commitSeen(); SV.survivor.look = LK.norm(cre.look); Game.save(); publish(); creEdit = false; await E.buildSurvivor(SV.survivor.look); renderHome(); toast('Looking good', 1.2); };
       if ($('#cCancel')) $('#cCancel').onclick = async () => { commitSeen(); creEdit = false; await E.buildSurvivor(SV.survivor.look); renderHome(); };
-    } else $('#cGo').onclick = async () => {
+    } else { if ($('#cSignIn')) $('#cSignIn').onclick = () => { SFX.play('ui'); openAccount(); };   // 0.28.3: an existing account loads its save instead
+    $('#cGo').onclick = async () => {
       SV.survivor = createSurvivor(cre.name.trim(), LK.norm(cre.look), cre.job);
       DM.S = SV.survivor; Game.save(); publish();
       if (DM.Tour) DM.Tour.queue();   // 0.26.2: setup (steps) first, before the tutorial house and any tip
       await E.buildSurvivor(cre.look);
       renderHome();
-    };
+    }; }
     startIdle($('#cPort'), () => creEdit ? (SV.survivor.hands && SV.survivor.hands.k) : D.JOBS[cre.job].hands);
   }
   function editLook(t) { creEdit = true; creTab = t || 'look'; cre.look = LK.norm(SV.survivor.look); renderCreate(); $('#menu').scrollTo(0, 0); }
@@ -1800,11 +1801,8 @@ const NEXT_VERSION = '0.28.2';
       $('#pCloud').onclick = () => { sheetClose(); res('remote'); };
     });
   }
-  async function netStart() {
+  async function pullCloud() {
     const N = window.NET; if (!N) return;
-    N.onRemoteAdopted = st => { if (st && st.v === VER) adoptState(st); };
-    N.onConflict = ({ local, remote }) => sig(local.state) === sig(remote.state) ? ((remote.at || 0) > (local.at || 0) ? 'remote' : 'local') : chooseSave(local.state, remote.state).then(pick => { if (pick === 'remote' && remote.state) setTimeout(() => adoptState(remote.state), 0); return pick; });
-    try { await withTimeout(N.init(), 6000); } catch (e) { /* offline or blocked: the game keeps going on this phone */ }
     try {
       if (N.ok) {
         const cloud = await withTimeout(N.load(), 6000);
@@ -1816,6 +1814,16 @@ const NEXT_VERSION = '0.28.2';
         }
       }
     } catch (e) { /* offline */ }
+  }
+  async function netStart() {
+    const N = window.NET; if (!N) return;
+    N.onRemoteAdopted = st => { if (st && st.v === VER) adoptState(st); };
+    N.onConflict = ({ local, remote }) => sig(local.state) === sig(remote.state) ? ((remote.at || 0) > (local.at || 0) ? 'remote' : 'local') : chooseSave(local.state, remote.state).then(pick => { if (pick === 'remote' && remote.state) setTimeout(() => adoptState(remote.state), 0); return pick; });
+    try { await withTimeout(N.init(), 6000); } catch (e) { /* offline or blocked: the game keeps going on this phone */ }
+    await pullCloud();
+    // 0.28.3 (owner: "there should be an option to sign in before character creation if you already have an acc"):
+    // signing in from the account panel loads that account's cloud save right away (before, only on the next start)
+    N.onSignedIn = async () => { const had = !!SV.survivor; await pullCloud(); if (!had && SV.survivor) { creEdit = false; renderHome(); } };
     N.onFix = onNetFix;
     N.onSteps = onNetSteps;   // set only after the save is settled: steps wait in the ledger until then
     try { if (N.ok) await withTimeout(N.partyGet(), 6000); } catch (e) { /* offline */ }

@@ -185,7 +185,7 @@
     if (a === 'close') return NET.closePanel();
     if (a === 'guide') { NET.closePanel(); if (window.SYNC) window.SYNC.open(); return; }
     if (a === 'register') { UI.h = val('np-h'); UI.n = val('np-n'); const r = await NET.register(UI.h, UI.n || UI.h); if (!r.ok) say('acct', r.message || r.error); else { await NET.board(); render(); } return; }
-    if (a === 'signin') { UI.h = val('np-h'); const r = await NET.signIn(UI.h, val('np-s')); if (!r.ok) say('acct', r.error); else { await Promise.all([NET.board(), NET.partyGet()]); render(); } return; }
+    if (a === 'signin') { UI.h = val('np-h'); const r = await NET.signIn(UI.h, val('np-s')); if (!r.ok) say('acct', r.error); else { await Promise.all([NET.board(), NET.partyGet()]); render(); if (NET.onSignedIn) { try { await NET.onSignedIn(); } catch (e) { /* ignore */ } } } return; }
     if (a === 'signout') { if (confirm('Sign out of @' + NET.handle + ' on this device? Your game stays saved on the server.')) NET.signOut(); return render(); }
     if (a === 'showPin') { UI.showPin = !UI.showPin; return render(); }
     if (a === 'pickPin') { const i = document.getElementById('np-pin'); if (i) i.value = NET.makePin(); return; }
