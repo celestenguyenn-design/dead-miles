@@ -24,7 +24,7 @@
   const hasArt = () => typeof ART !== 'undefined' && ART.rigs;
   const MIRRORS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];   // 0.19.2: four, raced (hedged)
   const CLAIM_M = 35, MAX_ACC = 60, VEHICLE_MS = 9, SETTLE_MS = 45000, FAST_HITS = 3;
-  const CELL = 0.006, PAD = 0.0004, CACHE_V = 3, CACHE_DAYS = 14, MAX_CELLS = 30, HOUSES_SHOWN = 45, HOUSE_BADGES = 24;
+  const CELL = 0.006, PAD = 0.0004, CACHE_V = 4, CACHE_DAYS = 14, MAX_CELLS = 30, HOUSES_SHOWN = 45, HOUSE_BADGES = 24;
   const ASK_MS = 20000, HEDGE_MS = 3500, INTRO_KEY = 'dm-next-mapintro';
   const ZMIN = 0.7, ZMAX = 5, ZDEF = 2.1;   // css px per metre
   const C = {
@@ -323,6 +323,20 @@ way[building]->.b;.b out skel geom qt;
       const tags = { building: flats ? 'apartments' : 'house', 'addr:housenumber': String(f.tags.housenumber).slice(0, 10) };
       if (lv >= 4) tags['building:levels'] = String(lv);   // brownstones (~3) get the usual mix of short and tall rows if (street) tags['addr:street'] = street;
       els.push(Object.assign({ type: 'way', id: b.id, center: ll(HE, x, y), tags }));
+    }
+    // 0.28.5 (owner: "Houses aren't refreshing as i walk on the map" - outside Brooklyn most buildings carry no house
+    // number in the tiles, so almost none became houses): unnumbered buildings become houses too, named by the nearest
+    // street ("House on Oakville Street"); about 1 in 3 of them (by id), so the map stays readable
+    for (const b of bs) {
+      if (used.has(b.id) || b.area < 35 || b.area > 2500 || b.id % 3) continue;
+      let sx = 0, sy = 0; const m = b.P.length / 2 - 1; for (let i = 0; i < m * 2; i += 2) { sx += b.P[i]; sy += b.P[i + 1]; } sx /= m; sy /= m;
+      let best = 40 / mpu, street = '';
+      for (const r of named) { const d = segDist(sx * E / BE, sy * E / BE, r.Q, r.s); if (d < best) { best = d; street = r.n; } }
+      if (!street) continue;   // off any named street: a shed, a garage, a park building
+      const lv = b.h ? Math.max(1, Math.round(b.h / 3)) : 0, flats = lv >= 6 || b.area > 900;
+      const tags = { building: flats ? 'apartments' : 'house', 'addr:street': street, name: (flats ? 'Apartments on ' : 'House on ') + street };
+      if (lv >= 4) tags['building:levels'] = String(lv);
+      els.push({ type: 'way', id: b.id, center: ll(BE, sx, sy), tags });
     }
     return els;
   }
@@ -662,7 +676,7 @@ way[building]->.b;.b out skel geom qt;
       <div id="mvMap"><canvas id="mvCv"></canvas><div id="mvPill" class="mvpill"><i></i><span></span></div><div id="mvBanner" class="mvbanner"></div><div id="mvTip" class="mvtip"></div>
         <div class="mvzoom"><button id="mvZin" aria-label="Zoom in">+</button><button id="mvZout" aria-label="Zoom out">&minus;</button></div>
         <button id="mvMe" class="mvme" aria-label="Back to me"><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="#f6e3bb" stroke-width="2.6"/><circle cx="12" cy="12" r="3" fill="#f07b3c"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="#f6e3bb" stroke-width="2.6" stroke-linecap="round"/></svg></button>
-        <div class="mvattr">OpenFreeMap <div class="mvattr">&copy; OpenStreetMap contributors</div>copy; OpenMapTiles · <div class="mvattr">&copy; OpenStreetMap contributors</div>copy; OpenStreetMap contributors</div><div id="mvMsg" class="mvmsg"></div></div>
+        <div class="mvattr">OpenFreeMap &copy; OpenMapTiles · &copy; OpenStreetMap contributors</div><div id="mvMsg" class="mvmsg"></div></div>
       <div class="mvcard" id="mvCard"><div class="mvprog"><span class="mvpips" id="mvPips"></span><span id="mvLeft"></span></div>
         <div class="mvnext"><span class="arr" id="mvArr"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1.5l6 13-6-3.4-6 3.4z" fill="#11142f"/></svg></span><img class="ico" id="mvIco" alt=""><div><span id="mvStat">Finding you...</span><span id="mvSub2"></span></div><em id="mvDist"></em></div></div>
       <div id="mvIntro" class="mvintro"></div>`;
@@ -745,7 +759,7 @@ way[building]->.b;.b out skel geom qt;
     $('#mvStat').textContent = line; $('#mvSub2').textContent = sub; $('#mvDist').textContent = dd;
     arr.classList.toggle('on', ang != null); if (ang != null) arr.querySelector('svg').style.transform = `rotate(${Math.round(ang)}deg)`;
     ico.classList.toggle('on', !!show && ang == null); if (show) ico.src = iconURL(show.type);
-    $('#mvTopSub').textContent = M.pos ? `${visible().filter(p => !p.house).length} places nearby · your real streets` : 'Your real streets';
+    { const v = visible(), nb = v.filter(p => !p.house).length, nh = v.filter(p => p.house).length; $('#mvTopSub').textContent = M.pos ? `${nb} place${nb === 1 ? '' : 's'} · ${nh} house${nh === 1 ? '' : 's'} nearby` : 'Your real streets'; }
   }
 
   // ------------------------------------------------------------- open / close
