@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.26.11';
+const NEXT_VERSION = '0.27.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -282,7 +282,7 @@ const NEXT_VERSION = '0.26.11';
     if (s) s.gsDays = (+s.gsDays || 0) + 1;   // 0.19: days played (one per day the game is opened, not per day away) for the gamestage
     SV.day = { key: t, phone: 0, typed: 0, walk: 0, scouted: 0 };
     // unlooted houses last 3 days; finished ones are cleared from the list; quest houses stay while the quest is open
-    SV.houses = SV.houses.filter(h => h.quest ? questById(h.quest) && h.status !== 'looted' : h.status === 'new' && dayNum(t) - dayNum(h.day) < 3);
+    SV.houses = SV.houses.filter(h => (h.npcq && DM.NPCQ && DM.NPCQ.forHouseQ(h.id)) || (h.quest ? questById(h.quest) && h.status !== 'looted' : h.status === 'new' && dayNum(t) - dayNum(h.day) < 3));   // 0.27: a house with an open NPC request stays
     if (s) DM.Crew.morning(days);   // phase 5b: the crew eats, the medic heals, the gardener waters, pets come home
     DM.Boss.roll();
   }
@@ -515,12 +515,14 @@ const NEXT_VERSION = '0.26.11';
     }
     const eq = evQuest(), est = eq && evState();
     if (eq && eq.give && !evReady(eq, est)) for (const [k, n] of eq.give) add(k, eq.n, n - countItem(k));
+    if (DM.NPCQ) DM.NPCQ.needs(add);   // 0.27
     return out;
   };
   // 0.19.1: the quest list behind the HUD chip (tap it): full text + what to look for
   Game.questList = function () {
     if (!SV || !SV.trader) return '';
     const rows = SV.trader.active.map(q => `<div class="ql"><b>${D.QUESTS[q.type].n}${q.done ? ' · done' : ''}</b><span>${esc(questText(q))}</span>${q.type === 'supply' && !q.done ? `<em>Look for: ${D.ITEMS[q.item].n.toLowerCase()} · ${Math.min(q.need, countItem(q.item))}/${q.need}</em>` : ''}</div>`);
+    if (DM.NPCQ) rows.push(...DM.NPCQ.listRows());   // 0.27
     const eq = evQuest(); if (eq) rows.unshift(`<div class="ql"><b>${esc(eq.n)}</b>${eq.give ? `<em>Look for: ${eq.give.map(([k, n]) => `${D.ITEMS[k].n.toLowerCase()} ${Math.min(n, countItem(k))}/${n}`).join(', ')}</em>` : ''}</div>`);
     return rows.join('');
   };
@@ -528,9 +530,10 @@ const NEXT_VERSION = '0.26.11';
     if (!SV || !SV.trader) return '';
     const eq = evQuest(), est = eq && evState();
     const evc = eq ? (evReady(eq, est) ? `<b>${esc(eq.n)}</b> done` : eq.kills ? `<b>${esc(eq.n)}</b> ${Math.max(0, est.kills - est.base)}/${eq.kills}` : `<b>${esc(eq.n)}</b> ${eq.give.map(([k, n]) => `${({ cranberry: 'cranberry', stuffing: 'stuffing', gift: 'gifts', pie: 'pies' })[k] || D.ITEMS[k].n.split(' ').pop().toLowerCase()} ${Math.min(n, countItem(k))}/${n}`).join(' ')}`) : '';
-    if (!SV.trader.active.length) return evc;
+    const nqc = DM.NPCQ ? DM.NPCQ.chip() : '';   // 0.27: NPC requests
+    if (!SV.trader.active.length) return [evc, nqc].filter(Boolean).join('<i></i>');
     const hid = DM.House.L && DM.House.L.id;
-    return (evc ? evc + '<i></i>' : '') + SV.trader.active.map(q => {
+    return (evc ? evc + '<i></i>' : '') + (nqc ? nqc + '<i></i>' : '') + SV.trader.active.map(q => {
       const n = D.QUESTS[q.type].n;
       if (q.done) return `<b>${n}</b> done`;
       if (q.type === 'clear') { if (hid === 'q-' + q.id) { const c = DM.House.zombieCount(); return `<b>Clear</b> ${c.dead}/${c.total}`; } return `<b>Clear</b> ${esc(q.addr)}`; }
@@ -1278,12 +1281,10 @@ const NEXT_VERSION = '0.26.11';
       const T = D.BTYPES[h.type], left = 3 - (dayNum(SV.day.key) - dayNum(h.day)), done = h.status !== 'new' && h.status !== 'far';
       const q = h.quest && questById(h.quest), far = h.status === 'far';
       const tags = [h.nLocks ? `${h.nLocks} lock${h.nLocks > 1 ? 's' : ''}` : 'no locks', `${h.nZombies} zombie${h.nZombies === 1 ? '' : 's'}`];
-      { const L = h.type !== 'tutorial' && h.status === 'new' ? layoutOf(h) : null;   // 0.26.10: where a brass key opens something
-        if (L && L.keyRoom) tags.push(`<b class="keytag">🔑 locked room${L.keyRoom.keyHere ? ' · key inside' : ''}</b>`);
-        if (L && L.car) tags.push('<b class="keytag">🔑 locked car</b>'); }
+      const nqb = DM.NPCQ ? DM.NPCQ.cardBits(h) : null; if (nqb) tags.push(nqb.tag);   // 0.27: someone who needs help (npcq.js)
       const bs = !done && !far ? EVS.bossFor(layoutOf(h)) : null;   // event mini-boss: scouts spot it from the street
       if (bs) tags.push(`<b class="evtag">${esc(bs.name.toLowerCase())} · ${bs.where}</b>`);
-      if (!done && !far && h.type !== 'tutorial') { const HL = layoutOf(h); if (HL.car) tags.push('<b class="keytag">🔑 locked car</b>'); if (HL.keyRoom) tags.push('<b class="keytag">🔑 locked room</b>');   // 0.8: brass-key spots
+      if (!done && !far && h.type !== 'tutorial') { const HL = layoutOf(h); if (HL.car) tags.push('<b class="keytag">🔑 locked car</b>'); if (HL.keyRoom) tags.push(`<b class="keytag">🔑 locked room${HL.keyRoom.keyHere ? ' · key inside' : ''}</b>`);   // 0.8: brass-key spots (0.26.10: key inside)
         const ip = DM.Inf.plan(HL, h.gs != null ? h.gs : gstage), ni = ip.kinds.filter(Boolean).length, nz = (HL.zombies || []).length + ip.extra;   // 0.13: special infected (danger 3+)
         tags[1] = `${nz} zombie${nz === 1 ? '' : 's'}`; if (ni) tags.push(`<b class="inftag">☣ ${ni} special infected</b>`); }
       if (h.route && !done && DM.Route) tags.push(DM.Route.tagHTML(h));   // 0.21 route: picked on the route map
@@ -1293,13 +1294,14 @@ const NEXT_VERSION = '0.26.11';
           <div class="haddr">${esc(h.address)}</div>
           <div class="hmeta"><span class="danger">${SKULL.repeat(h.danger)}<span class="dim">${SKULL.repeat(5 - h.danger)}</span></span><span>${tags.join(' · ')}</span></div>
           <div class="hdays">${q ? (far ? `${Math.max(0, Math.ceil(q.away - ((SV.walked || 0) - q.base))).toLocaleString('en-US')} steps away` : q.done ? 'Job done - see Dot' : 'Reached · no rush') : done ? (h.status === 'auto' ? 'Crew searched' : 'Looted') : h.type === 'tutorial' ? 'Start here' : left <= 1 ? 'Gone tomorrow' : left + ' days left'}</div></div>
-        ${done || far ? '' : q ? `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Go</button></div>` : `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Loot</button>${h.type === 'tutorial' ? '' : `<button class="mbtn ghost" data-auto="${h.id}">Crew</button>`}</div>`}
+        ${nqb && nqb.btn ? `<div class="hbtns">${nqb.btn}</div>` : done || far ? '' : q ? `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Go</button></div>` : `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Loot</button>${h.type === 'tutorial' ? '' : `<button class="mbtn ghost" data-auto="${h.id}">Crew</button>`}</div>`}
       </div>`;
     }).join('');
     const find = id => id === 'tutorial' ? { id: 'tutorial', type: 'tutorial', seed: 0, status: 'new' } : SV.houses.find(h => h.id === id);
     if ($('#hTrader')) $('#hTrader').onclick = () => { SFX.play('ui'); openTrader(); };
     DM.Boss.bind(el); if (dailyCard) { if (DM.Daily) DM.Daily.bind(el); if (DM.Gacha) DM.Gacha.bind(el); }
     if (rseg) DM.Route.bind(el, () => renderHome());   // 0.21 route: the List | Route toggle
+    if (DM.NPCQ) DM.NPCQ.bind(el, () => renderHome());   // 0.27: Return to someone who needed help
     el.querySelectorAll('[data-loot]').forEach(b => b.onclick = () => { SFX.play('ui'); loot(find(b.dataset.loot)); });
     el.querySelectorAll('[data-auto]').forEach(b => b.onclick = () => { SFX.play('ui'); autoSearch(find(b.dataset.auto)); });
   }
@@ -1660,6 +1662,7 @@ const NEXT_VERSION = '0.26.11';
     ['Base & farming', 'Your base is built with steps (the same steps also scout houses). Build walls, a gate, traps and garden beds; decorate with furniture you find. Plant seeds, water them with steps each day, and harvest real food. The stash chest lives here.'],
     ['Horde night', 'Every Sunday 9 PM New York time a horde hits. In the 24 hours before, do a watch shift (a 2-3 minute defence) - every kill thins the horde for your whole party. Strong bases hold and pay out a crate; weak ones lose something you repair with steps. Skip the shift and you get nothing.'],
     ['Seasonal events', 'Holidays switch on by themselves: Thanksgiving (from two weeks before to the Tuesday after) and Christmas (Dec 11 - Jan 2). Events bring holiday loot, a mini-boss in about 1 in 3 houses, a chain of event jobs from Dot, holiday capsules in the capsule machine, holiday decor and once-a-year cosmetics. Thanksgiving also has the Black Friday horde: a bigger Sunday horde with better crates.'],
+    ['People who need help', 'About 1 house in 8 has someone inside who needs help (the house card says "🙋 someone inside needs help"; look for the "!" above their head). Talk to them: they ask for something - bandages, food, water, batteries, nails, lockpicks, antibiotics. Accept, find or craft it, then walk: after 1,500-3,000 more steps the house card shows Return, and you hand it over from your pack or stash for caps, XP and a reward (sometimes a capsule token or a cosmetic, and sometimes they ask to join your crew). Up to 3 at once; the house stays on your list until you are done.'],
     ['Capsule machine', 'The capsule machine (Capsules tab) gives a random cosmetic, hairstyle or eye style for a token (new hairstyles and eyes show up in Edit look, marked with a lock until you pull them). You get a token for every 4,000 steps (up to 3 a day), or buy one for 50 caps. Odds: common 55%, rare 30%, epic 12%, legendary 3%, and at least one epic or better every 10 pulls. Cosmetics you do not have yet come first; Dot buys any duplicate. During a holiday its capsules join the machine, and 1 pull in 4 is a piece of holiday decor.'],
     ['Deck the base', 'During Thanksgiving and Christmas, place that holiday\'s decor at your base (Base > Decor) for prizes: 2 pieces = 2 capsule tokens + 40 caps, 5 = 3 tokens + 80 caps, 8 = a legendary holiday hat + 100 caps. Holiday decor comes from Dot\'s holiday shelf, holiday houses (storage, pantries, closets) and the capsule machine.'],
     ['Workbench & crafting', 'Workbench (home tab, or at the base) lists every recipe you know with each material, what you have and what you need. Tap a recipe to see what it does, every material in full with where to find it, and a big Craft button. Materials come from the stash and the pack. New recipes come from blueprints: Dot trades them, and some turn up in hidden stashes and safes.'],

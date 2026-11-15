@@ -60,6 +60,7 @@
   const crew = () => SV().crew.list, pets = () => SV().pets.list;
   C.bunks = () => 2 + ((SV().base && SV().base.built.bunks) || 0);
   C.free = () => C.bunks() - crew().length;
+  C.joinHelped = (name, seed) => { const m = newMember(seed); const mem = join({ name, look: m.look, role: m.role, xp: 0, mood: 70, hungry: 0, past: m.past }); C.ensureRig(mem.id, mem.look); return mem; };   // 0.27: npcq.js
   const working = m => m.mood >= 25;                        // a miserable crew member does not do their job
   C.activePet = () => pets().find(p => p.active && !(p.away && p.away >= dayNo())) || null;
   const roleLv = r => crew().filter(m => m.role === r && working(m)).map(C.lv);
@@ -148,7 +149,16 @@
       const under = L.furn.map((f, i) => [f, i]).filter(([f]) => ['table', 'bed', 'sofa', 'desk', 'coffee', 'cot', 'schooldesk', 'bench'].includes(f.art));
       if (under.length) { const kind = r() < .55 ? 'dog' : 'cat'; stray = { fi: pick(under, r)[1], kind, coat: Math.floor(r() * COATS[kind].length) }; }
     }
-    return { npc, stray };
+    // 0.27: someone who needs help (npcq.js) - never where a survivor is hiding
+    let nq = null;
+    if (!npc && DM.NPCQ) {
+      const sp = DM.NPCQ.spec(h);
+      if (sp) {
+        const spots = L.furn.map((f, i) => [f, i]).filter(([f]) => f.room !== 'o' && f.room !== 'Z' && !f.keyRoom && !f.secretLoot && ['sofa', 'table', 'bed', 'armchair', 'desk', 'kitchen', 'counter', 'dresser', 'bookshelf', 'coffee', 'cot', 'fridge', 'stove'].includes(f.art));
+        if (spots.length) nq = { fi: pick(spots, D.mulberry32(sp.seed))[1], spec: sp, h };
+      }
+    }
+    return { npc, stray, nq };
   };
 
   // ---------------------------------------------------------------- rigs (crew portraits + sprites)
@@ -271,6 +281,8 @@
         rigP[k] = ART.buildRig('survivor', 1.2, ART.LOOK.recolor(R.npcLook.look), k, ART.LOOK.patch(R.npcLook.look)).catch(() => { });
       }
       if (extra.hide.stray) R.straySpec = extra.hide.stray;
+      if (extra.hide.nq) { R.nqSpec = extra.hide.nq; R.nqLook = newMember(extra.hide.nq.spec.seed); const k = C.rigName('nq'); delete ART.rigs[k];
+        rigP[k] = ART.buildRig('survivor', 1.2, ART.LOOK.recolor(R.nqLook.look), k, ART.LOOK.patch(R.nqLook.look)).catch(() => { }); }
     }
     if (kind === 'base') C.ensureRigs();
     const O = Object.assign({}, o);
@@ -293,6 +305,11 @@
         let y = f.y + f.h + T * .42; if (DM.House.solidAt(Math.floor(cx / T), Math.floor(y / T))) y = f.y - T * .3;
         R.npc = { m: R.npcLook, x: cx + (f.w > T ? T * .3 : 0), y, room: f.room, st: 'hide', t: 0, a: 1, flip: true, hw: 10, hh: 7 };
       }
+    }
+    if (R.nqSpec) {
+      const f = g.furn[R.nqSpec.fi];
+      if (f) { const cx = f.x + f.w / 2; let y = f.y + f.h + T * .5; if (DM.House.solidAt(Math.floor(cx / T), Math.floor(y / T))) y = f.y - T * .3;
+        R.nq = { x: cx + (f.w > T ? T * .4 : 0), y, room: f.room, t: 0, a: 1, flip: true, hw: 10, hh: 7 }; }
     }
     if (R.straySpec) {
       const f = g.furn[R.straySpec.fi];
@@ -449,6 +466,7 @@
     if (R.extra.edit && R.extra.edit()) return;
     const A = (obj, act, name, done, o = {}) => out.push(Object.assign({ obj, act, name, rect: { x: obj.x - 16, y: obj.y - 12, w: 32, h: 22 }, dur: .25, noise: 0, verb: 'talking', corpse: true, done }, o));
     if (R.npc && R.npc.st === 'hide' && DM.House.fogOf(R.npc.room) < .55) A(R.npc, 'Talk', 'to the survivor', talk, { dur: .4 });
+    if (R.nq && DM.House.fogOf(R.nq.room) < .55) A(R.nq, 'Talk', `to ${R.nqSpec.spec.name}`, () => DM.NPCQ.offer(R.nqSpec.h, R.nqSpec.spec, panel, close), { dur: .4 });
     if (R.stray && R.stray.st === 'hide' && DM.House.fogOf(R.stray.room) < .55) {
       const s = R.stray, food = s.trust < .6 && hasFood();
       A(s, food ? 'Offer food' : 'Coax', `the ${s.pet.kind}`, () => coax(food), { dur: food ? .9 : 1.1, verb: 'coaxing', rect: { x: s.x - 22, y: s.y - 10, w: 44, h: 22 } });
@@ -471,6 +489,11 @@
     const out = [], t = g.t;
     const pe = R.pet;
     if (pe) out.push({ k: pe.y, draw: c => drawPet(c, pe.rec, pe.x, pe.y, { t, ph: pe.ph, move: Math.min(1, Math.hypot(pe.vx, pe.vy) / (2 * T)), flip: pe.flip, sit: Math.hypot(pe.vx, pe.vy) < 4, bark: pe.barkT > 0, heart: pe.heart, alpha: pe.a, sc: 1.1 }) });
+    if (R.nq) { const n = R.nq; n.t = (n.t || 0) + .016; const asked = DM.NPCQ && DM.NPCQ.forHouseQ(R.nqSpec.h.id);
+      out.push({ k: n.y, draw: c => { if (!ART.rigs[C.rigName('nq')]) return; c.save(); c.fillStyle = 'rgba(8,6,22,.4)'; c.beginPath(); c.ellipse(n.x, n.y + 1, 16, 5.5, 0, 0, 6.28); c.fill();
+        ART.drawRig(c, C.rigName('nq'), n.x, n.y, E.PSCALE, n.flip, { weapon: 'fists', sy: 1 + Math.sin(n.t * 2.2) * .012 });
+        const by = n.y - 118 + Math.sin(n.t * 3) * 3; c.fillStyle = asked ? '#9d90bf' : '#ffd27a'; c.strokeStyle = '#11142f'; c.lineWidth = 3; c.beginPath(); c.arc(n.x, by, 11, 0, 6.28); c.fill(); c.stroke();
+        c.fillStyle = '#11142f'; c.font = 'bold 15px sans-serif'; c.textAlign = 'center'; c.fillText(asked ? '…' : '!', n.x, by + 5); c.restore(); } }); }
     if (R.npc) { const n = R.npc; out.push({ k: n.y, draw: c => { if (!ART.rigs[C.rigName('npc')]) return; c.save(); c.globalAlpha = n.a; const sh = n.st === 'hide' ? Math.sin(n.t * 30) * .4 : 0; c.fillStyle = 'rgba(8,6,22,.4)'; c.beginPath(); c.ellipse(n.x, n.y + 1, 16, 5.5, 0, 0, 6.28); c.fill(); ART.drawRig(c, C.rigName('npc'), n.x + sh, n.y, E.PSCALE, n.flip, { weapon: 'fists', sy: n.st === 'hide' ? .8 : 1, rot: n.st === 'hide' ? -.06 : 0, parts: { arm: { r: n.st === 'hide' ? -1.1 : 0 } } }); c.restore(); } }); }
     if (R.stray) {
       const s = R.stray;
