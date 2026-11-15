@@ -803,6 +803,19 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   when the page becomes visible again) and keeps claiming; shows found x/3, the next place + distance or the status, metres
   walked, the last claim (flash + sound). The map stops drawing under it. Hold the button ~1.1 s to exit.
 
+## Done in 0.29 (owner: "a more interactive map that i wont be stopping to play" -> "Radio calls, dots deliveries, supply drops, and maybe fog of war")
+- mapfx.js, driven by map.js (onPos -> MapFX.onPos(pos, walkedM); draw -> drawFog under the places, drawMarks over them;
+  renderCard -> renderFx strip #mvFx; Pocket mode shows the top 2). Only while the map is open.
+  - Supply drops: <= 2 on the map, 3 a day, at map places 120-450 m away; collect within 25 m (+acc/2): storage + crate
+    loot. Air drop: 1 a day after 300 m walked, 20 min, 2 horde-crate rolls + 30 caps + 50% capsule token.
+  - Radio calls: after 200 m, 5% per fix, max 2 a day: a place 300-700 m away, deadline = walk time x 1.6 + 4 min;
+    35 caps, 20 XP, a supply item. Expires quietly with a toast.
+  - Dot's delivery: 1 a day from the map card: pick-up 150-450 m, drop-off 400-900 m from it; 45 + length/40 caps,
+    25 XP, 35% capsule token.
+  - Fog of war: ~25 m squares (lat .000225 x lon .0003) walked = 3x3 around each good fix; dark overlay on the rest
+    (toggle). XP every 40 squares, small finds (.4% a square), milestones 250 / 1k / 3k / 10k (caps + tokens).
+  - Privacy: spots and squares only in localStorage dm-next-mapfx (never the save / cloud; checked: no lat in SV).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
