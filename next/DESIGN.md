@@ -816,6 +816,12 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
     (toggle). XP every 40 squares, small finds (.4% a square), milestones 250 / 1k / 3k / 10k (caps + tokens).
   - Privacy: spots and squares only in localStorage dm-next-mapfx (never the save / cloud; checked: no lat in SV).
 
+## Done in 0.29.1 (owner: "on the right side of the map there's a small room? I can't get there" - the daily store's attic)
+- Attics are separate rooms (Z) reached by a ceiling hatch + a hook pole that is always hidden in the same house. Without
+  the pole nothing was shown. Now: once the secret gate is open every unfound secret is marked noticed (clue chip +
+  minimap "?" + "go back" toast) with its room; and standing at a hatch / hollow wall without the tool shows a NeedTool
+  label ("Attic hatch · needs a hook pole (it is in this house)", "Hollow wall · needs a crowbar or pry bar").
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
