@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.42.0';
+const NEXT_VERSION = '0.42.1';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -120,7 +120,8 @@ const NEXT_VERSION = '0.42.0';
   function createSurvivor(name, look, job) {
     const J = D.JOBS[job];
     let xp = 0; try { const v = JSON.parse(localStorage.getItem('dm-next-skills') || '{}'); if (v.scav) xp = +v.scav.xp || 0; } catch (e) { /* none */ }
-    const s = { name: name || 'Survivor', look, job, hp: 0, xp, gsDays: 0, pack: [], stash: [], hands: null, quiver: { n: 0 }, packBonus: 0, known: D.BASIC.concat(job === 'hunter' ? ['arrow', 'bow'] : []), wardrobe: { own: {}, seen: {} } };
+    const s = { name: name || (window.NET && NET.name) || 'Survivor',   // 0.42.1: an empty name takes the account name
+      look, job, hp: 0, xp, gsDays: 0, pack: [], stash: [], hands: null, quiver: { n: 0 }, packBonus: 0, known: D.BASIC.concat(job === 'hunter' ? ['arrow', 'bow'] : []), wardrobe: { own: {}, seen: {} } };
     DM.Skills.norm(s); s.hp = maxHp(s); DM.Food.norm(s, true);
     for (const [k, n] of J.kit) {
       if (k === J.hands) { s.hands = { k, d: D.wMax({ k, q: 2 }), q: 2 }; continue; }   // 0.19: the starting kit is Worn
@@ -1398,6 +1399,7 @@ const NEXT_VERSION = '0.42.0';
     if (BS.raidTile && SV.tutorialDone) { const rt = BS.raidTile(); if (rt) t.unshift(rt); }   // 0.33: base raids
     if (DM.Social && SV.tutorialDone) { const so = DM.Social.tile(); if (so) t.push(so); }   // 0.40: party walk + friends race
     if (DM.Gifts) DM.Gifts.check();   // 0.41: gifts from friends land in the stash
+    if (window.NET && NET.ok && NET.name && SV.survivor.name === 'Survivor') publish();   // 0.42.1: pick up the account name
     if (DM.Codex && SV.tutorialDone) { DM.Codex.check(); const ct = DM.Codex.tile(); if (ct) t.push(ct); }   // 0.35: bestiary + feats
     const gn = BS.gardenNote(); if (gn) t.push({ k: 'garden', c: '#93a86c', n: 'Garden', sub: gn, hot: '' });
     const ev = eventBanner();
@@ -1949,6 +1951,9 @@ const NEXT_VERSION = '0.42.0';
   function publish() {
     if (!window.NET || !SV.survivor) return;
     const s = SV.survivor;
+    // 0.42.1 (owner: "some of my friends still have their name as Survivor"): a character still on the default name takes
+    // the account's name (what they typed when they signed up), so friends see who they are
+    if ((!s.name || s.name === 'Survivor') && NET.name && NET.name !== 'Survivor') { s.name = String(NET.name).slice(0, 24); Game.save(); }
     try { NET.publish({ name: s.name, level: D.survLvl(s.xp), job: s.job, scav: Math.round(s.xp), looted: SV.stats.runs, kills: SV.stats.kills, extra: { look: s.look, trader: traderLevel(), quests: SV.trader.completed, secrets: SV.stats.secrets, cosmetics: Object.keys(s.wardrobe.own).length, wk: DM.Social ? DM.Social.myWeek() : undefined } }); } catch (e) { /* offline */ }
   }
   Game.onLevel = () => publish();

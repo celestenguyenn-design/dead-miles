@@ -981,6 +981,15 @@ either more things to craft, more storage or stacks, and reduce certain drop per
   batteries 4, tape 1, cloth 2; 26 dmg, stuns 0.6 s, sparks), Bandage roll (cloth 5 + tape 1 -> 5 bandages).
 - Dot > Sell: "Sell extras" sells everything above 20 of each material / ammo / seed (pack + stash), tap twice.
 
+## Done in 0.42.1 (owner: friends still named "Survivor"; horde night "kicked me out before I could loot the zombies";
+"my crew members were useless during horde night, they weren't there")
+- Names: a character still named "Survivor" takes the account name on the next publish (game.js publish, also nudged
+  from the home screen); new characters with an empty name take it too. (Server: brooklyn, sheepshead, tomsoo.)
+- Shift / raid end card: "Search the bodies (60 s)" - zombies still alive retreat, the gate swings open, a LOOT THE
+  BODIES timer runs, Leave (or the timer) goes inside. Down = no loot phase.
+- crew.js: on watch shifts and base raids every fed crew member is in the yard fighting (R.fighters, roam: chase any
+  zombie within 7 tiles; guards x1.5, medics heal once). Guard defence on horde night is unchanged.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

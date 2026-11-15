@@ -299,6 +299,9 @@
     const p = g.p;
     if (R.petRec) R.pet = { rec: R.petRec, x: p.x - 30, y: p.y + 8, vx: 0, vy: 0, hw: 7, hh: 5, ph: 0, flip: false, st: 'follow', heart: 0, barkT: 0 };
     if (R.kind === 'house' && !R.extra.noMate) { const m = crew().find(x => x.mate && !x.hungry); if (m) { C.ensureRig(m.id, m.look); R.mate = { m, x: p.x + 30, y: p.y + 8, vx: 0, vy: 0, hw: 10, hh: 7, ph: 0, flip: false, cd: 1, swing: 0, healed: 0 }; } }
+    // 0.42.1 (owner: "my crew members were useless during horde night, they weren't there"): on watch shifts and base raids
+    // every fed crew member is out in the yard fighting
+    if (R.kind === 'shift') { R.fighters = crew().filter(m => !m.hungry).map((m, i) => { C.ensureRig(m.id, m.look); return { m, x: p.x + (i % 2 ? 40 : -40) + (i >> 1) * 30, y: p.y + 20, vx: 0, vy: 0, hw: 10, hh: 7, ph: 0, flip: false, cd: 1 + i * .3, swing: 0, healed: 0, roam: 1 }; }); }
     if (R.npcSpec) {
       const f = g.furn[R.npcSpec.fi];
       if (f) {
@@ -353,18 +356,21 @@
       }
     }
     if (R.mate) mateTick(dt, g);
+    if (R.fighters) for (const f of R.fighters) mateTick(dt, g, f);
     if (R.npc) npcTick(dt, g);
     if (R.stray) strayTick(dt, g);
     for (const e of R.ents) baseWander(e, dt, g);
   }
   // 0.37 the run companion: follows like the pet, swings at the nearest zombie in reach. Guards hit harder, medics
   // patch her up once per run when she is low, scavengers sometimes pocket an extra find when she searches.
-  function mateTick(dt, g) {
-    const e = R.mate, p = g.p, lv = C.lv(e.m), role = e.m.role;
+  function mateTick(dt, g, ent) {
+    const e = ent || R.mate, p = g.p, lv = C.lv(e.m), role = e.m.role;
     e.cd = Math.max(0, e.cd - dt); e.swing = Math.max(0, e.swing - dt);
     let tgt = null, bd = 1e9;
-    for (const z of g.zs) { if (z.dead || z.raider || (z.st === 'rise' && z.stT < .3) || z.st === 'sleep') continue; const dz = dist(z, e); if (dz < bd && (dz < 1.6 * T || dist(z, p) < 4 * T)) { bd = dz; tgt = z; } }
+    for (const z of g.zs) { if (z.dead || z.raider || (z.st === 'rise' && z.stT < .3) || z.st === 'sleep') continue; const dz = dist(z, e); if (dz < bd && (dz < 1.6 * T || dist(z, p) < 4 * T || (e.roam && dz < 7 * T))) { bd = dz; tgt = z; } }
     const d = dist(e, p);
+    if (e.roam && tgt && dist(tgt, e) > 1.1 * T) { walkTo(e, tgt.x, tgt.y, 2.4 * T, dt); }   // shift / raid: go after anything in the yard
+    else
     if (d > 10 * T) { e.x = p.x - p.fx * 30; e.y = p.y - p.fy * 20; e.vx = e.vy = 0; }
     else if (tgt && dist(tgt, e) > 1.1 * T && dist(tgt, p) < 4 * T) walkTo(e, tgt.x, tgt.y, 2.6 * T, dt);
     else if (d > 1.6 * T) { const see = DM.House.los(e.x, e.y - 10, p.x, p.y - 10); const st = see ? { x: p.x + p.fx * -30 + 20, y: p.y - p.fy * 16 } : DM.House.stepToPlayer(e); walkTo(e, st.x, st.y, Math.min(4.6 * T, 1.5 * T + d * 1.6), dt); }
@@ -526,7 +532,7 @@
         } else drawPet(c, s.pet, s.x, s.y, { t: g.t, alpha: s.a, happy: true, heart: 1, stray: true, sc: 1.1 });
       } });
     }
-    if (R.mate) { const e = R.mate; out.push({ k: e.y, draw: c => {
+    for (const e of (R.fighters || []).concat(R.mate ? [R.mate] : [])) { out.push({ k: e.y, draw: c => {
       const rn = C.rigName(e.m.id); if (!ART.rigs[rn]) return;
       const amp = Math.min(1, Math.hypot(e.vx, e.vy) / (.95 * T)), s = Math.sin(e.ph * 2);
       c.fillStyle = 'rgba(8,6,22,.4)'; c.beginPath(); c.ellipse(e.x, e.y + 1, 16, 5.5, 0, 0, 6.28); c.fill();
