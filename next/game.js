@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.29.2';
+const NEXT_VERSION = '0.29.3';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -948,8 +948,18 @@ const NEXT_VERSION = '0.29.2';
     const s = SV.survivor, el = $('#tpane');
     const rows = [];
     for (const [from, list] of [['pack', s.pack], ['stash', s.stash]]) list.forEach((e, i) => { const v = D.valueOf(e.k, e.d, e.q); if (D.VALUE[e.k] === 0 || D.ITEMS[e.k].quest) return; rows.push({ from, i, e, v }); });
-    el.innerHTML = `<div class="kick sect">Sell to Dot · she pays low</div>` + (rows.length ? rows.map((r, j) => `<div class="shoprow">${icon(r.e.k)}<div><b>${D.ITEMS[r.e.k].n}${r.e.n > 1 ? ' x' + r.e.n : ''}</b><span>${r.from} · ${icon('caps')}${r.v >= 1 ? Math.floor(r.v) + ' each' : r.v === .5 ? '1 per 2' : '1 per ' + Math.round(1 / r.v)}</span></div>
+    // 0.29.3 (owner: "in dots shop we should have an option to auto sell junk with a button"): everything marked Sell
+    // (no crafting / base use) from the pack and the stash, in one go - tap twice
+    const junk = rows.filter(r => D.cat(r.e.k) === 'sell'), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(r.v * r.e.n)), 0);
+    el.innerHTML = `<div class="kick sect">Sell to Dot · she pays low</div>`
+      + (junk.length ? `<button class="mbtn" id="tJunk" style="margin:4px 0 10px">Sell all junk · ${junk.length} item${junk.length === 1 ? '' : 's'} · ${icon('caps')}${jv}</button>` : '<div class="empty" style="margin-bottom:8px">No junk to sell - things marked Sell show up here.</div>')
+      + (rows.length ? rows.map((r, j) => `<div class="shoprow">${icon(r.e.k)}<div><b>${D.ITEMS[r.e.k].n}${r.e.n > 1 ? ' x' + r.e.n : ''}</b><span>${r.from} · ${icon('caps')}${r.v >= 1 ? Math.floor(r.v) + ' each' : r.v === .5 ? '1 per 2' : '1 per ' + Math.round(1 / r.v)}</span></div>
       <button class="mbtn sm" data-sell="${j}">Sell ${r.e.n > 1 ? 'all' : ''} ${icon('caps')}${Math.max(1, Math.floor(r.v * r.e.n))}</button></div>`).join('') : '<div class="empty">Nothing to sell.</div>');
+    if ($('#tJunk')) $('#tJunk').onclick = function () {
+      if (!this.dataset.sure) { this.dataset.sure = 1; this.innerHTML = `Tap again to sell ${junk.length} item${junk.length === 1 ? '' : 's'} for ${icon('caps')}${jv}`; return; }
+      for (const r of junk) { const list = s[r.from], idx = list.indexOf(r.e); if (idx >= 0) list.splice(idx, 1); }
+      SV.trader.caps += jv; SFX.play('pick'); Game.save(); toast(`Dot paid ${jv} caps for your junk`, 1.8); renderTrader();
+    };
     el.querySelectorAll('[data-sell]').forEach(b => b.onclick = () => {
       const r = rows[+b.dataset.sell], list = s[r.from], idx = list.indexOf(r.e); if (idx < 0) return;
       list.splice(idx, 1); SV.trader.caps += Math.max(1, Math.floor(r.v * r.e.n));

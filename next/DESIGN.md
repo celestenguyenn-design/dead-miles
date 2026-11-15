@@ -828,6 +828,10 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   3 scrap + 1 tape; Solid->Fine 5 scrap + 2 tape + 40 caps; Fine->Masterwork 8 scrap + 3 tape + 100 caps. Sets q + 1
   and refills durability to the new max (+8% damage, +15% durability per tier).
 
+## Done in 0.29.3 (owner: "in dots shop we should have an option to auto sell junk with a button")
+- Dot > Sell: "Sell all junk · N items · caps" at the top (tap twice): every pack + stash item with category 'sell'
+  (D.cat - no crafting / base use) at her normal price. Single-item Sell rows unchanged.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
