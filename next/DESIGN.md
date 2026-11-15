@@ -696,6 +696,15 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   first" (the gate), then the tool ("needs a crowbar or pry bar" / "a hook pole") or the action. A gold "?" pulses on the
   minimap there, and when the gate opens a toast says to go back to it.
 
+## Done in 0.26.8 (owner: "david said hes having trouble syncing steps with android" -> "add more directions for android")
+- Diagnosis: his phone posted 11 times (handle/token fine, read permission granted) but every post was 0 steps - Health
+  Connect was empty because no step counter shared into it.
+- Sync guide, Android step 3 rewritten: why Health Connect needs a step counter app, per-phone directions (Samsung Health,
+  Google Fit, Fitbit/Garmin/Oura), and how to check today's steps in Health Connect. The Test result says "connected but
+  sent 0 steps" (Android) and points to step 3. Setup mode (tutorial) does not accept a 0-step sync after 10 AM.
+- Android app (StepsWorker): a 0-step read after 10 AM sets the status line to "Health Connect has 0 steps for today ..."
+  with the fix. The APK is rebuilt by the Pages workflow (apk job).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
