@@ -851,6 +851,12 @@ Christmas lights to whip" + "zombies should be more difficult as we progress")
 - Difficulty: D.gsFx ramp now starts at gamestage 4 (was 10): HP up to +60%, bites +40%, chase speed +15% at gamestage
   50; specials at danger 2 from gamestage 14 (up to 20%).
 
+## Done in 0.30.1 (owner: "when we click on stuff in our backpack or stash we have to scroll all the way to the bottom to
+click eat or drink - make a pop-up next to it")
+- game.js itemPop(): the selected item's action card (#sacts, built as before) moves into a fixed #ipop on <body>,
+  placed under the tapped slot (above it if no room), with a pointer arrow and a close button. Follows scroll and
+  resize; a tap outside it (not on another slot) closes it.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

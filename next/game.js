@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.30.0';
+const NEXT_VERSION = '0.30.1';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1558,7 +1558,7 @@ const NEXT_VERSION = '0.30.0';
       SFX.play('ui'); Game.save(); renderStash(); toast(s.pack.length ? 'Stash is full - some things stayed in your pack' : 'Everything is in the stash', 1.8);
     };
     if (el.querySelector('#sJunk')) el.querySelector('#sJunk').onclick = () => { SFX.play('ui'); sellJunk(); };
-    if (sel) stashActions();
+    if (sel) { stashActions(); itemPop(el); } else itemPop(null);
   }
   // 0.15: sell every "Sell" item in the stash to Dot in one go (she has to be in - it counts as a visit)
   function sellJunk() {
@@ -1587,6 +1587,38 @@ const NEXT_VERSION = '0.30.0';
     if (spare && q.n < D.QUIVER) add(`Fill from stash/pack (${Math.min(spare, D.QUIVER - q.n)})`, () => { const want = Math.min(spare, D.QUIVER - q.n); let need = want; for (const list of [s.pack, s.stash]) for (let i = list.length - 1; i >= 0 && need; i--) if (list[i].k === 'arrow') { const t = Math.min(need, list[i].n); list[i].n -= t; need -= t; if (!list[i].n) list.splice(i, 1); } q.n += want; done(`Quiver: ${q.n} arrows`); });
     if (q.n) add('Put in stash', () => { const n = addTo(s.stash, stashSlots(), 'arrow', q.n); if (!n) return toast('Stash is full', 1.4); q.n -= n; done(`${n} arrows to the stash`); }, !!spare);
     if (!q.n && !spare) add('No arrows yet', () => toast('Arrows: Dot\'s shop, gym lockers, or craft them with the arrow blueprint', 2.2), true);
+  }
+  // 0.30.1 (owner: "when we click on stuff in our backpack or stash we have to scroll all the way to the bottom to click
+  // eat or drink - make a pop-up next to it"): the item's actions float in a popup beside the tapped slot. #sacts is still
+  // filled in place, then its card is moved into #ipop (on <body>, so no scrolling pane or transform can clip it).
+  let popSlot = null;
+  function popPlace() {
+    const pop = $('#ipop'); if (!pop || !pop.classList.contains('on')) return;
+    if (!popSlot || !document.body.contains(popSlot)) { pop.classList.remove('on'); return; }
+    const r = popSlot.getBoundingClientRect(), vw = innerWidth, vh = innerHeight, w = Math.min(340, vw - 16);
+    pop.style.width = w + 'px';
+    const h = pop.offsetHeight;
+    let left = Math.max(8, Math.min(vw - w - 8, r.left + r.width / 2 - w / 2));
+    let top = r.bottom + 8; if (top + h > vh - 8) top = r.top - h - 8; if (top < 8) top = Math.max(8, Math.min(vh - h - 8, r.bottom + 8));
+    pop.style.left = left + 'px'; pop.style.top = top + 'px';
+    const ax = Math.max(16, Math.min(w - 16, r.left + r.width / 2 - left)); pop.style.setProperty('--ax', ax + 'px'); pop.classList.toggle('up', top < r.top);
+  }
+  function itemPop(host) {
+    let pop = $('#ipop');
+    if (!pop) {
+      pop = document.createElement('div'); pop.id = 'ipop'; document.body.appendChild(pop);
+      addEventListener('scroll', popPlace, true); addEventListener('resize', popPlace);
+      // tap anywhere else closes it (a tap on another slot just moves it)
+      document.addEventListener('pointerdown', ev => { if (!pop.classList.contains('on') || pop.contains(ev.target) || (ev.target.closest && ev.target.closest('[data-from]'))) return;
+        pop.classList.remove('on'); if (sel) { sel = null; setTimeout(() => { if (!sel) { const h = stashHost && document.body.contains(stashHost) ? stashHost : null; if (h || ($('#mpane') && $('#mpane').querySelector('#sacts'))) renderStash(); } }, 0); } }, true);
+    }
+    const acts = host && host.querySelector('#sacts');
+    if (!host || !acts || !acts.firstChild || !sel) { pop.classList.remove('on'); popSlot = null; return; }
+    popSlot = host.querySelector(`[data-from="${sel.from}"][data-i="${sel.i}"]`) || host.querySelector(`[data-from="${sel.from}"]`);
+    pop.innerHTML = ''; pop.appendChild(acts.firstChild);
+    const x = document.createElement('button'); x.className = 'ipx'; x.textContent = '✕'; x.setAttribute('aria-label', 'Close');
+    x.onclick = () => { sel = null; pop.classList.remove('on'); SFX.play('ui'); renderStash(); }; pop.firstChild.appendChild(x);
+    pop.classList.add('on'); popPlace();
   }
   function stashActions() {
     const s = SV.survivor, acts = (stashHost || $('#mpane')).querySelector('#sacts');
