@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.26.2';
+const NEXT_VERSION = '0.26.3';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -54,6 +54,7 @@ const NEXT_VERSION = '0.26.2';
     v.base = DM.Base.norm(v.base, v);       // phase 4: the base (pool, pieces, garden, decor)
     v.horde = DM.Base.normHorde(v.horde);   // phase 4: horde night (shifts, reports waiting to send, results)
     if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); s.packBonus = s.packBonus || 0; }
+    if (v.survivor) { D.mergeStacks(v.survivor.pack); D.mergeStacks(v.survivor.stash); }   // 0.26.3: bigger stacks - fold old ones together
     v.trader.event = v.trader.event || null;   // phase 5a: Dot's seasonal job chain { key, step, kills, base }
     v.tips = v.tips || {};                  // phase 5: first-time tips already shown
     if (v.survivor) migrateCos(v.survivor);
@@ -1407,8 +1408,9 @@ const NEXT_VERSION = '0.26.2';
   const subOf = from => from === 'pack' ? 'pack' : from === 'stash' ? 'stash' : 'gear';
   const catTag = k => { const c = D.cat(k); return `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
   Game.catTag = catTag;
+  const pawnVal = r => Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n * .5));   // 0.26.3: quick sell, half price
   const junkOf = s => s.stash.map((e, i) => ({ e, i })).filter(r => D.cat(r.e.k) === 'sell' && D.VALUE[r.e.k] !== 0);
-  function sortList(list) { const o = k => D.CAT_ORDER.indexOf(D.cat(k)); list.sort((a, b) => o(a.k) - o(b.k) || D.ITEMS[a.k].n.localeCompare(D.ITEMS[b.k].n)); }
+  function sortList(list) { D.mergeStacks(list); const o = k => D.CAT_ORDER.indexOf(D.cat(k)); list.sort((a, b) => o(a.k) - o(b.k) || D.ITEMS[a.k].n.localeCompare(D.ITEMS[b.k].n)); }
   function renderStash() {
     if (stashHost && !document.body.contains(stashHost)) stashHost = null;
     const s = SV.survivor, el = stashHost || $('#mpane');
@@ -1448,7 +1450,7 @@ const NEXT_VERSION = '0.26.2';
       body = `<div class="ghead"><span class="kick">${stashHost ? 'Stash chest' : 'Stash chest · at your base'} · ${s.stash.length}/${stashSlots()}</span>${s.stash.length > 1 ? '<button class="mini" id="sSortS">Sort</button>' : ''}</div>
       <div class="grid g5">${s.stash.map((e, i) => slot(e, 'stash', i)).join('')}${empty(Math.min(s.stash.length ? (5 - s.stash.length % 5) % 5 + 5 : 10, stashSlots() - s.stash.length))}</div>${A('stash')}
       ${!s.stash.length ? '<div class="ghint">Nothing stored yet. Move things here from the Backpack tab so a bad run cannot cost you them.</div>' : ''}
-      ${junk.length && !sel ? `<div class="ptools"><button class="mbtn sm${away || shut ? ' ghost' : ''}" id="sJunk"${away || shut ? ' disabled' : ''}>${away ? `Dot is away · sell junk in ${fmtN(away)} steps` : shut ? 'Dot is closed for today' : `Sell junk to Dot · ${icon('caps')}${jv}`}</button></div>` : ''}`;
+      ${junk.length && !sel ? `<div class="ptools"><button class="mbtn sm${away || shut ? ' ghost' : ''}" id="sJunk">${away || shut ? `Quick sell junk · half price · ${icon('caps')}${junk.reduce((a, r) => a + pawnVal(r), 0)}` : `Sell junk to Dot · ${icon('caps')}${jv}`}</button></div>` : ''}`;
     }
     el.innerHTML = seg + body;
     el.querySelectorAll('#gtabs button').forEach(b => { b.classList.toggle('on', b.dataset.g === gTab); b.onclick = () => { if (gTab === b.dataset.g) return; gTab = b.dataset.g; sel = null; SFX.play('ui'); renderStash(); }; });
@@ -1469,17 +1471,18 @@ const NEXT_VERSION = '0.26.2';
   function sellJunk() {
     const s = SV.survivor, junk = junkOf(s);
     if (!junk.length) return;
-    if (dotLeft()) { toast(`Dot is on the road - back in ${fmtN(dotLeft())} steps`, 2); return; }
-    if (dotDone()) { toast(DOT_SHUT, 2.4); return; }
-    const val = r => Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n)), tot = junk.reduce((a, r) => a + val(r), 0);
-    sheetOpen(`<div class="kick">Auntie Dot · sell junk</div><h3>Sell ${junk.length} thing${junk.length === 1 ? '' : 's'} for ${tot} caps?</h3>
+    // 0.26.3 (owner: "some way to sell besides the trader because we're all full"): with Dot away or closed for the day,
+    // junk can still be quick-sold for half price (a scrap dealer down the block). It is not a Dot visit.
+    const pawn = !!(dotLeft() || dotDone());
+    const val = r => pawn ? pawnVal(r) : Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n)), tot = junk.reduce((a, r) => a + val(r), 0);
+    sheetOpen(`<div class="kick">${pawn ? 'Quick sell · the scrap dealer' : 'Auntie Dot · sell junk'}</div><h3>Sell ${junk.length} thing${junk.length === 1 ? '' : 's'} for ${tot} caps?</h3>
       <div class="jlist">${junk.map(r => `<div class="jrow">${icon(r.e.k)}<span>${esc(D.ITEMS[r.e.k].n)}${r.e.n > 1 ? ' x' + r.e.n : ''}</span><b>${icon('caps')}${val(r)}</b></div>`).join('')}</div>
-      <p class="mp dim">Only things marked <b>Sell</b> (no crafting or base use). Dot counts this as a visit: she heads off for about ${fmtN(DOT_AWAY)} steps after.</p>
+      <p class="mp dim">Only things marked <b>Sell</b> (no crafting or base use). ${pawn ? 'Dot is away, so the scrap dealer down the block pays half what she would. Wait for Dot for the full price.' : `Dot counts this as a visit: she heads off for about ${fmtN(DOT_AWAY)} steps after.`}</p>
       <div class="btnrow"><button class="mbtn sm ghost" id="jNo">Keep them</button><button class="mbtn sm" id="jYes">Sell · ${tot} caps</button></div>`);
     $('#jNo').onclick = sheetClose;
     $('#jYes').onclick = () => {
       for (const r of junk.slice().sort((a, b) => b.i - a.i)) s.stash.splice(r.i, 1);
-      SV.trader.caps += tot; dotVisit(); SFX.play('pick'); Game.save(); sheetClose(); renderStash(); toast(`Dot paid ${tot} caps`, 1.8);
+      SV.trader.caps += tot; if (!pawn) dotVisit(); SFX.play('pick'); Game.save(); sheetClose(); renderStash(); toast(`${pawn ? 'The scrap dealer' : 'Dot'} paid ${tot} caps`, 1.8);
     };
   }
   // the quiver: fill it from the stash/pack, or put its arrows away in the stash
@@ -1562,7 +1565,7 @@ const NEXT_VERSION = '0.26.2';
       $('#mSfx').onchange = () => SFX.play('pick');
     }
     $('#mHow').onclick = () => { SFX.play('ui'); openHowTo(); };
-    if ($('#mTour')) $('#mTour').onclick = () => { SFX.play('ui'); sheetClose(); DM.Tour.start(); };   // 0.26.2: the guided tour (tour.js)
+    if ($('#mTour')) $('#mTour').onclick = () => { SFX.play('ui'); sheetClose(); DM.Tour.start(true); };   // 0.26.2: the guided tour (tour.js)
     if (DM.Weather) DM.Weather.bindSettings($('#msheet'));   // 0.22: weather area
     $('#mTips').onclick = () => { if (SV.tips.off) { SV.tips = {}; toast('Tips back on - you will see each one again', 1.8); } else { SV.tips.off = 1; toast('Tips off', 1.2); } Game.save(); openSettings(); };
     $('#mCopy').onclick = () => { const t = $('#mExp'); t.select(); try { navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand('copy'); } toast('Copied', 1); };
@@ -1599,14 +1602,14 @@ const NEXT_VERSION = '0.26.2';
     ['Crew', 'About 1 house in 25 has a survivor hiding in a closet or a secret room (more in mansions and police stations). Talk to them: with a free bunk they move into your base (2 bunks, build up to 4). Each has a role - Scavenger (crew searches bring back more), Guard (horde-night defence), Medic (heals you each morning), Gardener (waters a plant a day), Tinkerer (cheaper repairs) - and levels up slowly. Each eats 1 food a day from your STASH; three hungry days and they leave a note (they never take anything). The more crew you have, the more a Crew search brings back.'],
     ['Strays', 'Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Move slowly near them (a small push on the joystick) until they trust you, then tap to coax them out - or offer food from your pack. One pet comes along on runs and at the base; up to 4 live with you. Dogs bark when a zombie spots you and sometimes sniff out a container with something good; cats make you quieter and bring little presents some mornings. Pets level from your steps. They never die: a zombie scare sends them running home, back the next day.'],
     ['Weekly boss', 'Every week (Monday to Sunday, New York time) a named boss holes up in a special house on everyone\'s list. Walk 5,000 steps that week to reach it, then fight it up to 2 times a day (90 seconds each). Red markers on the floor show where the next attack lands: a charge line, a slam ring, walkers being called. Its health is shared by your whole party for the whole week; when it falls, everyone who hit it gets a good item, caps and a chance at a boss cosmetic. Going down in a boss fight costs you nothing but the fight.'],
-    ['Trader', 'Auntie Dot (top of the Houses list) is a safe zone. Take up to 2 jobs from her board, turn them in for caps and a reward you choose. Every 20 jobs raises her trader level: harder jobs, better stock, more cosmetics. Sell her spare loot (or use Sell junk in the Stash tab). She does not stay put: after each visit she moves on and is back once you have walked about 3,000 more steps (her card counts down; steps she did not need, up to 6,000, count toward her next returns, so a big batch of steps synced at once still works), up to 3 visits a day (a Dot stop on the daily route gives one more). Jobs you took keep counting while she is away; you turn them in on your next visit.'],
+    ['Trader', 'Auntie Dot (top of the Houses list) is a safe zone. Take up to 2 jobs from her board, turn them in for caps and a reward you choose. Every 20 jobs raises her trader level: harder jobs, better stock, more cosmetics. Sell her spare loot (or use Sell junk in the Stash tab). While she is away or closed for the day, Quick sell in the Stash tab sells junk to a scrap dealer for half her price. She does not stay put: after each visit she moves on and is back once you have walked about 3,000 more steps (her card counts down; steps she did not need, up to 6,000, count toward her next returns, so a big batch of steps synced at once still works), up to 3 visits a day (a Dot stop on the daily route gives one more). Jobs you took keep counting while she is away; you turn them in on your next visit.'],
   ];
   function openHowTo() {
     sheetOpen(`<div class="kick">Dead Miles</div><h3>How to play</h3>
       ${HOWTO.map(([t, d], i) => `<details class="howto"${i ? '' : ' open'}><summary>${t}</summary><p>${esc(d)}</p></details>`).join('')}
       <details class="howto"><summary>Step sync</summary><p>Your phone can send steps by itself: an iPhone Shortcut or the Android companion app. Sign in first (Account &amp; friends), then follow the guide.</p>${window.SYNC ? '<button class="mbtn sm" id="hSync">Open the step sync guide</button>' : ''}</details>
       <div class="btnrow"><button class="mbtn sm ghost" id="hBack">Back</button>${SV.survivor && DM.Tour && !DM.scene ? '<button class="mbtn sm ghost" id="hTour">Game tour</button>' : ''}<button class="mbtn sm" id="hClose">Close</button></div>`);
-    if ($('#hTour')) $('#hTour').onclick = () => { sheetClose(); DM.Tour.start(); };
+    if ($('#hTour')) $('#hTour').onclick = () => { sheetClose(); DM.Tour.start(true); };
     if ($('#hSync')) $('#hSync').onclick = () => { sheetClose(); try { SYNC.open(); } catch (e) { toast('Sync guide failed to open', 1.6); } };
     $('#hBack').onclick = openSettings; $('#hClose').onclick = sheetClose;
   }
