@@ -838,6 +838,19 @@ should come but don't make it too hard")
   does not reroll) the alarm wails ~8 s (SFX alert + noise radius 7, light shake) and 3-4 plain walkers (5 at
   gamestage 20+) arrive from both ends of the street, 1.4 s apart, heading for the car. No specials, no runners.
 
+## Done in 0.30.0 (owner: "add guns and more equips ... be goofy, a turkey squishy that makes noise every time you hit,
+Christmas lights to whip" + "zombies should be more difficult as we progress")
+- Guns (WEAPONS.*.gun = pack item used per shot; fireGun() in house.js, bullets ride G.arrows with a.bullet):
+  pistol 58 dmg (9mm rounds, noise 8), shotgun 5 pellets x 30 short range (new item shells, noise 10), nail gun 22
+  (nails, noise 2.2). No rounds = pistol-whip (18). Where: police gun locker jackpot (pistol 3/13, shotgun 2/13), trunk
+  jackpot, rare in car / safe / locker / evidence / nightstand, armory shotgun + shells, Dot (pistol rank 4, shotgun 5,
+  shells 3, nail gun 3). Recipes: nail gun (bp), shells (bp, scrap 2 + 9mm 4).
+- Goofy melee: brass knuckles (fast; everyone knows the recipe: scrap 3 + tape 1), squeaky turkey (SQUEAK on every hit,
+  1.7x knockback), light-string whip (reach 2.3, wide arc, sparkles; bp: battery 2 cloth 1 tape 2), frying pan (BONK,
+  dazes +0.45 s). Loot spots in data.js (0.30 loop before hordecrate). Icons + held art in art.js.
+- Difficulty: D.gsFx ramp now starts at gamestage 4 (was 10): HP up to +60%, bites +40%, chase speed +15% at gamestage
+  50; specials at danger 2 from gamestage 14 (up to 20%).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
