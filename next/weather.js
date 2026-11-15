@@ -143,6 +143,17 @@ window.DM = window.DM || {};
   W.drain = function () { const w = W.now(), f = fxOf(w); return { h: f.hunger, t: f.thirst * (w.heat ? W.HEAT.thirst : 1) }; };
   // extra rain-barrel charges today (base.js)
   W.barrelBonus = () => fxOf(W.now()).barrel;
+  // 0.39 (owner liked "weather and night bonus: real rain or night gives extra loot or XP, but tougher zombies"):
+  // bad weather (rain, storm, snow, fog) = +15% XP and +6% extra-find chance in runs; night (8 PM - 5 AM local time,
+  // or the sky says it is dark) = +20% XP, +8% extra-find chance, and zombies with +15% health that see 10% further.
+  // Both can stack. Map crates at night hold one more thing. (The daily house ignores all of it.)
+  W.night = () => { const h = new Date().getHours(), w = W.now(); return h >= 20 || h < 5 || (w.isDay === false && (h >= 17 || h < 8)); };
+  W.bonus = function () {
+    const w = W.now(), bad = ['rain', 'storm', 'snow', 'fog'].includes(w.type), night = W.night();
+    return { bad, night, xp: 1 + (bad ? .15 : 0) + (night ? .2 : 0), find: (bad ? .06 : 0) + (night ? .08 : 0), zhp: night ? 1.15 : 1, zsight: night ? 1.1 : 1,
+      label: [night ? '🌙 Night' : '', bad ? `${W.icon(w)} ${W.label(w)}` : ''].filter(Boolean).join(' + ') };
+  };
+  W.bonusLine = function () { const b = W.bonus(); if (!b.bad && !b.night) return ''; return `${b.label} bonus: +${Math.round((b.xp - 1) * 100)}% XP and better finds in runs${b.night ? ', but zombies are tougher and see further' : ''}`; };
   W.lines = function (w = W.now()) {   // plain-English effects, for the chip sheet
     const f = fxOf(w), out = [];
     if (f.hear < 1) out.push(`Zombies and raiders hear ${Math.round((1 - f.hear) * 100)}% less: the ${w.type === 'wind' ? 'wind' : 'rain'} covers your noise.`);
@@ -152,6 +163,7 @@ window.DM = window.DM || {};
     if (w.heat) out.push(`It is hot (over ${W.HEAT.c}°C / ${Math.round(W.HEAT.c * 9 / 5 + 32)}°F): thirst drains ${Math.round((W.HEAT.thirst - 1) * 100)}% faster.`);
     if (f.barrel) out.push(`Rain barrels at your base collect +${f.barrel} extra charge today.`);
     if (w.type === 'storm' && w.thunder) out.push('Lightning: every so often a flash lights up the whole house for a moment.');
+    { const bl = W.bonusLine(); if (bl) out.push(bl + '.'); }   // 0.39
     if (!out.length) out.push('No effects right now.');
     return out;
   };
@@ -162,7 +174,7 @@ window.DM = window.DM || {};
   W.icon = w => (w.type === 'clear' && w.isDay === false ? ICON.night : ICON[w.type] || ICON.clear);
   W.label = w => (w.type === 'storm' && !w.thunder ? 'Heavy rain' : w.type === 'storm' ? 'Thunderstorm' : fxOf(w).n);
   W.chipHTML = function () {
-    const w = W.now(), why = w.heat ? 'thirst drains faster' : SHORT[w.type];
+    const w = W.now(), b = W.bonus(), why = (b.night || b.bad) ? `${b.night ? 'night' : 'weather'} bonus: +${Math.round((b.xp - 1) * 100)}% XP` : w.heat ? 'thirst drains faster' : SHORT[w.type];   // 0.39
     const t = W.tempStr(w.temp);
     return `<button class="wxchip wx-${w.type}" id="wxChip"><span class="wxi">${W.icon(w)}</span><b>${W.label(w)}</b>${t ? `<i>${t}</i>` : ''}${why ? `<em>${why}</em>` : ''}<span class="wxgo">›</span></button>`;
   };

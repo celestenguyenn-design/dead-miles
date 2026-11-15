@@ -36,7 +36,9 @@
   const job = () => (S() && S().job) || 'scavenger';
   const scavLvl = () => D.scavLvl(S() ? S().xp : 0);
   const searchMul = () => 1.5 * (1 - .06 * (scavLvl() - 1)) * (job() === 'scavenger' ? .85 : 1) * F.searchMul() * SK.searchMul();   // slow at first, faster with skill; thirsty = slower
-  const extraChance = () => .04 * (scavLvl() - 1) + (job() === 'scavenger' ? .1 : 0) + SK.extraFind() + (DM.Crew && DM.Crew.mateFind ? DM.Crew.mateFind() : 0);   // 0.37: a scavenger companion
+  const extraChance = () => .04 * (scavLvl() - 1) + (job() === 'scavenger' ? .1 : 0) + SK.extraFind() + (DM.Crew && DM.Crew.mateFind ? DM.Crew.mateFind() : 0) + wxB().find;   // 0.37: a scavenger companion; 0.39 weather / night
+  // 0.39 weather / night bonus for this run (none in the daily house, the base, or boss fights)
+  const wxB = () => (G && G.wxb) || { xp: 1, find: 0, zhp: 1, zsight: 1 };
   const packSlots = () => 12 + (S().packBonus || 0) + SK.packBonus();   // 0.13: Pack rat is a Scavenging rank
   const keen = () => SK.keen();                                         // 0.13: Keen eye is a Scavenging rank
   const gatePct = () => job() === 'scavenger' ? .65 : .75;
@@ -45,6 +47,7 @@
   const maxHp = () => D.maxHp(S());
   function gainXP(n, x, y) {
     n += F.xpBonus(n);   // well fed + hydrated: +10%
+    if (wxB().xp > 1) n = Math.round(n * wxB().xp);   // 0.39: weather / night bonus
     const up = SK.addXP(n, { quiet: true }); DM.Game && DM.Game.save();   // 0.13: the survivor level (1 skill point a level)
     G.nums.push({ x: x + 16, y: y - 112, v: '+' + n + ' xp', t: 0, col: P.GRN, small: 1 });
     if (up > 0) levelUp(SK.level(), up);
@@ -133,6 +136,9 @@
     spawnInfected(houseZs);
     houseZs.forEach((z, i) => { z.zi = i; });   // 0.18: a stable index (seeded corpse loot, dead-on-resume for the daily house)
     if (G.dly && opts.resume && Array.isArray(opts.resume.zd)) G.zs = G.zs.filter(z => z.zi == null || !opts.resume.zd.includes(z.zi));
+    G.wxb = DM.Weather && DM.Weather.bonus && !G.dly && !L.base && !(opts.noBoss && opts.noFog) && !(L.deep && L.deep.f > 1) ? DM.Weather.bonus() : null;   // 0.39: weather / night bonus
+    if (G.wxb && !G.wxb.bad && !G.wxb.night) G.wxb = null;
+    if (G.wxb && !opts.resume) setTimeout(() => toast(`${G.wxb.label}: +${Math.round((G.wxb.xp - 1) * 100)}% XP and better finds${G.wxb.night ? ' - but the dead are tougher tonight' : ''}`, 3), 1600);
     for (const z of G.zs) if (!z.boss) gsZombie(z);   // 0.19: gamestage (L.gs) - zombie HP and hits, up to +25%
     for (const z of G.zs) if (z.special) ensureInfRig(z.kind);
     G.p.flip = false;
@@ -216,7 +222,9 @@
   }
   // 0.19: gamestage scaling for one zombie (never the event or weekly bosses, never raiders). Gamestage <= 10: no change.
   function gsZombie(z) {
-    const fx = gsFx(); if (fx.hp === 1 || z.boss || z.raider || z.gsx) return z;
+    const fx = gsFx(); if (z.boss || z.raider || z.gsx) return z;
+    if (wxB().zhp > 1 && !z.wxn) { z.wxn = 1; z.hp = z.maxHp = Math.round((z.maxHp || z.hp || 100) * wxB().zhp); z.sightMul = (z.sightMul || 1) * wxB().zsight; }   // 0.39: night
+    if (fx.hp === 1) return z;
     z.gsx = 1; z.hp = z.maxHp = Math.round((z.maxHp || z.hp || 100) * fx.hp); z.dmgMul = (z.dmgMul || 1) * fx.dmg; z.spdMul = fx.spd || 1;
     if (z.armor) z.armor = z.armor0 = Math.round(z.armor * fx.hp);
     return z;
@@ -1049,7 +1057,7 @@
   function canSee(z) {
     const p = G.p; if (p.st === 'down') return false;
     const dx = p.x - z.x, dy = p.y - z.y, d = Math.hypot(dx, dy) / T;
-    if (d > (z.sight || 7) * SK.sightMul() * (G.wx ? G.wx.sight : 1)) return false;   // 0.13: Stealth ranks shrink how far they spot her (0.22: fog too)
+    if (d > (z.sight || 7) * SK.sightMul() * (G.wx ? G.wx.sight : 1) * (z.sightMul || 1)) return false;   // 0.13: Stealth ranks shrink how far they spot her (0.22: fog too)
     const facing = (dx < 0) === (z.fx < 0);
     if (d > 2.6 && !facing) return false;
     if (d > 4 && !p.running && G.room !== z.roomNow && Math.random() < .5) return false;
