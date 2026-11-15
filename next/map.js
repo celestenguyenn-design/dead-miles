@@ -97,7 +97,15 @@
     if (M.fastRun >= FAST_HITS) M.lastFast = t;
   }
   const WALK_OK = 80;
-  const walkedTo = pl => !!M.far[pl.id] || (M.walkedM || 0) >= WALK_OK;
+  // 0.30.2 (owner: "when I walk to a place that's not at my home it doesn't collect ... we have to walk like 100 m ...
+  // pinpoint where someone's base is and don't let them [claim] around that area at home"): she marks her home spot
+  // once (kept on this phone only, never synced). Places within HOME_R of it still need the walk (WALK_OK metres with the
+  // map open, or having been away from them); everywhere else a place counts the moment she reaches it. With no home
+  // set yet the walk rule applies everywhere, as before. Home can be moved once a week.
+  const HOME_KEY = 'dm-map-home', HOME_R = 250, HOME_MOVE_MS = 7 * 864e5;
+  const home = () => { try { const h = JSON.parse(localStorage.getItem(HOME_KEY) || 'null'); return h && isFinite(h.lat) && isFinite(h.lon) ? h : null; } catch (e) { return null; } };
+  const nearHome = pl => { const h = home(); return !h || dist(h, pl) < HOME_R; };
+  const walkedTo = pl => !nearHome(pl) || !!M.far[pl.id] || (M.walkedM || 0) >= WALK_OK;
   const driveLock = () => { if (!M.lastFast) return 0; const l = SETTLE_MS - (Date.now() - M.lastFast); return l > 0 ? Math.ceil(l / 1000) : 0; };
 
   // ------------------------------------------------------------- local metre frame (x east, y south), fixed per session
@@ -696,7 +704,7 @@ way[building]->.b;.b out skel geom qt;
     .hname em.lmk { display: inline-flex; align-items: center; gap: 3px; } .hname em.lmk svg { color: var(--ink); }`;
     document.head.appendChild(st);
     const el = document.createElement('div'); el.id = 'mapv';
-    el.innerHTML = `<div class="mvtop"><button id="mvBack">&lsaquo; Back</button><div class="mvt"><b>MAP</b><span id="mvTopSub">Your real streets</span></div><button id="mvPocketB" class="mvq mvpk" aria-label="Pocket mode">🚶</button><button id="mvHelp" class="mvq" aria-label="What is the map?">?</button></div>
+    el.innerHTML = `<div class="mvtop"><button id="mvBack">&lsaquo; Back</button><div class="mvt"><b>MAP</b><span id="mvTopSub">Your real streets</span></div><button id="mvPocketB" class="mvq mvpk" aria-label="Pocket mode">🚶</button><button id="mvHomeB" class="mvq" aria-label="My home spot">🏠</button><button id="mvHelp" class="mvq" aria-label="What is the map?">?</button></div>
       <div id="mvMap"><canvas id="mvCv"></canvas><div id="mvPill" class="mvpill"><i></i><span></span></div><div id="mvBanner" class="mvbanner"></div><div id="mvTip" class="mvtip"></div>
         <div class="mvzoom"><button id="mvZin" aria-label="Zoom in">+</button><button id="mvZout" aria-label="Zoom out">&minus;</button></div>
         <button id="mvMe" class="mvme" aria-label="Back to me"><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="#f6e3bb" stroke-width="2.6"/><circle cx="12" cy="12" r="3" fill="#f07b3c"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="#f6e3bb" stroke-width="2.6" stroke-linecap="round"/></svg></button>
@@ -718,6 +726,7 @@ way[building]->.b;.b out skel geom qt;
     { const b = $('#pkExit'); let t = 0; const down = e => { e.preventDefault(); b.classList.add('hold'); t = setTimeout(() => { b.classList.remove('hold'); pocket(false); }, 1100); };
       const up = () => { clearTimeout(t); b.classList.remove('hold'); }; b.addEventListener('pointerdown', down); b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up); }
     $('#mvPocket').addEventListener('pointerdown', e => { if (!e.target.closest('#pkExit')) e.preventDefault(); });
+    $('#mvHomeB').onclick = () => { DM.E.SFX && DM.E.SFX.play && DM.E.SFX.play('ui'); homeAsk(true); };
     $('#mvHelp').onclick = () => { DM.E.SFX && DM.E.SFX.play && DM.E.SFX.play('ui'); intro(true); };
     $('#mvMe').onclick = () => { M.follow = true; $('#mvMe').classList.remove('on'); };
     $('#mvZin').onclick = () => zoomBy(1.4); $('#mvZout').onclick = () => zoomBy(1 / 1.4);
@@ -735,6 +744,22 @@ way[building]->.b;.b out skel geom qt;
     M.msgKind = kind || '';
     e.innerHTML = `<b>${title}</b>${body}${btn ? `<br><button id="mvMsgBtn">${btn}</button>` : ''}`; e.classList.add('on');
     if (btn) $('#mvMsgBtn').onclick = fn;
+  }
+  function homeAsk(byTap) {
+    const h = home(), wait = h ? HOME_MOVE_MS - (Date.now() - (h.t || 0)) : 0;
+    if (!M.pos) { if (byTap) message('Home spot', 'Waiting for your location first.', 'OK', () => message(), 'home'); return; }
+    if (M.pos.acc > 60) { if (byTap) message('Home spot', `GPS is fuzzy right now (about ${Math.round(M.pos.acc)} m). Try again by a window.`, 'OK', () => message(), 'home'); return; }
+    if (h && wait > 0) {
+      const away = Math.round(dist(h, M.pos));
+      message('Your home spot', `${away < HOME_R ? 'You are in your home zone.' : `You are ${fmtD(away)} from home.`} Places within ${HOME_R} m of home need a ${WALK_OK} m walk with the map open. Everywhere else you scout a place the moment you reach it. You can move home again in ${Math.ceil(wait / 864e5)} day${Math.ceil(wait / 864e5) === 1 ? '' : 's'}.`, 'OK', () => message(), 'home');
+      return;
+    }
+    message(h ? 'Move your home spot here?' : 'Are you at home?', `Set your home spot here (it stays on this phone). Places within ${HOME_R} m of it need a ${WALK_OK} m walk with the map open, so nobody can scout from the couch. Anywhere else you scout a place the moment you walk up to it. You can move it once a week.<br><button id="mvHomeNo" style="background:transparent;box-shadow:none;border:2px solid currentColor;color:inherit;opacity:.8">Not now</button>`,
+      'Yes, I\'m home - set it here', () => {
+        try { localStorage.setItem(HOME_KEY, JSON.stringify({ lat: +M.pos.lat.toFixed(4), lon: +M.pos.lon.toFixed(4), t: Date.now() })); } catch (e) { /* ignore */ }
+        message(); M.status = 'Home spot set - away from home you scout places as soon as you reach them'; M.dirty = true; renderCard(); claim();
+      }, 'home');
+    const no = $('#mvHomeNo'); if (no) no.onclick = () => { M.homeNo = 1; message(); };
   }
   function intro(force) {
     let seen = 0; try { seen = localStorage.getItem(INTRO_KEY); } catch (e) { /* ignore */ }
@@ -846,7 +871,7 @@ way[building]->.b;.b out skel geom qt;
     $('#pkFound').textContent = `${found} / 3`;
     $('#pkNext').textContent = M.status ? M.status : !M.pos ? 'Finding you...' : t ? `Next: ${t.name} · ${fmtD(t.d)}` : 'Nothing to scout nearby - keep walking';
     { const ls = DM.MapFX && M.pos ? DM.MapFX.lines(M.pos) : []; $('#pkFx').textContent = ls.length ? ls.slice(0, 2).map(l => `${l.t} · ${l.s}`).join('  |  ') : ''; }
-    $('#pkWalk').textContent = (M.walkedM || 0) < WALK_OK ? `Walk ${Math.ceil(WALK_OK - (M.walkedM || 0))} m more to start scouting` : `${Math.round(M.walkedM)} m walked with the map open`;
+    $('#pkWalk').textContent = M.pos && !nearHome(M.pos) ? 'Away from home - places count as soon as you reach them' : (M.walkedM || 0) < WALK_OK ? `Walk ${Math.ceil(WALK_OK - (M.walkedM || 0))} m more to start scouting` : `${Math.round(M.walkedM)} m walked with the map open`;
   }
   function close() {
     pocket(false);
@@ -888,6 +913,7 @@ way[building]->.b;.b out skel geom qt;
     if (first && DM.Weather) DM.Weather.noteArea(pos.lat, pos.lon);   // 0.22: weather.js keeps only the 0.1-degree area (~10 km), on this phone
     setOrigin(pos.lat, pos.lon);
     if (first && M.msgKind === 'gps') message();
+    if (!home() && !M.homeNo && !M.homeAsked && pos.acc <= 60 && !M.msgKind) { M.homeAsked = 1; homeAsk(false); }   // 0.30.2: once per map visit until set
     fetchAround(pos, true);
     claim(); renderCard();
     if (DM.MapFX) { DM.MapFX.onPos(pos, M.walkedM || 0); pocketCard(); }   // 0.29: drops, radio calls, deliveries, fog
@@ -1089,6 +1115,11 @@ way[building]->.b;.b out skel geom qt;
     if (S) { const k = c.s / S.s; x.drawImage(S.cv, M.W / 2 + (S.cx - c.x) * c.s - S.w / 2 * k, M.H / 2 + (S.cy - c.y) * c.s - S.h / 2 * k, S.w * k, S.h * k); }
     const SX = v => (v - c.x) * c.s + M.W / 2, SY = v => (v - c.y) * c.s + M.H / 2;
     if (DM.MapFX) DM.MapFX.drawFog(x, SX, SY, wx, wy, M.W, M.H);   // 0.29: fog of war (unwalked squares)
+    { const h = home(); if (h && O.set) {   // 0.30.2: the home zone - a dashed ring and a little house
+      const hx = SX(wx(h.lon)), hy = SY(wy(h.lat)), hr = HOME_R * c.s;
+      x.save(); x.setLineDash([10, 8]); x.lineWidth = 3; x.strokeStyle = 'rgba(240,123,60,.7)'; x.fillStyle = 'rgba(240,123,60,.07)';
+      x.beginPath(); x.arc(hx, hy, hr, 0, 6.3); x.fill(); x.stroke(); x.setLineDash([]); x.font = '22px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('🏠', hx, hy); x.restore();
+    } }
     zombies(x, t, dt);
     const P = M.lastMe, px = P ? SX(P.x) : M.W / 2, py = P ? SY(P.y) : M.H / 2;
     // fog: her lamp makes a pool of light; the rest of the night closes in
