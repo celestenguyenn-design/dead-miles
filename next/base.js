@@ -99,7 +99,8 @@
     if (b.built.walls) { const ids = wallIds(), ok = ids.filter(i => !b.broken[i]).length; d += PIECES.walls.tiers[b.built.walls - 1].def * ok / ids.length; }
     for (const k of ['gate', 'tower', 'gen']) if (b.built[k] && !b.broken[k]) d += PIECES[k].tiers[b.built[k] - 1].def;
     for (const k of ['spikes', 'wire']) if (b.built[k] && !b.broken[k]) d += 5 * b.built[k];
-    if (DM.Crew && b === base()) d += DM.Crew.guardDef();   // Guards in the crew stand watch on horde night
+    if (DM.Crew && b === base()) d += DM.Crew.guardDef();
+    if (b === base() && DM.Skills && DM.Skills.defBonus) d += DM.Skills.defBonus(SV().survivor);   // 0.34: Tinkerer Rigged yard   // Guards in the crew stand watch on horde night
     return Math.round(d);
   };
 

@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.33.0';
+const NEXT_VERSION = '0.34.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -24,7 +24,7 @@ const NEXT_VERSION = '0.33.0';
 (() => {
   const D = DM.D, E = DM.E, $ = E.$, SFX = E.SFX, toast = E.toast;
   const KEY = 'dm-next-save', VER = 1, VERSION = 'next ' + NEXT_VERSION;
-  const STASH_BASE = 40, stashSlots = () => STASH_BASE + (DM.Base && DM.Base.stashBonus ? DM.Base.stashBonus() : 0);   // 0.24.5: base Storage adds up to +40
+  const STASH_BASE = 40, stashSlots = () => STASH_BASE + (DM.Base && DM.Base.stashBonus ? DM.Base.stashBonus() : 0) + (DM.Skills && DM.Skills.stashBonus ? DM.Skills.stashBonus(SV && SV.survivor) : 0);   // 0.34: Pack mule Hoarder   // 0.24.5: base Storage adds up to +40
   DM.onlineState = { signedIn: false, name: null, lastSync: null, status: 'offline' };
   const Game = DM.Game = {};
   let SV = null;
@@ -696,7 +696,7 @@ const NEXT_VERSION = '0.33.0';
   // 0.19: crafted weapon quality - survivor level and the Combat / Scavenging trees push it up; mostly Worn-Solid, never Rusty
   function craftQuality(rnd = Math.random) {
     const s = SV.survivor, SK = DM.Skills, b = 2 + Math.min(.5, (SK.level(s) - 1) * .02) + .06 * (SK.rank('combat', s) + SK.rank('scav', s)) / 2;
-    return Math.max(2, D.rollQuality(Math.min(3.2, b), 0, rnd));
+    return Math.min(5, Math.max(2, D.rollQuality(Math.min(3.2, b), 0, rnd)) + SK.craftTier(s));   // 0.34: Tinkerer Master crafter
   }
   Game.craftQuality = craftQuality;
   // ---------------------------------------------------------------- 0.19: gamestage (data.js D.gamestage / D.gsFx)

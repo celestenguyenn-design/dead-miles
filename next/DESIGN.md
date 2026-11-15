@@ -909,6 +909,14 @@ people should be able to click a ? for help if they somehow skip it")
   Down or leaving with walkers left = one piece breaks (B.hordeDamage). Not defended in time: defence vs strength
   (18 + 1.6 x gamestage + 2 x walkers) - held (+15 caps) or one piece breaks. Home tile "Base raid!" (first).
 
+## Done in 0.34.0 - 3 of 12: job-only skill trees
+- skills.js: a 6th tree per job (only: job id; SK.trees(s) filters): Tracker (hunter: arrows never snap, bow range
+  x1.4 + 10%, sneak x2, Volley 2nd arrow), Pack mule (scavenger: +5% extra find, +2 pack, +5% rare, +10 stash),
+  Shadow (thief: searches -20% noise, dodge -25% stamina, picks -35% breaks, sight -20%), Bruiser (brawler: +10 HP,
+  +10% melee, Last stand heal 25 once per run under 25% HP, Cleave arc x1.3), Tinkerer (mechanic: wear -25%, +10
+  base defence, guns skip a round 25%, crafted weapons +1 tier). Costs 1/2/2/3. Hooks: house.js, game.js
+  (stashSlots, craftQuality), base.js (defense). Ranks from another job's tree are dropped in SK.norm.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
