@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.29.4';
+const NEXT_VERSION = '0.30.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -53,7 +53,7 @@ const NEXT_VERSION = '0.29.4';
     v.walked = v.walked || 0;
     v.base = DM.Base.norm(v.base, v);       // phase 4: the base (pool, pieces, garden, decor)
     v.horde = DM.Base.normHorde(v.horde);   // phase 4: horde night (shifts, reports waiting to send, results)
-    if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); if (s.job === 'hunter' && !s.known.includes('bow')) s.known.push('bow'); /* 0.29.2: hunters can always make a bow */ s.packBonus = s.packBonus || 0; }
+    if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); if (s.job === 'hunter' && !s.known.includes('bow')) s.known.push('bow'); /* 0.29.2: hunters can always make a bow */ if (!s.known.includes('knuckles')) s.known.push('knuckles'); /* 0.30 */ s.packBonus = s.packBonus || 0; }
     if (v.survivor) { D.mergeStacks(v.survivor.pack); D.mergeStacks(v.survivor.stash); }   // 0.26.3: bigger stacks - fold old ones together
     v.trader.event = v.trader.event || null;   // phase 5a: Dot's seasonal job chain { key, step, kills, base }
     v.tips = v.tips || {};                  // phase 5: first-time tips already shown
@@ -784,7 +784,7 @@ const NEXT_VERSION = '0.29.4';
   }
   function whatItDoes(k) {
     const it = D.ITEMS[k]; if (!it) return '';
-    if (it.w) { const W = D.WEAPONS[it.w], e2 = { k, q: 2 }, dm = D.wDmg(e2), du = D.wMax(e2); return (W.ranged ? `Ranged weapon · ${dm} damage · lasts ${du} shots · needs arrows` : `Melee weapon · ${dm} damage · reach ${W.reach} · lasts ${du} hits · ${W.noise >= 4 ? 'loud' : W.noise >= 3 ? 'a bit loud' : 'quiet'}`) + ' (Worn; each quality tier +8% damage, +15% durability)'; }   // 0.19
+    if (it.w) { const W = D.WEAPONS[it.w], e2 = { k, q: 2 }, dm = D.wDmg(e2), du = D.wMax(e2); return (W.gun ? `Gun · ${dm} damage${W.pellets ? ` x${W.pellets} pellets` : ''} · lasts ${du} shots · uses ${D.ITEMS[W.gun].n.toLowerCase()} from your pack · ${W.noise >= 8 ? 'VERY loud - brings the house' : 'fairly quiet'}` : W.ranged ? `Ranged weapon · ${dm} damage · lasts ${du} shots · needs arrows` : `Melee weapon · ${dm} damage · reach ${W.reach} · lasts ${du} hits · ${W.noise >= 4 ? 'loud' : W.noise >= 3 ? 'a bit loud' : 'quiet'}`) + ' (Worn; each quality tier +8% damage, +15% durability)'; }   // 0.19
     if (it.slots) return `Fit it to your pack: +${it.slots} pack slots for good`;
     if (it.hp || it.sta || it.hu || it.th) return [DM.Food.label(k), it.hp ? `heals ${it.hp} HP` : '', it.sta ? `+${it.sta} stamina` : ''].filter(Boolean).join(' · ').replace(/^./, c => c.toUpperCase());
     return { lockpick: 'Opens locks silently with the lockpick mini-game. Snaps if you force it.', arrow: 'Ammo for the hunting bow. You can pick most of them back up.', shoes: 'Wear them: your footsteps make 30% less noise.',

@@ -147,6 +147,28 @@ const ART = (() => {
     prybar(c) { c.save(); c.translate(23, -79); c.rotate(-.5); c.lineCap = 'round'; c.lineJoin = 'round';
       c.strokeStyle = P.INK; c.lineWidth = 9; c.beginPath(); c.moveTo(0, -10); c.lineTo(0, 56); c.lineTo(8, 62); c.stroke();
       c.strokeStyle = '#9aa0b4'; c.lineWidth = 4.5; c.stroke(); c.restore(); },
+    // 0.30: guns and goofy weapons for her
+    shotgun(c) { c.save(); c.translate(23, -79); c.rotate(-.5); c.lineJoin = 'round';
+      c.fillStyle = '#8a5a34'; c.strokeStyle = P.INK; c.lineWidth = 3.2; c.beginPath(); c.moveTo(-6, -22); c.lineTo(6, -22); c.lineTo(5, 16); c.lineTo(-5, 16); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#3a3848'; c.beginPath(); c.rect(-4, 14, 8, 50); c.fill(); c.stroke(); c.fillStyle = '#8a5a34'; c.beginPath(); c.rect(-5, 30, 10, 12); c.fill(); c.stroke(); c.restore(); },
+    nailgun(c) { c.save(); c.translate(23, -79); c.rotate(-.5); c.lineJoin = 'round';
+      c.fillStyle = '#e0b94a'; c.strokeStyle = P.INK; c.lineWidth = 3.2; c.beginPath(); c.rect(-6, -4, 12, 18); c.fill(); c.stroke();
+      c.beginPath(); c.rect(-9, 12, 18, 26); c.fill(); c.stroke(); c.fillStyle = '#3a3848'; c.beginPath(); c.rect(-3, 38, 6, 10); c.fill(); c.stroke(); c.restore(); },
+    knuckles(c) { c.save(); c.translate(23, -79); c.lineJoin = 'round';
+      c.fillStyle = '#e0b94a'; c.strokeStyle = P.INK; c.lineWidth = 3; for (let i = 0; i < 4; i++) { c.beginPath(); c.arc(-2 + i * 2, -6 + i * 7, 5, 0, 6.3); c.fill(); c.stroke(); } c.restore(); },
+    turkeysq(c) { c.save(); c.translate(23, -79); c.rotate(-.5); c.lineJoin = 'round'; c.strokeStyle = P.INK; c.lineWidth = 3;
+      c.fillStyle = '#f6e3bb'; c.beginPath(); c.rect(-3, -6, 6, 18); c.fill(); c.stroke(); c.beginPath(); c.arc(0, -8, 5, 0, 6.3); c.fill(); c.stroke();
+      c.fillStyle = '#c9803e'; c.beginPath(); c.ellipse(0, 34, 16, 22, 0, 0, 6.3); c.fill(); c.stroke();
+      c.fillStyle = '#e8a35a'; c.beginPath(); c.ellipse(-4, 30, 6, 9, -.3, 0, 6.3); c.fill(); c.restore(); },
+    xlights(c) { c.save(); c.translate(23, -79); c.rotate(-.5); c.lineCap = 'round';
+      c.strokeStyle = '#1e5a2e'; c.lineWidth = 3; c.beginPath(); c.moveTo(0, -6); c.bezierCurveTo(18, 24, -18, 50, 6, 84); c.stroke();
+      const cols = ['#ff5a5a', '#5aff7a', '#ffd23c', '#5ab4ff', '#ff8af0'];
+      for (let i = 0; i < 7; i++) { const t = (i + 1) / 8, mt = 1 - t, x = 3 * mt * mt * t * 18 + 3 * mt * t * t * -18 + t * t * t * 6, y = mt * mt * mt * -6 + 3 * mt * mt * t * 24 + 3 * mt * t * t * 50 + t * t * t * 84;
+        c.fillStyle = cols[i % 5]; c.strokeStyle = P.INK; c.lineWidth = 1.6; c.beginPath(); c.ellipse(x, y, 3.4, 5, 0, 0, 6.3); c.fill(); c.stroke(); } c.restore(); },
+    pan(c) { c.save(); c.translate(23, -79); c.rotate(-.5); c.lineJoin = 'round'; c.strokeStyle = P.INK; c.lineWidth = 3.2;
+      c.fillStyle = '#3a3848'; c.beginPath(); c.rect(-3.5, -10, 7, 36); c.fill(); c.stroke();
+      c.fillStyle = '#4c4a5e'; c.beginPath(); c.ellipse(0, 46, 17, 20, 0, 0, 6.3); c.fill(); c.stroke();
+      c.fillStyle = '#5e5c72'; c.beginPath(); c.ellipse(0, 46, 11, 14, 0, 0, 6.3); c.fill(); c.restore(); },
     pistol(c) { c.save(); c.translate(23, -79); c.rotate(-.5); c.lineJoin = 'round';   // 0.15: raiders only (she has no gun)
       c.fillStyle = '#3a3848'; c.strokeStyle = P.INK; c.lineWidth = 3.2; c.beginPath(); c.rect(-5, -4, 10, 18); c.fill(); c.stroke();
       c.fillStyle = '#5c5a6e'; c.beginPath(); c.rect(-6, 12, 12, 30); c.fill(); c.stroke();
@@ -522,6 +544,16 @@ const ART = (() => {
       <path d="M0,0 L0,-9 M0,0 L6,3" stroke="#11142f" stroke-width="2.2" stroke-linecap="round"/>`,
     ring: `<ellipse cx="0" cy="6" rx="18" ry="14" fill="none" stroke="#11142f" stroke-width="9"/><ellipse cx="0" cy="6" rx="18" ry="14" fill="none" stroke="#e0b94a" stroke-width="5"/>
       <path d="M-8,-10 L0,-20 L8,-10 L0,-4 Z" fill="#9fe0e6" stroke="#11142f" stroke-width="2.4" stroke-linejoin="round"/>`,
+  });
+  Object.assign(EXTRA_ICONS, {   // 0.30: guns + goofy weapons
+    pistol: `<g transform="rotate(-10)" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"><path d="M-26,-14 h44 v12 h-24 l-6,24 h-12 l4,-24 h-6 z" fill="#3a3848"/><rect x="-22" y="-12" width="36" height="4" fill="#5c5a6e" stroke="none"/></g>`,
+    shotgun: `<g transform="rotate(-30)" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"><rect x="-6" y="-5" width="36" height="8" fill="#3a3848"/><path d="M-6,-6 L-32,-2 L-34,12 L-6,4 Z" fill="#8a5a34"/><rect x="6" y="2" width="14" height="6" fill="#8a5a34"/></g>`,
+    nailgun: `<g stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"><rect x="-24" y="-16" width="40" height="18" rx="3" fill="#e0b94a"/><rect x="-14" y="2" width="12" height="22" rx="2" fill="#e0b94a"/><rect x="16" y="-12" width="10" height="10" fill="#3a3848"/></g>`,
+    shells: `<g stroke="#11142f" stroke-width="2.4">${[-12, 0, 12].map((x, i) => `<g transform="translate(${x} ${i % 2 ? -4 : 2})"><rect x="-5" y="-14" width="10" height="20" rx="2" fill="#c94a4a"/><rect x="-5" y="6" width="10" height="8" fill="#e0b94a"/></g>`).join('')}</g>`,
+    knuckles: `<g stroke="#11142f" stroke-width="2.6" fill="#e0b94a">${[-18, -6, 6, 18].map(x => `<circle cx="${x}" cy="-6" r="7"/>`).join('')}<path d="M-24,2 h48 v8 q-24,10 -48,0 z"/></g>`,
+    turkeysq: `<g stroke="#11142f" stroke-width="2.6"><ellipse cx="-4" cy="4" rx="22" ry="17" fill="#c9803e"/><ellipse cx="-10" cy="0" rx="8" ry="6" fill="#e8a35a" stroke="none"/><path d="M14,-4 l14,-14" stroke-width="7" stroke-linecap="round"/><path d="M14,-4 l14,-14" stroke="#f6e3bb" stroke-width="3.5" stroke-linecap="round"/><circle cx="29" cy="-19" r="4.5" fill="#f6e3bb"/></g>`,
+    xlights: `<g><path d="M-28,-18 C0,-28 -10,10 10,4 S20,24 28,18" fill="none" stroke="#1e5a2e" stroke-width="3"/>${[[-20, -21, '#ff5a5a'], [-6, -16, '#5aff7a'], [-2, 2, '#ffd23c'], [12, 6, '#5ab4ff'], [22, 18, '#ff8af0']].map(([x, y, c]) => `<ellipse cx="${x}" cy="${y + 5}" rx="4" ry="6" fill="${c}" stroke="#11142f" stroke-width="1.8"/>`).join('')}</g>`,
+    pan: `<g transform="rotate(-30)" stroke="#11142f" stroke-width="2.6"><rect x="10" y="-4" width="24" height="8" rx="2" fill="#3a3848"/><circle cx="-8" cy="0" r="20" fill="#4c4a5e"/><circle cx="-8" cy="0" r="13" fill="#5e5c72" stroke="none"/></g>`,
   });
   Object.assign(EXTRA_ICONS, {
     bat: `<g transform="rotate(40)"><path d="M-4,-30 Q0,-34 4,-30 L5,14 Q5,17 2,18 L-2,18 Q-5,17 -5,14 Z" fill="#e2b77e" stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"/><rect x="-3.5" y="18" width="7" height="12" rx="2" fill="#3d2d61" stroke="#11142f" stroke-width="2.4"/></g>`,

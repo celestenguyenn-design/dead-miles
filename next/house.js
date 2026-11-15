@@ -216,7 +216,7 @@
   // 0.19: gamestage scaling for one zombie (never the event or weekly bosses, never raiders). Gamestage <= 10: no change.
   function gsZombie(z) {
     const fx = gsFx(); if (fx.hp === 1 || z.boss || z.raider || z.gsx) return z;
-    z.gsx = 1; z.hp = z.maxHp = Math.round((z.maxHp || z.hp || 100) * fx.hp); z.dmgMul = (z.dmgMul || 1) * fx.dmg;
+    z.gsx = 1; z.hp = z.maxHp = Math.round((z.maxHp || z.hp || 100) * fx.hp); z.dmgMul = (z.dmgMul || 1) * fx.dmg; z.spdMul = fx.spd || 1;
     if (z.armor) z.armor = z.armor0 = Math.round(z.armor * fx.hp);
     return z;
   }
@@ -929,7 +929,9 @@
   }
   // 0.23.1 (owner: "as a hunter if I run out of arrows I'm f*cked"): an empty bow is swung like a club instead of doing nothing
   const BOWBASH = Object.assign({}, WEAPONS.fists, { n: 'Bow bash', dmg: 15, reach: 1.3, ranged: false });
-  const fightW = () => { const W = weapon(); return W.ranged && !arrowsLeft() ? BOWBASH : W; };
+  // 0.30: a gun with nothing to shoot is swung too (pistol-whip)
+  const GUNBASH = Object.assign({}, WEAPONS.fists, { n: 'Pistol-whip', dmg: 18, reach: 1.3, ranged: false });
+  const fightW = () => { const W = weapon(); return W.gun ? (packCount(W.gun) ? W : GUNBASH) : W.ranged && !arrowsLeft() ? BOWBASH : W; };
   function startSwing() {
     const p = G.p;
     // soft auto-aim toward the nearest live zombie in reach
@@ -938,6 +940,7 @@
     if (best && !fightW().ranged) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; p.fx = dx / d; p.fy = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; }
     const W = fightW(); SW_WIND = W.wind; SW_STRIKE = W.strike; SW_REC = W.rec; p.swRanged = !!W.ranged;
     if (W === BOWBASH && !G.bashTold) { G.bashTold = 1; toast('Out of arrows - bashing with the bow', 1.6); }
+    if (W === GUNBASH && !G.gbashTold) { G.gbashTold = 1; toast(`Out of ${ITEMS[weapon().gun].n.toLowerCase()} - swinging the ${weapon().n.toLowerCase()} instead`, 1.8); }
     p.st = 'swing'; p.stT = 0; p.swingHit = false; p.swingQ = false; p.sta = Math.max(0, p.sta - (W.ranged ? 3 : 7)); p.staDelay = .5; F.fight(G);
   }
   let SW_WIND = .12, SW_STRIKE = .1, SW_REC = .22;
@@ -946,7 +949,8 @@
     if (!p.swingHit && p.stT >= SW_WIND) {
       p.swingHit = true;
       const W = fightW();
-      if (W.ranged) { fireArrow(); }
+      if (W.gun) { fireGun(W); }
+      else if (W.ranged) { fireArrow(); }
       else {
         SFX.play('swing');
         const fa = Math.atan2(p.fy, p.fx);
@@ -955,10 +959,13 @@
           if (z.dead || z.st === 'rise' && z.stT < .3) continue;
           const dx = z.x - p.x, dy = (z.y - p.y) * 1.15, d = Math.hypot(dx, dy);
           if (d > W.reach * T) continue;
-          if (d > 18 && Math.abs(angDiff(Math.atan2(dy, dx), fa)) > 1.35) continue;
+          if (d > 18 && Math.abs(angDiff(Math.atan2(dy, dx), fa)) > (W.arc || 1.35)) continue;
           hitZombie(z, fa, W.dmg * qMul() * (job() === 'brawler' ? 1.3 : 1) * SK.meleeMul()); any = true;   // 0.19: qMul = weapon quality
+          if (W.kb) { z.kbx *= W.kb; z.kby *= W.kb; }                       // 0.30 squeaky turkey: sends them flying
+          if (W.stun && !z.dead && z.st === 'hurt') z.stT = -W.stun;        // 0.30 frying pan: dazed a bit longer
+          if (W.zap) puff(z.x, z.y - 40, 50, 8, ['#ff5a5a', '#5aff7a', '#ffd23c', '#5ab4ff'][Math.floor(Math.random() * 4)], 140, .4, 3);
         }
-        if (any) { G.hitstop = .055; G.shake = Math.max(G.shake, 5); if (W !== BOWBASH) wearWeapon(); }
+        if (any) { G.hitstop = .055; G.shake = Math.max(G.shake, 5); if (W !== BOWBASH && W !== GUNBASH) wearWeapon(); goofySound(W); }
         emitNoise(p.x, p.y, (any ? W.noise : 1.5) * SK.allNoise(), any);
       }
     }
@@ -1118,7 +1125,7 @@
         else if (foe) { const [fx, fy] = cellOf(foe), key = fy * MW + fx; if (!z.fpath || z.fpathKey !== key) { z.fpath = bfs(fx, fy); z.fpathKey = key; } const st = nextStep(z, z.fpath); tgt = st.same ? { x: tg.x, y: tg.y } : st; }
         else { const st = nextStep(z, playerField()); tgt = st.same ? { x: p.x, y: p.y } : st; }
         const dx = tgt.x - z.x, dy = tgt.y - z.y, dd = Math.hypot(dx, dy) || 1;
-        spd = ((z.special ? INF.KINDS[z.kind].spd : 1.85) + .25 * Math.sin(G.t * 2 + z.id * 9)) * T;   // 0.13: runners sprint, armored plod
+        spd = ((z.special ? INF.KINDS[z.kind].spd : 1.85) + .25 * Math.sin(G.t * 2 + z.id * 9)) * T * (z.spdMul || 1);   // 0.30: gamestage spdMul   // 0.13: runners sprint, armored plod
         if (dp < .75 * T) spd = 0;
         vx = dx / dd; vy = dy / dd; face(dxp);
         if (z.kind === 'turkey') { // fast and erratic: darting zig-zags
@@ -1978,7 +1985,7 @@
       $('#wpn img').src = ART.iconURL[h ? ITEMS[h.k].i : 'scrap'] || ''; $('#wpn').classList.toggle('fists', !h);
       $('#wpn i').style.width = (h && h.d != null ? Math.max(0, Math.min(1, h.d / D.wMax(h))) * 100 : 0) + '%';   // 0.19: max durability by quality
       if (h && D.qOf(h) >= 3) $('#wpn').style.setProperty('--qc', D.QUAL[D.qOf(h)].c); else $('#wpn').style.removeProperty('--qc');   // 0.19: Solid+ tint the chip
-      $('#wpn b').textContent = wk === 'bow' ? arrowsLeft() : '';   // the quiver (plus any spare arrows in the pack)
+      $('#wpn b').textContent = wk === 'bow' ? arrowsLeft() : WEAPONS[wk] && WEAPONS[wk].gun ? packCount(WEAPONS[wk].gun) : '';   // 0.30: rounds left   // the quiver (plus any spare arrows in the pack)
       const n = Math.round(G.noiseLvl * 5);
       noiseBars.forEach((b, i) => b.classList.toggle('on', i < n));
       $('#noise').classList.toggle('hot', n >= 4);
@@ -2439,6 +2446,44 @@
     SFX.play('bow'); emitNoise(p.x, p.y, WEAPONS.bow.noise * SK.allNoise(), false); wearWeapon();
     return true;
   }
+  // 0.30: the goofy weapons each have a hit sound
+  function goofySound(W) {
+    if (!SFX.ac) return;
+    if (W.squeak) { const f = 1150 + Math.random() * 300; SFX.tone('square', f, f * 1.6, .07, .07); SFX.tone('square', f * 1.6, f * .8, .12, .06, .07); }
+    if (W.bonk) { SFX.tone('triangle', 560, 400, .35, .16); SFX.tone('sine', 1120, 1000, .4, .05); }
+    if (W.zap) { SFX.noise(.12, 'highpass', 4000, 7000, .1, 2); SFX.tone('sawtooth', 2400, 1800, .06, .03); }
+  }
+  // 0.30 guns: one round (shell, nail) from the pack per shot; aims like the bow; a bullet is a fast arrow that does not drop
+  function fireGun(W) {
+    const p = G.p;
+    if (!packCount(W.gun)) return false;
+    usePack(W.gun); lastHud = '';
+    const range = W.spd * W.life * T;
+    let best = null, bd = range;
+    for (const z of G.zs) {
+      if (z.dead) continue;
+      const dx = z.x - p.x, dy = z.y - p.y, d = Math.hypot(dx, dy);
+      if (d < bd && dx * p.fx + dy * p.fy > 0 && losClear(p.x, p.y - 30, z.x, z.y - 30)) { bd = d; best = z; }
+    }
+    let ax = p.fx, ay = p.fy;
+    if (best) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; ax = dx / d; ay = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; p.fx = ax; p.fy = ay; }
+    const a0 = Math.atan2(ay, ax), n = W.pellets || 1, sp = W.spd * T, dmg = W.dmg * qMul() * SK.meleeMul();
+    for (let i = 0; i < n; i++) {
+      const a = a0 + (n > 1 ? (i / (n - 1) - .5) * 2 * W.spread + (Math.random() - .5) * .06 : 0);
+      G.arrows.push({ x: p.x + Math.cos(a) * 18, y: p.y + Math.sin(a) * 12, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, z: 36, life: W.life, bullet: W.gun, dmg });
+    }
+    const mx = p.x + ax * 34, my = p.y + ay * 20 - 40;
+    if (W.gun !== 'nails') { puff(mx, my, 0, 7, '#ffd27a', 140, .18, 3); G.shake = Math.max(G.shake, W.pellets ? 8 : 4); }
+    if (SFX.ac) {
+      if (W.gun === 'shells') { SFX.noise(.32, 'lowpass', 2400, 120, .6, 1); SFX.tone('square', 110, 30, .26, .16); }
+      else if (W.gun === 'ammo') { SFX.noise(.18, 'lowpass', 3200, 200, .45, 1); SFX.tone('square', 160, 40, .14, .12); }
+      else { SFX.tone('square', 900, 500, .05, .06); SFX.noise(.05, 'highpass', 3000, 6000, .1, .6); }
+    }
+    emitNoise(p.x, p.y, W.noise * SK.allNoise(), W.noise > 4);   // the catch: a gunshot brings the house running
+    wearWeapon();
+    if (!packCount(W.gun)) toast(`Last ${ITEMS[W.gun].n.toLowerCase()}!`, 1.2);
+    return true;
+  }
   function landArrow(x, y) {
     if (Math.random() > .65) return; // some snap
     const near = G.drops.find(d => d.k === 'arrow' && Math.hypot(d.x - x, d.y - y) < 26);
@@ -2450,8 +2495,8 @@
       for (let i = 0; i < steps && a.life > 0; i++) {
         a.x += a.vx * dt / steps; a.y += a.vy * dt / steps;
         const hitZ = G.zs.find(z => !z.dead && Math.hypot(z.x - a.x, (z.y - a.y) * 1.3) < 22);
-        if (hitZ) { hitZombie(hitZ, Math.atan2(a.vy, a.vx), WEAPONS.bow.dmg * (a.qm || 1) * SK.bowMul(), true); a.life = 0; landArrow(hitZ.x + (Math.random() - .5) * 20, hitZ.y + 8); break; }
-        if (overlapsSolid({ hw: 2, hh: 2 }, a.x, a.y)) { a.life = 0; SFX.play('thunk'); landArrow(a.x - a.vx * .012, a.y - a.vy * .012); break; }
+        if (hitZ) { hitZombie(hitZ, Math.atan2(a.vy, a.vx), a.bullet ? a.dmg : WEAPONS.bow.dmg * (a.qm || 1) * SK.bowMul(), true); a.life = 0; if (!a.bullet) landArrow(hitZ.x + (Math.random() - .5) * 20, hitZ.y + 8); break; }
+        if (overlapsSolid({ hw: 2, hh: 2 }, a.x, a.y)) { a.life = 0; if (a.bullet) puff(a.x, a.y, 30, 4, '#ffd27a', 80, .2, 2); else { SFX.play('thunk'); landArrow(a.x - a.vx * .012, a.y - a.vy * .012); } break; }
       }
       a.life -= dt;
       if (a.life <= 0 && !a.done) { a.done = true; }
@@ -2461,6 +2506,11 @@
   function drawArrows() {
     for (const a of G.arrows) {
       const ang = Math.atan2(a.vy, a.vx);
+      if (a.bullet) {   // 0.30: a tracer (nails: a grey dart)
+        ctx.save(); ctx.translate(a.x, a.y - a.z); ctx.rotate(ang); ctx.lineCap = 'round';
+        ctx.strokeStyle = a.bullet === 'nails' ? '#b9bdcc' : '#ffe08a'; ctx.lineWidth = a.bullet === 'nails' ? 3 : 3.5;
+        ctx.beginPath(); ctx.moveTo(a.bullet === 'nails' ? -10 : -26, 0); ctx.lineTo(6, 0); ctx.stroke(); ctx.restore(); continue;
+      }
       ctx.save(); ctx.translate(a.x, a.y - a.z); ctx.rotate(ang);
       ctx.strokeStyle = P.INK; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-18, 0); ctx.lineTo(12, 0); ctx.stroke();
       ctx.strokeStyle = '#d9a46a'; ctx.lineWidth = 2; ctx.stroke();

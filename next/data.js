@@ -56,6 +56,16 @@ window.DM = window.DM || {};
     spikedbat: { n: 'Spiked bat', i: 'spikedbat', w: 'spikedbat' },
     machete: { n: 'Machete', i: 'machete', w: 'machete' },
     prybar: { n: 'Pry bar', i: 'prybar', w: 'prybar' },
+    // 0.30 (owner: "We should add guns and more equips ... be goofy, a turkey squishy that makes noise every time you hit,
+    // Christmas lights to whip"): guns shoot what is in the pack (pistol: 9mm rounds, shotgun: shells, nail gun: nails)
+    pistol: { n: 'Pistol', i: 'pistol', w: 'pistol', rare: 1, tag: 'shoots 9mm rounds - loud!' },
+    shotgun: { n: 'Shotgun', i: 'shotgun', w: 'shotgun', rare: 1, tag: 'shoots shells - VERY loud' },
+    nailgun: { n: 'Nail gun', i: 'nailgun', w: 'nailgun', tag: 'shoots nails, fairly quiet' },
+    shells: { n: 'Shotgun shells', i: 'shells', rare: 1 },
+    knuckles: { n: 'Brass knuckles', i: 'knuckles', w: 'knuckles', tag: 'fast punches' },
+    turkeysq: { n: 'Squeaky turkey', i: 'turkeysq', w: 'turkeysq', tag: 'SQUEAK. knocks them back' },
+    xlights: { n: 'Light-string whip', i: 'xlights', w: 'xlights', tag: 'long reach, hits a wide arc' },
+    pan: { n: 'Frying pan', i: 'pan', w: 'pan', tag: 'BONK - dazes them' },
     packplus: { n: 'Reinforced pack', i: 'packplus', use: 'Fit', slots: 2 },
     backpack: { n: 'Hiking backpack', i: 'backpack', use: 'Fit', slots: 4, rare: 1 },
     shoes: { n: 'Quiet shoes', i: 'shoes', use: 'Wear' },
@@ -134,8 +144,12 @@ window.DM = window.DM || {};
     prybar: { out: ['prybar', 1], in: { scrap: 5, tape: 1 }, n: 'Pry bar (quiet prying)' },
     armor_pad: { out: ['armor_pad', 1], in: { cloth: 5, tape: 2 }, n: 'Padded jacket (armor, -10% damage)' },   // 0.28
     bow: { out: ['bow', 1], in: { wood: 3, cloth: 2, tape: 1 }, n: 'Hunting bow' },   // 0.29.2: hunters know it from the start
+    knuckles: { out: ['knuckles', 1], in: { scrap: 3, tape: 1 }, n: 'Brass knuckles' },   // 0.30: everyone knows it
+    xlights: { out: ['xlights', 1], in: { battery: 2, cloth: 1, tape: 2 }, n: 'Light-string whip' },
+    nailgun: { out: ['nailgun', 1], in: { scrap: 6, battery: 2, tape: 2 }, n: 'Nail gun (shoots nails)' },
+    shells: { out: ['shells', 6], in: { scrap: 2, ammo: 4 }, n: 'Shotgun shells' },
   };
-  D.BASIC = ['bandage', 'lockpick'];
+  D.BASIC = ['bandage', 'lockpick', 'knuckles'];
   // ---------------------------------------------------------------- 0.15: item categories (shown on pack / stash / loot cards)
   // owner: "inventory items should tell us 'materials' like for crafting or should be 'sold' - there's a lot of random shit like paperbacks"
   D.CATS = {
@@ -148,7 +162,7 @@ window.DM = window.DM || {};
   D.cat = function (k) {
     const it = D.ITEMS[k]; if (!it) return 'sell';
     if (it.cos) return 'cos'; if (it.decor) return 'decor'; if (it.seed) return 'seed'; if (it.quest) return 'quest'; if (k === 'key') return 'key';
-    if (it.bp) return 'bp'; if (it.w) return 'weapon'; if (k === 'ammo' || k === 'arrow') return 'ammo'; if (it.gift || k === 'hat') return 'event';
+    if (it.bp) return 'bp'; if (it.w) return 'weapon'; if (k === 'ammo' || k === 'arrow' || k === 'shells') return 'ammo'; if (it.gift || k === 'hat') return 'event';
     if (it.use === 'Drink') return 'drink'; if (it.use === 'Eat') return 'food'; if (it.hp || it.cure) return 'med'; if (k === 'note') return 'note';
     if (it.slots || it.armor || k === 'shoes' || k === 'lockset') return 'gear'; if (k === 'lockpick' || k === 'pole') return 'tool';
     return D.uses(k).length ? 'mat' : 'sell';
@@ -250,7 +264,7 @@ window.DM = window.DM || {};
   };
   D.COS_POOL = { 'cos_*': [], 'cosZ_*': ['corpse'], 'cosP_*': ['police'], 'cosM_*': ['mansion'], 'cosH_*': ['horde'] };
   // what the trader pays (caps each); she sells for about 4x
-  D.VALUE = { armor_pad: 10, armor_sport: 14, armor_riot: 25, armor_plate: 35, beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
+  D.VALUE = { pistol: 60, shotgun: 75, nailgun: 30, shells: 2, knuckles: 14, turkeysq: 10, xlights: 12, pan: 10, armor_pad: 10, armor_sport: 14, armor_riot: 25, armor_plate: 35, beans: 2, water: 2, snack: 1, drink: 1, bandage: 3, meds: 6, wrench: 3, scrap: 1, knife: 6, bat: 12, axe: 30, bow: 35, arrow: .5, crowbar: 15, ammo: .5, key: 4, cloth: 1, battery: 2, tape: 2, book: 1,
     lockpick: 3, gift: 8, candy: 1, cranberry: 3, stuffing: 3, pie: 4, turkey: 20, hat: 0, pole: 2, watch: 25, jewelry: 20, wood: 1, nails: .25, spikedbat: 20, machete: 22, prybar: 14, packplus: 15, backpack: 40, shoes: 10, lockset: 18, note: 0, parcel: 0, antibio: 12 };
   Object.assign(D.VALUE, { seed_tomato: 2, seed_potato: 2, seed_carrot: 2, seed_corn: 3, seed_herbs: 2, tomato: 2, potato: 2, carrot: 2, corn: 2, herbs: 3, coffee: 2 });
   for (const k in D.DECOR) D.VALUE[k] = D.DECOR[k].v;
@@ -258,7 +272,7 @@ window.DM = window.DM || {};
   D.valueOf = (k, d, q) => { if (k.startsWith('bp_')) return 25; let v = D.VALUE[k] || 1; if (D.ITEMS[k] && D.ITEMS[k].w) { const e = { k, q }; v *= 1 + .25 * (D.qOf(e) - 2); if (d != null) v = Math.max(1, Math.round(v * (.3 + .7 * Math.min(1, d / D.wMax(e))))); } return v; };
   // how many fit in one slot (anything not listed does not stack)
   // 0.26.3 (owner: "the storage sucks too much ... make the stacks higher?"): about double, and sell junk stacks too
-  D.STACK = { gift: 5, candy: 10, seed_tomato: 20, seed_potato: 20, seed_carrot: 20, seed_corn: 20, seed_herbs: 20, tomato: 6, potato: 6, carrot: 6, corn: 6, herbs: 6, wood: 20, nails: 40, lockpick: 10, arrow: 30, cranberry: 6, stuffing: 6, pie: 6, water: 6, beans: 6, snack: 6, drink: 6, coffee: 6, bandage: 10, meds: 10, antibio: 5, ammo: 60, scrap: 20, cloth: 10, tape: 6, battery: 8,
+  D.STACK = { shells: 40, gift: 5, candy: 10, seed_tomato: 20, seed_potato: 20, seed_carrot: 20, seed_corn: 20, seed_herbs: 20, tomato: 6, potato: 6, carrot: 6, corn: 6, herbs: 6, wood: 20, nails: 40, lockpick: 10, arrow: 30, cranberry: 6, stuffing: 6, pie: 6, water: 6, beans: 6, snack: 6, drink: 6, coffee: 6, bandage: 10, meds: 10, antibio: 5, ammo: 60, scrap: 20, cloth: 10, tape: 6, battery: 8,
     book: 5, watch: 5, jewelry: 5, wrench: 3, turkey: 2 };
   // merge partial stacks of the same thing (old saves had smaller stacks); entries with durability / quality never merge
   D.mergeStacks = function (list) {
@@ -289,6 +303,15 @@ window.DM = window.DM || {};
     machete: { n: 'Machete', dmg: 40, wind: .09, strike: .08, rec: .18, reach: 1.45, dur: 60, noise: 3 },
     prybar: { n: 'Pry bar', dmg: 24, wind: .12, strike: .09, rec: .2, reach: 1.4, dur: 110, noise: 3.5 },
     bow: { n: 'Hunting bow', ranged: 1, dmg: 46, wind: .32, strike: .05, rec: .26, dur: 120, noise: .8 },
+    // 0.30 guns: gun = the pack item each shot uses; noise is the catch (a gunshot brings the whole house)
+    pistol: { n: 'Pistol', ranged: 1, gun: 'ammo', dmg: 58, wind: .1, strike: .05, rec: .32, dur: 90, noise: 8, spd: 30, life: .45 },
+    shotgun: { n: 'Shotgun', ranged: 1, gun: 'shells', dmg: 30, pellets: 5, spread: .2, wind: .16, strike: .06, rec: .62, dur: 70, noise: 10, spd: 24, life: .3 },
+    nailgun: { n: 'Nail gun', ranged: 1, gun: 'nails', dmg: 22, wind: .06, strike: .04, rec: .16, dur: 140, noise: 2.2, spd: 20, life: .5 },
+    // 0.30 goofy melee: kb = extra knockback, stun = extra daze (s), arc = swing width (default 1.35), squeak/bonk/zap = sound
+    knuckles: { n: 'Brass knuckles', dmg: 20, wind: .05, strike: .06, rec: .1, reach: 1.15, dur: 160, noise: 1.2 },
+    turkeysq: { n: 'Squeaky turkey', dmg: 15, wind: .08, strike: .08, rec: .16, reach: 1.35, dur: 300, noise: 3.5, kb: 1.7, squeak: 1 },
+    xlights: { n: 'Light-string whip', dmg: 25, wind: .14, strike: .12, rec: .24, reach: 2.3, dur: 80, noise: 2.5, arc: 2.3, zap: 1 },
+    pan: { n: 'Frying pan', dmg: 34, wind: .14, strike: .1, rec: .24, reach: 1.4, dur: 140, noise: 5, stun: .45, bonk: 1 },
   };
   D.isWeapon = k => !!(D.ITEMS[k] && D.ITEMS[k].w);
 
@@ -324,14 +347,18 @@ window.DM = window.DM || {};
 
   // ---------------------------------------------------------------- 0.19: gamestage (per player)
   // gamestage = survivor level + days played / 3 (max +20) + 3 per step of best weapon quality above Worn; 1-60.
+  // (0.19 numbers below; 0.30 made the ramp start at 4 and go higher - see D.gsFx)
   // Up to gamestage 10 nothing changes (today's game). From 10 to 60 it ramps (t = 0..1):
   //   zombie HP and hits +0..25%, special-infected share +0..12 points at danger 3-4, from gamestage 25 some specials
   //   at danger 2 (up to 15% of zombies at 60), weapon quality roll +0..0.4, rare-find chance +0..6%.
   D.GS_MAX = 60;
   D.gamestage = (lvl, days, bestQ) => Math.max(1, Math.min(D.GS_MAX, Math.round((lvl || 1) + Math.min(20, (days || 0) / 3) + 3 * Math.max(0, (bestQ || 2) - 2))));
   D.gsFx = function (gs) {
-    const t = Math.max(0, Math.min(1, ((gs || 0) - 10) / 50)), t2 = Math.max(0, Math.min(1, ((gs || 0) - 25) / 35));
-    return { t, hp: 1 + .25 * t, dmg: 1 + .25 * t, spAdd: .12 * t, sp2: .15 * t2, qBonus: .4 * t, rare: .06 * t };
+    // 0.30 (owner: "zombies should be more difficult as we progress ... they're quite easy rn"): the ramp starts at
+    // gamestage 4 (was 10) and goes further: HP +60% and bites +40% at 50+ (was +25/+25 at 60), specials sooner, and
+    // zombies get a little quicker (spd up to +15%)
+    const t = Math.max(0, Math.min(1, ((gs || 0) - 4) / 46)), t2 = Math.max(0, Math.min(1, ((gs || 0) - 14) / 36));
+    return { t, hp: 1 + .6 * t, dmg: 1 + .4 * t, spd: 1 + .15 * t, spAdd: .15 * t, sp2: .2 * t2, qBonus: .4 * t, rare: .06 * t };
   };
 
   // merge rolled item keys into stacks; ammo/arrows come in handfuls; weapons carry durability
@@ -342,7 +369,7 @@ window.DM = window.DM || {};
       // 0.24.4: last check when a container opens - a blueprint she already knows (rolled before 0.24.3, or pre-rolled when the
       // house or today's route was made) is swapped for another one she can use, or a pocket watch
       if (k.startsWith('bp_') && D.ITEMS[k] && DM.S && (DM.S.known || []).includes(D.ITEMS[k].bp)) k = D.pickBP(rnd);
-      const n = k === 'ammo' ? 4 + Math.floor(rnd() * 9) : k === 'arrow' ? 3 + Math.floor(rnd() * 5) : k === 'nails' ? 3 + Math.floor(rnd() * 6) : D.ITEMS[k] && D.ITEMS[k].seed ? 2 + Math.floor(rnd() * 3) : 1;
+      const n = k === 'ammo' ? 4 + Math.floor(rnd() * 9) : k === 'shells' ? 2 + Math.floor(rnd() * 4) : k === 'arrow' ? 3 + Math.floor(rnd() * 5) : k === 'nails' ? 3 + Math.floor(rnd() * 6) : D.ITEMS[k] && D.ITEMS[k].seed ? 2 + Math.floor(rnd() * 3) : 1;
       if (D.isWeapon(k)) { const f = .45 + rnd() * .5; out.push(D.mkWeapon(k, D.rollQuality(qa ? qa.base : 1.5, qa ? qa.bonus : 0, rnd), f)); continue; }   // 0.19: quality
       const e = out.find(e => e.k === k && D.STACK[k]);
       if (e) e.n += n; else out.push({ k, n });
@@ -410,6 +437,12 @@ window.DM = window.DM || {};
   // phase 4: decor and seeds turn up now and then (decor more often in mansions and apartments - see game.js loot())
   for (const [t, w] of [['dresser', .3], ['wardrobe', .25], ['hutch', .5], ['side', .3], ['books', .4], ['storage', .35], ['desk', .2], ['tv', .25], ['cellar', .4], ['washer', .3]]) D.LOOT[t][1]['decor_*'] = w;
   for (const [t, w] of [['pantry', .5], ['cabinet', .3], ['storage', .6], ['garage', .4], ['shelves', .4], ['store', .4], ['cellar', .6], ['trash', .3], ['workbench', .3]]) D.LOOT[t][1]['seed_*'] = w;
+  // 0.30: goofy weapons and the odd gun in ordinary furniture (a pistol is ~1-2% per glove box / nightstand / safe)
+  for (const [t, k, w] of [['kdrawers', 'pan', .5], ['island', 'pan', .35], ['cabinet', 'pan', .2], ['storage', 'xlights', .25], ['shelves', 'xlights', .2],
+    ['attic', 'xlights', .4], ['washer', 'turkeysq', .2], ['dresser', 'turkeysq', .12], ['store', 'turkeysq', .15], ['register', 'knuckles', .2],
+    ['evidence', 'knuckles', .4], ['workbench', 'nailgun', .25], ['garage', 'nailgun', .2], ['toolbox', 'nailgun', .15],
+    ['car', 'pistol', .08], ['night', 'pistol', .03], ['safe', 'pistol', .15], ['armory', 'shotgun', .3], ['armory', 'shells', 1.2], ['locker', 'pistol', .12],
+    ['evidence', 'pistol', .12], ['cellar', 'shotgun', .08], ['cellar', 'shells', .4], ['car', 'shells', .3], ['corpse', 'shells', .25]]) D.LOOT[t][1][k] = w;
   D.LOOT.hordecrate = [[3, 4], { armor_riot: .35, armor_sport: .4, 'decor_*': 1, 'seed_*': 1.2, ammo: 2, meds: 2, bandage: 2, scrap: 2, nails: 2, wood: 2, tape: 1, battery: 1, 'bp_*': .5, 'cosH_*': .35 }];
   // phase 5: cosmetics are rare finds - clothes-ish furniture, zombies a little more often, police lockers better (mansions: see game.js loot())
   for (const [t, w] of [['wardrobe', .1], ['dresser', .08], ['coat', .09], ['hutch', .06], ['washer', .07], ['night', .04], ['gym', .05]]) D.LOOT[t][1]['cos_*'] = w;
@@ -425,11 +458,11 @@ window.DM = window.DM || {};
   D.LOOT.hordecrate_bf = [[5, 6], { 'decor_*': 1, 'seed_*': 1, ammo: 2, meds: 2.5, bandage: 2, scrap: 1.5, nails: 1.5, wood: 1.5, tape: 1, battery: 1, 'bp_*': 1.2, 'cosH_*': .7, turkey: .5, pie: 1.5, cranberry: 1, lockset: .3, backpack: .15 }, ['meds']];
   // 0.10: the one guaranteed prize in a key-locked room / car trunk (gen.js jackpots). Each entry: [weight, items].
   D.JACK = {
-    gun: [[3, ['ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo']], [2, ['machete']], [2, ['spikedbat']], [1, ['axe']], [2, ['cosP_*']], [1, ['lockset']]],
+    gun: [[3, ['pistol', 'ammo', 'ammo']], [2, ['shotgun', 'shells', 'shells']], [2, ['ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo']], [1, ['machete']], [1, ['spikedbat']], [1, ['axe']], [1, ['cosP_*']], [1, ['lockset']]],   // 0.30: real guns
     meds: [[3, ['meds', 'meds', 'meds', 'bandage', 'bandage']], [2, ['bp_*']], [1, ['backpack']], [1, ['packplus']]],
     safe: [[3, ['jewelry', 'jewelry', 'watch']], [2, ['cosM_*']], [2, ['decor_*']], [2, ['bp_*']], [1, ['backpack']]],
     stash: [[2, ['bp_*']], [2, ['cos_*']], [2, ['decor_*']], [1, ['backpack']], [2, ['packplus']], [1, ['machete']], [1, ['lockset']], [1, ['watch', 'jewelry']]],
-    trunk: [[2, ['machete']], [1, ['axe']], [2, ['crowbar']], [2, ['prybar']], [1, ['spikedbat']], [2, ['ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo']], [1, ['lockset']], [2, ['cos_*']]]
+    trunk: [[2, ['machete']], [1, ['axe']], [2, ['crowbar']], [2, ['prybar']], [1, ['spikedbat']], [2, ['ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo']], [1, ['lockset']], [2, ['cos_*']], [1, ['pistol', 'ammo']], [1, ['shotgun', 'shells']], [1, ['xlights']]]
   };
   // 0.24.3 (owner: "make it so that we can't get the same blueprints"): a blueprint roll never gives one she already knows,
   // already carries (pack, stash, hands) or was just rolled in the last 30 min (so one house can't hold two of the same).
@@ -534,6 +567,7 @@ window.DM = window.DM || {};
     ['backpack', 1, 150, 2, 1], ['machete', 1, 90, 2, .5], ['ammo', 15, 2, 2, .6], ['prybar', 1, 65, 2, .5], ['axe', 1, 120, 3, .5], ['bow', 1, 130, 3, .4], ['lockset', 1, 80, 3, .5],
     ['key', 1, 30, 2, .35], ['bp_*', 1, 110, 2, .45], ['bp_*', 1, 110, 4, .6],
     ['antibio', 1, 45, 2, .5],
+    ['shells', 10, 4, 3, .5], ['pistol', 1, 240, 4, .3], ['shotgun', 1, 320, 5, .25], ['nailgun', 1, 110, 3, .3], ['pan', 1, 20, 1, .3], ['turkeysq', 1, 25, 1, .25],   // 0.30
     ['armor_pad', 1, 55, 2, .4], ['armor_sport', 1, 80, 3, .35], ['armor_riot', 1, 140, 4, .3],   // 0.28 armor   // 0.18: Dot sells antibiotics from trader level 2 (about every other day)
   ];
   D.STREETS = ['Halsey St', 'Bergen St', 'Dean St', 'Putnam Ave', 'Jefferson Ave', 'Macon St', 'Decatur St', 'Hancock St', 'Lafayette Ave', 'Greene Ave', 'Quincy St', 'Gates Ave', 'Madison St', 'Monroe St', 'Kosciuszko St', 'Stuyvesant Ave', 'Tompkins Ave', 'Marcy Ave', 'Nostrand Ave', 'Bedford Ave', 'Franklin Ave', 'Classon Ave', 'Atlantic Ave', 'Fulton St', 'Pacific St', 'Prospect Pl', 'Sterling Pl', 'St Marks Ave', 'Park Pl', 'Sterling St'];
