@@ -857,6 +857,13 @@ click eat or drink - make a pop-up next to it")
   placed under the tapped slot (above it if no room), with a pointer arrow and a close button. Follows scroll and
   resize; a tap outside it (not on another slot) closes it.
 
+## Done in 0.30.2 (owner: "when I walk to a place that's not at my home it doesn't automatically collect ... we have to
+walk like 100 m ... pinpoint where someone's base is and don't let them [claim] around that area at home")
+- map.js home spot: localStorage 'dm-map-home' {lat, lon (4 dp), t}, this phone only, never synced. Asked once per map
+  visit on a good fix until set ("Are you at home?"); the 🏠 top-bar button shows it / moves it (once per 7 days).
+- walkedTo(pl): places more than HOME_R (250 m) from home count at once; inside the home zone (or with no home set)
+  the old rule stays (been away from it with the map open, or WALK_OK 80 m walked). Dashed orange ring on the map.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
