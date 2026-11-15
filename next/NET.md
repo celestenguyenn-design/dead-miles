@@ -39,6 +39,7 @@ anon only:
 | `next_get_board()` | rows published in the last 14 days, by steps_week desc, max 100 |
 | `next_party_join(h,t,code)` | `{ok, code, members, data, created}` / `error:'full'` (6 max) / `'code'`. Joining a party leaves your other party. |
 | `next_party_leave(h,t,code)` | `{ok}`. An empty party is deleted. |
+| `next_party_list(h,t)` | `{ok, parties:[{code,members,n,mine,updated}]}` - every party with members (0.26.5, next/party.sql). |
 | `next_party_get(h,t,code)` | `{ok, party:{code,members,data,created,mine}}`. Empty code = the party I am in. |
 | `next_party_shift(h,t,code,week,kills,defense)` | `{ok, code, week, members, horde:{shifts:{handle:{k,d,n,at}}}, mine}`. Adds one watch shift to `next_parties.data.horde[week]`. `week` must be a Sunday within 8 days of today; kills clamped 0..200 (total 1200), defense 0..500; max 6 shifts per member per week (`error:'max'`). Errors: `auth`, `code`, `member`, `week`. Weeks older than 35 days are pruned; other `data` keys are kept. Migration `next_party_shift` (2026-11-13). |
 | `next_daily_submit(h,t,day,score,detail jsonb)` | 0.18, **not applied yet - SQL in `next/daily.sql`**. `{ok:true, best}` (best = the stored score). The FIRST submission per handle per New York day is kept; later ones change nothing. `day` must be today or yesterday (New York) else `error:'day'`; score clamped 0..100000; detail ≤2 KB object. Table `next_daily` (day, handle) pk. |
@@ -75,7 +76,7 @@ State: `ok, handle, name, token, status ('online'|'offline'|'checking'|'bad-key'
 - `NET.publish(pub, {now})`: debounced 15 s. `steps_today`, `steps_week` and
   `typed_share` are filled from the ledger if you leave them out.
 - `await NET.board()`: rows, also cached in localStorage for offline.
-- `await NET.partyJoin(code)`, `NET.partyLeave()`, `NET.partyGet(code?)`
+- `await NET.partyJoin(code)`, `NET.partyLeave()`, `NET.partyGet(code?)`, `NET.partyList()`
 - `await NET.dailySubmit(day, score, detail)` → `{ok, best}` or `{ok:false, error:'signed-out'|'offline'|'auth'|'day'}` (0.18, daily.js)
 - `await NET.dailyBoard(day)` → `{ok, rows, cached}`; the last board is kept in localStorage `dm-next-daily` for offline
 - `NET.openPanel()` / `NET.closePanel()` (netpanel.js)

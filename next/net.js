@@ -569,6 +569,13 @@
     try { const r = await rpc('next_party_leave', { p_handle: NET.handle, p_token: NET.token, p_code: c }); NET.party = null; try { localStorage.removeItem(K.party); } catch (e) { } changed(); return r; }
     catch (e) { setErr(e); return { ok: false, error: 'Could not reach the server.' }; }
   };
+  // 0.26.5 (owner: "make it so that people can see which parties to join"): every party with members, mine first, then
+  // the fullest, then the most recent. [{code, members:[handles], n, mine, updated}] or null when it cannot be reached.
+  NET.partyList = async function () {
+    if (!NET.ok) return null;
+    try { const r = await rpc('next_party_list', { p_handle: NET.handle, p_token: NET.token }); return r && r.ok ? r.parties || [] : null; }
+    catch (e) { setErr(e); return null; }
+  };
   // No code: the party I am in (or null).
   NET.partyGet = async function (code) {
     if (!NET.ok) return null;
