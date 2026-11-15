@@ -844,10 +844,11 @@ way[building]->.b;.b out skel geom qt;
   function renderFx() {
     const el = $('#mvFx'); if (!el || !DM.MapFX) return;
     const ls = DM.MapFX.lines(M.pos), off = DM.MapFX.canOffer();
-    const key = JSON.stringify([ls, off, DM.MapFX.fogOn(), DM.MapFX.cells()]); if (key === M.fxKey) return; M.fxKey = key;
+    const key = JSON.stringify([ls, off, DM.MapFX.fogOn(), DM.MapFX.cells(), DM.MapQ && DM.MapQ.active()]); if (key === M.fxKey) return; M.fxKey = key;
     el.innerHTML = ls.map(l => `<div class="fxl${l.hot ? ' hot' : ''}"><b>${esc(l.t)}</b><span>${esc(l.s)}</span></div>`).join('')
-      + `<div class="fxb">${off ? '<button id="fxDeliv">🚚 Dot\'s delivery</button>' : ''}<button id="fxFog">🌫️ Fog ${DM.MapFX.fogOn() ? 'on' : 'off'} · ${DM.MapFX.cells().toLocaleString('en-US')} cleared</button></div>`;
+      + `<div class="fxb">${DM.MapQ && DM.MapQ.active() ? '<button id="fxQuit">✕ Drop quest</button>' : ''}${off ? '<button id="fxDeliv">🚚 Dot\'s delivery</button>' : ''}<button id="fxFog">🌫️ Fog ${DM.MapFX.fogOn() ? 'on' : 'off'} · ${DM.MapFX.cells().toLocaleString('en-US')} cleared</button></div>`;
     const d = $('#fxDeliv'); if (d) d.onclick = () => { DM.MapFX.offer(M.pos); M.fxKey = ''; renderFx(); };
+    { const q = $('#fxQuit'); if (q) { let sure = 0; q.onclick = () => { if (!sure) { sure = 1; q.textContent = 'Tap again to drop it'; return; } DM.MapQ.drop(); M.fxKey = ''; renderFx(); }; } }
     $('#fxFog').onclick = () => { DM.MapFX.toggleFog(); M.fxKey = ''; M.dirty = true; renderFx(); };
   }
   function renderCard() {

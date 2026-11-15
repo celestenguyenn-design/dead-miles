@@ -79,7 +79,10 @@ window.DM = window.DM || {};
     const dv = s.deliv;
     if (dv && !dv.got && dist(dv.a, pos) <= 30 + Math.min(15, pos.acc / 2)) { dv.got = 1; save(); sfx('pick'); buzz([60, 40, 60]); toast(`🚚 Picked up Dot's package. Now take it to ${dv.b.at} (${fmtD(dist(dv.b, pos))}).`, 3.6); }
     else if (dv && dv.got && dist(dv.b, pos) <= 30 + Math.min(15, pos.acc / 2)) { s.deliv = null; s.delivDone++; save(); const c = 45 + Math.round(dv.len / 40); caps(c); xp(25); const tk = token(.35); reward("🚚 Dot's delivery", dv.b.at, `${c} caps, 25 XP${tk ? ', a capsule token' : ''}`); }
+    if (DM.MapQ) DM.MapQ.onPos(pos, walked);   // 0.31: quests and encounters
   };
+  // 0.31: map quests (mapquest.js) use these
+  X.spots = (pos, lo, hi) => spots(pos, lo, hi); X.give = items => give(items); X.rollItems = (t, n) => rollItems(t, n);
   // ---------------------------------------------------------------- Dot's delivery offer (map card button)
   X.canOffer = () => { const s = st(); newDay(); return !s.deliv && s.delivDone < 1; };
   X.offer = function (pos) {
@@ -97,6 +100,7 @@ window.DM = window.DM || {};
     if (s.radio) out.push({ t: `📻 ${s.radio.at}`, s: `${fmtD(dist(s.radio, pos))} · ${mmss(s.radio.until - now)} left`, hot: 1 });
     for (const d of s.drops) out.push({ t: `${d.air ? '✈️ Air drop' : '📦 Crate'} · ${d.at}`, s: fmtD(dist(d, pos)) + (d.air ? ` · ${mmss(d.until - now)} left` : ''), hot: d.air });
     if (s.deliv) { const tgt = s.deliv.got ? s.deliv.b : s.deliv.a; out.push({ t: `🚚 ${s.deliv.got ? 'Deliver to' : 'Pick up at'} ${tgt.at}`, s: fmtD(dist(tgt, pos)) }); }
+    if (DM.MapQ) return DM.MapQ.lines(pos).concat(out);   // 0.31: quests first
     return out;
   };
   X.cells = () => st().nCells;
@@ -132,5 +136,7 @@ window.DM = window.DM || {};
     for (const d of s.drops) mark(x, SX(wx(d.lon)), SY(wy(d.lat)), d.air ? '✈️' : '📦', d.air ? '#f0c23d' : '#93a86c', t, d.air ? mmss(d.until - now) : '');
     if (s.radio) mark(x, SX(wx(s.radio.lon)), SY(wy(s.radio.lat)), '📻', '#7ee0d8', t, mmss(s.radio.until - now));
     if (s.deliv) { const g = s.deliv.got ? s.deliv.b : s.deliv.a; mark(x, SX(wx(g.lon)), SY(wy(g.lat)), '🚚', '#f07b3c', t, s.deliv.got ? 'drop off' : 'pick up'); }
+    if (DM.MapQ) DM.MapQ.drawMarks(x, t, SX, SY, wx, wy);
   };
+  X.mark = mark;
 })();
