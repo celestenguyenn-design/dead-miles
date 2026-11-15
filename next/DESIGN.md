@@ -797,6 +797,12 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
   map.js picks the best-ranked place in reach first, and with 0 left only upgrades glow / get claimed; the banner says
   "Upgraded! Replaced <name>". New landmark houses keep h.lmKey.
 
+## Done in 0.28.8 (owner: "the map autoclaim should work even if we don't have it open. Or change it to be something we can actually use while walking")
+- A web page gets no location while closed / locked (iPhone and Android browsers), so: Pocket mode (map.js, 🚶 button in
+  the map header): a nearly black, touch-locked overlay (#mvPocket) that keeps the screen awake (wake lock, re-requested
+  when the page becomes visible again) and keeps claiming; shows found x/3, the next place + distance or the status, metres
+  walked, the last claim (flash + sound). The map stops drawing under it. Hold the button ~1.1 s to exit.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

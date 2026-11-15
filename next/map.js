@@ -600,6 +600,7 @@ way[building]->.b;.b out skel geom qt;
     if (!near.length || M.jump) return;
     const pl = near[0], r = DM.Game.addLandmark({ key: keyOf(pl), type: pl.type, name: pl.name, street: pl.street });
     if (r === 'upgrade') pl.replaced = DM.Game.lastReplaced || 'your weakest';
+    if ((r === 'ok' || r === 'upgrade') && M.pocket) { const el = $('#pkLast'); if (el) el.textContent = `${r === 'upgrade' ? 'Upgraded! ' : 'Got '}${pl.name}${pl.replaced ? ' (replaced ' + String(pl.replaced).split(' · ')[0] + ')' : ''}`; const pk = $('#mvPocket'); pk.classList.remove('flash'); void pk.offsetWidth; pk.classList.add('flash'); try { DM.E.SFX.play('pick'); setTimeout(() => DM.E.SFX.play('open'), 220); } catch (e) { /* ignore */ } }
     if (r === 'ok' || r === 'upgrade') {
       DM.E.SFX && DM.E.SFX.play && DM.E.SFX.play('pick');
       if (navigator.vibrate) try { navigator.vibrate([60, 40, 90]); } catch (e) { /* ignore */ }
@@ -676,19 +677,41 @@ way[building]->.b;.b out skel geom qt;
     .mvnext div { flex: 1; min-width: 0; } .mvnext #mvStat { display: block; font-size: 14.5px; font-weight: 900; line-height: 1.25; }
     .mvnext #mvSub2 { display: block; font-size: 11.5px; font-weight: 700; line-height: 1.3; color: var(--mute); }
     .mvnext em { flex: none; font-style: normal; font-size: 15px; font-weight: 900; color: var(--ora); }
+    .mvpocket { position: absolute; inset: 0; z-index: 30; display: none; place-items: center; background: #020208; color: #6a6090; touch-action: none; -webkit-user-select: none; user-select: none; }
+    .mvpocket.on { display: grid; } .mvpocket .pk { text-align: center; padding: 24px; max-width: 360px; }
+    .mvpocket .pkk { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; font-weight: 900; color: #7a4a2a; }
+    .mvpocket .pkbig { font-size: 72px; font-weight: 900; color: #8a6040; line-height: 1; margin-top: 10px; } .mvpocket .pksub { font-size: 13px; margin-bottom: 18px; }
+    .mvpocket .pkline { font-size: 16px; font-weight: 800; color: #7a70a0; margin: 6px 0; } .mvpocket .pkline.dim { font-size: 13px; opacity: .8; } .mvpocket .pkline.last { color: #8aa070; min-height: 20px; }
+    .mvpocket .pkhelp { font-size: 12px; line-height: 1.4; opacity: .7; margin: 18px 0; }
+    .mvpocket .pkexit { position: relative; overflow: hidden; width: 200px; height: 52px; border-radius: 26px; border: 2px solid #3a3058; background: #0c0a18; color: #7a70a0; font: 900 15px Inter, system-ui, sans-serif; touch-action: none; }
+    .mvpocket .pkexit i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #2a2048; }
+    .mvpocket .pkexit.hold i { width: 100%; transition: width 1.1s linear; } .mvpocket .pkexit span { position: relative; }
+    .mvpocket.flash { animation: pkflash 1.2s ease-out; } @keyframes pkflash { 0% { background: #2a3a1a; } 100% { background: #020208; } }
+    .mvtop .mvpk { font-size: 20px; margin-right: 6px; }
     .hname em.lmk { display: inline-flex; align-items: center; gap: 3px; } .hname em.lmk svg { color: var(--ink); }`;
     document.head.appendChild(st);
     const el = document.createElement('div'); el.id = 'mapv';
-    el.innerHTML = `<div class="mvtop"><button id="mvBack">&lsaquo; Back</button><div class="mvt"><b>MAP</b><span id="mvTopSub">Your real streets</span></div><button id="mvHelp" class="mvq" aria-label="What is the map?">?</button></div>
+    el.innerHTML = `<div class="mvtop"><button id="mvBack">&lsaquo; Back</button><div class="mvt"><b>MAP</b><span id="mvTopSub">Your real streets</span></div><button id="mvPocketB" class="mvq mvpk" aria-label="Pocket mode">🚶</button><button id="mvHelp" class="mvq" aria-label="What is the map?">?</button></div>
       <div id="mvMap"><canvas id="mvCv"></canvas><div id="mvPill" class="mvpill"><i></i><span></span></div><div id="mvBanner" class="mvbanner"></div><div id="mvTip" class="mvtip"></div>
         <div class="mvzoom"><button id="mvZin" aria-label="Zoom in">+</button><button id="mvZout" aria-label="Zoom out">&minus;</button></div>
         <button id="mvMe" class="mvme" aria-label="Back to me"><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="none" stroke="#f6e3bb" stroke-width="2.6"/><circle cx="12" cy="12" r="3" fill="#f07b3c"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="#f6e3bb" stroke-width="2.6" stroke-linecap="round"/></svg></button>
         <div class="mvattr">OpenFreeMap &copy; OpenMapTiles · &copy; OpenStreetMap contributors</div><div id="mvMsg" class="mvmsg"></div></div>
       <div class="mvcard" id="mvCard"><div class="mvprog"><span class="mvpips" id="mvPips"></span><span id="mvLeft"></span></div>
         <div class="mvnext"><span class="arr" id="mvArr"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1.5l6 13-6-3.4-6 3.4z" fill="#11142f"/></svg></span><img class="ico" id="mvIco" alt=""><div><span id="mvStat">Finding you...</span><span id="mvSub2"></span></div><em id="mvDist"></em></div></div>
-      <div id="mvIntro" class="mvintro"></div>`;
+      <div id="mvIntro" class="mvintro"></div>
+      <div id="mvPocket" class="mvpocket"><div class="pk"><div class="pkk">Pocket mode · scouting</div><div class="pkbig" id="pkFound">0 / 3</div><div class="pksub">landmarks today</div>
+        <div class="pkline" id="pkNext"></div><div class="pkline dim" id="pkWalk"></div><div class="pkline last" id="pkLast"></div>
+        <p class="pkhelp">Keep walking - places are claimed as you pass, and better ones replace your weakest. Screen stays on (dimmed); pocket touches do nothing.</p>
+        <button id="pkExit" class="pkexit"><i></i><span>Hold to exit</span></button></div></div>`;
     document.body.appendChild(el);
     $('#mvBack').onclick = close;
+    // 0.28.8 (owner: "the map autoclaim should work even if we don't have it open. Or change it to be something we can
+    // actually use while walking"): a web page gets no location while closed or locked, so: Pocket mode - a nearly
+    // black, touch-locked screen that stays awake and keeps claiming; the map stops drawing to save battery.
+    $('#mvPocketB').onclick = () => pocket(true);
+    { const b = $('#pkExit'); let t = 0; const down = e => { e.preventDefault(); b.classList.add('hold'); t = setTimeout(() => { b.classList.remove('hold'); pocket(false); }, 1100); };
+      const up = () => { clearTimeout(t); b.classList.remove('hold'); }; b.addEventListener('pointerdown', down); b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up); }
+    $('#mvPocket').addEventListener('pointerdown', e => { if (!e.target.closest('#pkExit')) e.preventDefault(); });
     $('#mvHelp').onclick = () => { DM.E.SFX && DM.E.SFX.play && DM.E.SFX.play('ui'); intro(true); };
     $('#mvMe').onclick = () => { M.follow = true; $('#mvMe').classList.remove('on'); };
     $('#mvZin').onclick = () => zoomBy(1.4); $('#mvZout').onclick = () => zoomBy(1 / 1.4);
@@ -696,6 +719,8 @@ way[building]->.b;.b out skel geom qt;
     cv.addEventListener('pointerdown', pdown); cv.addEventListener('pointermove', pmove); cv.addEventListener('pointerup', pup); cv.addEventListener('pointercancel', pup);
     cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, e.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
     addEventListener('resize', () => { if (M.on) size(); });
+    // 0.28.8: the phone drops the screen-awake lock whenever the page is hidden - ask again when it comes back
+    document.addEventListener('visibilitychange', () => { if (M.on && document.visibilityState === 'visible' && navigator.wakeLock) navigator.wakeLock.request('screen').then(w => { M.wake = w; }).catch(() => { }); });
     addEventListener('online', () => { if (M.on && (M.offline || M.fails)) { M.offline = false; retry(); } });
   }
   function message(title, body, btn, fn, kind) {
@@ -790,9 +815,23 @@ way[building]->.b;.b out skel geom qt;
     for (const t of ['pharmacy', 'bodega', 'police', 'school', 'laundro', 'garage', 'rowS', 'rowL', 'apt']) img(t);
     intro(false); renderCard(); scoutPill();
     cancelAnimationFrame(M.raf); M.lastT = 0; M.raf = requestAnimationFrame(frame);
-    clearInterval(M.cardT); M.cardT = setInterval(() => { if (M.on) { if (M.pos) claim(); renderCard(); } }, 1000);
+    clearInterval(M.cardT); M.cardT = setInterval(() => { if (M.on) { if (M.pos) claim(); renderCard(); pocketCard(); } }, 1000);
+  }
+  function pocket(on) {
+    M.pocket = on; const el = $('#mvPocket'); if (!el) return;
+    el.classList.toggle('on', on);
+    if (on) { try { if (DM.E.SFX && DM.E.SFX.init) DM.E.SFX.init(); } catch (e) { /* ignore */ } pocketCard(); }
+    else { M.dirty = true; renderCard(); }
+  }
+  function pocketCard() {
+    if (!M.pocket) return;
+    const left = DM.Game.landmarkLeft(), found = 3 - left, t = M.pos ? target() : null;
+    $('#pkFound').textContent = `${found} / 3`;
+    $('#pkNext').textContent = M.status ? M.status : !M.pos ? 'Finding you...' : t ? `Next: ${t.name} · ${fmtD(t.d)}` : 'Nothing to scout nearby - keep walking';
+    $('#pkWalk').textContent = (M.walkedM || 0) < WALK_OK ? `Walk ${Math.ceil(WALK_OK - (M.walkedM || 0))} m more to start scouting` : `${Math.round(M.walkedM)} m walked with the map open`;
   }
   function close() {
+    pocket(false);
     M.on = false; const v = $('#mapv'); if (v) v.classList.remove('on');
     if (M.watch != null) { try { navigator.geolocation.clearWatch(M.watch); } catch (e) { /* ignore */ } M.watch = null; }
     if (M.wake) { try { M.wake.release(); } catch (e) { /* ignore */ } M.wake = null; }
@@ -876,6 +915,7 @@ way[building]->.b;.b out skel geom qt;
   function frame(t) {
     if (!M.on) return;
     M.raf = requestAnimationFrame(frame);
+    if (M.pocket) return;   // 0.28.8: nothing to draw under the pocket screen
     if (t - M.lastT < 30) return;   // ~30 fps is plenty, and kinder to the battery
     const dt = M.lastT ? Math.min(.1, (t - M.lastT) / 1000) : 0; M.lastT = t;
     const p = me(), c = M.cam;
