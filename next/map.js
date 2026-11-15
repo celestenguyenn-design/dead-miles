@@ -677,6 +677,11 @@ way[building]->.b;.b out skel geom qt;
     .mvnext div { flex: 1; min-width: 0; } .mvnext #mvStat { display: block; font-size: 14.5px; font-weight: 900; line-height: 1.25; }
     .mvnext #mvSub2 { display: block; font-size: 11.5px; font-weight: 700; line-height: 1.3; color: var(--mute); }
     .mvnext em { flex: none; font-style: normal; font-size: 15px; font-weight: 900; color: var(--ora); }
+    .mvfx { position: absolute; left: 10px; right: 10px; bottom: calc(118px + var(--sb, 0px)); z-index: 6; display: grid; gap: 4px; pointer-events: none; }
+    .mvfx .fxl { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 10px; background: rgba(17,20,47,.88); border: 2px solid #3d2d61; font-size: 12px; color: #f6e3bb; }
+    .mvfx .fxl.hot { border-color: #f0c23d; } .mvfx .fxl span { color: #9d90bf; font-weight: 800; white-space: nowrap; }
+    .mvfx .fxb { display: flex; gap: 6px; pointer-events: auto; } .mvfx .fxb button { flex: 1; padding: 6px 8px; border-radius: 10px; background: rgba(17,20,47,.88); border: 2px solid #5a4a86; color: #f6e3bb; font: 800 11px Inter, system-ui, sans-serif; }
+    .mvpocket .pkline.fx { color: #b0a060; font-size: 14px; }
     .mvpocket { position: absolute; inset: 0; z-index: 30; display: none; place-items: center; background: #020208; color: #6a6090; touch-action: none; -webkit-user-select: none; user-select: none; }
     .mvpocket.on { display: grid; } .mvpocket .pk { text-align: center; padding: 24px; max-width: 360px; }
     .mvpocket .pkk { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; font-weight: 900; color: #7a4a2a; }
@@ -698,9 +703,10 @@ way[building]->.b;.b out skel geom qt;
         <div class="mvattr">OpenFreeMap &copy; OpenMapTiles · &copy; OpenStreetMap contributors</div><div id="mvMsg" class="mvmsg"></div></div>
       <div class="mvcard" id="mvCard"><div class="mvprog"><span class="mvpips" id="mvPips"></span><span id="mvLeft"></span></div>
         <div class="mvnext"><span class="arr" id="mvArr"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1.5l6 13-6-3.4-6 3.4z" fill="#11142f"/></svg></span><img class="ico" id="mvIco" alt=""><div><span id="mvStat">Finding you...</span><span id="mvSub2"></span></div><em id="mvDist"></em></div></div>
+      <div id="mvFx" class="mvfx"></div>
       <div id="mvIntro" class="mvintro"></div>
       <div id="mvPocket" class="mvpocket"><div class="pk"><div class="pkk">Pocket mode · scouting</div><div class="pkbig" id="pkFound">0 / 3</div><div class="pksub">landmarks today</div>
-        <div class="pkline" id="pkNext"></div><div class="pkline dim" id="pkWalk"></div><div class="pkline last" id="pkLast"></div>
+        <div class="pkline" id="pkNext"></div><div class="pkline fx" id="pkFx"></div><div class="pkline dim" id="pkWalk"></div><div class="pkline last" id="pkLast"></div>
         <p class="pkhelp">Keep walking - places are claimed as you pass, and better ones replace your weakest. Screen stays on (dimmed); pocket touches do nothing.</p>
         <button id="pkExit" class="pkexit"><i></i><span>Hold to exit</span></button></div></div>`;
     document.body.appendChild(el);
@@ -766,7 +772,18 @@ way[building]->.b;.b out skel geom qt;
   }
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmtD = d => d < 1000 ? Math.max(5, Math.round(d / 5) * 5) + ' m' : (d / 1000).toFixed(1) + ' km';
+  // 0.29: the map's jobs (mapfx.js) under the card: what is out there, how far, how long; Dot's delivery; fog on/off
+  function renderFx() {
+    const el = $('#mvFx'); if (!el || !DM.MapFX) return;
+    const ls = DM.MapFX.lines(M.pos), off = DM.MapFX.canOffer();
+    const key = JSON.stringify([ls, off, DM.MapFX.fogOn(), DM.MapFX.cells()]); if (key === M.fxKey) return; M.fxKey = key;
+    el.innerHTML = ls.map(l => `<div class="fxl${l.hot ? ' hot' : ''}"><b>${esc(l.t)}</b><span>${esc(l.s)}</span></div>`).join('')
+      + `<div class="fxb">${off ? '<button id="fxDeliv">🚚 Dot\'s delivery</button>' : ''}<button id="fxFog">🌫️ Fog ${DM.MapFX.fogOn() ? 'on' : 'off'} · ${DM.MapFX.cells().toLocaleString('en-US')} cleared</button></div>`;
+    const d = $('#fxDeliv'); if (d) d.onclick = () => { DM.MapFX.offer(M.pos); M.fxKey = ''; renderFx(); };
+    $('#fxFog').onclick = () => { DM.MapFX.toggleFog(); M.fxKey = ''; M.dirty = true; renderFx(); };
+  }
   function renderCard() {
+    renderFx();
     if (!$('#mvCard')) return;
     const left = DM.Game.landmarkLeft(), got = 3 - left;
     $('#mvPips').innerHTML = [0, 1, 2].map(i => `<i class="${i < got ? 'on' : ''}"></i>`).join('');
@@ -828,6 +845,7 @@ way[building]->.b;.b out skel geom qt;
     const left = DM.Game.landmarkLeft(), found = 3 - left, t = M.pos ? target() : null;
     $('#pkFound').textContent = `${found} / 3`;
     $('#pkNext').textContent = M.status ? M.status : !M.pos ? 'Finding you...' : t ? `Next: ${t.name} · ${fmtD(t.d)}` : 'Nothing to scout nearby - keep walking';
+    { const ls = DM.MapFX && M.pos ? DM.MapFX.lines(M.pos) : []; $('#pkFx').textContent = ls.length ? ls.slice(0, 2).map(l => `${l.t} · ${l.s}`).join('  |  ') : ''; }
     $('#pkWalk').textContent = (M.walkedM || 0) < WALK_OK ? `Walk ${Math.ceil(WALK_OK - (M.walkedM || 0))} m more to start scouting` : `${Math.round(M.walkedM)} m walked with the map open`;
   }
   function close() {
@@ -872,6 +890,7 @@ way[building]->.b;.b out skel geom qt;
     if (first && M.msgKind === 'gps') message();
     fetchAround(pos, true);
     claim(); renderCard();
+    if (DM.MapFX) { DM.MapFX.onPos(pos, M.walkedM || 0); pocketCard(); }   // 0.29: drops, radio calls, deliveries, fog
   }
 
   // ------------------------------------------------------------- camera + touch
@@ -1069,6 +1088,7 @@ way[building]->.b;.b out skel geom qt;
     x.fillStyle = C.GROUND; x.fillRect(0, 0, M.W, M.H);
     if (S) { const k = c.s / S.s; x.drawImage(S.cv, M.W / 2 + (S.cx - c.x) * c.s - S.w / 2 * k, M.H / 2 + (S.cy - c.y) * c.s - S.h / 2 * k, S.w * k, S.h * k); }
     const SX = v => (v - c.x) * c.s + M.W / 2, SY = v => (v - c.y) * c.s + M.H / 2;
+    if (DM.MapFX) DM.MapFX.drawFog(x, SX, SY, wx, wy, M.W, M.H);   // 0.29: fog of war (unwalked squares)
     zombies(x, t, dt);
     const P = M.lastMe, px = P ? SX(P.x) : M.W / 2, py = P ? SY(P.y) : M.H / 2;
     // fog: her lamp makes a pool of light; the rest of the night closes in
@@ -1089,6 +1109,7 @@ way[building]->.b;.b out skel geom qt;
       } else if (M.guess) { x.beginPath(); x.arc(px, py, Math.min(M.guess.acc * c.s, 400), 0, 6.2832); x.fillStyle = 'rgba(157,144,191,.08)'; x.fill(); }
     }
     drawPlaces(x, t, SX, SY);
+    if (DM.MapFX) DM.MapFX.drawMarks(x, t, SX, SY, wx, wy);   // 0.29: crates, air drops, radio calls, Dot's delivery
     // her: the game's own survivor sprite, walking when she moves
     if (P) {
       x.fillStyle = 'rgba(9,8,26,.55)'; x.beginPath(); x.ellipse(px, py + 1, 13, 4.5, 0, 0, 6.2832); x.fill();
