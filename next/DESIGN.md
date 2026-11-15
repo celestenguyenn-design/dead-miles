@@ -705,6 +705,14 @@ are looted by hand, Project Zomboid / 7 Days to Die style, on a phone.
 - Android app (StepsWorker): a 0-step read after 10 AM sets the status line to "Health Connect has 0 steps for today ..."
   with the fix. The APK is rebuilt by the Pages workflow (apk job).
 
+## Done in 0.26.9 (owner: "how do we get it to be a homescreen app" -> "that should be step 1 for iphones AND androids")
+- next/manifest.json (its own: start_url/scope ./, icons from the root) + manifest / apple-touch-icon links: installs as a
+  full-screen app at /next/.
+- install.js: before a new player makes a character, on a phone not opened from the icon, "Step 1 - put Dead Miles on
+  your home screen" with this phone's steps (iPhone Safari Share; Android Chrome menu + a one-tap Install button when
+  beforeinstallprompt fires; Samsung Internet menu). iPhone warns the home-screen app keeps its own save. "Continue in
+  the browser instead" (per session; iPhone asks to confirm). The tour's setup also starts with it when still needed.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
