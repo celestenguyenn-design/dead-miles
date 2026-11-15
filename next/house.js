@@ -977,7 +977,7 @@
   // by: 0.15 - a raider (raiders.js) hitting a zombie: no sneak bonus, no xp or kill count for her
   function hitZombie(z, fa, base = 34, ranged, by) {
     const sneak = !by && (z.st === 'sleep' || z.st === 'idle' || z.st === 'search' || (z.raider && (z.st === 'loot' || z.st === 'goto') && !z.aggro)) && z.kind !== 'turkey';
-    let dmg = Math.round(base * (sneak ? (SK.sneakMul() || (job() === 'hunter' ? 1.6 : 1.45)) : 1) + Math.random() * 4);   // 0.34: Tracker Silent kill x2
+    let dmg = Math.round(base * (sneak ? (SK.sneakMul() || (job() === 'hunter' ? 1.6 : 1.45)) : 1) * (!by && DM.Codex ? DM.Codex.dmgVs(z) : 1) + Math.random() * 4);   // 0.35: bestiary tiers   // 0.34: Tracker Silent kill x2
     if (z.raider) { RA.damage(z, dmg, fa, by || null, sneak); return; }
     if (by) { z.foe = by; if (z.st === 'idle' || z.st === 'investigate' || z.st === 'search' || z.st === 'sleep') { z.st = 'chase'; z.stT = 0; z.lostT = 0; } }
     else if (ranged && z.st !== 'chase') alertZombie(z, G.p.x, G.p.y, true);

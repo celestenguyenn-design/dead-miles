@@ -102,7 +102,7 @@ window.DM = window.DM || {};
     school: { t: 'Kids\' drawings in the window', d: 'Crayon suns and stick families. A backpack hangs on the fence.', opts: [
       { t: 'Check the backpack', p: .85, win: 'Snacks and a paperback, still dry.', lose: 'A cat hisses out of it. Just a cat.', r: { items: [['snack', 2], ['book', 1]] } }, { t: 'Leave a note for whoever comes back', p: 1, win: 'It feels right. You feel a little braver.', r: { xp: 15 } }] },
     bodega: { t: 'The bodega cat', d: 'A one-eyed orange cat sits on the counter like it owns the place. It probably does.', opts: [
-      { t: 'Share a snack', p: 1, win: 'It purrs and knocks something off a shelf for you.', cost: ['snack', 1], r: { items: [['battery', 1], ['tape', 1]], xp: 8 } }, { t: 'Pet it and go', p: .7, win: 'Best cat.', lose: 'It scratches you. Fair.', hurt: 3 }] },
+      { t: 'Share a snack', p: 1, flag: 'cat', win: 'It purrs and knocks something off a shelf for you.', cost: ['snack', 1], r: { items: [['battery', 1], ['tape', 1]], xp: 8 } }, { t: 'Pet it and go', p: .7, win: 'Best cat.', lose: 'It scratches you. Fair.', hurt: 3 }] },
     laundro: { t: 'Lost and found', d: 'A bin of clothes nobody came back for.', opts: [
       { t: 'Dig through it', p: .9, win: 'Clean rags, and something shiny at the bottom.', lose: 'Moths. So many moths.', r: { items: [['cloth', 3]], loot: ['wardrobe', 1] } }, { t: 'Leave it', p: 1, win: 'Fine.' }] },
     garage: { t: 'A half-fixed car', d: 'Hood up, tools everywhere. Someone left in a hurry.', opts: [
@@ -147,6 +147,7 @@ window.DM = window.DM || {};
     if (o.cost && !has(o.cost[0], o.cost[1])) return { text: `You need ${o.cost[1]} ${DM.D.ITEMS[o.cost[0]].n.toLowerCase()} for that.`, bad: 1, keep: 1 };
     if (o.cost) G().takeItems(o.cost[0], o.cost[1]);
     const r = rng(seed), ok = r() < o.p;
+    if (ok && o.flag && DM.Codex) DM.Codex.flag(o.flag);   // 0.35: feats
     let text = ok ? o.win : o.lose, bad = !ok, rw = '';
     if (!ok && o.hurt) text += ` (${hurt(o.hurt)})`;
     const pay = o.r ? Object.assign({}, o.r) : null;

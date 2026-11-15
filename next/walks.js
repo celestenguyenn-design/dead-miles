@@ -98,7 +98,7 @@ window.DM = window.DM || {};
     w.ms.push(t); SV().trader.caps += m[2]; tok(m[3]); if (m[4]) G().unlockCos('cos_' + m[4]); if (!w.title) w.title = m[1];
     G().save(); SFX.play('pick'); toast(`🏅 ${m[1]}! +${m[2]} caps, ${m[3]} capsule token${m[3] > 1 ? 's' : ''}${m[4] ? ' and a legendary cosmetic' : ''}`, 3); render();
   }
-  W.titles = () => { const w = st(); return w ? MS.filter(m => w.ms.includes(m[0])).map(m => m[1]).concat(w.best >= 30 ? ['Iron Legs'] : []) : []; };
+  W.titles = () => { const w = st(); return w ? MS.filter(m => w.ms.includes(m[0])).map(m => m[1]).concat(w.best >= 30 ? ['Iron Legs'] : []).concat(DM.Codex ? DM.Codex.titles() : []) : []; };   // 0.35: + Codex feat titles
   W.title = () => { const w = st(); return w && w.title && W.titles().includes(w.title) ? w.title : ''; };
   // ---------------------------------------------------------------- the tab
   let host = null;
