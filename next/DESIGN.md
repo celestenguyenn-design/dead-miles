@@ -864,6 +864,14 @@ walk like 100 m ... pinpoint where someone's base is and don't let them [claim] 
 - walkedTo(pl): places more than HOME_R (250 m) from home count at once; inside the home zone (or with no home set)
   the old rule stays (been away from it with the map open, or WALK_OK 80 m walked). Dashed orange ring on the map.
 
+## Done in 0.30.3 (owner: "how can we prevent people from cheating? ... I go to my boyfriend's every Friday, so my base
+kind of changes on the weekend")
+- Up to 2 home spots (dm-map-home is now an array; old single object still read). Adding one is always allowed (it only
+  protects more ground); with 2 set, the oldest can be moved once a week.
+- Learned home zones (dm-map-spots): the ~110 m square (lat/lon to 3 dp) she opens the map in is noted once per map visit
+  per day; a square seen on 3+ different days counts as a home zone too. So a fake home far away does not free the real
+  one for more than a couple of days. Learned zones draw as a fainter ring.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
