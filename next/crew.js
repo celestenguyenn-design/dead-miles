@@ -87,7 +87,7 @@
     for (let d = 0; d < n; d++) for (const m of crew()) {
       let fed = false;
       for (const k of foods) { const i = stash.findIndex(e => e.k === k); if (i < 0) continue; if (!--stash[i].n) stash.splice(i, 1); fed = true; break; }
-      if (fed) { ate++; m.hungry = 0; m.mood = Math.min(100, m.mood + 6); m.xp += 1; }
+      if (fed) { ate++; m.hungry = 0; m.mood = Math.min(100, m.mood + 6); m.xp += 1; if (m.hp != null) m.hp = Math.min(C.maxHp(m), m.hp + 10 + (crew().some(x => x.role === 'medic' && x !== m) ? 10 : 0)); }   // 0.51: a fed night's rest heals a little (more with a medic)
       else { missed++; m.hungry++; m.mood = Math.max(0, m.mood - 22); }
     }
     if (ate) lines.push(`The crew ate ${ate} food from the stash.`);
@@ -368,15 +368,34 @@
   // 0.44.3 (owner: "your crew should have HP and get attacked as well in horde night"): fighters have HP (80 + 8 a level,
   // guards +40). A zombie right next to one hits it every ~1.2 s. At 0 HP they fall back hurt: out of fights and runs
   // for the rest of the day, mood -8 (the medic's morning rounds and a good night fix it).
-  function fhp(m) { const mx = 80 + 8 * C.lv(m) + (m.role === 'guard' ? 40 : 0); return { hp: mx, maxHp: mx, hitT: .8, flash: 0 }; }
+  // 0.51 (owner: "if your crew dies while you're looting a house, they die permanently. Their HP should stay ... we have to
+  // keep healing them. We should provide our crew members with weapons ... and armor"): m.hp persists (null = full);
+  // m.wpn = { k, q, d } and m.arm = { k, d } are theirs (out of your stash). Healing: Patch up in a fight, the crew sheet
+  // (bandage / painkillers), the medic, and a little rest every morning.
+  C.maxHp = m => 80 + 8 * C.lv(m) + (m.role === 'guard' ? 40 : 0);
+  C.hpOf = m => m.hp == null ? C.maxHp(m) : Math.max(0, Math.min(C.maxHp(m), m.hp));
+  function fhp(m) { const mx = C.maxHp(m); return { hp: m.ally ? mx : Math.max(1, C.hpOf(m)), maxHp: mx, hitT: .8, flash: 0 }; }
+  const syncHp = e => { if (e && e.m && !e.m.ally) e.m.hp = Math.max(0, Math.round(e.hp)); };
   function hurtMate(e, g) {
     e.hitT -= g.dtLast || .016; e.flash = Math.max(0, e.flash - (g.dtLast || .016) * 3);
     if (e.hitT > 0) return;
     const z = g.zs.find(z => !z.dead && (!z.raider || (z.camp && z.aggro)) && z.st !== 'sleep' && z.st !== 'idle' && z.st !== 'rise' && z.st !== 'guard' && dist(z, e) < .85 * T);
     if (!z) { e.hitT = .3; return; }
-    e.hitT = 1.2; e.hp -= Math.round(9 * (z.dmgMul || 1)); e.flash = 1; SFX.play('hurt');
+    const arm = e.m.arm && D.ITEMS[e.m.arm.k] && D.ITEMS[e.m.arm.k].armor;
+    let dmg = Math.round(9 * (z.dmgMul || 1)); if (arm) { dmg = Math.max(1, Math.round(dmg * (1 - arm.red))); e.m.arm.d = Math.max(0, (e.m.arm.d != null ? e.m.arm.d : arm.dur) - 1); if (!e.m.arm.d) { toast(`${e.m.name}'s ${D.ITEMS[e.m.arm.k].n.toLowerCase()} fell apart`, 1.8); e.m.arm = null; } }
+    e.hitT = 1.2; e.hp -= dmg; e.flash = 1; SFX.play('hurt'); syncHp(e);
+    // in a house (looting, deep runs, camps) a crew member who drops is gone for good
+    if (e.hp <= 0 && R.kind === 'house' && !e.m.ally) {
+      e.gone = 1; const m = e.m, v = SV(); v.crew.list = v.crew.list.filter(x => x !== m);
+      if (m.wpn || m.arm) { const back = [m.wpn, m.arm].filter(Boolean).map(x => Object.assign({ n: 1 }, x)); if (DM.House && DM.House.G) for (const x of back) DM.House.G.drops.push({ k: x.k, n: 1, d: x.d, q: x.q, x: e.x, y: e.y, t: .5 }); }
+      if (DM.Journal) DM.Journal.note(`${m.name} died in there. I couldn't save them.`);
+      G().save(); SFX.play('kill');
+      toast(`${m.name} is dead. ${m.wpn || m.arm ? 'Their gear lies where they fell.' : ''}`, 3.4);
+      if (R.mate === e) R.mate = null; if (R.fighters) R.fighters = R.fighters.filter(x => x !== e);
+      return;
+    }
     if (e.hp <= 0) {
-      e.gone = 1; e.m.hurt = dayNo(); e.m.mood = Math.max(0, e.m.mood - 8); G().save();
+      e.gone = 1; e.m.hurt = dayNo(); e.m.hp = 1; e.m.mood = Math.max(0, e.m.mood - 8); G().save();
       toast(`${e.m.name} is hurt and falls back${R.kind === 'shift' ? ' inside' : ' - heading home'}. Resting until tomorrow.`, 2.6);
       if (R.mate === e) R.mate = null; if (R.fighters) R.fighters = R.fighters.filter(x => x !== e);
     }
@@ -396,10 +415,12 @@
     else { e.vx *= Math.exp(-8 * dt); e.vy *= Math.exp(-8 * dt); e.ph = E.lerp(e.ph, 0, .1); }
     if (tgt && dist(tgt, e) < 1.4 * T && !e.cd) {
       e.cd = 1.1; e.swing = .25; e.flip = tgt.x < e.x;
-      const dmg = (16 + 3 * lv) * (role === 'guard' ? 1.5 : 1);
+      const w = e.m.wpn && D.WEAPONS[(D.ITEMS[e.m.wpn.k] || {}).w], wm = w && !w.ranged ? D.wDmg(e.m.wpn) * .8 : 16;   // 0.51: their own weapon
+      const dmg = (wm + 3 * lv) * (role === 'guard' ? 1.5 : 1);
+      if (w && !w.ranged && e.m.wpn.d != null) { e.m.wpn.d--; if (e.m.wpn.d <= 0) { toast(`${e.m.name}'s ${D.ITEMS[e.m.wpn.k].n.toLowerCase()} broke`, 1.8); e.m.wpn = null; } }
       DM.House.hurtZombie(tgt, dmg, Math.atan2(tgt.y - e.y, tgt.x - e.x), true); SFX.play('swing');
     }
-    if (role === 'medic') { e.mt = (e.mt || 20) - dt; if (e.mt <= 0) { e.mt = 20; const all = (R.fighters || []).concat(R.mate ? [R.mate] : []).filter(x => !x.gone && x !== e && x.hp < x.maxHp * .7); const w = all.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0]; if (w && dist(w, e) < 6 * T) { w.hp = Math.min(w.maxHp, w.hp + 15 + 3 * lv); toast(`${e.m.name} patches up ${w.m.name}`, 1.4); } } }   // 0.46.2: medics heal the crew too
+    if (role === 'medic') { e.mt = (e.mt || 20) - dt; if (e.mt <= 0) { e.mt = 20; const all = (R.fighters || []).concat(R.mate ? [R.mate] : []).filter(x => !x.gone && x !== e && x.hp < x.maxHp * .7); const w = all.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0]; if (w && dist(w, e) < 6 * T) { w.hp = Math.min(w.maxHp, w.hp + 15 + 3 * lv); syncHp(w); toast(`${e.m.name} patches up ${w.m.name}`, 1.4); } } }   // 0.46.2: medics heal the crew too
     if (role === 'medic' && !e.healed && p.hp > 0 && p.hp < DM.D.maxHp(DM.S) * .4) { e.healed = 1; p.hp = Math.min(DM.D.maxHp(DM.S), p.hp + 12 + 3 * lv); toast(`${e.m.name} patches you up (+${12 + 3 * lv} HP)`, 2); SFX.play('pick'); }
   }
   C.mateFind = () => R && R.mate && R.mate.m.role === 'scavenger' ? .1 + .02 * C.lv(R.mate.m) : 0;   // house.js: extra-find chance
@@ -524,7 +545,7 @@
     for (const e of (R.fighters || []).concat(R.mate ? [R.mate] : [])) {
       if (e.gone || e.hp >= e.maxHp || Math.hypot(e.x - g.p.x, e.y - g.p.y) > 1.6 * T) continue;
       const k = g.pack.some(x => x.k === 'bandage') ? 'bandage' : g.pack.some(x => x.k === 'meds') ? 'meds' : null;
-      if (k) A(e, 'Patch up', `${e.m.name} (${D.ITEMS[k].n.toLowerCase()})`, () => { const i = g.pack.findIndex(x => x.k === k); if (i < 0) return; if (!--g.pack[i].n) g.pack.splice(i, 1); const h = k === 'meds' ? 60 : 35; e.hp = Math.min(e.maxHp, e.hp + h); SFX.play('pick'); toast(`${e.m.name} +${h} HP`, 1.4); }, { dur: .9, verb: 'patching up' });
+      if (k) A(e, 'Patch up', `${e.m.name} (${D.ITEMS[k].n.toLowerCase()})`, () => { const i = g.pack.findIndex(x => x.k === k); if (i < 0) return; if (!--g.pack[i].n) g.pack.splice(i, 1); const h = k === 'meds' ? 60 : 35; e.hp = Math.min(e.maxHp, e.hp + h); syncHp(e); SFX.play('pick'); toast(`${e.m.name} +${h} HP`, 1.4); }, { dur: .9, verb: 'patching up' });
     }
     if (R.kind === 'base') for (const e of R.ents) {
       if (e.m) A(e, 'Talk', e.m.name, () => chat(e.m));
@@ -621,7 +642,10 @@
           <span>${nx ? `Lv ${lv + 1}: ${Math.floor(m.xp)}/${nx}` : 'Max level'}</span><i class="cbar"><i style="width:${nx ? Math.min(100, (m.xp - LVX[lv - 1]) / (nx - LVX[lv - 1]) * 100) : 100}%"></i></i></div>
           <div class="cpast">${esc(m.name)} ${esc(m.past)}.${m.hungry ? ` <b class="bad">Hungry ${m.hungry} day${m.hungry > 1 ? 's' : ''}${m.hungry >= 2 ? ' - leaves tomorrow without food!' : ''}</b>` : ''}</div>
           ${m.mate ? '<span class="pactive">Comes along on runs</span> <button class="linkbtn" data-mate="">Leave at base</button>' : `<button class="mbtn sm ghost" data-mate="${m.id}">Take on runs</button>`}
-          ${m.hurt === dayNo() ? `<button class="mbtn sm ghost" data-heal="${m.id}">Patch up · 2 bandages</button>` : ''}
+          ${(() => { const hp = C.hpOf(m), mx = C.maxHp(m), w = m.wpn, a = m.arm; return `<div class="cbars"><span>HP ${hp}/${mx}</span><i class="cbar"><i style="width:${hp / mx * 100}%;background:${hp / mx > .5 ? '#7fd49a' : hp / mx > .25 ? '#e0b94a' : '#ff6b5a'}"></i></i></div>
+            ${hp < mx ? `<div class="cgear"><button class="mbtn sm ghost" data-heal="${m.id}" data-hk="bandage">Bandage +35</button><button class="mbtn sm ghost" data-heal="${m.id}" data-hk="meds">Painkillers +60</button></div>` : ''}
+            <div class="cgear"><span>⚔ ${w ? `${esc(D.QUAL[D.qOf(w)].n)} ${esc(D.ITEMS[w.k].n.toLowerCase())}` : 'bare hands'}</span><button class="linkbtn" data-gw="${m.id}">${w ? 'swap' : 'give a weapon'}</button>${w ? `<button class="linkbtn" data-tw="${m.id}">take</button>` : ''}</div>
+            <div class="cgear"><span>🛡 ${a ? esc(D.ITEMS[a.k].n.toLowerCase()) : 'no armor'}</span><button class="linkbtn" data-ga="${m.id}">${a ? 'swap' : 'give armor'}</button>${a ? `<button class="linkbtn" data-ta="${m.id}">take</button>` : ''}</div>`; })()}
           <button class="linkbtn" data-dis="${m.id}">Dismiss</button></div></div>`; }).join('')
         : '<div class="empty">No crew yet. About 1 house in 25 has someone hiding in a closet or a secret room - more in mansions and police stations.</div>'}
       <div class="kick sect">Strays · ${pl.length}/${C.MAX_PETS}</div>
@@ -640,10 +664,23 @@
     $('#csClose').onclick = closeSheet;
     el.querySelectorAll('[data-dis]').forEach(b => b.onclick = () => {
       if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Tap again: send them away?'; return; }
-      const m = crew().find(x => x.id === b.dataset.dis); v.crew.list = v.crew.list.filter(x => x !== m); G().save(); toast(`${m.name} packs a bag and heads off. "Good luck."`, 2.2); C.openSheet();
+      const m = crew().find(x => x.id === b.dataset.dis); if (m) { back(m.wpn); back(m.arm); } v.crew.list = v.crew.list.filter(x => x !== m); G().save(); toast(`${m.name} packs a bag and heads off. "Good luck."`, 2.2); C.openSheet();
     });
     // 0.37 (owner liked "companion on runs"): one crew member can follow her into houses and fight beside her
-    el.querySelectorAll('[data-heal]').forEach(b => b.onclick = () => { const m = crew().find(x => x.id === b.dataset.heal); if (!m) return; if (G().countItem('bandage') < 2) { toast('Needs 2 bandages (pack or stash)', 1.8); return; } G().takeItems('bandage', 2); m.hurt = 0; m.mood = Math.min(100, m.mood + 4); G().save(); SFX.play('pick'); toast(`${m.name} is patched up and ready`, 1.8); C.openSheet(); });   // 0.46.2
+    el.querySelectorAll('[data-heal]').forEach(b => b.onclick = () => { const m = crew().find(x => x.id === b.dataset.heal), k = b.dataset.hk; if (!m) return; if (G().countItem(k) < 1) { toast(`No ${D.ITEMS[k].n.toLowerCase()} in your pack or stash`, 1.8); return; } G().takeItems(k, 1); m.hp = Math.min(C.maxHp(m), C.hpOf(m) + (k === 'meds' ? 60 : 35)); if (m.hp > C.maxHp(m) * .25) m.hurt = 0; G().save(); SFX.play('pick'); toast(`${m.name}: HP ${m.hp}/${C.maxHp(m)}`, 1.6); C.openSheet(); });   // 0.51
+    // 0.51: give / take crew gear (out of / back into the stash)
+    const s0 = () => SV().survivor, pickFrom = (test, onPick, title) => {
+      const s = s0(), list = []; for (const [from, L] of [['pack', s.pack], ['stash', s.stash]]) L.forEach(e => { if (test(e)) list.push({ from, e }); });
+      if (!list.length) { toast(`No ${title} in your pack or stash`, 1.8); return; }
+      panel(`<div class="kick">${esc(title)}</div><h3>Pick one</h3><div class="cplist">${list.map((x, i) => `<button class="mbtn sm ghost" data-pk="${i}" style="width:100%;text-align:left">${esc(D.ITEMS[x.e.k].n)}${D.isWeapon(x.e.k) ? ` · ${D.QUAL[D.qOf(x.e)].n} · ${D.wDmg(x.e)} dmg` : ''}</button>`).join('')}</div><button class="mbtn ghost" id="pkNo">Cancel</button>`);
+      document.querySelectorAll('[data-pk]').forEach(b => b.onclick = () => { const x = list[+b.dataset.pk], L = s0()[x.from], i = L.indexOf(x.e); if (i < 0) return; L.splice(i, 1); onPick(x.e); G().save(); SFX.play('pick'); C.openSheet(); });
+      document.getElementById('pkNo').onclick = () => C.openSheet();
+    };
+    const back = x => { if (x) G().routeApi.toStash([Object.assign({ n: 1 }, x)]); };
+    el.querySelectorAll('[data-gw]').forEach(b => b.onclick = () => { const m = crew().find(x => x.id === b.dataset.gw); if (!m) return; pickFrom(e => D.isWeapon(e.k) && !(D.WEAPONS[D.ITEMS[e.k].w] || {}).ranged, e => { back(m.wpn); m.wpn = { k: e.k, q: D.qOf(e), d: e.d != null ? e.d : D.wMax(e) }; toast(`${m.name} takes the ${D.ITEMS[e.k].n.toLowerCase()}`, 1.6); }, 'melee weapons'); });
+    el.querySelectorAll('[data-tw]').forEach(b => b.onclick = () => { const m = crew().find(x => x.id === b.dataset.tw); if (!m || !m.wpn) return; back(m.wpn); m.wpn = null; G().save(); C.openSheet(); });
+    el.querySelectorAll('[data-ga]').forEach(b => b.onclick = () => { const m = crew().find(x => x.id === b.dataset.ga); if (!m) return; pickFrom(e => D.ITEMS[e.k] && D.ITEMS[e.k].armor, e => { back(m.arm); m.arm = { k: e.k, d: e.d != null ? e.d : D.ITEMS[e.k].armor.dur }; toast(`${m.name} puts on the ${D.ITEMS[e.k].n.toLowerCase()}`, 1.6); }, 'armor'); });
+    el.querySelectorAll('[data-ta]').forEach(b => b.onclick = () => { const m = crew().find(x => x.id === b.dataset.ta); if (!m || !m.arm) return; back(m.arm); m.arm = null; G().save(); C.openSheet(); });
     el.querySelectorAll('[data-mate]').forEach(b => b.onclick = () => { for (const m of crew()) m.mate = !!b.dataset.mate && m.id === b.dataset.mate; G().save(); SFX.play('ui'); if (b.dataset.mate) toast(`${crew().find(m => m.mate).name} will come along on your runs`, 2); C.openSheet(); });
     el.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { for (const p of pets()) p.active = p.id === b.dataset.act; G().save(); SFX.play('ui'); C.openSheet(); });
     el.querySelectorAll('[data-ren]').forEach(b => b.onclick = () => { const p = pets().find(x => x.id === b.dataset.ren); renameSheet(p); });

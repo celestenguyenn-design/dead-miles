@@ -1141,6 +1141,18 @@ in my backpack it zooms my screen all the way to the top")
 - Keys: LOOT weight x0.45 (measured 0.98 -> 0.52 a house). New uses: Dot > Sell has a Brass keys row - sell 1 for 15
   caps, or 3 for a blueprint (pickBP); the cache bag's "2 keys: open now" opens a walking cache without the walk.
 
+## Done in 0.51.0 (owner: crew "die permanently" in houses; "HP should stay ... we have to keep healing them"; "provide
+our crew members with weapons ... and armor"; blueprint trade "more than 3 - I have 30 brass keys")
+- crew.js: m.hp persists (C.hpOf / C.maxHp; null = full). Fights start at their saved HP and write it back on every hit
+  and heal. Dropping to 0 in a 'house' run (houses, deep runs, camps) = dead: removed from the crew, journal line, their
+  weapon / armor fall on the floor (pick up, quality kept). On a watch shift / base raid they still just fall back hurt.
+- Healing: Patch up in a fight (bandage +35 / painkillers +60), the crew sheet (same items, from pack or stash), the
+  medic, and +10 HP each fed morning (+10 more with a medic in the crew).
+- Gear: crew sheet "give a weapon" (melee only) / "give armor" - moves it out of the stash onto them (m.wpn {k,q,d}, m.arm
+  {k,d}); take / swap returns to the stash; dismissing returns it. Weapon: hit = 80% of its damage + 3/level, wears and
+  can break; armor: cuts hits by its rating, wears and can fall apart.
+- Dot: 10 brass keys per blueprint (was 3).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
