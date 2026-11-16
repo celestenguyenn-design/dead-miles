@@ -1084,6 +1084,11 @@ in my backpack it zooms my screen all the way to the top")
   pack; medics heal the most-hurt crew mate nearby every 20 s; at home a member who fell back hurt can be patched up
   with 2 bandages (crew sheet) to fight again today.
 
+## Done in 0.46.3 (owner: "on the map, if I click one of the quests ... it should show me where on the map")
+- Every line on the map card (quests, survivors, crates, air drops, radio calls, deliveries, strange places, camps)
+  carries lat/lon; tapping it (map.js focusOn) stops following her, centers the map there, and pulses orange rings on
+  the spot for 5 s. The target button (bottom right) comes back to her.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

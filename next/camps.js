@@ -163,7 +163,7 @@ window.DM = window.DM || {};
   CP.lines = function (pos) {
     const n = N(); if (!pos || !n || !n.ok) return [];
     const sp = CP.spots(pos).filter(x => !mine(x.c)).map(x => [x, dist(x, pos)]).sort((a, b) => a[1] - b[1])[0];
-    return sp ? [{ t: `🏴 ${sp[0].c.name} · ${sp[0].c.handle ? sp[0].c.owner : 'bandits'}`, s: fmtD(sp[1]) }] : [];
+    return sp ? [{ t: `🏴 ${sp[0].c.name} · ${sp[0].c.handle ? sp[0].c.owner : 'bandits'}`, s: fmtD(sp[1]), lat: sp[0].lat, lon: sp[0].lon }] : [];
   };
   const css = document.createElement('style'); css.textContent = `
     .cplist { display: grid; gap: 5px; margin: 6px 0; } .cprow { display: flex; justify-content: space-between; gap: 8px; padding: 7px 10px; border-radius: 10px; background: rgba(17,20,47,.6); border: 2px solid #3d2d61; font-size: 13px; }

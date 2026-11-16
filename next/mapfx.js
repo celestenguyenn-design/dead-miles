@@ -103,9 +103,9 @@ window.DM = window.DM || {};
   // ---------------------------------------------------------------- what to show (map card / pocket mode)
   X.lines = function (pos) {
     const s = st(), out = [], now = Date.now(); if (!pos) return out;
-    if (s.radio) out.push({ t: `📻 ${s.radio.at}`, s: `${fmtD(dist(s.radio, pos))} · ${mmss(s.radio.until - now)} left`, hot: 1 });
-    for (const d of s.drops) out.push({ t: `${d.air ? '✈️ Air drop' : '📦 Crate'} · ${d.at}`, s: fmtD(dist(d, pos)) + (d.air ? ` · ${mmss(d.until - now)} left` : ''), hot: d.air });
-    if (s.deliv) { const tgt = s.deliv.got ? s.deliv.b : s.deliv.a; out.push({ t: `🚚 ${s.deliv.got ? 'Deliver to' : 'Pick up at'} ${tgt.at}`, s: fmtD(dist(tgt, pos)) }); }
+    if (s.radio) out.push({ t: `📻 ${s.radio.at}`, s: `${fmtD(dist(s.radio, pos))} · ${mmss(s.radio.until - now)} left`, hot: 1, lat: s.radio.lat, lon: s.radio.lon });
+    for (const d of s.drops) out.push({ t: `${d.air ? '✈️ Air drop' : '📦 Crate'} · ${d.at}`, s: fmtD(dist(d, pos)) + (d.air ? ` · ${mmss(d.until - now)} left` : ''), hot: d.air, lat: d.lat, lon: d.lon });
+    if (s.deliv) { const tgt = s.deliv.got ? s.deliv.b : s.deliv.a; out.push({ t: `🚚 ${s.deliv.got ? 'Deliver to' : 'Pick up at'} ${tgt.at}`, s: fmtD(dist(tgt, pos)), lat: tgt.lat, lon: tgt.lon }); }
     if (DM.MapQ) return DM.MapQ.lines(pos).concat(DM.Camps ? DM.Camps.lines(pos) : [], out, DM.MapPOI ? DM.MapPOI.lines(pos) : []);   // 0.31: quests first; 0.43 the nearest made-up place
     return out;
   };

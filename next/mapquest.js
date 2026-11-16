@@ -299,8 +299,8 @@ window.DM = window.DM || {};
   Q.drop = () => { const s = st(); if (!s.active) return; toast(`Dropped "${QUESTS[s.active.q].title}"`, 2); s.active = null; save(); };
   Q.lines = function (pos) {
     const s = st(), out = []; if (!pos) return out; newDay();
-    const a = s.active; if (a) { const sp = QUESTS[a.q].steps[a.i]; out.push({ t: `❓ ${sp.goal}${a.pt ? ' · ' + a.pt.at : ''}`, s: a.pt ? fmtD(dist(a.pt, pos)) : 'keep walking', hot: 1 }); }
-    for (const g of s.givers) out.push({ t: `${g.leg ? '⭐' : QUESTS[g.q].story ? '📖' : '❗'} ${QUESTS[g.q].who} · ${g.at}`, s: fmtD(dist(g, pos)), hot: g.leg });
+    const a = s.active; if (a) { const sp = QUESTS[a.q].steps[a.i]; out.push({ t: `❓ ${sp.goal}${a.pt ? ' · ' + a.pt.at : ''}`, s: a.pt ? fmtD(dist(a.pt, pos)) : 'keep walking', hot: 1, lat: a.pt && a.pt.lat, lon: a.pt && a.pt.lon }); }
+    for (const g of s.givers) out.push({ t: `${g.leg ? '⭐' : QUESTS[g.q].story ? '📖' : '❗'} ${QUESTS[g.q].who} · ${g.at}`, s: fmtD(dist(g, pos)), hot: g.leg, lat: g.lat, lon: g.lon });
     return out;
   };
   Q.drawMarks = function (x, t, SX, SY, wx, wy) {
