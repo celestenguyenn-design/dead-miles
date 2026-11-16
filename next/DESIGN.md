@@ -1042,6 +1042,15 @@ capsule we should be able to see how many caps we have")
 - gacha.js: caps shown next to tokens on the machine (tab + card); Buy is disabled when short.
 - base.js tick guards a frame after the shift closed (an intermittent null S.shift error).
 
+## Done in 0.45.0 (owner: "the UI is definitely still confusing ... for everyone that's new ... if you've never played
+these type of games")
+- game.js guideCard(): "What to do next" on the home screen (after the tutorial): the 3 most useful steps right now
+  (defend a raid, low HP, skill points, food for the crew, a better weapon, a house to loot, sell junk to Dot, craft,
+  open the map, walk to the next house), each tappable to the right place. Hide / show (SV.guideOff).
+- Gradual unlocks for brand-new saves only (SV.unlocks = [] when a survivor is made with no runs yet; older saves have
+  no SV.unlocks = everything open): Walks / Crew / Daily / Event tab at level 2, Capsules / Codex / Walk together at 3,
+  Weekly boss / Deep runs at 4. Each unlock shows a short "Unlocked" card once (UNLOCK table, unlockPops). Game.unl(k).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.44.3';
+const NEXT_VERSION = '0.45.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1100,6 +1100,7 @@ const NEXT_VERSION = '0.44.3';
     } else { if ($('#cSignIn')) $('#cSignIn').onclick = () => { SFX.play('ui'); if (window.NET && NET.openPanel) NET.openPanel('old'); else openAccount(); };   // 0.28.3: an existing account loads its save instead
     $('#cGo').onclick = async () => {
       SV.survivor = createSurvivor(cre.name.trim(), LK.norm(cre.look), cre.job);
+      if (!SV.stats.runs) SV.unlocks = [];   // 0.45: a brand-new player opens the extra features one by one
       DM.S = SV.survivor; Game.save(); publish();
       if (DM.Tour) DM.Tour.queue();   // 0.26.2: setup (steps) first, before the tutorial house and any tip
       await E.buildSurvivor(cre.look);
@@ -1224,9 +1225,11 @@ const NEXT_VERSION = '0.44.3';
           ${IS_IOS && window.NET && NET.ok ? '<button class="mbtn sm" id="mSyncNow" style="width:100%;margin:8px 0 0">Sync my steps now</button>' : ''}
         </div>
       </div>
+      ${SV.tutorialDone ? guideCard() : ''}
       ${gated ? homeTiles() : eventBanner()}
-      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Walks ? `<button data-t="walks">Walks${DM.Walks.claimable() && curTab !== 'walks' ? '<i class="tbadge">!</i>' : ''}</button>` : ''}${SV.tutorialDone && DM.Gacha ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}<button data-t="help" class="helptab" aria-label="Help for this tab">?</button></div>
+      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Walks && unl('walks') ? `<button data-t="walks">Walks${DM.Walks.claimable() && curTab !== 'walks' ? '<i class="tbadge">!</i>' : ''}</button>` : ''}${SV.tutorialDone && DM.Gacha && unl('gacha') ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA && unl('event') ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}<button data-t="help" class="helptab" aria-label="Help for this tab">?</button></div>
       <div id="mpane"></div>`;
+    bindGuide(); setTimeout(unlockPops, 600);   // 0.45
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { if (b.dataset.t === 'help') { helpTab(); return; } SFX.play('ui'); if (b.dataset.t === 'map') { DM.Map.open(); return; } tab(b.dataset.t); }; });
     $('#mLog').onclick = () => {
       const v = parseInt(String($('#mSteps').value).replace(/[^0-9]/g, ''), 10); /* "8,500" or "8 500" is 8500, not 8 */ if (!(v > 0)) { toast('Type your step total for today', 1.6); return; }
@@ -1379,9 +1382,65 @@ const NEXT_VERSION = '0.44.3';
         <div class="hbtnrow">${open && mine < HD.MAX_SHIFTS ? '<button class="mbtn sm" id="hShift">Start watch shift</button>' : open ? '<span class="hdone">Shifts done this week</span>' : '<span class="hdone">Shifts open 24 h before</span>'}<button class="mbtn sm ghost" id="hParty">${code ? 'Party' : 'Join party'}</button></div>
         ${res ? resultHTML(res[0], res[1]) : ''}</div>`;
   }
+  // ---------------------------------------------------------------- 0.45 (owner: "the UI is confusing for everyone that's
+  // new ... especially if you've never played these type of games"): (1) a "What to do next" card - 1-3 plain steps picked
+  // from where she is right now, each one tappable; (2) brand-new saves (SV.unlocks set when the survivor is made) open the
+  // extra features one by one as they level up, each with a short "Unlocked" card. Saves from before 0.45 keep everything.
+  const UNLOCK = {   // feature: [level, title, what it is]
+    walks: [2, 'Walks', 'Get paid for walking: keep a daily streak (5,000 steps), pick an expedition your steps carry you through, and claim milestones.'],
+    crew: [2, 'Crew & strays', 'Survivors hiding in houses can join you. They live at your base, eat from your stash, and help - one can even come on runs.'],
+    daily: [2, 'Daily challenge', 'One special house a day, the same for everyone. Loot it and see how you score against your friends.'],
+    event: [2, 'Holiday events', 'Seasonal events add special zombies, food, decor and Dot jobs. Check the event tab while one is on.'],
+    gacha: [3, 'Capsule machine', 'Spend tokens (from walking, or 50 caps) on random cosmetics: outfits, hats, hair and more.'],
+    codex: [3, 'Codex', 'Your bestiary (kill more of a kind to hit it harder) and feats that pay caps and unlock titles.'],
+    social: [3, 'Walk together', 'Walk with friends: a shared party step goal and a weekly step race with prizes.'],
+    boss: [4, 'Weekly boss', 'A big zombie every week. Walk to reach it, then fight it in short rounds with your party.'],
+    deep: [4, 'Deep runs', 'Floor after floor of a big building. The deeper you go, the better the loot - but you only keep it if you get out.'],
+  };
+  const unl = k => !SV.unlocks || !UNLOCK[k] || DM.Skills.level(SV.survivor) >= UNLOCK[k][0];
+  Game.unl = unl;
+  function unlockPops() {   // one card at a time for whatever just opened up
+    if (!SV.unlocks || DM.scene || $('#msheet').classList.contains('on')) return;
+    const k = Object.keys(UNLOCK).find(k => unl(k) && !SV.unlocks.includes(k)); if (!k) return;
+    SV.unlocks.push(k); Game.save(); const U = UNLOCK[k];
+    sheetOpen(`<div class="kick">Unlocked · level ${U[0]}</div><h3>${esc(U[1])}</h3><p class="mp">${esc(U[2])}</p><p class="mp dim">You'll find it on the home screen. The ? button explains any tab.</p><button class="mbtn" id="ulOk">Got it</button>`);
+    $('#ulOk').onclick = () => { sheetClose(); setTimeout(unlockPops, 300); };
+  }
+  function guideSteps() {
+    const s = SV.survivor, out = [], add = (k, t, sub) => { if (out.length < 3 && !out.some(x => x.k === k)) out.push({ k, t, sub }); };
+    const rd = BS.raid && BS.raid(); if (rd && (rd.st === 'pending' || rd.st === 'fighting')) add('raid', 'Defend your base', 'Walkers are at your fence - go fight them off');
+    if (s.hp < maxHp(s) * .4) add('gear', 'Patch yourself up', 'Your HP is low - eat, or use a bandage or painkillers (Gear tab)');
+    const pts = DM.Skills.points(s); if (pts) add('skills', `Spend ${pts} skill point${pts > 1 ? 's' : ''}`, 'Make yourself stronger - tap Skills');
+    const cr = (SV.crew && SV.crew.list) || []; if (cr.length && !s.stash.some(e => D.ITEMS[e.k] && D.ITEMS[e.k].use === 'Eat')) add('gear', 'Put food in your stash', 'Your crew eats from the stash every morning');
+    if (betterBadge()) add('gear', 'Equip a better weapon', 'You found something stronger - Gear tab');
+    const ready = (SV.houses || []).filter(h => h.status === 'new' || h.run);
+    if (ready.length) add('houses', `Loot a house (${ready.length} waiting)`, 'Houses tab - tap Loot to go in, search, and walk out the front door');
+    if (!dotLeft() && !dotDone() && junkOf(s).length) add('dot', 'Sell junk to Dot', 'Turn things marked Sell into caps');
+    if ((s.known || []).some(k => D.RECIPES[k] && canCraft(D.RECIPES[k]))) add('bench', 'Craft something', 'You have the materials - Workbench tab');
+    let mapUsed = 0; try { mapUsed = localStorage.getItem('dm-next-mapintro2') || localStorage.getItem('dm-next-mapintro'); } catch (e) { /* ignore */ }
+    if (!mapUsed && DM.Map) add('map', 'Open the Map', 'Walk to real places near you - they become bonus houses');
+    const nxt = nextHouseAt(SV.day); if (nxt && !ready.length) add('walk', `Walk to ${nxt.toLocaleString('en-US')} steps`, 'Your steps find new houses to loot');
+    if (!out.length) add('map', 'Take a walk with the map open', 'Crates, survivors and strange places turn up as you walk');
+    return out;
+  }
+  function guideCard() {
+    if (SV.guideOff) return `<button class="gdshow" id="gdShow">What should I do next? ›</button>`;
+    const st = guideSteps();
+    return `<div class="gdcard"><div class="gdhead"><span class="kick">What to do next</span><button class="gdx" id="gdHide" aria-label="Hide">Hide</button></div>${st.map((x, i) => `<button class="gdrow" data-gd="${x.k}"><i>${i + 1}</i><span><b>${esc(x.t)}</b><em>${esc(x.sub)}</em></span><u>›</u></button>`).join('')}</div>`;
+  }
+  function bindGuide() {
+    const h = $('#gdHide'); if (h) h.onclick = () => { SV.guideOff = 1; Game.save(); renderHome(); };
+    const sh = $('#gdShow'); if (sh) sh.onclick = () => { SV.guideOff = 0; Game.save(); renderHome(); };
+    document.querySelectorAll('[data-gd]').forEach(b => b.onclick = () => {
+      SFX.play('ui'); const k = b.dataset.gd;
+      if (k === 'raid') openCardSheet('raid'); else if (k === 'skills') DM.Skills.open(() => renderHome()); else if (k === 'dot') openTrader();
+      else if (k === 'map') DM.Map.open(); else if (k === 'walk') toast('Walk with your phone - steps sync on their own, or type today\'s total above', 2.6);
+      else { tab(k === 'gear' ? 'stash' : k); const m = $('#mtabs'); if (m) m.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    });
+  }
   // the home tiles: one compact tile per feature; each opens its own sheet
   function homeTiles() {
-    const t = [], s = SV.survivor, hr = hordeRes();
+    let t = [], s = SV.survivor, hr = hordeRes();
     if (hr) t.push({ k: 'horde', c: hr[1].hold ? '#93a86c' : '#ff6b5a', n: 'Horde night', sub: hr[1].hold ? 'Your base held!' : 'The horde got in', hot: 'See' });
     if (DM.Boss) {
       const B = DM.Boss; B.roll(); const st = B.state(), boss = B.bossOf(B.week()), ws = B.weekSteps(), far = ws < B.STEPS, dead = st.hp <= 0, left = B.fightsLeft(), pct = Math.round(Math.max(0, st.hp / st.max * 100));
@@ -1408,6 +1467,7 @@ const NEXT_VERSION = '0.44.3';
     if (DM.Codex && SV.tutorialDone) { DM.Codex.check(); const ct = DM.Codex.tile(); if (ct) t.push(ct); }   // 0.35: bestiary + feats
     const gn = BS.gardenNote(); if (gn) t.push({ k: 'garden', c: '#93a86c', n: 'Garden', sub: gn, hot: '' });
     const ev = eventBanner();
+    t = t.filter(x => unl(x.k));   // 0.45: new players get these one by one
     return `<div class="hsect"><span class="kick">This week</span></div>${ev}<div class="tiles">${t.map(x => `<button class="tile" data-tile="${x.k}" style="--tc:${x.c}"><span class="tn">${esc(x.n)}</span><span class="ts">${esc(x.sub)}</span>${x.bar != null ? `<i class="tbar"><i style="width:${Math.max(0, Math.min(100, x.bar))}%"></i></i>` : ''}${x.hot ? `<b class="thot">${esc(x.hot)}</b>` : ''}</button>`).join('')}</div>`;
   }
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
