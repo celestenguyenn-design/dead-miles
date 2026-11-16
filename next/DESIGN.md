@@ -1153,6 +1153,17 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   can break; armor: cuts hits by its rating, wears and can fall apart.
 - Dot: 10 brass keys per blueprint (was 3).
 
+## Done in 0.52.0 (owner: "more things to build, also decorations... move the storage chest... change the color of our houses")
+- Decorate mode can now move build pieces: tap the chest, workbench, barrels, beds, tower, generator etc., then tap
+  an empty yard/shack tile. Saved in base.pos[k]. spotOf(k) applies overrides; reserved() replaces RESERVED.
+- Paint (Decorate > Paint): 10 wall colours, plain/stripe/wainscot, 9 floors. base.paint {wall,wkind,floor},
+  applied by DM.Base.applyPaint -> ART.paintRoom('w', ...). The shack itself can't be moved, only painted.
+- New buildings: campfire (crew +10 HP, +3 mood each morning), greenhouse (crops 30% faster), sandbags (2 tiers,
+  +8 def each), floodlights (2 tiers, +4 def each).
+- 14 new decor items reusing house furniture art (lamppost, TV, heater, cot, crates, chair, dining table, wine rack,
+  stove, fridge, desk, shelf, trash can, side table).
+- Fix: base no longer shows the night/weather loot bonus.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

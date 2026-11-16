@@ -73,7 +73,7 @@
   let G;
   function startRun(layout, o) {
     L = layout; opts = o || {};
-    const lookSeed = L.seed != null && !L.base ? L.seed : null; ART.houseLook(lookSeed); rugLook(lookSeed);   // 0.10: each house its own colours
+    const lookSeed = L.seed != null && !L.base ? L.seed : null; ART.houseLook(lookSeed); rugLook(lookSeed); if ((L.base || L.type === 'base') && DM.Base && DM.Base.applyPaint) DM.Base.applyPaint();   // 0.10: each house its own colours; 0.52 the base's own paint
     ROWS = L.rows; MW = ROWS[0].length; MH = ROWS.length;
     const st = L.start;
     if (S() && S().food) S().hp = F.tick(S(), S().hp);   // hunger/thirst catch up before she goes in
@@ -137,7 +137,7 @@
     spawnInfected(houseZs);
     houseZs.forEach((z, i) => { z.zi = i; });   // 0.18: a stable index (seeded corpse loot, dead-on-resume for the daily house)
     if (G.dly && opts.resume && Array.isArray(opts.resume.zd)) G.zs = G.zs.filter(z => z.zi == null || !opts.resume.zd.includes(z.zi));
-    G.wxb = DM.Weather && DM.Weather.bonus && !G.dly && !L.base && !(opts.noBoss && opts.noFog) && !(L.deep && L.deep.f > 1) ? DM.Weather.bonus() : null;   // 0.39: weather / night bonus
+    G.wxb = DM.Weather && DM.Weather.bonus && !G.dly && !L.base && L.type !== 'base' && !(opts.noBoss && opts.noFog) && !(L.deep && L.deep.f > 1) ? DM.Weather.bonus() : null;   // 0.39: weather / night bonus
     if (G.wxb && !G.wxb.bad && !G.wxb.night) G.wxb = null;
     if (G.wxb && !opts.resume) setTimeout(() => toast(`${G.wxb.label}: +${Math.round((G.wxb.xp - 1) * 100)}% XP and better finds${G.wxb.night ? ' - but the dead are tougher tonight' : ''}`, 3), 1600);
     for (const z of G.zs) if (!z.boss) gsZombie(z);   // 0.19: gamestage (L.gs) - zombie HP and hits, up to +25%

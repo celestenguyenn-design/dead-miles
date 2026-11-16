@@ -49,8 +49,19 @@
       { n: 'Shipping crate (+20 stash)', s: 6000, m: { scrap: 14, nails: 16, tape: 3 }, def: 0 }] },
     gen: { n: 'Generator', d: 'Floodlight over the yard (+defence). More perks later.', tiers: [
       { n: 'Generator', s: 8000, m: { scrap: 12, battery: 6, tape: 3 }, def: 5 }] },
+    // 0.52 (owner: "more things to build")
+    campfire: { n: 'Campfire', d: 'Your crew rests by the fire: +10 HP and better mood every morning.', tiers: [
+      { n: 'Campfire', s: 1500, m: { wood: 6, scrap: 2 }, def: 0 }] },
+    greenhouse: { n: 'Greenhouse', d: 'Plastic sheeting over a frame: crops grow 30% faster.', tiers: [
+      { n: 'Greenhouse', s: 4000, m: { wood: 8, cloth: 6, tape: 4, nails: 10 }, def: 0 }] },
+    sandbags: { n: 'Sandbags', d: 'A sandbag line inside the gate. Soaks up the rush.', tiers: [
+      { n: 'Sandbag line', s: 2500, m: { cloth: 6, wood: 2 }, def: 8 },
+      { n: 'Double sandbags', s: 4500, m: { cloth: 10, scrap: 4 }, def: 8 }] },
+    lights: { n: 'Floodlights', d: 'Light poles in the yard. Easier to see them coming.', tiers: [
+      { n: 'Floodlight', s: 3000, m: { scrap: 6, battery: 3, tape: 2 }, def: 4 },
+      { n: 'Second floodlight', s: 4000, m: { scrap: 6, battery: 4, tape: 2 }, def: 4 }] },
   };
-  const ORDER = ['walls', 'gate', 'spikes', 'wire', 'tower', 'beds', 'barrel', 'bunks', 'storage', 'gen'];
+  const ORDER = ['walls', 'gate', 'spikes', 'wire', 'sandbags', 'lights', 'tower', 'beds', 'greenhouse', 'barrel', 'campfire', 'bunks', 'storage', 'gen'];
   const mech = () => G().survivor && G().survivor.job === 'mechanic';
   function costOf(key, tier, repair) { // tier: 1-based tier being built
     const t = PIECES[key].tiers[tier - 1], k = (mech() ? .75 : 1) * (repair ? .3 * (DM.Crew ? DM.Crew.repairMul() : 1) : 1), m = {};   // a Tinkerer in the crew makes repairs cheaper
@@ -65,7 +76,8 @@
       const d = st && st.day; b.pool = d ? Math.min(POOL_MAX, Math.round((d.phone || 0) + (d.walk || 0) + (d.typed || 0) * .5)) : 0;
     }
     b.v = b.v || 1;
-    b.built = Object.assign({ walls: 0, gate: 0, tower: 0, spikes: 0, wire: 0, barrel: 0, beds: 0, gen: 0, bunks: 0, storage: 0 }, b.built || {});
+    b.built = Object.assign({ walls: 0, gate: 0, tower: 0, spikes: 0, wire: 0, barrel: 0, beds: 0, gen: 0, bunks: 0, storage: 0, campfire: 0, greenhouse: 0, sandbags: 0, lights: 0 }, b.built || {});
+    b.pos = b.pos && typeof b.pos === 'object' ? b.pos : {}; b.paint = b.paint && typeof b.paint === 'object' ? b.paint : {};   // 0.52: moved pieces, shack paint
     b.broken = b.broken && typeof b.broken === 'object' ? b.broken : {};
     b.beds = Array.isArray(b.beds) ? b.beds : [];
     while (b.beds.length < 4) b.beds.push(null);
@@ -98,6 +110,7 @@
     let d = 0;
     if (b.built.walls) { const ids = wallIds(), ok = ids.filter(i => !b.broken[i]).length; d += PIECES.walls.tiers[b.built.walls - 1].def * ok / ids.length; }
     for (const k of ['gate', 'tower', 'gen']) if (b.built[k] && !b.broken[k]) d += PIECES[k].tiers[b.built[k] - 1].def;
+    for (const k of ['sandbags', 'lights']) if (b.built[k] && !b.broken[k]) d += PIECES[k].tiers.slice(0, b.built[k]).reduce((a, t) => a + t.def, 0);   // 0.52
     for (const k of ['spikes', 'wire']) if (b.built[k] && !b.broken[k]) d += 5 * b.built[k];
     if (DM.Crew && b === base()) d += DM.Crew.guardDef();
     if (b === base() && DM.Skills && DM.Skills.defBonus) d += DM.Skills.defBonus(SV().survivor);   // 0.34: Tinkerer Rigged yard   // Guards in the crew stand watch on horde night
@@ -117,7 +130,7 @@
   }
   B.plantState = function (p, t = dayNo()) {
     if (!p) return null;
-    const C = D.CROPS[p.k], need = C.days, w = new Set(p.w || []);
+    const C = D.CROPS[p.k], need = base().built.greenhouse ? Math.max(1, Math.round(C.days * .7)) : C.days, w = new Set(p.w || []);   // 0.52: greenhouse
     let grown = 0, streak = 0, dead = !!p.dead;
     for (let d = p.d0; d < t && !dead; d++) {
       if (grown >= need) break;
@@ -181,7 +194,13 @@
   const SX0 = 5, SX1 = 13, SY0 = 5, SY1 = 11, DOOR = [9, 11];  // the shack
   const GATE = [9, 10, 11];                                     // gap in the south fence
   const SPOTS = { chest: [6, 6, 1, 1], bench: [10, 6, 3, 1], barrel0: [3, 6, 1, 1], barrel1: [16, 6, 1, 1],
-    beds0: [4, 15, 2, 1], beds1: [4, 18, 2, 1], beds2: [14, 15, 2, 1], beds3: [14, 18, 2, 1], tower: [15, 21, 2, 2], gen: [3, 22, 1, 1] };
+    beds0: [4, 15, 2, 1], beds1: [4, 18, 2, 1], beds2: [14, 15, 2, 1], beds3: [14, 18, 2, 1], tower: [15, 21, 2, 2], gen: [3, 22, 1, 1],
+    campfire: [12, 17, 1, 1], greenhouse: [6, 20, 3, 2], sandbags: [6, 21, 3, 1], lights0: [3, 13, 1, 1], lights1: [17, 13, 1, 1] };
+  // 0.52 (owner: "be able to move the storage chest ... make it more cool"): every build piece can be moved in Decorate mode;
+  // b.pos[key] = [x, y] overrides the default spot
+  const MOVABLE = { chest: 'Stash chest', bench: 'Workbench', barrel0: 'Rain barrel', barrel1: 'Rain barrel', beds0: 'Garden bed 1', beds1: 'Garden bed 2', beds2: 'Garden bed 3', beds3: 'Garden bed 4', tower: 'Watchtower', gen: 'Generator', campfire: 'Campfire', greenhouse: 'Greenhouse', sandbags: 'Sandbags', lights0: 'Floodlight', lights1: 'Floodlight' };
+  const spotOf = k => { const b = base(), p = b && b.pos && b.pos[k], s0 = SPOTS[k]; return p ? [p[0], p[1], s0[2], s0[3]] : s0; };
+  const isBuilt = k => { const b = base(), bt = b.built; if (k === 'chest' || k === 'bench') return true; if (/^barrel\d/.test(k)) return bt.barrel > +k.slice(6); if (/^beds\d/.test(k)) return bt.beds > +k.slice(4); if (/^lights\d/.test(k)) return bt.lights > +k.slice(6); return !!bt[k]; };
   function wallIds() { // in order around the ring, so neighbours in the list are neighbours on the ground
     const o = [];
     for (let x = FX0; x <= FX1; x++) o.push('w' + x + ',' + FY0);
@@ -201,9 +220,12 @@
   const inYard = (x, y) => x > FX0 && x < FX1 && y > FY0 && y < FY1 && !(x >= SX0 && x <= SX1 && y >= SY0 && y <= SY1);
   // where decor can go: wall rows (posters, lights) and the floor of the yard and shack
   const WALLROW = new Set(); for (let x = SX0 + 1; x < SX1; x++) { WALLROW.add(x + ',' + SY0); if (x !== DOOR[0]) WALLROW.add(x + ',' + SY1); }
-  const RESERVED = new Set();
-  for (const k in SPOTS) { const [x, y, w, h] = SPOTS[k]; for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) RESERVED.add((x + i) + ',' + (y + j)); }
-  for (const t of [[9, 10], [9, 12], [9, 13], [9, 23], [10, 23], [11, 23], [10, 22], [7, 6], [9, 6]]) RESERVED.add(t.join(','));
+  const PATHS = [[9, 10], [9, 12], [9, 13], [9, 23], [10, 23], [11, 23], [10, 22]];
+  function reserved(ignore) {   // 0.52: build spots (where they are now) + the paths
+    const R = new Set(PATHS.map(t => t.join(',')));
+    for (const k in SPOTS) { if (k === ignore) continue; const [x, y, w, h] = spotOf(k); for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) R.add((x + i) + ',' + (y + j)); if (k === 'chest' || k === 'bench') R.add(x + ',' + (y + h)); }
+    return R;
+  }
   function layout() {
     const rows = [];
     for (let y = 0; y < MH; y++) {
@@ -428,6 +450,18 @@
     if (face === 3) mir = !mir;
     if (mir) { c.save(); c.translate(2 * f.x + f.w, 0); c.scale(-1, 1); fn(c, f, g); c.restore(); } else fn(c, f, g);
   };
+  // 0.52 build-piece art
+  F.bcampfire = (c, f, g) => { const cx = f.x + f.w / 2, cy = f.y + f.h - 8, t = (g && g.t) || 0;
+    for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; dot(c, cx + Math.cos(a) * 13, cy + Math.sin(a) * 6, 5, '#7d8398'); }
+    blk(c, cx - 12, cy - 6, 24, 5, '#7a5040', 2, 1.6); blk(c, cx - 3, cy - 12, 6, 12, '#7a5040', 2, 1.6);
+    const fl = 1 + Math.sin(t * 9) * .12; c.fillStyle = '#f07b3c'; c.beginPath(); c.moveTo(cx - 9, cy - 6); c.quadraticCurveTo(cx - 6, cy - 26 * fl, cx, cy - 34 * fl); c.quadraticCurveTo(cx + 6, cy - 26 * fl, cx + 9, cy - 6); c.fill();
+    c.fillStyle = '#ffd23c'; c.beginPath(); c.moveTo(cx - 4, cy - 6); c.quadraticCurveTo(cx, cy - 22 * fl, cx + 4, cy - 6); c.fill(); };
+  F.bgreenhouse = (c, f) => { const x = f.x + 4, w = f.w - 8, yb = f.y + f.h, H = f.H;
+    c.fillStyle = 'rgba(160,220,200,.35)'; c.strokeStyle = P.INK; c.lineWidth = 2.4; c.beginPath(); c.moveTo(x, yb); c.lineTo(x, yb - H + 18); c.lineTo(x + w / 2, yb - H); c.lineTo(x + w, yb - H + 18); c.lineTo(x + w, yb); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle = 'rgba(17,20,47,.6)'; c.lineWidth = 1.6; for (let i = 1; i < 4; i++) { c.beginPath(); c.moveTo(x + w * i / 4, yb); c.lineTo(x + w * i / 4, yb - H + 18 + Math.abs(i - 2) * 6); c.stroke(); }
+    for (let i = 0; i < 5; i++) dot(c, x + 10 + i * (w - 20) / 4, yb - 10, 5, '#5c8a3c'); };
+  F.bsandbags = (c, f) => { const rows = f.tier > 1 ? 2 : 1, yb = f.y + f.h;
+    for (let r0 = 0; r0 < rows; r0++) for (let i = 0; i < Math.floor(f.w / 18); i++) blk(c, f.x + 2 + i * 18 + (r0 % 2) * 9, yb - 12 - r0 * 10, 18, 11, r0 ? '#b8a27a' : '#a8926a', 4, 1.8); };
   // icons: seeds + crops as SVG, decor drawn from its furniture art
   (function icons() {
     const S = '#11142f';
@@ -470,19 +504,23 @@
   function pieceFurn() { // the build pieces as furniture definitions (layout format)
     const b = base(), out = [], br = b.broken, wt = b.built.walls;
     const P2 = (id, art, at, H, o = {}) => out.push(Object.assign({ art, at, H, piece: id, solid: 1 }, o));
-    P2('chest', 'bchest', SPOTS.chest, 34, { name: 'Stash chest' });
-    P2('bench', 'workbench', SPOTS.bench, 34, { name: 'Workbench' });
+    P2('chest', 'bchest', spotOf('chest'), 34, { name: 'Stash chest', mv: 'chest' });
+    P2('bench', 'workbench', spotOf('bench'), 34, { name: 'Workbench', mv: 'bench' });
     if (wt) for (const id of wallIds()) {
       const [x, y] = id.slice(1).split(',').map(Number), v = (x === FX0 || x === FX1) && y !== FY0 && y !== FY1;
       P2(id, 'bfence', [x, y, 1, 1], [0, 30, 40, 50][wt], { tier: wt, ori: v ? 'v' : 'h', broken: !!br[id], solid: br[id] ? 0 : 1, fence: 1, d: 6 });
     }
     if (b.built.gate) P2('gate', 'bgate', [GATE[0], FY1, GATE.length, 1], [0, 32, 42, 52][b.built.gate], { tier: b.built.gate, broken: !!br.gate, open: b.gateOpen && !S.shift, solid: br.gate || (b.gateOpen && !S.shift) ? 0 : 1, fence: 1, d: 6, name: 'Gate' });
     for (const k of ['spikes', 'wire']) if (b.built[k] && !br[k]) for (const [x, y] of trapTiles(k, b.built[k])) P2(k, k === 'spikes' ? 'bspikes' : 'bwire', [x, y, 1, 1], 24, { solid: 0, trap: k });
-    if (b.built.tower) P2('tower', 'btower', SPOTS.tower, 96, { broken: !!br.tower, name: 'Watchtower', d: 20 });
-    if (b.built.gen) P2('gen', 'bgen', SPOTS.gen, 30, { broken: !!br.gen, name: 'Generator' });
+    if (b.built.tower) P2('tower', 'btower', spotOf('tower'), 96, { broken: !!br.tower, name: 'Watchtower', d: 20, mv: 'tower' });
+    if (b.built.gen) P2('gen', 'bgen', spotOf('gen'), 30, { broken: !!br.gen, name: 'Generator', mv: 'gen' });
+    if (b.built.campfire) P2('campfire', 'bcampfire', spotOf('campfire'), 20, { name: 'Campfire', mv: 'campfire', solid: 1 });
+    if (b.built.greenhouse) P2('greenhouse', 'bgreenhouse', spotOf('greenhouse'), 60, { name: 'Greenhouse', mv: 'greenhouse', solid: 1 });
+    if (b.built.sandbags) P2('sandbags', 'bsandbags', spotOf('sandbags'), b.built.sandbags > 1 ? 30 : 20, { name: 'Sandbags', mv: 'sandbags', tier: b.built.sandbags });
+    for (let i = 0; i < b.built.lights; i++) P2('lights' + i, 'lamppost', spotOf('lights' + i), 90, { name: 'Floodlight', mv: 'lights' + i, solid: 1 });
     const w = barrels();
-    for (let i = 0; i < b.built.barrel; i++) P2('barrel', 'bbarrel', SPOTS['barrel' + i], 36, { broken: !!br.barrel, water: Math.max(0, w.n - i * 3), name: 'Rain barrel' });
-    for (let i = 0; i < b.built.beds; i++) { const s = B.plantState(b.beds[i]); P2('bed' + i, 'bbed', SPOTS['beds' + i], 18, { bed: i, plant: s, wet: s && s.today, name: 'Garden bed ' + (i + 1) }); }
+    for (let i = 0; i < b.built.barrel; i++) P2('barrel', 'bbarrel', spotOf('barrel' + i), 36, { broken: !!br.barrel, water: Math.max(0, w.n - i * 3), name: 'Rain barrel', mv: 'barrel' + i });
+    for (let i = 0; i < b.built.beds; i++) { const s = B.plantState(b.beds[i]); P2('bed' + i, 'bbed', spotOf('beds' + i), 18, { bed: i, plant: s, wet: s && s.today, name: 'Garden bed ' + (i + 1), mv: 'beds' + i }); }
     return out;
   }
   function decorFurn(o) {
@@ -539,7 +577,7 @@
       }
     }
   }
-  function splash(i) { const g = House().G, [x, y, w] = SPOTS['beds' + i]; if (!g) return; for (let k = 0; k < 10; k++) g.parts.push({ x: (x + Math.random() * w) * T, y: (y + .7) * T, z: 20, vx: (Math.random() - .5) * 40, vy: 0, vz: 30 + Math.random() * 50, g: 300, life: .6, max: .6, col: '#7ec8e8', size: 3 }); }
+  function splash(i) { const g = House().G, [x, y, w] = spotOf('beds' + i); if (!g) return; for (let k = 0; k < 10; k++) g.parts.push({ x: (x + Math.random() * w) * T, y: (y + .7) * T, z: 20, vx: (Math.random() - .5) * 40, vy: 0, vz: 30 + Math.random() * 50, g: 300, life: .6, max: .6, col: '#7ec8e8', size: 3 }); }
 
   // ---------------------------------------------------------------- panels (in-run sheets)
   function panel(html, wide) { const el = $('#msheet'); el.innerHTML = `<div class="mcard${wide ? ' wide' : ''}">${html}</div>`; el.classList.add('on'); el.onclick = e => { if (e.target === el || e.target.hasAttribute('data-close')) panelClose(); }; E.resetJoy(); }
@@ -601,7 +639,7 @@
     for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) {
       const tx = x + i, ty = y + j, key = tx + ',' + ty;
       if (d.wall) { if (!WALLROW.has(key)) return 'Posters and lights go on the shack walls'; }
-      else { if (!(inYard(tx, ty) || inShack(tx, ty))) return 'That spot is outside the yard'; if (RESERVED.has(key)) return 'Keep that spot clear (a build spot or a path)'; }
+      else { if (!(inYard(tx, ty) || inShack(tx, ty))) return 'That spot is outside the yard'; if (reserved().has(key)) return 'Keep that spot clear (a build spot or a path)'; }
       if (taken.has(key)) return 'Something is already there';
     }
     if (!d.wall && !d.floor && d.solid !== 0) { const p = House().G.p, px = Math.floor(p.x / T), py = Math.floor(p.y / T); if (px >= x && px < x + w && py >= y && py < y + h) return "You're standing there"; }
@@ -628,8 +666,15 @@
       const o = { id: 'd' + (++base().seq), k: S.pend, x, y, r: 0, m: 0, rv: 2 }; base().decor.push(o); S.sel = o.id; S.pend = null;
       G().save(); syncDecor(); SFX.play('pick'); editBar(); toast('Placed. Tap it to move, turn or store it.', 1.8); return true;
     }
+    // 0.52: moving a build piece - picked one: this tap places it (its top-left at the tapped tile, centred)
+    if (S.psel) {
+      const k = S.psel, [, , w, h] = spotOf(k), x = tx - Math.floor((w - 1) / 2), y = ty - Math.floor((h - 1) / 2), R = reserved(k), taken = occ('floor');
+      for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) { const kk = (x + i) + ',' + (y + j); if (!(inYard(x + i, y + j) || inShack(x + i, y + j))) { toast('That spot is outside the yard', 1.6); return true; } if (R.has(kk) || taken.has(kk)) { toast('Something is already there', 1.6); return true; } }
+      base().pos[k] = [x, y]; S.psel = null; G().save(); syncPieces(); SFX.play('pick'); editBar(); toast(`${MOVABLE[k]} moved`, 1.4); return true;
+    }
+    { const g = House().G, f = g.furn.find(f => f.mv && wx >= f.x && wx < f.x + f.w && wy >= f.y - 30 && wy < f.y + f.h); if (f && !decorAt(wx, wy)) { S.psel = f.mv; S.sel = null; SFX.play('ui'); editBar(); return true; } }
     const o = decorAt(wx, wy);
-    if (o) { S.sel = S.sel === o.id ? null : o.id; SFX.play('ui'); editBar(); return true; }
+    if (o) { S.sel = S.sel === o.id ? null : o.id; S.psel = null; SFX.play('ui'); editBar(); return true; }
     const sel = base().decor.find(x => x.id === S.sel);
     if (sel) {
       const d = D.DECOR[sel.k], [w, h] = dims(sel);
@@ -639,6 +684,22 @@
       sel.x = x; sel.y = y; G().save(); syncDecor(); SFX.play('pick'); return true;
     }
     return true;
+  }
+  // 0.52 (owner: "change the color of our houses"): the shack's walls and floor
+  const WALLS = [['Default', null], ['Brick red', ['#8a3a30', '#702e26', '#3a1410']], ['Sage', ['#6d8a5e', '#5a744c', '#2c3a24']], ['Navy', ['#2f3e66', '#26334f', '#141a2e']], ['Butter', ['#d9c27a', '#bfa865', '#5a4c24']],
+    ['Lilac', ['#8a6aa8', '#74588f', '#3a2c4a']], ['Teal', ['#2f7a7a', '#266464', '#123232']], ['Charcoal', ['#3c3c4c', '#2f2f3d', '#18181f']], ['Peach', ['#d99a7a', '#bf8466', '#5a3a2a']], ['Pink', ['#d97aa8', '#bf6691', '#5a2a44']]];
+  const WKIND = [['Plain', 'plain'], ['Stripes', 'stripe'], ['Wainscot', 'wainscot']];
+  const FLOORS = [['Default', null], ['Oak planks', ['#a0704f', '#8a5e40', 'planks']], ['Dark wood', ['#5a3a28', '#4a2f20', 'planks']], ['Checker', ['#d9d0c0', '#3a3848', 'check']], ['Blue carpet', ['#3f5a8a', '#36507a', 'carpet']],
+    ['Red carpet', ['#8a3a3a', '#763030', 'carpet']], ['Green carpet', ['#4a6a40', '#3e5a36', 'carpet']], ['Concrete', ['#7d8398', '#6a7086', 'concrete']], ['Tiles', ['#cfd6e0', '#aab4c4', 'smalltile']]];
+  B.applyPaint = function () {
+    const p = (base() || {}).paint || {}, w = WALLS[p.wall || 0][1], f = FLOORS[p.floor || 0][1];
+    if (w) ART.paintRoom('w', { a: w[0], b: w[1], trim: w[2], kind: WKIND[p.wkind || 0][1] }); else if (p.wkind) ART.paintRoom('w', { kind: WKIND[p.wkind][1] });
+    if (f) ART.paintRoom('w', null, { a: f[0], b: f[1], kind: f[2] });
+  };
+  function openPaint() {
+    const p = base().paint, row = (lab, list, key) => `<div class="kick sect">${lab}</div><div class="chips">${list.map((x, i) => `<button class="chip${(p[key] || 0) === i ? ' on' : ''}" data-pt="${key}:${i}"${x[1] && Array.isArray(x[1]) ? ` style="border-color:${x[1][0]}"` : ''}>${x[1] && Array.isArray(x[1]) ? `<i style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${x[1][0]};margin-right:5px;vertical-align:-1px"></i>` : ''}${esc(x[0])}</button>`).join('')}</div>`;
+    panel(`<div class="kick">Decorate</div><h3>Paint the shack</h3>${row('Walls', WALLS, 'wall')}${row('Wall style', WKIND, 'wkind')}${row('Floor', FLOORS, 'floor')}<p class="mp dim">Free - change it whenever you like.</p><button class="mbtn" data-close>Done</button>`, 1);
+    $('#msheet').querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { const [k, i] = b.dataset.pt.split(':'); p[k] = +i; G().save(); ART.houseLook(null); B.applyPaint(); const g = House().G; if (g) { g.wallCache = null; g.floorCache = null; } if (House().refresh) House().refresh(); SFX.play('pick'); openPaint(); });
   }
   function decorCounts() { // what can be placed: the decor box, then stash, then pack
     const c = {}; for (const k in base().box) if (base().box[k] > 0) c[k] = (c[k] || 0) + base().box[k];
@@ -655,10 +716,10 @@
   }
   function editBar() {
     const el = $('#editbar'), sel = S.sel && base().decor.find(o => o.id === S.sel);
-    el.innerHTML = `<div class="ehint">${S.pend ? `Tap where the <b>${D.ITEMS[S.pend].n.toLowerCase()}</b> goes` : sel ? `<b>${D.ITEMS[sel.k].n}</b> · tap a spot to move it` : 'Tap decor to pick it up · walk with the joystick'}</div>
-      <div class="erow">${S.pend ? '<button class="mbtn sm ghost" id="eCancel">Cancel</button>' : `<button class="mbtn sm" id="eBox">Decor box</button>${sel ? `${D.DECOR[sel.k].wall ? '' : '<button class="mbtn sm ghost" id="eRot">Rotate</button>'}<button class="mbtn sm ghost" id="eFlip">Turn</button>` + '<button class="mbtn sm ghost" id="eStore">Store</button>' : ''}`}<button class="mbtn sm" id="eDone">Done</button></div>`;
+    el.innerHTML = `<div class="ehint">${S.psel ? `Moving the <b>${esc(MOVABLE[S.psel].toLowerCase())}</b> · tap where it goes` : S.pend ? `Tap where the <b>${D.ITEMS[S.pend].n.toLowerCase()}</b> goes` : sel ? `<b>${D.ITEMS[sel.k].n}</b> · tap a spot to move it` : 'Tap decor or a build piece (chest, workbench...) to move it'}</div>
+      <div class="erow">${S.pend ? '<button class="mbtn sm ghost" id="eCancel">Cancel</button>' : `<button class="mbtn sm" id="eBox">Decor box</button>${sel ? `${D.DECOR[sel.k].wall ? '' : '<button class="mbtn sm ghost" id="eRot">Rotate</button>'}<button class="mbtn sm ghost" id="eFlip">Turn</button>` + '<button class="mbtn sm ghost" id="eStore">Store</button>' : ''}`}<button class="mbtn sm ghost" id="ePaint">Paint</button><button class="mbtn sm" id="eDone">Done</button></div>`;
     const on = (id, fn) => { const b = $('#' + id); if (b) b.onclick = e => { e.stopPropagation(); SFX.play('ui'); fn(); }; };
-    on('eBox', openDecorBox); on('eCancel', () => { S.pend = null; editBar(); }); on('eDone', () => setEdit(false));
+    on('eBox', openDecorBox); on('eCancel', () => { S.pend = null; S.psel = null; editBar(); }); on('eDone', () => { S.psel = null; setEdit(false); }); on('ePaint', openPaint);
     // 0.26.1 (owner: "Decorate should have a rotate not just a turn"): Rotate = a quarter turn (front, side, back, other
     // side; long pieces turn their footprint), Turn = mirror left/right
     on('eRot', () => { const r = ((sel.r || 0) + 1) % 4, why = fits(sel.k, sel.x, sel.y, r, sel.id); if (why) { toast('No room to rotate it here', 1.4); return; } sel.r = r; G().save(); syncDecor(); });
@@ -679,8 +740,9 @@
     if (b.built.gen && !b.broken.gen) glow(c, 9.5 * T, 13 * T, 6 * T, .12);
     // edit mode: build spots are off limits, the selection and (while placing) a soft grid
     if (S.edit) {
+      const RSV = reserved();
       c.lineWidth = 1.5;
-      for (let y = FY0; y <= FY1; y++) for (let x = FX0; x <= FX1; x++) { const key = x + ',' + y; if ((inYard(x, y) || inShack(x, y)) && !RESERVED.has(key)) { c.strokeStyle = 'rgba(246,227,187,.10)'; c.strokeRect(x * T + 2, y * T + 2, T - 4, T - 4); } }
+      for (let y = FY0; y <= FY1; y++) for (let x = FX0; x <= FX1; x++) { const key = x + ',' + y; if ((inYard(x, y) || inShack(x, y)) && !RSV.has(key)) { c.strokeStyle = 'rgba(246,227,187,.10)'; c.strokeRect(x * T + 2, y * T + 2, T - 4, T - 4); } }
       if (S.pend && D.DECOR[S.pend].wall) for (const key of WALLROW) { const [x, y] = key.split(',').map(Number); c.strokeStyle = 'rgba(240,123,60,.6)'; c.setLineDash([5, 4]); c.strokeRect(x * T + 4, y * T + T - 58, T - 8, 44); c.setLineDash([]); }
       const sel = S.sel && b.decor.find(o => o.id === S.sel);
       if (sel) {
@@ -837,6 +899,7 @@
     if (shift) { g.cam.y = g.p.y - 60; g.banners.push(o.raid ? { text: 'BASE RAID', sub: 'walkers at the fence', t: 0 } : { text: 'WATCH SHIFT', sub: 'they are coming', t: 0 }); }
     hudSync();
   };
+  B._tap = (wx, wy) => tapEdit(wx, wy);   // tests
   B.barrelCharges = () => barrels().n;
   B.active = () => !!S;
   B.isShift = () => !!(S && S.shift);
