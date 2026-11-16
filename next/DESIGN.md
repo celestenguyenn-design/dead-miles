@@ -1051,6 +1051,25 @@ these type of games")
   no SV.unlocks = everything open): Walks / Crew / Daily / Event tab at level 2, Capsules / Codex / Walk together at 3,
   Weekly boss / Deep runs at 4. Each unlock shows a short "Unlocked" card once (UNLOCK table, unlockPops). Game.unl(k).
 
+## Done in 0.46.0 - camps (owner: map raids "like the Walking Dead Governor taking over every campsite", other parties can
+take them, friends far away; tribute only for a special store with expensive pack/stash space; party raids; "I expect
+people to die. I want it to be a real fight")
+- Server (next/camps.sql, migration next_camps): next_camps (12 rows, start as Bandits), next_camp_log, next_camp_rally;
+  next_camps_list, next_camp_take (12 h safe after a capture, 3 captures/day/player), next_camp_fortify (+15, once a day,
+  max 250), next_camp_rally (party mates at the same camp in the last 30 min).
+- camps.js (DM.Camps): every ~2 km cell (0.02 lat x 0.025 lon) has its own copy of all 12 camps, placed by hash(camp +
+  cell) and snapped to the nearest loaded map place - friends walking together share spots, far-away friends get local
+  ones; ownership is shared. 🏴 markers (red bandits / green yours / blue others), nearest one on the map card.
+- At a camp: dialog -> Raid (3 attempts/day) or Fortify (your side). Raid = DM.House.start of a generated building with
+  opts.camp: raiders.js spawnCamp puts 3-9 raiders + a leader (hp 260 + 2.2 x def) inside, hp x (1 + def/180), dmg x
+  (1 + def/260); they guard, wake each other, never flee or forget her. Kill all -> opts.onCampWin -> next_camp_take
+  (+40 caps, +80 XP). Dying = the normal death. Rallied party mates join as AI allies (crew.js extra.allies, roam
+  fighters with HP); crew/allies now fight camp raiders and can be hurt by them.
+- Tribute: 1 mark a day per camp held (+1 at 3+, +2 more at 6+), claimed from the Camps home tile (unlocks at level 4
+  for new players). War chest (marks only): +1 pack slot (10/16/24/34, s.warPack), +10 stash (12/18/26/36,
+  s.warStash), plated armor 14, Masterwork weapon 22, 3 capsule tokens 6. Losing a camp shows a toast.
+- Codex feat "The Governor": take 5 camps.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.45.0';
+const NEXT_VERSION = '0.46.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -24,7 +24,7 @@ const NEXT_VERSION = '0.45.0';
 (() => {
   const D = DM.D, E = DM.E, $ = E.$, SFX = E.SFX, toast = E.toast;
   const KEY = 'dm-next-save', VER = 1, VERSION = 'next ' + NEXT_VERSION;
-  const STASH_BASE = 40, stashSlots = () => STASH_BASE + (DM.Base && DM.Base.stashBonus ? DM.Base.stashBonus() : 0) + (DM.Skills && DM.Skills.stashBonus ? DM.Skills.stashBonus(SV && SV.survivor) : 0);   // 0.34: Pack mule Hoarder   // 0.24.5: base Storage adds up to +40
+  const STASH_BASE = 40, stashSlots = () => STASH_BASE + (DM.Base && DM.Base.stashBonus ? DM.Base.stashBonus() : 0) + (DM.Skills && DM.Skills.stashBonus ? DM.Skills.stashBonus(SV && SV.survivor) : 0) + ((SV && SV.survivor && SV.survivor.warStash) || 0);   // 0.34: Pack mule Hoarder; 0.46 War chest   // 0.24.5: base Storage adds up to +40
   DM.onlineState = { signedIn: false, name: null, lastSync: null, status: 'offline' };
   const Game = DM.Game = {};
   let SV = null;
@@ -139,7 +139,7 @@ const NEXT_VERSION = '0.45.0';
     while (left && list.length < slots) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; if (q != null) e.q = q; list.push(e); left -= t; }
     return n - left;
   }
-  const packSlots = () => 12 + (SV.survivor.packBonus || 0) + DM.Skills.packBonus(SV.survivor);   // 0.13: Pack rat is a Scavenging rank
+  const packSlots = () => 12 + (SV.survivor.packBonus || 0) + (SV.survivor.warPack || 0) + DM.Skills.packBonus(SV.survivor);   // 0.46: + War chest slots   // 0.13: Pack rat is a Scavenging rank
 
   // ---------------------------------------------------------------- steps -> houses
   const effective = d => d.phone + d.walk + d.typed * .5;
@@ -1394,6 +1394,7 @@ const NEXT_VERSION = '0.45.0';
     gacha: [3, 'Capsule machine', 'Spend tokens (from walking, or 50 caps) on random cosmetics: outfits, hats, hair and more.'],
     codex: [3, 'Codex', 'Your bestiary (kill more of a kind to hit it harder) and feats that pay caps and unlock titles.'],
     social: [3, 'Walk together', 'Walk with friends: a shared party step goal and a weekly step race with prizes.'],
+    camps: [4, 'Camps', 'Bandit camps all over the map. Raid them - a real fight - and hold them for daily tribute you spend in the War chest.'],
     boss: [4, 'Weekly boss', 'A big zombie every week. Walk to reach it, then fight it in short rounds with your party.'],
     deep: [4, 'Deep runs', 'Floor after floor of a big building. The deeper you go, the better the loot - but you only keep it if you get out.'],
   };
@@ -1461,6 +1462,7 @@ const NEXT_VERSION = '0.45.0';
     }
     if (DM.Advent && SV.tutorialDone) { const at = DM.Advent.tile(); if (at) t.unshift(at); }   // 0.32: December 1-24
     if (BS.raidTile && SV.tutorialDone) { const rt = BS.raidTile(); if (rt) t.unshift(rt); }   // 0.33: base raids
+    if (DM.Camps && SV.tutorialDone) { const cp = DM.Camps.tile(); if (cp) t.push(cp); }   // 0.46: camps
     if (DM.Social && SV.tutorialDone) { const so = DM.Social.tile(); if (so) t.push(so); }   // 0.40: party walk + friends race
     if (DM.Gifts) DM.Gifts.check();   // 0.41: gifts from friends land in the stash
     if (window.NET && NET.ok && NET.name && SV.survivor.name === 'Survivor') publish();   // 0.42.1: pick up the account name
@@ -1473,14 +1475,15 @@ const NEXT_VERSION = '0.45.0';
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
     cardSheet = k;
-    const html = k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
+    const html = k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
     sheetOpen(`<div class="cardsheet" data-cs="${k}">${html}</div><button class="mbtn ghost" id="csDone">Close</button>`);
     const el = $('#msheet'), root = el.querySelector('.cardsheet');
     el.onclick = e => { if (e.target === el) closeCardSheet(); };
     $('#csDone').onclick = () => { SFX.play('ui'); closeCardSheet(); };
     // actions that leave the menu (a fight, a shift, back into a run) close the sheet first
     root.addEventListener('click', e => { if (e.target.closest('[data-boss="go"],[data-deep="resume"],#hShift')) { cardSheet = null; sheetClose(); } }, true);
-    if (k === 'social') { publish(); const w = root.querySelector('.sowrap'), re = () => { w.innerHTML = DM.Social.html(); DM.Social.bind(w, re); }; DM.Social.bind(w, re); }
+    if (k === 'camps') { const w = root.querySelector('.cpwrap'), re = () => { w.innerHTML = DM.Camps.html(); DM.Camps.bind(w, re); }; DM.Camps.bind(w, re); }
+    else if (k === 'social') { publish(); const w = root.querySelector('.sowrap'), re = () => { w.innerHTML = DM.Social.html(); DM.Social.bind(w, re); }; DM.Social.bind(w, re); }
     else if (k === 'codex') DM.Codex.bind(root.querySelector('.cxwrap'));
     else if (k === 'raid') { const g = root.querySelector('#raidGo'); if (g) g.onclick = () => { SFX.play('ui'); cardSheet = null; sheetClose(); BS.raidDefend(); }; else { BS.raidSeen(); } }
     else if (k === 'advent') DM.Advent.bind(root.querySelector('.advwrap'));

@@ -85,6 +85,7 @@ window.DM = window.DM || {};
     else if (dv && dv.got && dist(dv.b, pos) <= 30 + Math.min(15, pos.acc / 2)) { s.deliv = null; s.delivDone++; save(); const c = 45 + Math.round(dv.len / 40); caps(c); xp(25); const tk = token(.35); reward("🚚 Dot's delivery", dv.b.at, `${c} caps, 25 XP${tk ? ', a capsule token' : ''}`); }
     if (DM.MapQ) DM.MapQ.onPos(pos, walked);   // 0.31: quests and encounters
     if (DM.MapPOI) DM.MapPOI.onPos(pos);   // 0.43: made-up places
+    if (DM.Camps) DM.Camps.onPos(pos);   // 0.46: camps
   };
   // 0.31: map quests (mapquest.js) use these
   X.spots = (pos, lo, hi) => spots(pos, lo, hi); X.give = items => give(items); X.rollItems = (t, n) => rollItems(t, n);
@@ -105,7 +106,7 @@ window.DM = window.DM || {};
     if (s.radio) out.push({ t: `📻 ${s.radio.at}`, s: `${fmtD(dist(s.radio, pos))} · ${mmss(s.radio.until - now)} left`, hot: 1 });
     for (const d of s.drops) out.push({ t: `${d.air ? '✈️ Air drop' : '📦 Crate'} · ${d.at}`, s: fmtD(dist(d, pos)) + (d.air ? ` · ${mmss(d.until - now)} left` : ''), hot: d.air });
     if (s.deliv) { const tgt = s.deliv.got ? s.deliv.b : s.deliv.a; out.push({ t: `🚚 ${s.deliv.got ? 'Deliver to' : 'Pick up at'} ${tgt.at}`, s: fmtD(dist(tgt, pos)) }); }
-    if (DM.MapQ) return DM.MapQ.lines(pos).concat(out, DM.MapPOI ? DM.MapPOI.lines(pos) : []);   // 0.31: quests first; 0.43 the nearest made-up place
+    if (DM.MapQ) return DM.MapQ.lines(pos).concat(DM.Camps ? DM.Camps.lines(pos) : [], out, DM.MapPOI ? DM.MapPOI.lines(pos) : []);   // 0.31: quests first; 0.43 the nearest made-up place
     return out;
   };
   X.cells = () => st().nCells;
@@ -143,6 +144,7 @@ window.DM = window.DM || {};
     if (s.radio) mark(x, SX(wx(s.radio.lon)), SY(wy(s.radio.lat)), '📻', '#7ee0d8', t, mmss(s.radio.until - now));
     if (s.deliv) { const g = s.deliv.got ? s.deliv.b : s.deliv.a; mark(x, SX(wx(g.lon)), SY(wy(g.lat)), '🚚', '#f07b3c', t, s.deliv.got ? 'drop off' : 'pick up'); }
     if (DM.MapPOI) DM.MapPOI.drawMarks(x, t, SX, SY, wx, wy);   // 0.43
+    if (DM.Camps) DM.Camps.drawMarks(x, t, SX, SY, wx, wy);   // 0.46
     if (DM.MapQ) DM.MapQ.drawMarks(x, t, SX, SY, wx, wy);
   };
   X.mark = mark;
