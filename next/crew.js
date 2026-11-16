@@ -298,10 +298,10 @@
     if (R.init) return; R.init = true;
     const p = g.p;
     if (R.petRec) R.pet = { rec: R.petRec, x: p.x - 30, y: p.y + 8, vx: 0, vy: 0, hw: 7, hh: 5, ph: 0, flip: false, st: 'follow', heart: 0, barkT: 0 };
-    if (R.kind === 'house' && !R.extra.noMate) { const m = crew().find(x => x.mate && !x.hungry); if (m) { C.ensureRig(m.id, m.look); R.mate = { m, x: p.x + 30, y: p.y + 8, vx: 0, vy: 0, hw: 10, hh: 7, ph: 0, flip: false, cd: 1, swing: 0, healed: 0 }; } }
+    if (R.kind === 'house' && !R.extra.noMate) { const m = crew().find(x => x.mate && !x.hungry && x.hurt !== dayNo()); if (m) { C.ensureRig(m.id, m.look); R.mate = Object.assign({ m, x: p.x + 30, y: p.y + 8, vx: 0, vy: 0, hw: 10, hh: 7, ph: 0, flip: false, cd: 1, swing: 0, healed: 0 }, fhp(m)); } }
     // 0.42.1 (owner: "my crew members were useless during horde night, they weren't there"): on watch shifts and base raids
     // every fed crew member is out in the yard fighting
-    if (R.kind === 'shift') { R.fighters = crew().filter(m => !m.hungry).map((m, i) => { C.ensureRig(m.id, m.look); return { m, x: p.x + (i % 2 ? 40 : -40) + (i >> 1) * 30, y: p.y + 20, vx: 0, vy: 0, hw: 10, hh: 7, ph: 0, flip: false, cd: 1 + i * .3, swing: 0, healed: 0, roam: 1 }; }); }
+    if (R.kind === 'shift') { R.fighters = crew().filter(m => !m.hungry && m.hurt !== dayNo()).map((m, i) => { C.ensureRig(m.id, m.look); return Object.assign(fhp(m), { m, x: p.x + (i % 2 ? 40 : -40) + (i >> 1) * 30, y: p.y + 20, vx: 0, vy: 0, hw: 10, hh: 7, ph: 0, flip: false, cd: 1 + i * .3, swing: 0, healed: 0, roam: 1 }); }); }
     if (R.npcSpec) {
       const f = g.furn[R.npcSpec.fi];
       if (f) {
@@ -363,8 +363,25 @@
   }
   // 0.37 the run companion: follows like the pet, swings at the nearest zombie in reach. Guards hit harder, medics
   // patch her up once per run when she is low, scavengers sometimes pocket an extra find when she searches.
+  // 0.44.3 (owner: "your crew should have HP and get attacked as well in horde night"): fighters have HP (80 + 8 a level,
+  // guards +40). A zombie right next to one hits it every ~1.2 s. At 0 HP they fall back hurt: out of fights and runs
+  // for the rest of the day, mood -8 (the medic's morning rounds and a good night fix it).
+  function fhp(m) { const mx = 80 + 8 * C.lv(m) + (m.role === 'guard' ? 40 : 0); return { hp: mx, maxHp: mx, hitT: .8, flash: 0 }; }
+  function hurtMate(e, g) {
+    e.hitT -= g.dtLast || .016; e.flash = Math.max(0, e.flash - (g.dtLast || .016) * 3);
+    if (e.hitT > 0) return;
+    const z = g.zs.find(z => !z.dead && !z.raider && z.st !== 'sleep' && z.st !== 'idle' && z.st !== 'rise' && dist(z, e) < .85 * T);
+    if (!z) { e.hitT = .3; return; }
+    e.hitT = 1.2; e.hp -= Math.round(9 * (z.dmgMul || 1)); e.flash = 1; SFX.play('hurt');
+    if (e.hp <= 0) {
+      e.gone = 1; e.m.hurt = dayNo(); e.m.mood = Math.max(0, e.m.mood - 8); G().save();
+      toast(`${e.m.name} is hurt and falls back${R.kind === 'shift' ? ' inside' : ' - heading home'}. Resting until tomorrow.`, 2.6);
+      if (R.mate === e) R.mate = null; if (R.fighters) R.fighters = R.fighters.filter(x => x !== e);
+    }
+  }
   function mateTick(dt, g, ent) {
     const e = ent || R.mate, p = g.p, lv = C.lv(e.m), role = e.m.role;
+    g.dtLast = dt; hurtMate(e, g); if (e.gone) return;
     e.cd = Math.max(0, e.cd - dt); e.swing = Math.max(0, e.swing - dt);
     let tgt = null, bd = 1e9;
     for (const z of g.zs) { if (z.dead || z.raider || (z.st === 'rise' && z.stT < .3) || z.st === 'sleep') continue; const dz = dist(z, e); if (dz < bd && (dz < 1.6 * T || dist(z, p) < 4 * T || (e.roam && dz < 7 * T))) { bd = dz; tgt = z; } }
@@ -537,7 +554,8 @@
       const amp = Math.min(1, Math.hypot(e.vx, e.vy) / (.95 * T)), s = Math.sin(e.ph * 2);
       c.fillStyle = 'rgba(8,6,22,.4)'; c.beginPath(); c.ellipse(e.x, e.y + 1, 16, 5.5, 0, 0, 6.28); c.fill();
       ART.drawRig(c, rn, e.x, e.y - Math.abs(Math.cos(e.ph * 2)) * 2 * amp, E.PSCALE, e.flip, { weapon: 'bat', parts: { legB: { r: s * .45 * amp }, legF: { r: -s * .45 * amp }, bat: { r: e.swing > 0 ? -1.2 + (1 - e.swing / .25) * 2.2 : 0 } } });
-      c.font = '900 10px Inter, sans-serif'; c.fillStyle = '#7fd49a'; c.textAlign = 'center'; c.fillText(e.m.name, e.x, e.y - 100); c.textAlign = 'left';
+      c.font = '900 10px Inter, sans-serif'; c.fillStyle = e.flash > 0 ? '#ff8a7a' : '#7fd49a'; c.textAlign = 'center'; c.fillText(e.m.name, e.x, e.y - 100); c.textAlign = 'left';
+      if (e.hp < e.maxHp) { const w = 34, x = e.x - w / 2, y = e.y - 96; c.fillStyle = '#11142f'; c.fillRect(x - 1, y - 1, w + 2, 6); c.fillStyle = e.hp / e.maxHp > .4 ? '#7fd49a' : '#ff6b5a'; c.fillRect(x, y, w * Math.max(0, e.hp / e.maxHp), 4); }
     } }); }
     for (const e of R.ents) {
       if (R.kind === 'shift') continue;
@@ -587,7 +605,7 @@
       <div class="poolline"><b>${cl.length}/${C.bunks()}</b> bunks <span>${C.bunks() < 4 ? 'build a bunk bed at the base for more' : 'all bunks built'} · each eats 1 food a day from the stash</span></div>
       ${cl.length ? cl.map(m => { const Rl = ROLES[m.role], lv = C.lv(m), nx = LVX[lv] || null; return `<div class="crow">
         <canvas data-cp="${m.id}" width="72" height="92"></canvas>
-        <div class="cinfo"><b>${esc(m.name)}</b><div class="crole" style="color:${Rl.col}">${Rl.n} · Lv ${lv}</div>
+        <div class="cinfo"><b>${esc(m.name)}</b><div class="crole" style="color:${Rl.col}">${Rl.n} · Lv ${lv}${m.hurt === dayNo() ? ' · <b class="bad">hurt - resting today</b>' : ''}</div>
           <div class="cperk">${Rl.perk(lv)}${working(m) ? '' : ' <em>(too unhappy to work)</em>'}</div>
           <div class="cbars"><span>Mood · ${moodWord(m)}</span><i class="cbar"><i style="width:${m.mood}%;background:${m.mood >= 45 ? '#93a86c' : m.mood >= 25 ? '#e0b94a' : '#ff6b5a'}"></i></i>
           <span>${nx ? `Lv ${lv + 1}: ${Math.floor(m.xp)}/${nx}` : 'Max level'}</span><i class="cbar"><i style="width:${nx ? Math.min(100, (m.xp - LVX[lv - 1]) / (nx - LVX[lv - 1]) * 100) : 100}%"></i></i></div>

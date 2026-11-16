@@ -753,6 +753,7 @@
     toast(['Movement to the north...', 'Groaning from the south wall!', 'Shapes coming from the west...', 'They are at the east side!'][side], 1.6);
   }
   function tick(dt, g) {
+    if (!S) return;   // 0.44.3: a frame after the shift closed
     if (!S.shift) { if ((S.hudT -= dt) <= 0) { S.hudT = 1; hudSync(); } return; }
     const sh = S.sh;
     if (sh.over) {   // 0.42.1 (owner: "it kicked me out before I could loot the zombies"): a minute to search the bodies
