@@ -896,6 +896,7 @@
       if (p.stT > .28) p.st = 'free';
     }
     if (p.st === 'swing') updateSwing(dt);
+    if (G.reload) tickReload(dt);   // 0.44
 
     // integrate
     const ox = p.x, oy = p.y;
@@ -943,8 +944,27 @@
   const BOWBASH = Object.assign({}, WEAPONS.fists, { n: 'Bow bash', dmg: 15, reach: 1.3, ranged: false });
   // 0.30: a gun with nothing to shoot is swung too (pistol-whip)
   const GUNBASH = Object.assign({}, WEAPONS.fists, { n: 'Pistol-whip', dmg: 18, reach: 1.3, ranged: false });
-  const fightW = () => { const W = weapon(); return W.gun ? (packCount(W.gun) ? W : GUNBASH) : W.ranged && !arrowsLeft() ? BOWBASH : W; };
+  const fightW = () => { const W = weapon(); return W.gun ? ((S().hands && S().hands.mag > 0) || reserve(W.gun) ? W : GUNBASH) : W.ranged && !arrowsLeft() ? BOWBASH : W; };   // 0.44: magazine + reserve
+  // 0.44 (owner: "guns should have a reload and an ammo slot"): each gun has a magazine (W.mag) loaded in her hands
+  // (S().hands.mag). Firing empties it; an empty gun reloads by itself from the ammo pouch, then the pack (R key or the
+  // reload button any time). Reloading takes W.reload seconds - she can move, not shoot.
+  function startReload(auto) {
+    const W = weapon(), h = S().hands; if (!W.gun || !h || G.reload) return false;
+    if ((h.mag || 0) >= W.mag) { if (!auto) toast('Already full', .9); return false; }
+    if (!reserve(W.gun)) { if (!auto) toast(`No ${ITEMS[W.gun].n.toLowerCase()} left`, 1.2); return false; }
+    G.reload = { t: W.reload * (modOn('mod_grip') ? .85 : 1), wk: h.k }; lastHud = '';
+    if (SFX.ac) { SFX.tone('square', 300, 200, .05, .05); SFX.noise(.06, 'highpass', 2000, 4000, .08, 1, .05); }
+    return true;
+  }
+  function tickReload(dt) {
+    const R = G.reload, h = S().hands; if (!h || h.k !== R.wk) { G.reload = null; lastHud = ''; return; }
+    R.t -= dt; if (R.t > 0) return;
+    const W = weapon(); h.mag = (h.mag || 0) + takeReserve(W.gun, W.mag - (h.mag || 0)); G.reload = null; lastHud = '';
+    if (SFX.ac) { SFX.tone('square', 500, 700, .05, .06); SFX.tone('square', 700, 400, .05, .06, .07); }
+  }
   function startSwing() {
+    if (G.reload) return;   // 0.44: busy reloading
+    { const W0 = fightW(); if (W0.gun && !(S().hands.mag > 0)) { startReload(true); return; } }
     const p = G.p;
     // soft auto-aim toward the nearest live zombie in reach
     let best = null, bd = 2.3 * T;
@@ -1985,7 +2005,7 @@
     const p = G.p;
     hpFill.style.width = (p.hp / maxHp() * 100) + '%'; stFill.style.width = Math.min(100, p.sta / Math.max(100, F.staMax()) * 100) + '%';
     needsHud(p);
-    const hudKey = [Math.round(p.hp), G.pack.length, packCount('lockpick'), G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5), S().xp, S().hands ? S().hands.k + S().hands.d : '-', arrowsLeft()].join('|');
+    const hudKey = [Math.round(p.hp), G.pack.length, packCount('lockpick'), G.target ? G.target.act + G.target.name : '', Math.round(G.noiseLvl * 5), S().xp, S().hands ? S().hands.k + S().hands.d + ':' + (S().hands.mag || 0) : '-', arrowsLeft(), !!G.reload].join('|');
     if (hudKey !== lastHud) {
       lastHud = hudKey;
       hpVal.textContent = Math.ceil(p.hp);
@@ -1998,7 +2018,7 @@
       $('#wpn img').src = ART.iconURL[h ? ITEMS[h.k].i : 'scrap'] || ''; $('#wpn').classList.toggle('fists', !h);
       $('#wpn i').style.width = (h && h.d != null ? Math.max(0, Math.min(1, h.d / D.wMax(h))) * 100 : 0) + '%';   // 0.19: max durability by quality
       if (h && D.qOf(h) >= 3) $('#wpn').style.setProperty('--qc', D.QUAL[D.qOf(h)].c); else $('#wpn').style.removeProperty('--qc');   // 0.19: Solid+ tint the chip
-      $('#wpn b').textContent = wk === 'bow' ? arrowsLeft() : WEAPONS[wk] && WEAPONS[wk].gun ? packCount(WEAPONS[wk].gun) : '';   // 0.30: rounds left   // the quiver (plus any spare arrows in the pack)
+      $('#wpn b').textContent = wk === 'bow' ? arrowsLeft() : WEAPONS[wk] && WEAPONS[wk].gun ? (G.reload ? '⟳' : `${(S().hands || {}).mag || 0}/${reserve(WEAPONS[wk].gun)}`) : ''; document.body.classList.toggle('gunheld', !!(WEAPONS[wk] && WEAPONS[wk].gun));   // 0.30: rounds left   // the quiver (plus any spare arrows in the pack)
       const n = Math.round(G.noiseLvl * 5);
       noiseBars.forEach((b, i) => b.classList.toggle('on', i < n));
       $('#noise').classList.toggle('hot', n >= 4);
@@ -2077,10 +2097,14 @@
   // 0.7: arrows go to the quiver first (no pack slot, never spilled on death); the pack only takes the overflow
   const quiver = () => (S().quiver = S().quiver || { n: 0 });
   const arrowsLeft = () => quiver().n + packCount('arrow');
+  // 0.44: the ammo pouch (9mm, shells) - no pack slot, never spilled
+  const pouch = () => (S().pouch = S().pouch || {});
+  const reserve = k => (D.POUCH[k] ? (pouch()[k] || 0) : 0) + packCount(k);
+  function takeReserve(k, n) { let got = 0; if (D.POUCH[k]) { const t = Math.min(n, pouch()[k] || 0); pouch()[k] -= t; got += t; n -= t; } while (n > 0 && packCount(k) > 0) { usePack(k); got++; n--; } return got; }
   function useArrow() { if (quiver().n > 0) quiver().n--; else usePack('arrow'); }
   function roomFor(k) { // how many of k the pack can still take
     if (isCos(k) || k === 'key') return 99;
-    let room = k === 'arrow' ? Math.max(0, D.QUIVER - quiver().n) : 0; const m = stackMax(k);
+    let room = k === 'arrow' ? Math.max(0, D.QUIVER - quiver().n) : D.POUCH[k] ? Math.max(0, D.POUCH[k] - (pouch()[k] || 0)) : 0; const m = stackMax(k);
     for (const e of G.pack) if (e.k === k) room += m - e.n;
     return room + (packSlots() - G.pack.length) * m;
   }
@@ -2089,6 +2113,7 @@
     if (k === 'key') { ring().keys += n; return n; }   // straight onto the keyring
     const m = stackMax(k); let left = n;
     if (k === 'arrow') { const q = quiver(), t = Math.min(left, Math.max(0, D.QUIVER - q.n)); q.n += t; left -= t; }
+    if (D.POUCH[k]) { const pp = pouch(), t = Math.min(left, Math.max(0, D.POUCH[k] - (pp[k] || 0))); pp[k] = (pp[k] || 0) + t; left -= t; }   // 0.44
     for (const e of G.pack) if (e.k === k && e.n < m && left) { const t = Math.min(left, m - e.n); e.n += t; left -= t; }
     while (left && G.pack.length < packSlots()) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; if (q != null) e.q = q; G.pack.push(e); left -= t; }
     return n - left;
@@ -2098,6 +2123,7 @@
   const ctag = (k, it) => { const c = D.cat(k); return it.tag && (c === 'event' || c === 'quest') ? `<small class="tag">${it.tag}</small>` : `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
   // 0.19.1: tap the quest chip in a run to open/close the full quest list
   document.addEventListener('click', ev => { const c = ev.target.closest && ev.target.closest('#qchip'); if (!c || !G) return; G.qOpen = !G.qOpen; lastQ = ''; SFX.play('pick'); });
+  document.addEventListener('click', ev => { const c = ev.target.closest && ev.target.closest('#rld'); if (!c || !G || G.over) return; ev.stopPropagation(); startReload(); }, true);   // 0.44: the reload button
   document.addEventListener('click', ev => { const c = ev.target.closest && ev.target.closest('#secchip'); if (!c || !G) return; G.secOpen = !G.secOpen; lastSec = ''; SFX.play('pick'); });   // 0.43.2
   function itemCard(e, onTap, extra = '', cls = '') {
     const it = ITEMS[e.k], el = document.createElement('button');
@@ -2396,12 +2422,13 @@
     const h = S().hands; if (!h || h.d == null) return;
     if (Math.random() < SK.wearSkip()) return;   // 0.34: Tinkerer Patch job
     h.d -= n;
-    if (h.d <= 0) { toast(`Your ${ITEMS[h.k].n.toLowerCase()} broke!`, 2); SFX.play('break'); S().hands = null; lastHud = ''; }
+    if (h.d <= 0) { toast(`Your ${ITEMS[h.k].n.toLowerCase()} broke!`, 2); SFX.play('break'); D.unloadGun(S()); G.reload = null; S().hands = null; lastHud = ''; }
   }
   function swapWeapon() {
     const ws = G.pack.map((e, i) => [e, i]).filter(([e]) => D.isWeapon(e.k));
     if (!ws.length) { toast(S().hands ? 'No other weapon in your pack' : 'No weapon - fists it is', 1.4); return; }
     const [e, i] = ws[0], cur = S().hands;
+    D.unloadGun(S()); G.reload = null;   // 0.44: its loaded rounds go back to the pouch
     S().hands = { k: e.k, d: e.d == null ? D.wMax(e) : e.d, q: D.qOf(e) };   // 0.19: quality goes with it
     if (cur) G.pack[i] = { k: cur.k, n: 1, d: cur.d, q: D.qOf(cur) }; else G.pack.splice(i, 1);
     // rotate so repeated taps cycle through every weapon
@@ -2432,13 +2459,14 @@
   function holster() {
     const h = S().hands; if (!h) return;
     if (G.pack.length >= packSlots()) { toast('No room in your pack to put it away', 1.6); return; }
-    G.pack.push({ k: h.k, n: 1, d: h.d, q: D.qOf(h) }); S().hands = null;
+    D.unloadGun(S()); G.reload = null; G.pack.push({ k: h.k, n: 1, d: h.d, q: D.qOf(h) }); S().hands = null;
     if (DM.Game && DM.Game.onEquip) DM.Game.onEquip();
     SFX.play('pick'); toast('Fists up', 1); lastHud = '';
   }
   function equipFromPack(i) {
     const e = G.pack[i]; if (!e || !D.isWeapon(e.k)) return;
     const cur = S().hands;
+    D.unloadGun(S()); G.reload = null;   // 0.44: its loaded rounds go back to the pouch
     S().hands = { k: e.k, d: e.d == null ? D.wMax(e) : e.d, q: D.qOf(e) };   // 0.19: quality goes with it
     if (cur) G.pack[i] = { k: cur.k, n: 1, d: cur.d, q: D.qOf(cur) }; else G.pack.splice(i, 1);
     if (DM.Game && DM.Game.onEquip) DM.Game.onEquip();
@@ -2472,8 +2500,8 @@
   // 0.30 guns: one round (shell, nail) from the pack per shot; aims like the bow; a bullet is a fast arrow that does not drop
   function fireGun(W) {
     const p = G.p;
-    if (!packCount(W.gun)) return false;
-    if (Math.random() >= SK.ammoSkip()) usePack(W.gun); lastHud = '';   // 0.34: Tinkerer Lean loads
+    const hh = S().hands; if (!hh || !(hh.mag > 0)) return false;
+    if (Math.random() >= SK.ammoSkip()) hh.mag--; lastHud = '';   // 0.34: Tinkerer Lean loads; 0.44: from the magazine
     const range = W.spd * W.life * T * (modOn('mod_scope') ? 1.4 : 1);   // 0.36: scope
     let best = null, bd = range;
     for (const z of G.zs) {
@@ -2498,7 +2526,7 @@
     const nz = W.noise * (modOn('mod_silencer') ? .4 : 1);   // 0.36: silencer
     emitNoise(p.x, p.y, nz * SK.allNoise(), nz > 4);   // the catch: a gunshot brings the house running
     wearWeapon();
-    if (!packCount(W.gun)) toast(`Last ${ITEMS[W.gun].n.toLowerCase()}!`, 1.2);
+    if (!(hh.mag > 0)) { if (reserve(W.gun)) setTimeout(() => { if (G && !G.over) startReload(true); }, 250); else toast(`Out of ${ITEMS[W.gun].n.toLowerCase()}!`, 1.2); }   // 0.44: auto-reload when empty
     return true;
   }
   function landArrow(x, y) {
@@ -2566,6 +2594,7 @@
     }
     if (e.code === 'Space' || e.code === 'KeyJ') { e.preventDefault(); btn.atkPressed = true; }
     if (e.code === 'KeyE' || e.code === 'Enter') { e.preventDefault(); btn.use = true; }
+    if (e.code === 'KeyR' && G && !G.over) startReload();   // 0.44
     if (e.code === 'KeyQ' || e.code === 'KeyK') btn.dodge = true;
     if (e.code === 'KeyR') swapWeapon();
     if (e.code === 'KeyI' || e.code === 'Tab') { e.preventDefault(); openPack(); }

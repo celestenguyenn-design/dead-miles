@@ -304,7 +304,17 @@ window.DM = window.DM || {};
     return list;
   };
   D.stackMax = k => D.STACK[k] || 1;
-  D.QUIVER = 60;   // 0.7: arrows live in a quiver (survivor.quiver.n), not in a pack slot
+  D.QUIVER = 60;
+  // 0.44 (owner: "guns should have a reload and an ammo slot"): the ammo pouch - 9mm and shells, no pack slot, never spilled
+  D.POUCH = { ammo: 90, shells: 30 };
+  D.isPouch = k => k === 'ammo' || k === 'shells';
+  // a gun leaving her hands takes its loaded rounds back out: into the pouch (or the pack for nails / a full pouch)
+  D.unloadGun = function (s) {
+    const h = s && s.hands; if (!h || !h.mag) return;
+    const W = D.WEAPONS[(D.ITEMS[h.k] || {}).w], k = W && W.gun; let n = h.mag; h.mag = 0; if (!k) return;
+    if (D.POUCH[k]) { s.pouch = s.pouch || {}; const t = Math.min(n, D.POUCH[k] - (s.pouch[k] || 0)); s.pouch[k] = (s.pouch[k] || 0) + t; n -= t; }
+    if (n) { const e = s.pack.find(x => x.k === k); if (e) e.n += n; else s.pack.push({ k, n }); }
+  };   // 0.7: arrows live in a quiver (survivor.quiver.n), not in a pack slot
 
   // melee: dmg, wind/strike/rec seconds, reach in tiles, durability. bow is ranged.
   D.WEAPONS = {
@@ -318,11 +328,11 @@ window.DM = window.DM || {};
     prybar: { n: 'Pry bar', dmg: 24, wind: .12, strike: .09, rec: .2, reach: 1.4, dur: 110, noise: 3.5 },
     bow: { n: 'Hunting bow', ranged: 1, dmg: 46, wind: .32, strike: .05, rec: .26, dur: 120, noise: .8 },
     // 0.30 guns: gun = the pack item each shot uses; noise is the catch (a gunshot brings the whole house)
-    pistol: { n: 'Pistol', ranged: 1, gun: 'ammo', dmg: 58, wind: .1, strike: .05, rec: .32, dur: 90, noise: 8, spd: 30, life: .45 },
-    shotgun: { n: 'Shotgun', ranged: 1, gun: 'shells', dmg: 30, pellets: 5, spread: .2, wind: .16, strike: .06, rec: .62, dur: 70, noise: 10, spd: 24, life: .3 },
-    nailgun: { n: 'Nail gun', ranged: 1, gun: 'nails', dmg: 22, wind: .06, strike: .04, rec: .16, dur: 140, noise: 2.2, spd: 20, life: .5 },
+    pistol: { n: 'Pistol', ranged: 1, gun: 'ammo', mag: 8, reload: 1.3, dmg: 58, wind: .1, strike: .05, rec: .32, dur: 90, noise: 8, spd: 30, life: .45 },
+    shotgun: { n: 'Shotgun', ranged: 1, gun: 'shells', mag: 2, reload: 1.8, dmg: 30, pellets: 5, spread: .2, wind: .16, strike: .06, rec: .62, dur: 70, noise: 10, spd: 24, life: .3 },
+    nailgun: { n: 'Nail gun', ranged: 1, gun: 'nails', mag: 16, reload: 1.1, dmg: 22, wind: .06, strike: .04, rec: .16, dur: 140, noise: 2.2, spd: 20, life: .5 },
     // 0.30 goofy melee: kb = extra knockback, stun = extra daze (s), arc = swing width (default 1.35), squeak/bonk/zap = sound
-    pipegun: { n: 'Pipe pistol', ranged: 1, gun: 'ammo', dmg: 42, wind: .14, strike: .05, rec: .4, dur: 45, noise: 8, spd: 26, life: .42 },
+    pipegun: { n: 'Pipe pistol', ranged: 1, gun: 'ammo', mag: 3, reload: 1.9, dmg: 42, wind: .14, strike: .05, rec: .4, dur: 45, noise: 8, spd: 26, life: .42 },
     baton: { n: 'Shock baton', dmg: 26, wind: .1, strike: .09, rec: .2, reach: 1.4, dur: 90, noise: 2.5, stun: .6, zap: 1 },
     knuckles: { n: 'Brass knuckles', dmg: 20, wind: .05, strike: .06, rec: .1, reach: 1.15, dur: 160, noise: 1.2 },
     turkeysq: { n: 'Squeaky turkey', dmg: 15, wind: .08, strike: .08, rec: .16, reach: 1.35, dur: 300, noise: 3.5, kb: 1.7, squeak: 1 },
