@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.50.0';
+const NEXT_VERSION = '0.50.1';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -985,13 +985,19 @@ const NEXT_VERSION = '0.50.0';
     // 0.29.3 (owner: "in dots shop we should have an option to auto sell junk with a button"): everything marked Sell
     // (no crafting / base use) from the pack and the stash, in one go - tap twice
     const junk = rows.filter(r => D.cat(r.e.k) === 'sell'), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(r.v * r.e.n)), 0);
-    const ex = extras(s);
+    const ex = extras(s), sw = spareWeapons(s);
     el.innerHTML = `<div class="kick sect">Sell to Dot · she pays low</div>`
+      + (sw.spare.length ? `<button class="mbtn ghost" id="tSpare" style="margin:4px 0 6px;width:100%">Sell spare weapons · ${sw.spare.length} · ${icon('caps')}${sw.caps}</button><div class="mp dim" style="margin:-2px 0 8px;font-size:11.5px">Keeps your best of each kind (and the one in your hand): ${esc(sw.spare.slice(0, 4).map(x => D.QUAL[D.qOf(x.e)].n.toLowerCase() + ' ' + D.ITEMS[x.e.k].n.toLowerCase()).join(', '))}${sw.spare.length > 4 ? '...' : ''}</div>` : '')
       + (ex.n ? `<button class="mbtn ghost" id="tExtra" style="margin:4px 0 6px;width:100%">Sell extras · ${ex.n} over ${KEEP} of each · ${icon('caps')}${ex.caps}</button><div class="mp dim" style="margin:-2px 0 8px;font-size:11.5px">Keeps ${KEEP} of every material, ammo and seed (pack + stash) and sells the rest: ${esc(ex.list.slice(0, 4).map(([k, n]) => n + ' ' + D.ITEMS[k].n.toLowerCase()).join(', '))}${ex.list.length > 4 ? '...' : ''}</div>` : '')
       + (junk.length ? `<button class="mbtn" id="tJunk" style="margin:4px 0 10px">Sell all junk · ${junk.length} item${junk.length === 1 ? '' : 's'} · ${icon('caps')}${jv}</button>` : '<div class="empty" style="margin-bottom:8px">No junk to sell - things marked Sell show up here.</div>')
-      + (rows.length ? rows.map((r, j) => `<div class="shoprow">${icon(r.e.k)}<div><b>${D.ITEMS[r.e.k].n}${r.e.n > 1 ? ' x' + r.e.n : ''}</b><span>${r.from} · ${icon('caps')}${r.v >= 1 ? Math.floor(r.v) + ' each' : r.v === .5 ? '1 per 2' : '1 per ' + Math.round(1 / r.v)}</span></div>
+      + (rows.length ? rows.map((r, j) => `<div class="shoprow">${icon(r.e.k)}<div><b>${D.ITEMS[r.e.k].n}${r.e.n > 1 ? ' x' + r.e.n : ''}</b>${gearTag(r.e)}<span>${r.from} · ${icon('caps')}${r.v >= 1 ? Math.floor(r.v) + ' each' : r.v === .5 ? '1 per 2' : '1 per ' + Math.round(1 / r.v)}</span></div>
       <button class="mbtn sm" data-sell="${j}">Sell ${r.e.n > 1 ? 'all' : ''} ${icon('caps')}${Math.max(1, Math.floor(r.v * r.e.n))}</button></div>`).join('') : '<div class="empty">Nothing to sell.</div>');
     // 0.42 (owner: "an overload of batteries, cloth rags, 9mm"): sell everything above KEEP of each material / ammo / seed
+    if ($('#tSpare')) $('#tSpare').onclick = function () {
+      if (!this.dataset.sure) { this.dataset.sure = 1; this.innerHTML = `Tap again: sell ${sw.spare.length} weapon${sw.spare.length > 1 ? 's' : ''} for ${icon('caps')}${sw.caps}`; return; }
+      for (const x of sw.spare) { const list = s[x.from], i = list.indexOf(x.e); if (i >= 0) list.splice(i, 1); }
+      SV.trader.caps += sw.caps; SFX.play('pick'); Game.save(); toast(`Dot paid ${sw.caps} caps for your spare weapons`, 1.8); renderTrader();
+    };
     if ($('#tExtra')) $('#tExtra').onclick = function () {
       if (!this.dataset.sure) { this.dataset.sure = 1; this.innerHTML = `Tap again: sell ${ex.n} extra for ${icon('caps')}${ex.caps}`; return; }
       for (const [k, n0] of ex.list) { let n = n0; for (const list of [s.stash, s.pack]) for (let i = list.length - 1; i >= 0 && n > 0; i--) { const e = list[i]; if (e.k !== k) continue; const t = Math.min(n, e.n); e.n -= t; n -= t; if (!e.n) list.splice(i, 1); } }
@@ -1702,6 +1708,21 @@ const NEXT_VERSION = '0.50.0';
     };
     if (el.querySelector('#sJunk')) el.querySelector('#sJunk').onclick = () => { SFX.play('ui'); sellJunk(); };
     if (sel) { stashActions(); itemPop(el); } else itemPop(null);
+  }
+  // 0.50.1 (Isabel: "you can't see the weapon variety of what you're selling"): quality, damage and condition on sell rows
+  function gearTag(e) {
+    const it = D.ITEMS[e.k];
+    if (it.w) { const q = D.qOf(e), mx = D.wMax(e), pct = Math.round(Math.min(1, (e.d != null ? e.d : mx) / mx) * 100); return `<em class="sgt" style="color:${D.QUAL[q].c}">${D.QUAL[q].n} · ${D.wDmg(e)} dmg · ${pct}%</em>`; }
+    if (it.armor) { const pct = Math.round(Math.min(1, (e.d != null ? e.d : it.armor.dur) / it.armor.dur) * 100); return `<em class="sgt">-${Math.round(it.armor.red * 100)}% damage · ${pct}%</em>`; }
+    return '';
+  }
+  // 0.50.1: spare weapons - keep the best of each kind (quality, then condition), the rest can go to Dot
+  function spareWeapons(s) {
+    const best = {}, all = [];
+    for (const [from, list] of [['pack', s.pack], ['stash', s.stash]]) list.forEach(e => { if (!D.isWeapon(e.k)) return; all.push({ from, e }); const b = best[e.k], sc = x => D.qOf(x) * 1000 + (x.d || 0); if (!b || sc(e) > sc(b.e)) best[e.k] = { from, e }; });
+    if (s.hands) best[s.hands.k] = best[s.hands.k] && (D.qOf(best[s.hands.k].e) * 1000 + (best[s.hands.k].e.d || 0)) > (D.qOf(s.hands) * 1000 + (s.hands.d || 0)) ? best[s.hands.k] : { from: 'hands', e: s.hands };
+    const spare = all.filter(x => best[x.e.k] && best[x.e.k].e !== x.e);
+    return { spare, caps: spare.reduce((a, x) => a + Math.max(1, Math.floor(D.valueOf(x.e.k, x.e.d, x.e.q))), 0) };
   }
   // 0.42: what is over KEEP of each material / ammo / seed (counted over pack + stash)
   const KEEP = 20;
