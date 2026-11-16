@@ -21,6 +21,7 @@ window.DM = window.DM || {};
   const EVA = () => D.EV;
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Math.round(n).toLocaleString('en-US');
+  const icon = k => `<img alt="" src="${(typeof ART !== 'undefined' && (ART.iconURL[(D.ITEMS[k] || {}).i] || ART.iconURL[k])) || ''}" style="width:18px;height:18px;vertical-align:-3px">`;
 
   function st() {
     const v = SV(); if (!v || !v.survivor) return null;
@@ -88,7 +89,7 @@ window.DM = window.DM || {};
     return `<div class="hcard gacha" id="gaCard"><div class="bicon gaicon">${CAPSULE(ev ? ev.ev.accent.c : '#f07aa8', '#f6e3bb')}</div>
       <div class="hinfo"><div class="hname">Capsule machine${ev && pool().some(k => D.COS[k].ev) ? ` <em>${esc(ev.ev.short || ev.ev.name)} capsules</em>` : ''}</div>
         <div class="haddr">A random cosmetic${ev && ev.ev.decor ? ' or holiday decor' : ''} for a token</div>
-        <div class="hmeta"><span><b>${g.tok}</b> token${g.tok === 1 ? '' : 's'}</span><span>${n ? `next in ${fmt(n)} steps` : 'Step tokens done for today'}</span></div></div>
+        <div class="hmeta"><span><b>${g.tok}</b> token${g.tok === 1 ? '' : 's'}</span><span><b>${fmt(SV().trader.caps)}</b> caps</span><span>${n ? `next in ${fmt(n)} steps` : 'Step tokens done for today'}</span></div></div>
       <div class="hbtns"><button class="mbtn${g.tok ? '' : ' ghost'}" id="gaOpen">${g.tok ? 'Pull' : 'Look'}</button></div></div>`;
   };
   GA.bind = function (root) { const b = (root || document).querySelector('#gaOpen'); if (b) b.onclick = () => { SFX.play('ui'); sheet(); G().tip('gacha'); }; const d = (root || document).querySelector('#dkOpen'); if (d) d.onclick = () => { SFX.play('ui'); deckSheet(); G().tip('deck'); }; };
@@ -107,13 +108,13 @@ window.DM = window.DM || {};
       : `<div class="garesult" style="--rc:#f07aa8"><div class="gaitem">${U().icon(res.decor)}</div><div><i>Holiday decor</i><b>${esc(D.ITEMS[res.decor].n)}</b><span>${res.lost ? 'Your stash is full - it was left behind' : 'In your stash - place it at the base'}</span></div></div>`;
     const inTab = host && document.body.contains(host) && G().ui && document.querySelector('#mtabs [data-t="gacha"].on');
     (inTab ? h => { host.innerHTML = `<div class="mcard gatab">${h}</div>`; } : U().sheetOpen)(`<div class="kick">Capsule machine${ev && P.some(k => D.COS[k].ev) ? ' · ' + esc(ev.ev.name) + ' capsules in' : ''}</div>
-      <h3>${g.tok} token${g.tok === 1 ? '' : 's'}</h3>${resHTML}
+      <h3>${g.tok} token${g.tok === 1 ? '' : 's'} <span class="gacaps" style="font-size:.8em;color:var(--mute)">· ${icon('caps')} ${fmt(SV().trader.caps)} caps</span></h3>${resHTML}
       <p class="mp dim">1 token per ${fmt(STEP)} steps (up to ${DAY_MAX} a day${g.dayTok >= DAY_MAX ? ' - done for today' : `, next in ${fmt(nextIn(g))}`}), or ${PRICE} caps. Epic or better at least every ${PITY} pulls (${PITY - g.pity} to go).</p>
       <div class="gapool">${P.map(k => `<span class="gap${w[k] ? ' own' : ''}" style="--rc:${RCOL[D.COS[k].r]}" title="${esc(D.COS[k].n)}">${U().icon('cos_' + k)}</span>`).join('')}</div>
       <div class="kick sect" style="margin-top:8px">Hairstyles &amp; eyes · ${lookPool().filter(k => looksOwned()[k]).length}/${lookPool().length}</div>
       <div class="gapool">${lookPool().map(k => `<span class="gap${looksOwned()[k] ? ' own' : ''}" style="--rc:${RCOL[D.LOOKUN[k].r]}" title="${esc(D.LOOKUN[k].n)}">${lookIcon(k)}</span>`).join('')}</div>
       <p class="mp dim">Cosmetics ${got}/${P.length} collected${ev && ev.ev.decor ? ` · 1 pull in 4 is ${esc(ev.ev.name)} decor` : ''}</p>
-      <div class="btnrow">${inTab ? '' : '<button class="mbtn sm ghost" id="gaClose">Close</button>'}<button class="mbtn sm ghost" id="gaBuy">Buy · ${PRICE} caps</button><button class="mbtn sm" id="gaPull"${g.tok ? '' : ' disabled'}>Pull</button></div>`);
+      <div class="btnrow">${inTab ? '' : '<button class="mbtn sm ghost" id="gaClose">Close</button>'}<button class="mbtn sm ghost" id="gaBuy"${SV().trader.caps < PRICE ? ' disabled' : ''}>Buy · ${PRICE} caps</button><button class="mbtn sm" id="gaPull"${g.tok ? '' : ' disabled'}>Pull</button></div>`);
     if ($('#gaClose')) $('#gaClose').onclick = () => { U().sheetClose(); G().renderHome(); };
     if (inTab) G().tip('gacha');
     $('#gaBuy').onclick = buy; $('#gaPull').onclick = pull;

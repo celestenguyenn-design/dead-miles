@@ -1034,6 +1034,14 @@ either more things to craft, more storage or stacks, and reduce certain drop per
   and distance to the stairwell. Last floor: a card - walk there, or Leave now (opens the usual fire-exit choice ->
   Get out; loot goes to the stash as normal).
 
+## Done in 0.44.3 (owner: "your crew should have HP and get attacked as well in horde night"; "before you pull the
+capsule we should be able to see how many caps we have")
+- crew.js: fighters (shift / raid) and the run companion have HP (80 + 8/level, guards +40), shown as a bar over the
+  name tag when hurt. A zombie right next to one hits it every ~1.2 s (9 x its damage multiplier). At 0 HP: falls back,
+  m.hurt = today (out of fights and runs until tomorrow, crew sheet says so), mood -8.
+- gacha.js: caps shown next to tokens on the machine (tab + card); Buy is disabled when short.
+- base.js tick guards a frame after the shift closed (an intermittent null S.shift error).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
