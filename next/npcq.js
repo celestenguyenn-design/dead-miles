@@ -110,7 +110,7 @@ window.DM = window.DM || {};
     for (const [k, n0] of need) { let n = n0; for (const list of [s.pack, s.stash]) for (let i = list.length - 1; i >= 0 && n > 0; i--) { const e = list[i]; if (e.k !== k) continue; const t = Math.min(n, e.n); e.n -= t; n -= t; if (!e.n) list.splice(i, 1); } }
   }
   function release(q) { const h = (SV().houses || []).find(x => x.id === q.house); if (h && h.npcq === q.id) delete h.npcq; }
-  const BONUS = [['bandage', 3], ['meds', 2], ['ammo', 15], ['lockpick', 3], ['beans', 3], ['water', 3], ['battery', 2], ['tape', 2], ['arrow', 10]];
+  const BONUS = [['bandage', 1], ['meds', 1], ['ammo', 15], ['lockpick', 3], ['beans', 3], ['water', 3], ['battery', 2], ['tape', 2], ['arrow', 10]];
   function reward(q, P) {   // P = { panel, close } inside a run (crew.js), else the home sheet
     const v = SV(), S = st(), r = D.mulberry32((q.seed ^ 0x7f4a7c15) >>> 0), U = G().ui;
     q.state = 'done'; S.done = (S.done || 0) + 1; release(q);

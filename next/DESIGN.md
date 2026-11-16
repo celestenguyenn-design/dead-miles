@@ -1000,6 +1000,13 @@ either more things to craft, more storage or stacks, and reduce certain drop per
   Two choices each, outcomes seeded (MapQ.ui dialogs). Nearest one shown on the map card; used ones fade.
 - mapfx give() merges duplicate items in reward text. Map guide page 3 mentions them.
 
+## Done in 0.43.1 (owner: "a ton of bandages and med stuff ... it never feels bad")
+- data.js: bandages x0.45, painkillers x0.5, antibiotics x0.8 in every LOOT table, and the cut weight now goes to an
+  empty draw (__none, skipped in rollLoot) - before, cutting a weight only shifted odds between the items left, so
+  medicine cabinets still always gave medicine. This also makes 0.42's seed / battery / 9mm / cloth cuts really bite.
+  Measured: medical containers ~0.34 bandages + ~0.24 painkillers each (was ~0.65 + ~0.47).
+- Smaller medical rewards: pharmacy jackpot, bandage roll (3, was 5), NPC thank-you bonus, map places, Ray's list.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

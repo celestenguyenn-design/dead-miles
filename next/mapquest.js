@@ -83,7 +83,7 @@ window.DM = window.DM || {};
       steps: [
         { k: 'go', lo: 150, hi: 350, goal: 'Stop 1 on Ray\'s list', arrive: 'Behind the counter: a roll of tape and some scrap. Check.', r: { items: [['tape', 1], ['scrap', 2]] } },
         { k: 'go', lo: 150, hi: 350, goal: 'Stop 2 on Ray\'s list', arrive: 'A stockroom nobody found yet. Cans!', r: { items: [['beans', 2]] } },
-        { k: 'go', lo: 150, hi: 350, goal: 'Stop 3 on Ray\'s list', arrive: 'The last stop. A first-aid kit taped under a desk.', r: { items: [['bandage', 2]] } },
+        { k: 'go', lo: 150, hi: 350, goal: 'Stop 3 on Ray\'s list', arrive: 'The last stop. A roll of bandage taped under a desk.', r: { items: [['bandage', 1]] } },
         { k: 'back', goal: 'Bring the list back to Ray', arrive: '"You\'re a legend. Dot\'ll hear about this."', r: { caps: 55, xp: 35 } },
       ] },
     vex: { who: 'Vex', face: '🦹', title: 'Somebody else\'s stash',

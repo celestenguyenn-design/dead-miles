@@ -154,7 +154,7 @@ window.DM = window.DM || {};
     knuckles: { out: ['knuckles', 1], in: { scrap: 3, tape: 1 }, n: 'Brass knuckles' },   // 0.30: everyone knows it
     pipegun: { out: ['pipegun', 1], in: { scrap: 6, tape: 2, wood: 1 }, n: 'Pipe pistol (shoots 9mm)' },   // 0.42: everyone knows it
     baton: { out: ['baton', 1], in: { scrap: 3, battery: 4, tape: 1, cloth: 2 }, n: 'Shock baton (uses batteries)' },   // 0.42: everyone knows it
-    bandage2: { out: ['bandage', 5], in: { cloth: 5, tape: 1 }, n: 'Bandage roll (5 bandages)' },   // 0.42: a use for piles of cloth
+    bandage2: { out: ['bandage', 3], in: { cloth: 5, tape: 1 }, n: 'Bandage roll (3 bandages)' },   // 0.42: a use for piles of cloth
     xlights: { out: ['xlights', 1], in: { battery: 2, cloth: 1, tape: 2 }, n: 'Light-string whip' },
     nailgun: { out: ['nailgun', 1], in: { scrap: 6, battery: 2, tape: 2 }, n: 'Nail gun (shoots nails)' },
     shells: { out: ['shells', 6], in: { scrap: 2, ammo: 4 }, n: 'Shotgun shells' },
@@ -474,11 +474,11 @@ window.DM = window.DM || {};
   D.LOOT.hordecrate_bf = [[5, 6], { 'decor_*': 1, 'seed_*': 1, ammo: 2, meds: 2.5, bandage: 2, scrap: 1.5, nails: 1.5, wood: 1.5, tape: 1, battery: 1, 'bp_*': 1.2, 'cosH_*': .7, turkey: .5, pie: 1.5, cranberry: 1, lockset: .3, backpack: .15 }, ['meds']];
   // 0.42 (owner: "seeds should be more limited ... an overload of batteries, cloth rags, a ton of 9mm"): those turn up
   // less often everywhere (seeds -60%, batteries -40%, 9mm -40%, cloth -30%); jackpots are unchanged
-  for (const t in D.LOOT) { const w = D.LOOT[t][1]; for (const [k, m] of [['seed_*', .4], ['battery', .6], ['ammo', .6], ['cloth', .7]]) if (w[k]) w[k] = +(w[k] * m).toFixed(3); }
+  for (const t in D.LOOT) { const w = D.LOOT[t][1]; for (const [k, m] of [['seed_*', .4], ['battery', .6], ['ammo', .6], ['cloth', .7], ['bandage', .45], ['meds', .5], ['antibio', .8]]) if (w[k]) { const cut = w[k] * (1 - m); w[k] = +(w[k] * m).toFixed(3); w.__none = +((w.__none || 0) + cut).toFixed(3); } }   // the cut weight becomes "nothing" (__none), so fewer items really come out   // 0.43.1 (owner: "a ton of bandages and med stuff ... it never feels bad"): medical x0.45-0.5
   // 0.10: the one guaranteed prize in a key-locked room / car trunk (gen.js jackpots). Each entry: [weight, items].
   D.JACK = {
     gun: [[3, ['pistol', 'ammo', 'ammo']], [2, ['shotgun', 'shells', 'shells']], [2, ['ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo']], [1, ['machete']], [1, ['spikedbat']], [1, ['axe']], [1, ['cosP_*']], [1, ['lockset']]],   // 0.30: real guns
-    meds: [[3, ['meds', 'meds', 'meds', 'bandage', 'bandage']], [2, ['bp_*']], [1, ['backpack']], [1, ['packplus']]],
+    meds: [[3, ['meds', 'meds', 'bandage']], [2, ['bp_*']], [1, ['backpack']], [1, ['packplus']]],
     safe: [[3, ['jewelry', 'jewelry', 'watch']], [2, ['cosM_*']], [2, ['decor_*']], [2, ['bp_*']], [1, ['backpack']]],
     stash: [[2, ['bp_*']], [2, ['cos_*']], [2, ['decor_*']], [1, ['backpack']], [2, ['packplus']], [1, ['machete']], [1, ['lockset']], [1, ['watch', 'jewelry']]],
     trunk: [[2, ['machete']], [1, ['axe']], [2, ['crowbar']], [2, ['prybar']], [1, ['spikedbat']], [2, ['ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo']], [1, ['lockset']], [2, ['cos_*']], [1, ['pistol', 'ammo']], [1, ['shotgun', 'shells']], [1, ['xlights']]]
@@ -512,7 +512,7 @@ window.DM = window.DM || {};
     let n = a + Math.floor(rnd() * (b - a + 1)) - out.length;
     if (key === 'corpse' && rnd() > .45) n = 0;
     const ks = Object.keys(tab), tot = ks.reduce((s, k) => s + tab[k], 0);
-    for (let i = 0; i < n; i++) { let v = rnd() * tot; for (const k of ks) { v -= tab[k]; if (v <= 0) { out.push(k); break; } } }
+    for (let i = 0; i < n; i++) { let v = rnd() * tot; for (const k of ks) { v -= tab[k]; if (v <= 0) { if (k !== '__none') out.push(k); break; } } }   // 0.43.1: __none = an empty draw
     for (let i = 0; i < out.length; i++) if (out[i] === 'bp_*') { out[i] = D.pickBP(rnd); }
       else if (out[i] === 'decor_*') { const b = Object.keys(D.DECOR); out[i] = b[Math.floor(rnd() * b.length)]; }
       else if (out[i] === 'seed_*') { const b = Object.keys(D.ITEMS).filter(x => D.ITEMS[x].seed); out[i] = b[Math.floor(rnd() * b.length)]; }
