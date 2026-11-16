@@ -77,7 +77,7 @@ window.DM = window.DM || {};
   W.open = function (i) {
     const w = st(), c = w.bag[i]; if (!c || c.got < c.need) return;
     w.bag.splice(i, 1);
-    const H = HAUL[c.k], keys = [];
+    const H = HAUL[c.k], keys = []; DM.Journal && DM.Journal.note(`Walked a ${c.k.replace('cache', '')} km cache open.`);
     for (const [t, n] of H.rolls) for (let j = 0; j < n; j++) keys.push(...D().rollLoot(t, Math.random));
     if (H.bp) keys.push(D().pickBP(Math.random));
     const stacks = D().toStacks(keys, Math.random);
@@ -139,7 +139,7 @@ window.DM = window.DM || {};
   W.escortLeft = () => { const e = bd().esc; return e.st === 'on' ? Math.max(0, e.need - ((SV().walked || 0) - e.s0)) : e.need; };
   W.escortDone = function () {
     const e = bd().esc; if (e.st !== 'on' || W.escortLeft() > 0) return;
-    e.st = 'done'; SV().trader.caps += 40; if (DM.Skills) DM.Skills.addXP(30);
+    e.st = 'done'; DM.Journal && DM.Journal.note(`Walked ${e.who} to ${e.to}.`); SV().trader.caps += 40; if (DM.Skills) DM.Skills.addXP(30);
     const join = Math.random() < .2 && DM.Crew && DM.Crew.free && DM.Crew.free() > 0 && !/kids|dog/.test(e.who);
     if (join) DM.Crew.joinHelped(e.who.replace(/^(Old |Mr\. )/, ''), D().hashStr(e.who + today()));
     G().save(); try { DM.E.SFX.play('pick'); } catch (x) { /* ignore */ }

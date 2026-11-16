@@ -60,7 +60,7 @@
   const crew = () => SV().crew.list, pets = () => SV().pets.list;
   C.bunks = () => 2 + ((SV().base && SV().base.built.bunks) || 0);
   C.free = () => C.bunks() - crew().length;
-  C.joinHelped = (name, seed) => { const m = newMember(seed); const mem = join({ name, look: m.look, role: m.role, xp: 0, mood: 70, hungry: 0, past: m.past }); C.ensureRig(mem.id, mem.look); return mem; };   // 0.27: npcq.js
+  C.joinHelped = (name, seed) => { DM.Journal && DM.Journal.note(`${name} joined the crew.`); const m = newMember(seed); const mem = join({ name, look: m.look, role: m.role, xp: 0, mood: 70, hungry: 0, past: m.past }); C.ensureRig(mem.id, mem.look); return mem; };   // 0.27: npcq.js
   const working = m => m.mood >= 25;                        // a miserable crew member does not do their job
   C.activePet = () => pets().find(p => p.active && !(p.away && p.away >= dayNo())) || null;
   const roleLv = r => crew().filter(m => m.role === r && working(m)).map(C.lv);

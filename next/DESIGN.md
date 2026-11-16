@@ -1120,6 +1120,15 @@ in my backpack it zooms my screen all the way to the top")
 - Power walk: 15 min at 1.1-2.6 m/s (map or Pocket mode on; a >90 s gap costs 2 min) -> hordecrate roll + 20 caps +
   20 XP, once a day. Progress line on the map card once she is moving.
 
+## Done in 0.50.0 - the survival log (journal.js, DM.Journal) (owner: "make it animated with sound effects of page turning")
+- One page a day, written by the game: steps, houses, kills, downs, notes from other systems (DM.Journal.note: camps
+  taken, base raids, crew joining, deep runs, level-ups, walking caches, escorts), a weather line and a mood line
+  (seeded by the date). Day number = days since the save was made. Pages close when the date changes (last 120 kept).
+- The book: full-screen lined paper page; flip with Back / Next or a swipe - the page turns over in 3D (CSS rotateY,
+  0.55 s) with a paper sound (bandpass + highpass noise). "Copy page" for sending to friends. Home tile "Survival log".
+- All of the 2026-11-16 list is now built (walk report, upkeep, caches, bounties, escorts, stamps, power walk, journal).
+  Not built from the ideas list: real injuries (Zomboid), skill books, moods, harder blood moons, the forge.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

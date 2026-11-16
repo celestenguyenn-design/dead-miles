@@ -407,6 +407,7 @@
   function endRun(kind) { // clear the run and keep a line for the home card
     const d = st(), r = d.run;
     d.last = { b: r.b, kind, f: r.f, n: N(r), at: Date.now(), items: 0 };
+    DM.Journal && DM.Journal.note(kind === 'out' ? `Got out of ${DP.B[r.b].n} from floor ${r.f}.` : `Went down on floor ${r.f} of ${DP.B[r.b].n}. Lost everything I found in there.`);
     if (kind === 'out') { d.stats.out++; d.stats.deepest = Math.max(d.stats.deepest || 0, r.f); } else d.stats.downs++;
     d.run = null;
     return d.last;

@@ -900,7 +900,7 @@
       r.st = 'won'; const caps = 25 + kills * 3; SV().trader.caps += caps; if (DM.Skills) DM.Skills.addXP(15 + kills * 2);
       const keys = DM.D.rollLoot('hordecrate', Math.random), lost = G().routeApi.toStash(keys.map(k => ({ k, n: k === 'ammo' ? 8 : 1 })));
       rew = `${caps} caps, ${15 + kills * 2} XP, ${keys.map(k => DM.D.ITEMS[k] ? DM.D.ITEMS[k].n.toLowerCase() : k).join(', ')}${lost && lost.length ? ' (stash full - some left behind)' : ''}`;
-      r.res = `You drove them off: ${kills} kill${kills === 1 ? '' : 's'}. ${rew}.`; if (DM.Codex) DM.Codex.flag('raids');
+      r.res = `You drove them off: ${kills} kill${kills === 1 ? '' : 's'}. ${rew}.`; if (DM.Codex) DM.Codex.flag('raids'); DM.Journal && DM.Journal.note(`Walkers hit the base. Drove them off.`);
     }
     r.seen = 1; G().save();
     const card = () => {

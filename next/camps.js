@@ -105,7 +105,7 @@ window.DM = window.DM || {};
       onCampWin: async () => {
         won = true; const g = DM.House.G; g.banners.push({ text: 'CAMP TAKEN', sub: c.name, t: 0 }); try { DM.E.SFX.play('kill'); } catch (e) { /* ignore */ }
         const n = N(); let r; try { r = await n.rpc('next_camp_take', { p_handle: n.handle, p_token: n.token, p_camp: c.id, p_party: party() }); } catch (e) { r = null; }
-        if (r && r.ok) { SV().trader.caps += 40; if (DM.Skills) DM.Skills.addXP(80); if (DM.Codex) DM.Codex.flag('camps'); toast(`🏴 ${c.name} is yours! +40 caps, +80 XP. It pays tribute every day. Walk out the front door when you're done.`, 4.5); }
+        if (r && r.ok) { DM.Journal && DM.Journal.note(`Took ${c.name} from ${c.handle ? c.owner : 'the bandits'}.`); SV().trader.caps += 40; if (DM.Skills) DM.Skills.addXP(80); if (DM.Codex) DM.Codex.flag('camps'); toast(`🏴 ${c.name} is yours! +40 caps, +80 XP. It pays tribute every day. Walk out the front door when you're done.`, 4.5); }
         else toast(r && r.error === 'safe' ? 'Someone took it moments before you - it is safe for now' : r && r.error === 'limit' ? 'You took 3 camps today - this one stays as it is' : 'Could not claim it (offline?) - try again later', 3.4);
         CP.refresh(true);
       },
