@@ -33,19 +33,19 @@ window.DM = window.DM || {};
   const has = (k, n) => DM.Game.countItem(k) >= n;
   const KINDS = {
     checkpoint: { w: 18, g: '🪖', col: '#7a8a4a', n: 'Army checkpoint', d: 'Sandbags, a barrier arm and two tired soldiers. "Halt. You bit? No? Then what have you got for us?"', opts: [
-      { t: 'Trade 2 painkillers for supplies', cost: ['meds', 2], p: 1, win: 'The sergeant nods and slides a crate across the sandbags.', r: { caps: 40, xp: 15, items: [['bandage', 2], ['shells', 4]] }, rare: [['armor_riot', .15], ['mod_silencer', .08]] },
+      { t: 'Trade 2 painkillers for supplies', cost: ['meds', 2], p: 1, win: 'The sergeant nods and slides a crate across the sandbags.', r: { caps: 40, xp: 15, items: [['shells', 4], ['tape', 1]] }, rare: [['armor_riot', .15], ['mod_silencer', .08]] },
       { t: 'Ask what they know', p: 1, win: '"Stay off the main roads after dark. And the vending machines are booby-trapped. Mostly."', r: { xp: 20, caps: 10 } }] },
     heli: { w: 7, weekly: 1, g: '🚁', col: '#c95f2c', n: 'Crashed helicopter', d: 'A military helicopter on its side, rotor bent into the street. The cargo bay is still shut.', opts: [
-      { t: 'Pry open the cargo bay', p: .7, win: 'Military crates. Jackpot.', lose: 'Something in the cockpit was not dead. You get the crates, and a bite.', hurt: 14, r: { caps: 40, xp: 40, loot: ['hordecrate', 1], items: [['meds', 1]] }, rare: [['shotgun', .15], ['mod_scope', .2], ['shells', .5]] },
-      { t: 'Check the cockpit only', p: .9, win: 'A flight bag: medicine, a map, a little cash.', lose: 'Empty. Someone beat you to it.', r: { caps: 20, items: [['meds', 2]], xp: 20 } }] },
+      { t: 'Pry open the cargo bay', p: .7, win: 'Military crates. Jackpot.', lose: 'Something in the cockpit was not dead. You get the crates, and a bite.', hurt: 14, r: { caps: 40, xp: 40, loot: ['hordecrate', 1] }, rare: [['shotgun', .15], ['mod_scope', .2], ['shells', .5]] },
+      { t: 'Check the cockpit only', p: .9, win: 'A flight bag: a map, a little cash, a pair of gloves.', lose: 'Empty. Someone beat you to it.', r: { caps: 30, items: [['cloth', 1]], xp: 20 } }] },
     camp: { w: 15, g: '⛺', col: '#d9a65a', n: 'Survivor camp', d: 'A ring of tents around a fire in a parking lot. Someone is cooking something that almost smells good.', opts: [
       { t: 'Rest by the fire', p: 1, win: 'You sit, you eat, you sleep for an hour. You feel human.', heal: 30, r: { xp: 10 } },
       { t: 'Swap stories', p: 1, win: 'Everyone has a story. You trade a few and walk off a little wiser.', r: { xp: 30 } }] },
     tent: { w: 9, g: '⚕️', col: '#9fe0e6', n: 'Quarantine tent', d: 'A white tent with a red cross, flaps zipped. "QUARANTINE - DO NOT ENTER" in marker.', opts: [
-      { t: 'Search the cots', p: .65, win: 'Medical supplies, sealed and clean.', lose: 'One of the patients is still here. Sort of. You get out fast.', hurt: 10, r: { items: [['bandage', 3]], loot: ['nurse', 1], xp: 15 }, rare: [['antibio', .3]] },
+      { t: 'Search the cots', p: .65, win: 'Medical supplies, sealed and clean.', lose: 'One of the patients is still here. Sort of. You get out fast.', hurt: 10, r: { items: [['bandage', 1]], xp: 15 }, rare: [['meds', .4], ['antibio', .25]] },
       { t: 'Leave it zipped', p: 1, win: 'Some doors are better left shut.' }] },
     ambulance: { w: 12, g: '🚑', col: '#e05050', n: 'Abandoned ambulance', d: 'Back doors open, lights long dead. The cabinets inside look untouched.', opts: [
-      { t: 'Raid the cabinets', p: .9, win: 'Bandages, painkillers, a little of everything.', lose: 'Picked over, except a single roll of tape.', r: { loot: ['medcab', 1], xp: 12 } },
+      { t: 'Raid the cabinets', p: .9, win: 'A first-aid kit, half used.', lose: 'Picked over, except a single roll of tape.', r: { items: [['bandage', 1]], xp: 12 }, rare: [['meds', .35]] },
       { t: 'Take the battery', p: 1, win: 'The ambulance battery still holds a charge.', r: { items: [['battery', 2]] } }] },
     nest: { w: 7, weekly: 1, g: '🧟', col: '#93a86c', n: 'Zombie nest', d: 'A collapsed storefront packed with sleeping dead. Dozens. Something glints in the middle of them.', opts: [
       { t: 'Mark it - clear it out later', p: 1, win: 'You mark it on your list. A dangerous house, with the good stuff inside.', nest: 1, r: { xp: 15 } },
