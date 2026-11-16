@@ -1129,6 +1129,14 @@ in my backpack it zooms my screen all the way to the top")
 - All of the 2026-11-16 list is now built (walk report, upkeep, caches, bounties, escorts, stamps, power walk, journal).
   Not built from the ideas list: real injuries (Zomboid), skill books, moods, harder blood moons, the forge.
 
+## Done in 0.50.1 (owner + Isabel: can't see weapon quality when selling; "getting a lot of weapons"; check drop rates -
+"limited stash and backpack space")
+- Audit (150 houses, scratch audit2.js): per house before -> after: weapons 0.80 -> 0.31 (knives 0.47 -> 0.15), sell-only
+  junk 1.93 -> 1.34, slots filled 3.9 -> 3.0. Materials (~7.5) kept for building. data.js: weapons x0.5, knives x0.3,
+  junk x0.6 in all LOOT tables (empty-draw weight).
+- Dot > Sell: weapons show quality (colour) · damage · condition %, armor shows damage cut · condition. New "Sell spare
+  weapons": keeps the best of each kind (quality, then durability; the one in hand counts), sells the rest, tap twice.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
