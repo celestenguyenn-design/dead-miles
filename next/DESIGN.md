@@ -1070,6 +1070,13 @@ people to die. I want it to be a real fight")
   s.warStash), plated armor 14, Masterwork weapon 22, 3 capsule tokens 6. Losing a camp shows a toast.
 - Codex feat "The Governor": take 5 camps.
 
+## Done in 0.46.1 (owner: "a lot of people aren't joining parties ... they should be prompted"; "when I learn a blueprint
+in my backpack it zooms my screen all the way to the top")
+- Party nudges: "Join a party" in What to do next (signed in, no party) or "Sign in to play with friends" (level 2+,
+  signed out); and once every 3 days a "Join a party" card (horde night, camps, step goal, boss) -> the party list.
+- renderHome() now keeps #menu's scroll position on every redraw (renderHome0 is the old body).
+- Server cleanup: removed the zz-next-test-* parties and test accounts (they showed in the party list).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
