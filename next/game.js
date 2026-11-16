@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.43.2';
+const NEXT_VERSION = '0.44.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -58,7 +58,7 @@ const NEXT_VERSION = '0.43.2';
     v.trader.event = v.trader.event || null;   // phase 5a: Dot's seasonal job chain { key, step, kills, base }
     v.tips = v.tips || {};                  // phase 5: first-time tips already shown
     if (v.survivor) migrateCos(v.survivor);
-    if (v.survivor) migrateQuiver(v.survivor);
+    if (v.survivor) { migrateQuiver(v.survivor); migratePouch(v.survivor); }
     if (v.survivor) migrateKeys(v.survivor);
     if (v.survivor) migrateQuality(v.survivor, v);   // 0.19: weapon quality + days played for the gamestage
     if (v.survivor && !v.run0111) { dropNotes(v.survivor); v.run0111 = 1; }   // notes carried home before 0.11.1
@@ -102,6 +102,9 @@ const NEXT_VERSION = '0.43.2';
     if (s.gsDays == null) s.gsDays = Math.min(60, Math.max(0, Math.floor((Date.now() - (+v.created || Date.now())) / 864e5)));
   }
   function dropNotes(s) { if (!s) return; for (const k of ['pack', 'stash']) if (Array.isArray(s[k])) s[k] = s[k].filter(e => e.k !== 'note'); }
+  // 0.44: the ammo pouch (9mm, shells): no pack slot, never spilled; fills before the pack / stash
+  function toPouch(k, n) { const s = SV.survivor, p = s.pouch = s.pouch || {}, t = Math.max(0, Math.min(n, D.POUCH[k] - (p[k] || 0))); p[k] = (p[k] || 0) + t; return t; }
+  function migratePouch(s) { const p = s.pouch = s.pouch && typeof s.pouch === 'object' ? s.pouch : {}; for (const k in D.POUCH) { p[k] = Math.max(0, Math.min(D.POUCH[k], +p[k] || 0)); for (let i = s.pack.length - 1; i >= 0 && p[k] < D.POUCH[k]; i--) if (s.pack[i].k === k) { const t = Math.min(s.pack[i].n, D.POUCH[k] - p[k]); p[k] += t; s.pack[i].n -= t; if (!s.pack[i].n) s.pack.splice(i, 1); } } }
   function toQuiver(n) { const q = SV.survivor.quiver = SV.survivor.quiver || { n: 0 }, t = Math.max(0, Math.min(n, D.QUIVER - q.n)); q.n += t; return t; }
   const cosQueue = [];   // unlock popups waiting to be shown
   D.cosOwned = () => (SV && SV.survivor && SV.survivor.wardrobe ? SV.survivor.wardrobe.own : {});
@@ -279,7 +282,7 @@ const NEXT_VERSION = '0.43.2';
     },
     toStash(stacks) {   // like the crew's haul: everything to the stash; returns what did not fit
       const lost = [];
-      for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'key') { SV.survivor.keys = (+SV.survivor.keys || 0) + e.n; continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, stashSlots(), e.k, e.n, e.d, e.q); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k, false, e.q); }
+      for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'key') { SV.survivor.keys = (+SV.survivor.keys || 0) + e.n; continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } if (D.isPouch(e.k)) { e.n -= toPouch(e.k, e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, stashSlots(), e.k, e.n, e.d, e.q); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k, false, e.q); }
       return lost;
     },
     showResult: (...a) => showResult(...a), openTrader: () => openTrader(), maxHp: s => maxHp(s), dayNum: k => dayNum(k),
@@ -317,7 +320,7 @@ const NEXT_VERSION = '0.43.2';
     }
     DM.Crew.onTask('scavenger', 2);
     const stacks = D.toStacks(got, rnd, { base: D.qBaseFor(h.danger || 1), bonus: D.gsFx(gamestage().gs).qBonus }), lost = [];   // 0.19: quality by danger + gamestage
-    for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, stashSlots(), e.k, e.n, e.d, e.q); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k, false, e.q); }
+    for (const e of stacks) { if (D.ITEMS[e.k].cos) { Game.unlockCos(e.k); continue; } if (e.k === 'arrow') { e.n -= toQuiver(e.n); if (!e.n) continue; } if (D.isPouch(e.k)) { e.n -= toPouch(e.k, e.n); if (!e.n) continue; } const n = addTo(SV.survivor.stash, stashSlots(), e.k, e.n, e.d, e.q); if (n < e.n) lost.push({ k: e.k, n: e.n - n }); else Game.onWeaponLoot(e.k, false, e.q); }
     h.status = 'auto'; SV.stats.auto++;
     DM.Skills.addXP(3);
     Game.save();
@@ -423,17 +426,19 @@ const NEXT_VERSION = '0.43.2';
   // ---------------------------------------------------------------- trader: Auntie Dot, quests, shop, crafting
   const traderLevel = () => Math.min(5, 1 + Math.floor((SV.trader.completed || 0) / 20));
   const questById = id => SV.trader.active.find(q => q.id === id) || null;
-  const countItem = k => SV.survivor.pack.concat(SV.survivor.stash).filter(e => e.k === k).reduce((a, e) => a + e.n, 0) + (k === 'arrow' && SV.survivor.quiver ? SV.survivor.quiver.n : 0) + (k === 'key' ? +SV.survivor.keys || 0 : 0);
+  const countItem = k => SV.survivor.pack.concat(SV.survivor.stash).filter(e => e.k === k).reduce((a, e) => a + e.n, 0) + (k === 'arrow' && SV.survivor.quiver ? SV.survivor.quiver.n : 0) + (D.isPouch(k) && SV.survivor.pouch ? +SV.survivor.pouch[k] || 0 : 0) + (k === 'key' ? +SV.survivor.keys || 0 : 0);
   function takeItems(k, n) { // stash first, then pack; returns removed entries (weapons keep durability)
     const out = [];
     for (const list of [SV.survivor.stash, SV.survivor.pack]) for (let i = list.length - 1; i >= 0 && n > 0; i--) if (list[i].k === k) { const t = Math.min(n, list[i].n); list[i].n -= t; n -= t; out.push({ k, n: t, d: list[i].d, q: list[i].q }); if (!list[i].n) list.splice(i, 1); }
     if (k === 'arrow' && n > 0 && SV.survivor.quiver) { const t = Math.min(n, SV.survivor.quiver.n); SV.survivor.quiver.n -= t; if (t) out.push({ k, n: t }); }
+    if (D.isPouch(k) && n > 0 && SV.survivor.pouch) { const t = Math.min(n, SV.survivor.pouch[k] || 0); SV.survivor.pouch[k] -= t; n -= t; if (t) out.push({ k, n: t }); }
     if (k === 'key' && n > 0 && SV.survivor.keys > 0) { const t = Math.min(n, SV.survivor.keys); SV.survivor.keys -= t; out.push({ k, n: t }); }
     return out;
   }
   function give(k, n, d, q) { // into the pack if it fits, the rest to the stash; returns what did not fit anywhere (0.19: q = weapon quality)
     if (D.ITEMS[k] && D.ITEMS[k].cos) { Game.unlockCos(k); return 0; }
     if (k === 'arrow') { n -= toQuiver(n); if (!n) return 0; }   // arrows: the quiver first
+    if (D.isPouch(k)) { n -= toPouch(k, n); if (!n) return 0; }   // 0.44: 9mm / shells: the ammo pouch first
     if (k === 'key') { SV.survivor.keys = (+SV.survivor.keys || 0) + n; return 0; }   // keys: the keyring
     if (D.isWeapon(k)) { if (q == null) q = 2; if (d == null) d = D.wMax({ k, q }); }   // 0.19: a weapon without a quality is Worn
     let got = addTo(SV.survivor.pack, packSlots(), k, n, d, q); if (got < n) got += addTo(SV.survivor.stash, stashSlots(), k, n - got, d, q);
@@ -798,7 +803,7 @@ const NEXT_VERSION = '0.43.2';
   }
   function whatItDoes(k) {
     const it = D.ITEMS[k]; if (!it) return '';
-    if (it.w) { const W = D.WEAPONS[it.w], e2 = { k, q: 2 }, dm = D.wDmg(e2), du = D.wMax(e2); return (W.gun ? `Gun · ${dm} damage${W.pellets ? ` x${W.pellets} pellets` : ''} · lasts ${du} shots · uses ${D.ITEMS[W.gun].n.toLowerCase()} from your pack · ${W.noise >= 8 ? 'VERY loud - brings the house' : 'fairly quiet'}` : W.ranged ? `Ranged weapon · ${dm} damage · lasts ${du} shots · needs arrows` : `Melee weapon · ${dm} damage · reach ${W.reach} · lasts ${du} hits · ${W.noise >= 4 ? 'loud' : W.noise >= 3 ? 'a bit loud' : 'quiet'}`) + ' (Worn; each quality tier +8% damage, +15% durability)'; }   // 0.19
+    if (it.w) { const W = D.WEAPONS[it.w], e2 = { k, q: 2 }, dm = D.wDmg(e2), du = D.wMax(e2); return (W.gun ? `Gun · ${dm} damage${W.pellets ? ` x${W.pellets} pellets` : ''} · holds ${W.mag}, ${W.reload} s reload · lasts ${du} shots · uses ${D.ITEMS[W.gun].n.toLowerCase()} from your pack · ${W.noise >= 8 ? 'VERY loud - brings the house' : 'fairly quiet'}` : W.ranged ? `Ranged weapon · ${dm} damage · lasts ${du} shots · needs arrows` : `Melee weapon · ${dm} damage · reach ${W.reach} · lasts ${du} hits · ${W.noise >= 4 ? 'loud' : W.noise >= 3 ? 'a bit loud' : 'quiet'}`) + ' (Worn; each quality tier +8% damage, +15% durability)'; }   // 0.19
     if (it.slots) return `Fit it to your pack: +${it.slots} pack slots for good`;
     if (it.hp || it.sta || it.hu || it.th) return [DM.Food.label(k), it.hp ? `heals ${it.hp} HP` : '', it.sta ? `+${it.sta} stamina` : ''].filter(Boolean).join(' · ').replace(/^./, c => c.toUpperCase());
     return { lockpick: 'Opens locks silently with the lockpick mini-game. Snaps if you force it.', arrow: 'Ammo for the hunting bow. You can pick most of them back up.', shoes: 'Wear them: your footsteps make 30% less noise.',
@@ -1555,9 +1560,10 @@ const NEXT_VERSION = '0.43.2';
         ${(() => { const ar = s.armor && D.ITEMS[s.armor.k] && D.ITEMS[s.armor.k].armor ? s.armor : null, ad = ar && D.ITEMS[ar.k].armor;   // 0.28: the body armor slot
           return `<button class="eqslot armor${sel && sel.from === 'armor' ? ' sel' : ''}" ${ar ? 'data-from="armor" data-i="0"' : 'id="eqNoArmor"'}><i class="eqk">Armor · body</i>${ar ? icon(ar.k) : '<span class="eqnone">🦺</span>'}<b>${ar ? esc(D.ITEMS[ar.k].n) : 'No armor'}</b><span>${ar ? `-${Math.round(ad.red * 100)}% damage · ${DM.Armor.dur(ar)}/${ad.dur}` : 'Find or craft some'}</span>${ar ? `<i class="dur"><i style="width:${Math.round(DM.Armor.dur(ar) / ad.dur * 100)}%"></i></i>` : ''}</button>`; })()}
         <button class="eqslot quiv${sel && sel.from === 'quiver' ? ' sel' : ''}" data-from="quiver" data-i="0"><i class="eqk">Quiver</i>${(s.quiver || {}).n ? icon('arrow') : `<img class="dim" alt="" src="${ART.iconURL.arrow}">`}<b>${(s.quiver || {}).n || 0} arrow${(s.quiver || {}).n === 1 ? '' : 's'}</b><span>max ${D.QUIVER} · no pack slot</span></button>
+        <button class="eqslot pouch${sel && sel.from === 'pouch' ? ' sel' : ''}" data-from="pouch" data-i="0"><i class="eqk">Ammo pouch</i>${icon('ammo')}<b>${(s.pouch || {}).ammo || 0} 9mm · ${(s.pouch || {}).shells || 0} shells</b><span>max ${D.POUCH.ammo} / ${D.POUCH.shells} · no pack slot</span></button>
         <div class="eqslot"><i class="eqk">Backpack</i>${s.packBonus ? icon(s.packBonus >= 4 ? 'backpack' : 'packplus') : `<img class="dim" alt="" src="${ART.iconURL.backpack}">`}<b>${packSlots()} slots</b><span>${s.packBonus ? `+${s.packBonus} from upgrades` : 'No upgrade yet'}</span></div>
         <button class="eqslot cos" id="eqWard"><i class="eqk">Cosmetics</i><span class="eqcos">${worn.length ? worn.slice(0, 4).map(c => `<img alt="" src="${ART.iconURL['cos_' + c]}">`).join('') : '<img alt="" src="' + ART.iconURL.cosS_beanie + '">'}</span><b>Wardrobe →</b><span>${worn.length ? worn.length + ' worn' : 'Nothing worn'}${newCos() ? ` · <em class="newtxt">${newCos()} new</em>` : ''}</span></button>
-      </div>${A('hands')}${A('armor')}${A('quiver')}
+      </div>${A('hands')}${A('armor')}${A('quiver')}${A('pouch')}
       <div class="kick sect">Always with you</div>
       ${(() => { const m = s.mods || {}, nm = k => k ? D.ITEMS[k].n : 'empty'; return `<div class="gline"><span class="gi">🔧</span><div><b>Mods · melee: ${esc(nm(m.melee))} · ranged: ${esc(nm(m.ranged))}</b><span>${m.melee || m.ranged ? 'They work on whatever weapon you hold. Fit another to swap.' : 'Craft grip wraps and nail studs at the Workbench, then tap one in your pack or stash and Fit it.'}</span></div></div>`; })()}
       <div class="gline"><span class="gi">🔑</span><div><b>Keyring · ${+s.keys || 0} brass key${(+s.keys || 0) === 1 ? '' : 's'}</b><span>Opens locked cars and key-locked rooms · no pack slot</span></div></div>
@@ -1618,6 +1624,17 @@ const NEXT_VERSION = '0.43.2';
       SV.trader.caps += tot; if (!pawn) dotVisit(); SFX.play('pick'); Game.save(); sheetClose(); renderStash(); toast(`${pawn ? 'The scrap dealer' : 'Dot'} paid ${tot} caps`, 1.8);
     };
   }
+  // 0.44: the ammo pouch: fill it from the stash/pack, or empty it into the stash
+  function pouchActions(s, acts) {
+    const p = s.pouch = s.pouch || {}, spare = k => s.pack.concat(s.stash).filter(e => e.k === k).reduce((a, e) => a + e.n, 0);
+    const done = msg => { sel = null; Game.save(); reHost(); if (msg) toast(msg, 1.6); };
+    acts.innerHTML = `<div class="sact"><span><b>Ammo pouch</b> ${p.ammo || 0}/${D.POUCH.ammo} 9mm · ${p.shells || 0}/${D.POUCH.shells} shells <em>guns reload from here first; it never uses a pack slot or spills when you go down</em></span></div>`;
+    const row = acts.firstChild, add = (t, fn, ghost) => { const b = document.createElement('button'); b.className = 'mbtn sm' + (ghost ? ' ghost' : ''); b.textContent = t; b.onclick = () => { SFX.play('pick'); fn(); }; row.appendChild(b); };
+    const room = k => D.POUCH[k] - (p[k] || 0), can = Object.keys(D.POUCH).filter(k => spare(k) && room(k) > 0);
+    if (can.length) add('Fill from stash/pack', () => { for (const k of can) { const want = Math.min(spare(k), room(k)); let need = want; for (const list of [s.pack, s.stash]) for (let i = list.length - 1; i >= 0 && need; i--) if (list[i].k === k) { const t = Math.min(need, list[i].n); list[i].n -= t; need -= t; if (!list[i].n) list.splice(i, 1); } p[k] = (p[k] || 0) + want; } done('Pouch filled'); });
+    if ((p.ammo || 0) + (p.shells || 0)) add('Put in stash', () => { for (const k in D.POUCH) if (p[k]) { const n = addTo(s.stash, stashSlots(), k, p[k]); p[k] -= n; } done('Ammo moved to the stash'); }, can.length > 0);
+    if (!can.length && !((p.ammo || 0) + (p.shells || 0))) add('No ammo yet', () => toast('9mm and shells: police stations, cars, Dot\'s shop', 2.2), true);
+  }
   // the quiver: fill it from the stash/pack, or put its arrows away in the stash
   function quiverActions(s, acts) {
     const q = s.quiver = s.quiver || { n: 0 }, spare = s.pack.concat(s.stash).filter(e => e.k === 'arrow').reduce((a, e) => a + e.n, 0);
@@ -1663,11 +1680,12 @@ const NEXT_VERSION = '0.43.2';
   function stashActions() {
     const s = SV.survivor, acts = (stashHost || $('#mpane')).querySelector('#sacts');
     if (sel.from === 'quiver') { quiverActions(s, acts); return; }
+    if (sel.from === 'pouch') { pouchActions(s, acts); return; }
     const e = sel.from === 'hands' ? { k: s.hands.k, n: 1, d: s.hands.d, q: D.qOf(s.hands) } : sel.from === 'armor' ? (s.armor ? { k: s.armor.k, n: 1, d: DM.Armor.dur(s.armor) } : null) : s[sel.from][sel.i];
     if (!e) { sel = null; return; }
     const it = D.ITEMS[e.k], btns = [];
     const done = msg => { sel = null; Game.save(); reHost(); if (msg) toast(msg, 1.4); };
-    if (it.w && sel.from !== 'hands') btns.push(['Equip' + (wDmg(e) > handsDmg() ? ` · +${wDmg(e) - handsDmg()} dmg` : ''), () => { const cur = s.hands; s.hands = { k: e.k, d: e.d, q: D.qOf(e) }; s[sel.from].splice(sel.i, 1); if (cur) addTo(s.pack, packSlots(), cur.k, 1, cur.d, D.qOf(cur)) || addTo(s.stash, stashSlots(), cur.k, 1, cur.d, D.qOf(cur)); Game.onEquip(); done('Equipped ' + it.n.toLowerCase() + ' - it is in your hand now'); }, 'big']);
+    if (it.w && sel.from !== 'hands') btns.push(['Equip' + (wDmg(e) > handsDmg() ? ` · +${wDmg(e) - handsDmg()} dmg` : ''), () => { D.unloadGun(s); const cur = s.hands; s.hands = { k: e.k, d: e.d, q: D.qOf(e) }; s[sel.from].splice(sel.i, 1); if (cur) addTo(s.pack, packSlots(), cur.k, 1, cur.d, D.qOf(cur)) || addTo(s.stash, stashSlots(), cur.k, 1, cur.d, D.qOf(cur)); Game.onEquip(); done('Equipped ' + it.n.toLowerCase() + ' - it is in your hand now'); }, 'big']);
     if (sel.from === 'pack') btns.push(['To stash', () => { const n = addTo(s.stash, stashSlots(), e.k, e.n, e.d, e.q); if (!n) return toast('Stash is full', 1.4); e.n -= n; if (!e.n) s.pack.splice(sel.i, 1); done(); }]);
     if (sel.from === 'stash') btns.push(['To pack', () => { const n = addTo(s.pack, packSlots(), e.k, e.n, e.d, e.q); if (!n) return toast('Pack is full', 1.4); e.n -= n; if (!e.n) s.stash.splice(sel.i, 1); done(); }]);
     // 0.28 armor: Wear (from the pack / stash), Take off, Repair with cloth or scrap
@@ -1688,7 +1706,7 @@ const NEXT_VERSION = '0.43.2';
       s.mods[it.mod] = e.k; if (old) addTo(s.stash, stashSlots(), old, 1) || addTo(s.pack, packSlots(), old, 1);
       done(`${it.n} fitted${old ? ` (${D.ITEMS[old].n.toLowerCase()} back in the stash)` : ''}`);
     }, 'big']);
-    if (sel.from === 'hands') btns.push(['Unequip', () => { if (!addTo(s.pack, packSlots(), e.k, 1, e.d, e.q) && !addTo(s.stash, stashSlots(), e.k, 1, e.d, e.q)) return toast('No room', 1.4); s.hands = null; done(); }]);
+    if (sel.from === 'hands') btns.push(['Unequip', () => { D.unloadGun(s); if (!addTo(s.pack, packSlots(), e.k, 1, e.d, e.q) && !addTo(s.stash, stashSlots(), e.k, 1, e.d, e.q)) return toast('No room', 1.4); s.hands = null; done(); }]);
     if (it.w) {
       const cost = s.job === 'mechanic' ? 1 : 2, max = D.wMax(e);   // 0.19: max durability by quality
       if (e.d < max) btns.push([`Repair (${cost} scrap)`, () => {

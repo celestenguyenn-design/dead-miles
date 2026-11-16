@@ -1011,6 +1011,15 @@ either more things to craft, more storage or stacks, and reduce certain drop per
 - house.js: the quest chip and the clue chip start as one-line pills ("📋 3 quests ▸", "🔍 2 hidden spots ▸"); tap to
   open the full text (G.qOpen / G.secOpen), tap again to close.
 
+## Done in 0.44.0 (owner: "guns should have a reload and an ammo slot")
+- Magazines: WEAPONS.*.mag / reload (pistol 8 / 1.3 s, shotgun 2 / 1.8 s, pipe pistol 3 / 1.9 s, nail gun 16 / 1.1 s).
+  Loaded rounds live on S().hands.mag; firing uses them; empty = auto-reload from the pouch, then the pack. Manual
+  reload: the ⟳ button next to the weapon chip, or R. Moving, no shooting while reloading; the grip wrap reloads 15%
+  faster. Chip shows loaded/reserve. D.unloadGun puts loaded rounds back when a gun leaves her hands.
+- Ammo pouch (s.pouch = { ammo <= 90, shells <= 30 }): like the quiver - no pack slot, never spilled; 9mm and shells go
+  there first from any loot / reward / stash transfer (give, toStash, house addToPack), counted by countItem/takeItems.
+  Gear > Equipped has an Ammo pouch card (fill from stash/pack, put in stash). Old pack ammo moves in on load.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
