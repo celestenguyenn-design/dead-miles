@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.46.0';
+const NEXT_VERSION = '0.46.1';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -785,7 +785,10 @@ const NEXT_VERSION = '0.46.0';
   let benchHost = null, stashHost = null;   // set while the base shows the workbench / stash chest
   Game.benchPanel = el => { benchHost = el; stashHost = null; benchSel = null; renderBench(); };
   Game.stashPanel = el => { stashHost = el; benchHost = null; sel = null; renderStash(); };
-  const reHost = () => { if (benchHost && document.body.contains(benchHost)) renderBench(); else if (stashHost && document.body.contains(stashHost)) renderStash(); else { benchHost = stashHost = null; renderHome(); } };
+  // 0.46.1 (owner: "when I learn a blueprint in my backpack it zooms my screen all the way to the top"): redrawing the home
+  // screen keeps the scroll position
+  const keepScroll = fn => { const m = $('#menu'), y = m ? m.scrollTop : 0; fn(); if (m) { m.scrollTop = y; requestAnimationFrame(() => { m.scrollTop = y; }); } };
+  const reHost = () => { if (benchHost && document.body.contains(benchHost)) renderBench(); else if (stashHost && document.body.contains(stashHost)) renderStash(); else { benchHost = stashHost = null; keepScroll(renderHome); } };
   // where a material turns up: the loot tables that carry it most, Dot's shelf, or the bench itself
   const PLACE = { fridge: 'fridges', cooler: 'coolers', cabinet: 'kitchen cabinets', kdrawers: 'kitchen drawers', pantry: 'pantries', trash: 'garbage bins', island: 'kitchen islands', vanity: 'bathroom vanities',
     medcab: 'medicine cabinets', shelves: 'utility shelves', toolbox: 'toolboxes', crate: 'hidden stashes', books: 'bookshelves', night: 'nightstands', wardrobe: 'closets', dresser: 'dressers', desk: 'desks',
@@ -1190,7 +1193,8 @@ const NEXT_VERSION = '0.46.0';
   }
 
   // ---- home
-  function renderHome() {
+  function renderHome() { const m = $('#menu'), y = m ? m.scrollTop : 0; renderHome0(); if (m && y) { m.scrollTop = y; requestAnimationFrame(() => { m.scrollTop = y; }); } }   // 0.46.1: a redraw keeps the scroll position
+  function renderHome0() {
     if (!SV || !SV.survivor || DM.scene) return;
     if (DM.Title && DM.Title.up) return;   // 0.22: the title screen is still up; its tap boots the home (no tips under it)
     rollDay();
@@ -1229,7 +1233,7 @@ const NEXT_VERSION = '0.46.0';
       ${gated ? homeTiles() : eventBanner()}
       <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Walks && unl('walks') ? `<button data-t="walks">Walks${DM.Walks.claimable() && curTab !== 'walks' ? '<i class="tbadge">!</i>' : ''}</button>` : ''}${SV.tutorialDone && DM.Gacha && unl('gacha') ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA && unl('event') ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}<button data-t="help" class="helptab" aria-label="Help for this tab">?</button></div>
       <div id="mpane"></div>`;
-    bindGuide(); setTimeout(unlockPops, 600);   // 0.45
+    bindGuide(); setTimeout(unlockPops, 600); setTimeout(partyAsk, 1500);   // 0.45; 0.46.1 party nudge
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { if (b.dataset.t === 'help') { helpTab(); return; } SFX.play('ui'); if (b.dataset.t === 'map') { DM.Map.open(); return; } tab(b.dataset.t); }; });
     $('#mLog').onclick = () => {
       const v = parseInt(String($('#mSteps').value).replace(/[^0-9]/g, ''), 10); /* "8,500" or "8 500" is 8500, not 8 */ if (!(v > 0)) { toast('Type your step total for today', 1.6); return; }
@@ -1400,6 +1404,18 @@ const NEXT_VERSION = '0.46.0';
   };
   const unl = k => !SV.unlocks || !UNLOCK[k] || DM.Skills.level(SV.survivor) >= UNLOCK[k][0];
   Game.unl = unl;
+  // 0.46.1: signed in but in no party - once every 3 days, a short card on why parties matter
+  function partyAsk() {
+    const N0 = window.NET; if (!N0 || !N0.ok || (N0.party && N0.party.code) || DM.scene || $('#msheet').classList.contains('on')) return;
+    if (!SV.tutorialDone || Date.now() - (SV.partyAsk || 0) < 3 * 864e5) return;
+    SV.partyAsk = Date.now(); Game.save();
+    sheetOpen(`<div class="kick">Play with friends</div><h3>Join a party</h3>
+      <p class="mp">Up to 6 friends in one party. Wherever they live, you all:</p>
+      <ul class="mp" style="margin:4px 0 10px;padding-left:18px;line-height:1.5"><li>fight the <b>same horde night</b> - every kill counts for everyone</li><li>take and hold <b>camps</b> together - mates at the same camp fight beside you</li><li>walk toward a <b>shared step goal</b> for rewards</li><li>hit the <b>weekly boss</b> together</li></ul>
+      <div class="btnrow"><button class="mbtn sm ghost" id="paNo">Not now</button><button class="mbtn sm" id="paGo">See parties</button></div>`);
+    $('#paNo').onclick = () => sheetClose();
+    $('#paGo').onclick = () => { sheetClose(); partySheet(); };
+  }
   function unlockPops() {   // one card at a time for whatever just opened up
     if (!SV.unlocks || DM.scene || $('#msheet').classList.contains('on')) return;
     const k = Object.keys(UNLOCK).find(k => unl(k) && !SV.unlocks.includes(k)); if (!k) return;
@@ -1409,11 +1425,15 @@ const NEXT_VERSION = '0.46.0';
   }
   function guideSteps() {
     const s = SV.survivor, out = [], add = (k, t, sub) => { if (out.length < 3 && !out.some(x => x.k === k)) out.push({ k, t, sub }); };
+    const N0 = window.NET, inParty = !!(N0 && N0.party && N0.party.code);
     const rd = BS.raid && BS.raid(); if (rd && (rd.st === 'pending' || rd.st === 'fighting')) add('raid', 'Defend your base', 'Walkers are at your fence - go fight them off');
     if (s.hp < maxHp(s) * .4) add('gear', 'Patch yourself up', 'Your HP is low - eat, or use a bandage or painkillers (Gear tab)');
     const pts = DM.Skills.points(s); if (pts) add('skills', `Spend ${pts} skill point${pts > 1 ? 's' : ''}`, 'Make yourself stronger - tap Skills');
     const cr = (SV.crew && SV.crew.list) || []; if (cr.length && !s.stash.some(e => D.ITEMS[e.k] && D.ITEMS[e.k].use === 'Eat')) add('gear', 'Put food in your stash', 'Your crew eats from the stash every morning');
     if (betterBadge()) add('gear', 'Equip a better weapon', 'You found something stronger - Gear tab');
+    // 0.46.1 (owner: "a lot of people aren't joining parties ... that's where the fun is"): nudge them in
+    if (N0 && N0.ok && !inParty) add('party', 'Join a party', 'Friends share horde night, camps, the step goal and the race');
+    else if (N0 && !N0.ok && DM.Skills.level(s) >= 2) add('account', 'Sign in to play with friends', 'Parties, camps, gifts and the step race need an account');
     const ready = (SV.houses || []).filter(h => h.status === 'new' || h.run);
     if (ready.length) add('houses', `Loot a house (${ready.length} waiting)`, 'Houses tab - tap Loot to go in, search, and walk out the front door');
     if (!dotLeft() && !dotDone() && junkOf(s).length) add('dot', 'Sell junk to Dot', 'Turn things marked Sell into caps');
@@ -1434,7 +1454,7 @@ const NEXT_VERSION = '0.46.0';
     const sh = $('#gdShow'); if (sh) sh.onclick = () => { SV.guideOff = 0; Game.save(); renderHome(); };
     document.querySelectorAll('[data-gd]').forEach(b => b.onclick = () => {
       SFX.play('ui'); const k = b.dataset.gd;
-      if (k === 'raid') openCardSheet('raid'); else if (k === 'skills') DM.Skills.open(() => renderHome()); else if (k === 'dot') openTrader();
+      if (k === 'party') partySheet(); else if (k === 'account') openAccount(); else if (k === 'raid') openCardSheet('raid'); else if (k === 'skills') DM.Skills.open(() => renderHome()); else if (k === 'dot') openTrader();
       else if (k === 'map') DM.Map.open(); else if (k === 'walk') toast('Walk with your phone - steps sync on their own, or type today\'s total above', 2.6);
       else { tab(k === 'gear' ? 'stash' : k); const m = $('#mtabs'); if (m) m.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     });
