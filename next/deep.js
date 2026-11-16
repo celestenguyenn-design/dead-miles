@@ -105,24 +105,24 @@
   function found(r) { const c = counts(S()), out = {}; for (const k in c) { const f = c[k] - (r.own[k] || 0); if (f > 0) out[k] = f; } return out; }
   function takePack(k, n, out) { // newest stacks first
     const pk = S().pack;
-    for (let i = pk.length - 1; i >= 0 && n > 0; i--) { const e = pk[i]; if (e.k !== k) continue; const t = Math.min(n, e.n); e.n -= t; n -= t; out.push({ k, n: t, d: e.d }); if (!e.n) pk.splice(i, 1); }
+    for (let i = pk.length - 1; i >= 0 && n > 0; i--) { const e = pk[i]; if (e.k !== k) continue; const t = Math.min(n, e.n); e.n -= t; n -= t; out.push({ k, n: t, d: e.d, q: e.q }); if (!e.n) pk.splice(i, 1); }
     return n;
   }
   const KEEP = { food: 1, drink: 1, med: 1, tool: 1 };   // stays in the pack when she goes deeper (usable on the next floor)
-  function merge(list, items) { for (const e of items) { const m = !D.isWeapon(e.k) && list.find(x => x.k === e.k); if (m) m.n += e.n; else list.push({ k: e.k, n: e.n, d: e.d }); } return list; }
+  function merge(list, items) { for (const e of items) { const m = !D.isWeapon(e.k) && list.find(x => x.k === e.k); if (m) m.n += e.n; else list.push({ k: e.k, n: e.n, d: e.d, q: e.q }); } return list; }
   const runLoot = r => merge(merge([], r.haul), (() => { const f = found(r), out = []; for (const k in f) out.push({ k, n: f[k] }); return out; })()).concat(r.cos.map(k => ({ k, n: 1 })));
-  function addTo(list, slots, k, n, d) { // same as game.js addTo
+  function addTo(list, slots, k, n, d, q) { // same as game.js addTo (0.46.4: + q, weapon quality)
     const m = D.stackMax(k); let left = n;
     for (const e of list) if (e.k === k && e.n < m && left) { const t = Math.min(left, m - e.n); e.n += t; left -= t; }
-    while (left && list.length < slots) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; list.push(e); left -= t; }
+    while (left && list.length < slots) { const t = Math.min(left, m); const e = { k, n: t }; if (d != null) e.d = d; if (q != null) e.q = q; list.push(e); left -= t; }
     return n - left;
   }
-  const packSlots = () => 12 + (S().packBonus || 0) + SK().packBonus(S());
+  const packSlots = () => 12 + (S().packBonus || 0) + (S().warPack || 0) + SK().packBonus(S());
   function bank(items) { // stash first, then the pack; anything else waits on the home card (SV.deep.held)
     const s = S(), d = st(), left = [];
     for (const e of items) {
-      let got = addTo(s.stash, DP.STASH, e.k, e.n, e.d); if (got < e.n) got += addTo(s.pack, packSlots(), e.k, e.n - got, e.d);
-      if (got < e.n) left.push({ k: e.k, n: e.n - got, d: e.d });
+      let got = addTo(s.stash, DP.STASH, e.k, e.n, e.d, e.q); if (got < e.n) got += addTo(s.pack, packSlots(), e.k, e.n - got, e.d, e.q);   // 0.46.4: keep quality
+      if (got < e.n) left.push({ k: e.k, n: e.n - got, d: e.d, q: e.q });
     }
     d.held = merge(d.held, left);
     return left;

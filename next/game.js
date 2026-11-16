@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.46.3';
+const NEXT_VERSION = '0.46.4';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -60,7 +60,7 @@ const NEXT_VERSION = '0.46.3';
     if (v.survivor) migrateCos(v.survivor);
     if (v.survivor) { migrateQuiver(v.survivor); migratePouch(v.survivor); }
     if (v.survivor) migrateKeys(v.survivor);
-    if (v.survivor) migrateQuality(v.survivor, v);   // 0.19: weapon quality + days played for the gamestage
+    if (v.survivor) { repairQuality(v.survivor); migrateQuality(v.survivor, v); }   // 0.19: weapon quality + days played for the gamestage; 0.46.4 repair first
     if (v.survivor && !v.run0111) { dropNotes(v.survivor); v.run0111 = 1; }   // notes carried home before 0.11.1
     if (v.survivor) DM.Food.norm(v.survivor);   // 0.8: hunger + thirst (older saves start at 80/80, draining from now)
     if (v.survivor) DM.Skills.norm(v.survivor); // 0.13: skill points; old Lv 3/6/9 perks stay as free ranks
@@ -96,6 +96,18 @@ const NEXT_VERSION = '0.46.3';
   // 0.19: weapons from before quality tiers become Worn (quality 2: +8% damage on what they did before, never less).
   // Their max durability grows 15%, so durability left grows with it and the bar shows the same %.
   // The gamestage's "days played" starts at the days since the save was made (capped where it stops counting anyway).
+  // 0.46.4 (owner: "I clicked stash ... and I lost my Masterwork fire axe"): Stash all (and deep-run banking) dropped a
+  // weapon's quality tier. Such a weapon keeps its durability, which is more than its tier allows - read the tier back from
+  // it: no q and durability above Worn's max -> the lowest tier whose max fits it. Runs before migrateQuality.
+  function repairQuality(s) {
+    const fix = e => {
+      if (!e || !D.isWeapon(e.k) || e.q != null || e.d == null) return;
+      if (e.d <= D.wMax({ k: e.k, q: 2 })) return;
+      for (let q = 3; q <= 5; q++) if (D.wMax({ k: e.k, q }) >= e.d) { e.q = q; return; }
+      e.q = 5;
+    };
+    fix(s.hands); for (const list of [s.pack || [], s.stash || []]) list.forEach(fix);
+  }
   function migrateQuality(s, v) {
     const fix = e => { if (!e || !D.isWeapon(e.k) || e.q != null) return; e.q = 2; if (e.d != null) e.d = Math.max(1, Math.round(e.d * D.qDurMul(2))); };
     fix(s.hands); for (const list of [s.pack || [], s.stash || []]) list.forEach(fix);
@@ -1676,7 +1688,7 @@ const NEXT_VERSION = '0.46.3';
     el.querySelectorAll('[data-from]').forEach(b => b.onclick = () => { const f = b.dataset.from, i = +b.dataset.i; sel = sel && sel.from === f && sel.i === i ? null : { from: f, i }; SFX.play('ui'); renderStash(); });
     for (const [id, list] of [['#sSortP', s.pack], ['#sSortS', s.stash]]) if (el.querySelector(id)) el.querySelector(id).onclick = () => { sortList(list); sel = null; SFX.play('ui'); Game.save(); renderStash(); toast('Sorted by kind', 1); };
     if (el.querySelector('#sAll')) el.querySelector('#sAll').onclick = () => {
-      for (let i = s.pack.length - 1; i >= 0; i--) { const e = s.pack[i]; const n = addTo(s.stash, stashSlots(), e.k, e.n, e.d); e.n -= n; if (!e.n) s.pack.splice(i, 1); }
+      for (let i = s.pack.length - 1; i >= 0; i--) { const e = s.pack[i]; const n = addTo(s.stash, stashSlots(), e.k, e.n, e.d, e.q); e.n -= n; if (!e.n) s.pack.splice(i, 1); }   // 0.46.4: keep weapon quality (a Masterwork axe came out Worn)
       SFX.play('ui'); Game.save(); renderStash(); toast(s.pack.length ? 'Stash is full - some things stayed in your pack' : 'Everything is in the stash', 1.8);
     };
     if (el.querySelector('#sJunk')) el.querySelector('#sJunk').onclick = () => { SFX.play('ui'); sellJunk(); };

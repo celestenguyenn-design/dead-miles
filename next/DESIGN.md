@@ -1089,6 +1089,13 @@ in my backpack it zooms my screen all the way to the top")
   carries lat/lon; tapping it (map.js focusOn) stops following her, centers the map there, and pulses orange rings on
   the spot for 5 s. The target button (bottom right) comes back to her.
 
+## Done in 0.46.4 (owner: "I clicked stash ... and I lost my Masterwork fire axe")
+- Bug: Gear > Backpack "Stash all" (game.js #sAll) called addTo without the weapon quality, so weapons arrived with no q
+  (= Worn). Same in deep.js (takePack / merge / bank / its own addTo) for weapons found in deep runs. All pass q now.
+- repairQuality() on load (before migrateQuality): a weapon with no q whose durability is above Worn's max gets the lowest
+  tier whose max fits it back. The owner's cloud save showed the axe as { d: 80, no q } = exactly a Masterwork axe's max.
+  RULE: anything that moves weapon stacks must carry d AND q.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
