@@ -583,8 +583,11 @@
     return 'go back to it';
   }
   const noticedSecrets = () => (G.sec || []).filter(x => x.noticed && !x.found);
+  // 0.43.2 (owner: "the side quests and stuff take up a lot of the screen"): the clue chip and the quest chip start small
+  // (one line); tap either to open the details
   function secretChip() {
     const list = noticedSecrets();
+    if (list.length && !G.secOpen) return `<div class="sc"><b>🔍 ${list.length} hidden spot${list.length > 1 ? 's' : ''}</b> <em class="tapm">▸</em></div>`;
     return list.map(x => `<div class="sc"><b>🔍 ${x.noticed.what}</b>${x.noticed.room ? ` · ${x.noticed.room.toLowerCase()}` : ''}<span>${secretNeed(x)}</span></div>`).join('');
   }
   function secretSpot(x) {   // tile coords of a secret, for the minimap
@@ -2020,7 +2023,7 @@
       if (go && G.gateWas === false && noticedSecrets().length) { const x = noticedSecrets()[0]; toast(`You've searched enough - go back to the ${x.noticed.what.toLowerCase()}${x.noticed.room ? ' in the ' + x.noticed.room.toLowerCase() : ''}`, 4); }
       G.gateWas = go; }
     const q = DM.Game && DM.Game.questChip ? DM.Game.questChip() : '';
-    if (q !== lastQ) { lastQ = q; $('#qchip').innerHTML = q + '<span class="qcaret">▾ quests</span>' + (G.qOpen && DM.Game.questList ? '<div class="qlist">' + DM.Game.questList() + '</div>' : ''); $('#qchip').classList.toggle('on', !!q); $('#qchip').classList.toggle('open', !!G.qOpen); }
+    if (q + G.qOpen !== lastQ) { lastQ = q + G.qOpen; const nq = q ? (q.match(/<i><\/i>/g) || []).length + 1 : 0; $('#qchip').innerHTML = !G.qOpen ? `<b>📋 ${nq} quest${nq > 1 ? 's' : ''}</b> <em class="tapm">▸</em>` : q + '<span class="qcaret">▴ close</span>' + (DM.Game.questList ? '<div class="qlist">' + DM.Game.questList() + '</div>' : ''); $('#qchip').classList.toggle('on', !!q); $('#qchip').classList.toggle('open', !!G.qOpen); }
     $('#hp').classList.toggle('low', p.hp < maxHp() * .35);
     drawMini();
   }
@@ -2095,6 +2098,7 @@
   const ctag = (k, it) => { const c = D.cat(k); return it.tag && (c === 'event' || c === 'quest') ? `<small class="tag">${it.tag}</small>` : `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
   // 0.19.1: tap the quest chip in a run to open/close the full quest list
   document.addEventListener('click', ev => { const c = ev.target.closest && ev.target.closest('#qchip'); if (!c || !G) return; G.qOpen = !G.qOpen; lastQ = ''; SFX.play('pick'); });
+  document.addEventListener('click', ev => { const c = ev.target.closest && ev.target.closest('#secchip'); if (!c || !G) return; G.secOpen = !G.secOpen; lastSec = ''; SFX.play('pick'); });   // 0.43.2
   function itemCard(e, onTap, extra = '', cls = '') {
     const it = ITEMS[e.k], el = document.createElement('button');
     el.className = 'slot' + (it.rare ? ' rare' : '') + (it.w ? ' wq q' + D.qOf(e) : '') + cls;   // 0.19: tier colour on weapons

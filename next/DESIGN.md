@@ -1007,6 +1007,10 @@ either more things to craft, more storage or stacks, and reduce certain drop per
   Measured: medical containers ~0.34 bandages + ~0.24 painkillers each (was ~0.65 + ~0.47).
 - Smaller medical rewards: pharmacy jackpot, bandage roll (3, was 5), NPC thank-you bonus, map places, Ray's list.
 
+## Done in 0.43.2 (owner: "the side quests and stuff take up a lot of the screen", screenshot of a police run)
+- house.js: the quest chip and the clue chip start as one-line pills ("📋 3 quests ▸", "🔍 2 hidden spots ▸"); tap to
+  open the full text (G.qOpen / G.secOpen), tap again to close.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
