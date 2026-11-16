@@ -1114,6 +1114,12 @@ in my backpack it zooms my screen all the way to the top")
 - Escort: one survivor a day (6 names), accept -> walk 3,000-4,500 steps before midnight -> 40 caps, 30 XP, 20% they
   join the crew (bunk free). No penalty for ignoring it.
 
+## Done in 0.49.0 - neighbourhood stamps + power walk (mapfx.js stampsAndPace)
+- Stamps: each new ~500 m square (0.0045 x 0.006 deg) walked into with the map open; 5 / 15 / 40 / 100 pay caps +
+  tokens; Codex feat Globetrotter (40). Count shown on the map's fog button (📮 N).
+- Power walk: 15 min at 1.1-2.6 m/s (map or Pocket mode on; a >90 s gap costs 2 min) -> hordecrate roll + 20 caps +
+  20 XP, once a day. Progress line on the map card once she is moving.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

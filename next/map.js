@@ -852,9 +852,9 @@ way[building]->.b;.b out skel geom qt;
   function renderFx() {
     const el = $('#mvFx'); if (!el || !DM.MapFX) return;
     const ls = DM.MapFX.lines(M.pos), off = DM.MapFX.canOffer();
-    const key = JSON.stringify([ls, off, DM.MapFX.fogOn(), DM.MapFX.cells(), DM.MapQ && DM.MapQ.active()]); if (key === M.fxKey) return; M.fxKey = key;
+    const key = JSON.stringify([ls, off, DM.MapFX.fogOn(), DM.MapFX.cells(), DM.MapQ && DM.MapQ.active(), DM.MapFX.stamps && DM.MapFX.stamps()]); if (key === M.fxKey) return; M.fxKey = key;
     el.innerHTML = ls.map((l, i) => `<div class="fxl${l.hot ? ' hot' : ''}${l.lat != null ? ' tap' : ''}" data-fx="${i}"><b>${esc(l.t)}</b><span>${esc(l.s)}${l.lat != null ? ' ›' : ''}</span></div>`).join('')
-      + `<div class="fxb">${DM.MapQ && DM.MapQ.active() ? '<button id="fxQuit">✕ Drop quest</button>' : ''}${off ? '<button id="fxDeliv">🚚 Dot\'s delivery</button>' : ''}<button id="fxFog">🌫️ Fog ${DM.MapFX.fogOn() ? 'on' : 'off'} · ${DM.MapFX.cells().toLocaleString('en-US')} cleared</button></div>`;
+      + `<div class="fxb">${DM.MapQ && DM.MapQ.active() ? '<button id="fxQuit">✕ Drop quest</button>' : ''}${off ? '<button id="fxDeliv">🚚 Dot\'s delivery</button>' : ''}<button id="fxFog">🌫️ Fog ${DM.MapFX.fogOn() ? 'on' : 'off'} · ${DM.MapFX.cells().toLocaleString('en-US')} cleared · 📮 ${DM.MapFX.stamps ? DM.MapFX.stamps() : 0}</button></div>`;
     // 0.46.3 (owner: "if I click one of the quests ... it should show me where on the map"): tap a line -> the map flies there
     el.querySelectorAll('[data-fx]').forEach(row => row.onclick = () => { const l = ls[+row.dataset.fx]; if (l && l.lat != null) focusOn(l.lat, l.lon, l.t); });
     const d = $('#fxDeliv'); if (d) d.onclick = () => { DM.MapFX.offer(M.pos); M.fxKey = ''; renderFx(); };

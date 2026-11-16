@@ -83,10 +83,39 @@ window.DM = window.DM || {};
     const dv = s.deliv;
     if (dv && !dv.got && dist(dv.a, pos) <= 30 + Math.min(15, pos.acc / 2)) { dv.got = 1; save(); sfx('pick'); buzz([60, 40, 60]); toast(`🚚 Picked up Dot's package. Now take it to ${dv.b.at} (${fmtD(dist(dv.b, pos))}).`, 3.6); }
     else if (dv && dv.got && dist(dv.b, pos) <= 30 + Math.min(15, pos.acc / 2)) { s.deliv = null; s.delivDone++; save(); const c = 45 + Math.round(dv.len / 40); caps(c); xp(25); const tk = token(.35); reward("🚚 Dot's delivery", dv.b.at, `${c} caps, 25 XP${tk ? ', a capsule token' : ''}`); }
+    stampsAndPace(pos, now);   // 0.49
     if (DM.MapQ) DM.MapQ.onPos(pos, walked);   // 0.31: quests and encounters
     if (DM.MapPOI) DM.MapPOI.onPos(pos);   // 0.43: made-up places
     if (DM.Camps) DM.Camps.onPos(pos);   // 0.46: camps
   };
+  // ---------------------------------------------------------------- 0.49 neighbourhood stamps + the power walk
+  // Stamps: every new ~500 m square (0.0045 lat x 0.006 lon) she walks into with the map open is a stamp in her book.
+  // 5 / 15 / 40 / 100 stamps pay caps, tokens and a title (Codex). Power walk: 15 minutes of brisk walking (1.1-2.6 m/s,
+  // pauses under 90 s are fine) with the map or Pocket mode on -> a "Power walk" crate, once a day.
+  const STAMP_LAT = .0045, STAMP_LON = .006, PW_SEC = 900;
+  const STAMP_MS = [[5, 30, 1], [15, 60, 2], [40, 120, 3], [100, 250, 5]];
+  function stampsAndPace(pos, now) {
+    const s = st(); s.stamps = s.stamps || {}; s.nStamps = s.nStamps || 0; s.stampMs = s.stampMs || [];
+    const k = Math.floor(pos.lat / STAMP_LAT) + ':' + Math.floor(pos.lon / STAMP_LON);
+    if (!s.stamps[k]) {
+      s.stamps[k] = today(); s.nStamps++; save(); sfx('pick'); buzz([40, 30, 40]);
+      toast(`📮 New neighbourhood stamped! ${s.nStamps} in your book`, 2.4);
+      for (const [n, c, tk] of STAMP_MS) if (s.nStamps >= n && !s.stampMs.includes(n)) { s.stampMs.push(n); caps(c); if (DM.Gacha) DM.Gacha.state().tok += tk; reward('📮 Stamp book', `${n} neighbourhoods`, `${c} caps, ${tk} capsule token${tk > 1 ? 's' : ''}`); }
+      if (DM.Codex) DM.Codex.check();
+    }
+    // power walk
+    const pw = s.pw && s.pw.day === today() ? s.pw : (s.pw = { day: today(), sec: 0, last: null, done: 0 });
+    if (pw.done) return;
+    const L = pw.last; pw.last = { lat: pos.lat, lon: pos.lon, t: now };
+    if (!L) return;
+    const dt = (now - L.t) / 1000; if (dt <= 0) return;
+    if (dt > 90) { pw.sec = Math.max(0, pw.sec - 120); return; }   // a long stop costs a little
+    const v = dist(L, pos) / dt;
+    if (v >= 1.1 && v <= 2.6) pw.sec += dt;
+    if (pw.sec >= PW_SEC) { pw.done = 1; save(); caps(20); xp(20); reward('⚡ Power walk', '15 brisk minutes', give(rollItems('hordecrate', 1)) + ', 20 caps, 20 XP'); }
+  }
+  X.stamps = () => st().nStamps || 0;
+  X.powerLine = function () { const s = st(), pw = s.pw && s.pw.day === today() ? s.pw : null; if (pw && pw.done) return null; const sec = pw ? pw.sec : 0; return { t: `⚡ Power walk ${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')} / 15:00`, s: 'brisk walking counts' }; };
   // 0.31: map quests (mapquest.js) use these
   X.spots = (pos, lo, hi) => spots(pos, lo, hi); X.give = items => give(items); X.rollItems = (t, n) => rollItems(t, n);
   // ---------------------------------------------------------------- Dot's delivery offer (map card button)
@@ -103,6 +132,7 @@ window.DM = window.DM || {};
   // ---------------------------------------------------------------- what to show (map card / pocket mode)
   X.lines = function (pos) {
     const s = st(), out = [], now = Date.now(); if (!pos) return out;
+    { const pl = X.powerLine(); if (pl && (s.pw && s.pw.sec > 30)) out.push(pl); }   // 0.49: once she is walking
     if (s.radio) out.push({ t: `📻 ${s.radio.at}`, s: `${fmtD(dist(s.radio, pos))} · ${mmss(s.radio.until - now)} left`, hot: 1, lat: s.radio.lat, lon: s.radio.lon });
     for (const d of s.drops) out.push({ t: `${d.air ? '✈️ Air drop' : '📦 Crate'} · ${d.at}`, s: fmtD(dist(d, pos)) + (d.air ? ` · ${mmss(d.until - now)} left` : ''), hot: d.air, lat: d.lat, lon: d.lon });
     if (s.deliv) { const tgt = s.deliv.got ? s.deliv.b : s.deliv.a; out.push({ t: `🚚 ${s.deliv.got ? 'Deliver to' : 'Pick up at'} ${tgt.at}`, s: fmtD(dist(tgt, pos)), lat: tgt.lat, lon: tgt.lon }); }
