@@ -1137,6 +1137,10 @@ in my backpack it zooms my screen all the way to the top")
 - Dot > Sell: weapons show quality (colour) · damage · condition %, armor shows damage cut · condition. New "Sell spare
   weapons": keeps the best of each kind (quality, then durability; the one in hand counts), sells the rest, tap twice.
 
+## Done in 0.50.2 (owner: "still getting a lot of brass keys, not many things to do with it")
+- Keys: LOOT weight x0.45 (measured 0.98 -> 0.52 a house). New uses: Dot > Sell has a Brass keys row - sell 1 for 15
+  caps, or 3 for a blueprint (pickBP); the cache bag's "2 keys: open now" opens a walking cache without the walk.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

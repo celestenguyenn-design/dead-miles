@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.50.1';
+const NEXT_VERSION = '0.50.2';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -985,14 +985,18 @@ const NEXT_VERSION = '0.50.1';
     // 0.29.3 (owner: "in dots shop we should have an option to auto sell junk with a button"): everything marked Sell
     // (no crafting / base use) from the pack and the stash, in one go - tap twice
     const junk = rows.filter(r => D.cat(r.e.k) === 'sell'), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(r.v * r.e.n)), 0);
-    const ex = extras(s), sw = spareWeapons(s);
+    const ex = extras(s), sw = spareWeapons(s), keys = +s.keys || 0;
     el.innerHTML = `<div class="kick sect">Sell to Dot · she pays low</div>`
+      + (keys ? `<div class="shoprow">${icon('key')}<div><b>Brass keys x${keys}</b><span>keyring · Dot collects them</span></div><div style="display:flex;flex-direction:column;gap:4px"><button class="mbtn sm" id="tKey1">Sell 1 · ${icon('caps')}15</button>${keys >= 3 ? `<button class="mbtn sm ghost" id="tKey3">3 for a blueprint</button>` : ''}</div></div>` : '')
       + (sw.spare.length ? `<button class="mbtn ghost" id="tSpare" style="margin:4px 0 6px;width:100%">Sell spare weapons · ${sw.spare.length} · ${icon('caps')}${sw.caps}</button><div class="mp dim" style="margin:-2px 0 8px;font-size:11.5px">Keeps your best of each kind (and the one in your hand): ${esc(sw.spare.slice(0, 4).map(x => D.QUAL[D.qOf(x.e)].n.toLowerCase() + ' ' + D.ITEMS[x.e.k].n.toLowerCase()).join(', '))}${sw.spare.length > 4 ? '...' : ''}</div>` : '')
       + (ex.n ? `<button class="mbtn ghost" id="tExtra" style="margin:4px 0 6px;width:100%">Sell extras · ${ex.n} over ${KEEP} of each · ${icon('caps')}${ex.caps}</button><div class="mp dim" style="margin:-2px 0 8px;font-size:11.5px">Keeps ${KEEP} of every material, ammo and seed (pack + stash) and sells the rest: ${esc(ex.list.slice(0, 4).map(([k, n]) => n + ' ' + D.ITEMS[k].n.toLowerCase()).join(', '))}${ex.list.length > 4 ? '...' : ''}</div>` : '')
       + (junk.length ? `<button class="mbtn" id="tJunk" style="margin:4px 0 10px">Sell all junk · ${junk.length} item${junk.length === 1 ? '' : 's'} · ${icon('caps')}${jv}</button>` : '<div class="empty" style="margin-bottom:8px">No junk to sell - things marked Sell show up here.</div>')
       + (rows.length ? rows.map((r, j) => `<div class="shoprow">${icon(r.e.k)}<div><b>${D.ITEMS[r.e.k].n}${r.e.n > 1 ? ' x' + r.e.n : ''}</b>${gearTag(r.e)}<span>${r.from} · ${icon('caps')}${r.v >= 1 ? Math.floor(r.v) + ' each' : r.v === .5 ? '1 per 2' : '1 per ' + Math.round(1 / r.v)}</span></div>
       <button class="mbtn sm" data-sell="${j}">Sell ${r.e.n > 1 ? 'all' : ''} ${icon('caps')}${Math.max(1, Math.floor(r.v * r.e.n))}</button></div>`).join('') : '<div class="empty">Nothing to sell.</div>');
     // 0.42 (owner: "an overload of batteries, cloth rags, 9mm"): sell everything above KEEP of each material / ammo / seed
+    // 0.50.2 (owner: "still getting a lot of brass keys, not many things to do with it"): Dot buys them, or trades a blueprint
+    if ($('#tKey1')) $('#tKey1').onclick = () => { if (!(s.keys > 0)) return; s.keys--; SV.trader.caps += 15; SFX.play('pick'); Game.save(); toast('Dot paid 15 caps for the key', 1.4); renderTrader(); };
+    if ($('#tKey3')) $('#tKey3').onclick = () => { if (!(s.keys >= 3)) return; const bp = D.pickBP(Math.random); s.keys -= 3; give(bp, 1); SFX.play('pick'); Game.save(); toast(`Dot swaps 3 keys for a ${D.ITEMS[bp].n.toLowerCase()}`, 2.2); renderTrader(); };
     if ($('#tSpare')) $('#tSpare').onclick = function () {
       if (!this.dataset.sure) { this.dataset.sure = 1; this.innerHTML = `Tap again: sell ${sw.spare.length} weapon${sw.spare.length > 1 ? 's' : ''} for ${icon('caps')}${sw.caps}`; return; }
       for (const x of sw.spare) { const list = s[x.from], i = list.indexOf(x.e); if (i >= 0) list.splice(i, 1); }

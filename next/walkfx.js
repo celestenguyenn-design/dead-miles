@@ -97,9 +97,13 @@ window.DM = window.DM || {};
   W.cachesHTML = function () {
     const w = st();
     return `<div class="kick">Cache bag · ${w.bag.length}/${BAG}</div><h3>Walking caches</h3><p class="mp dim">Locked crates you find in safes, attics, caches and on your walks. Your steps open them - 2 km, 5 km or 10 km. The farther, the better.</p>
-      <div class="cplist">${w.bag.map((c, i) => `<div class="cpbuy"><div><b>${esc(D().ITEMS[c.k].n)}</b><span>${c.got >= c.need ? 'Ready!' : `${fmt(c.got)} / ${fmt(c.need)} steps`}</span><div class="cxbar"><i style="width:${Math.min(100, c.got / c.need * 100)}%"></i></div></div><button class="mbtn sm${c.got >= c.need ? '' : ' ghost'}" data-wc="${i}"${c.got >= c.need ? '' : ' disabled'}>Open</button></div>`).join('') || '<p class="mp dim">Empty. Tap a walking cache in your pack or stash, then "Walk it open".</p>'}</div>`;
+      <div class="cplist">${w.bag.map((c, i) => `<div class="cpbuy"><div><b>${esc(D().ITEMS[c.k].n)}</b><span>${c.got >= c.need ? 'Ready!' : `${fmt(c.got)} / ${fmt(c.need)} steps`}</span><div class="cxbar"><i style="width:${Math.min(100, c.got / c.need * 100)}%"></i></div></div>${c.got >= c.need ? `<button class="mbtn sm" data-wc="${i}">Open</button>` : `<button class="mbtn sm ghost" data-wk="${i}"${(+SV().survivor.keys || 0) >= 2 ? '' : ' disabled'}>2 keys: open now</button>`}</div>`).join('') || '<p class="mp dim">Empty. Tap a walking cache in your pack or stash, then "Walk it open".</p>'}</div>`;
   };
-  W.bindCaches = function (root) { root.querySelectorAll('[data-wc]').forEach(b => b.onclick = () => W.open(+b.dataset.wc)); };
+  W.bindCaches = function (root) {
+    root.querySelectorAll('[data-wc]').forEach(b => b.onclick = () => W.open(+b.dataset.wc));
+    // 0.50.2: 2 brass keys pick a walking cache's lock - open it now without the walk
+    root.querySelectorAll('[data-wk]').forEach(b => b.onclick = () => { const s = SV().survivor, c = st().bag[+b.dataset.wk]; if (!c || (+s.keys || 0) < 2) return; s.keys -= 2; c.got = c.need; G().save(); W.open(+b.dataset.wk); });
+  };
   // ---------------------------------------------------------------- 0.48 daily bounties + escorts
   // Bounties: 3 a day (one about walking at a time of day, two others), seeded by the date. Progress is measured from the
   // day's first look (SV.wfx.bd = { day, w0, e0, r0, k0, p0, done: [], claimed: [], all }). Each pays caps + a little
