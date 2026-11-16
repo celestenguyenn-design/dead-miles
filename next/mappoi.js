@@ -55,7 +55,7 @@ window.DM = window.DM || {};
       { t: 'Listen to the radio hut', p: 1, win: 'Static, then numbers. Then a song. You stay for the whole thing.', r: { xp: 15 }, token: .3 }] },
     cache: { w: 4, weekly: 1, g: '🎯', col: '#ffd23c', n: 'Weapons cache', d: 'A storm drain with a padlocked army footlocker chained inside. Somebody planned ahead.', opts: [
       { t: 'Break the lock', p: .8, win: 'Inside: a weapon wrapped in oilcloth, good as new.', lose: 'The lock fights you. You get it open, and cut your hand doing it.', hurt: 6, weapon: 1, r: { xp: 30 } },
-      { t: 'Pick the lock (1 lockpick)', cost: ['lockpick', 1], p: 1, win: 'Click. A weapon in oilcloth and a box of rounds.', weapon: 1, r: { xp: 30, items: [['ammo', 10]] } }] },
+      { t: 'Pick the lock (1 lockpick)', cost: ['lockpick', 1], p: 1, win: 'Click. A weapon in oilcloth and a box of rounds.', weapon: 1, r: { xp: 30, items: [['ammo', 5]] } }] },
     vending: { w: 13, g: '🥤', col: '#5ab4ff', n: 'Vending machine', d: 'A vending machine nobody has smashed yet. It hums. It actually hums.', opts: [
       { t: 'Kick it', p: .6, win: 'CLUNK. Two cans and a bag of chips drop.', lose: 'It falls on you. Of course it does.', hurt: 6, r: { items: [['drink', 2], ['snack', 1]] } },
       { t: 'Feed it 5 caps', capsCost: 5, p: 1, win: 'It takes your caps and, miraculously, gives you a soda. And another. And another.', r: { items: [['drink', 3]] } }] },

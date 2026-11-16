@@ -78,7 +78,7 @@ window.DM = window.DM || {};
         s.radio = { lat: pl.lat, lon: pl.lon, at: pl.name, until: now + mins * 60000 }; s.radios++; save(); sfx('alert'); buzz([100, 60, 100, 60, 100]);
         toast(`📻 "Anyone out there? Meet me at ${pl.name}. ${mins} minutes, then I'm gone."`, 4.5); }
     }
-    if (s.radio && dist(s.radio, pos) <= 30 + Math.min(15, pos.acc / 2)) { const r = s.radio; s.radio = null; save(); caps(35); xp(20); reward('📻 Radio call', r.at, give([pick([['meds', 1], ['ammo', 12], ['bandage', 3], ['battery', 2], ['lockpick', 3]])]) + ', 35 caps, 20 XP'); }
+    if (s.radio && dist(s.radio, pos) <= 30 + Math.min(15, pos.acc / 2)) { const r = s.radio; s.radio = null; save(); caps(35); xp(20); reward('📻 Radio call', r.at, give([pick([['meds', 1], ['ammo', 6], ['bandage', 3], ['battery', 2], ['lockpick', 3]])]) + ', 35 caps, 20 XP'); }
     // Dot's delivery
     const dv = s.deliv;
     if (dv && !dv.got && dist(dv.a, pos) <= 30 + Math.min(15, pos.acc / 2)) { dv.got = 1; save(); sfx('pick'); buzz([60, 40, 60]); toast(`🚚 Picked up Dot's package. Now take it to ${dv.b.at} (${fmtD(dist(dv.b, pos))}).`, 3.6); }

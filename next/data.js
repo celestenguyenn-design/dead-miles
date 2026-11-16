@@ -395,7 +395,7 @@ window.DM = window.DM || {};
       // 0.24.4: last check when a container opens - a blueprint she already knows (rolled before 0.24.3, or pre-rolled when the
       // house or today's route was made) is swapped for another one she can use, or a pocket watch
       if (k.startsWith('bp_') && D.ITEMS[k] && DM.S && (DM.S.known || []).includes(D.ITEMS[k].bp)) k = D.pickBP(rnd);
-      const n = k === 'ammo' ? 4 + Math.floor(rnd() * 9) : k === 'shells' ? 2 + Math.floor(rnd() * 4) : k === 'arrow' ? 3 + Math.floor(rnd() * 5) : k === 'nails' ? 3 + Math.floor(rnd() * 6) : D.ITEMS[k] && D.ITEMS[k].seed ? 2 + Math.floor(rnd() * 3) : 1;
+      const n = k === 'ammo' ? 2 + Math.floor(rnd() * 4) : k === 'shells' ? 1 + Math.floor(rnd() * 3) :   /* 0.44.1: 9mm 2-5 a find (was 4-12), shells 1-3 */ k === 'arrow' ? 3 + Math.floor(rnd() * 5) : k === 'nails' ? 2 + Math.floor(rnd() * 4) : D.ITEMS[k] && D.ITEMS[k].seed ? 2 + Math.floor(rnd() * 3) : 1;
       if (D.isWeapon(k)) { const f = .45 + rnd() * .5; out.push(D.mkWeapon(k, D.rollQuality(qa ? qa.base : 1.5, qa ? qa.bonus : 0, rnd), f)); continue; }   // 0.19: quality
       const e = out.find(e => e.k === k && D.STACK[k]);
       if (e) e.n += n; else out.push({ k, n });
@@ -484,7 +484,10 @@ window.DM = window.DM || {};
   D.LOOT.hordecrate_bf = [[5, 6], { 'decor_*': 1, 'seed_*': 1, ammo: 2, meds: 2.5, bandage: 2, scrap: 1.5, nails: 1.5, wood: 1.5, tape: 1, battery: 1, 'bp_*': 1.2, 'cosH_*': .7, turkey: .5, pie: 1.5, cranberry: 1, lockset: .3, backpack: .15 }, ['meds']];
   // 0.42 (owner: "seeds should be more limited ... an overload of batteries, cloth rags, a ton of 9mm"): those turn up
   // less often everywhere (seeds -60%, batteries -40%, 9mm -40%, cloth -30%); jackpots are unchanged
-  for (const t in D.LOOT) { const w = D.LOOT[t][1]; for (const [k, m] of [['seed_*', .4], ['battery', .6], ['ammo', .6], ['cloth', .7], ['bandage', .45], ['meds', .5], ['antibio', .8]]) if (w[k]) { const cut = w[k] * (1 - m); w[k] = +(w[k] * m).toFixed(3); w.__none = +((w.__none || 0) + cut).toFixed(3); } }   // the cut weight becomes "nothing" (__none), so fewer items really come out   // 0.43.1 (owner: "a ton of bandages and med stuff ... it never feels bad"): medical x0.45-0.5
+  for (const t in D.LOOT) { const w = D.LOOT[t][1]; for (const [k, m] of [['seed_*', .4], ['battery', .42], ['ammo', .35], ['cloth', .7], ['bandage', .45], ['meds', .3], ['antibio', .8], ['nails', .75]]) if (w[k]) { const cut = w[k] * (1 - m); w[k] = +(w[k] * m).toFixed(3); w.__none = +((w.__none || 0) + cut).toFixed(3); } }   // the cut weight becomes "nothing" (__none), so fewer items really come out   // 0.43.1 (owner: "a ton of bandages and med stuff ... it never feels bad"): medical x0.45-0.5
+  // 0.44.1 (owner: "there's sooo much 9mm ... check when things are too much of an abundance"): no container guarantees
+  // 9mm or medicine any more (safes, caches, armories, crates, cages); a measured run of 60 houses is in DESIGN.md
+  for (const t in D.LOOT) { const g = D.LOOT[t][2]; if (Array.isArray(g)) { const left = g.filter(k => k !== 'ammo' && k !== 'meds'); if (left.length !== g.length) D.LOOT[t][2] = left.length ? left : undefined; } }
   // 0.10: the one guaranteed prize in a key-locked room / car trunk (gen.js jackpots). Each entry: [weight, items].
   D.JACK = {
     gun: [[3, ['pistol', 'ammo', 'ammo']], [2, ['shotgun', 'shells', 'shells']], [2, ['ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo']], [1, ['machete']], [1, ['spikedbat']], [1, ['axe']], [1, ['cosP_*']], [1, ['lockset']]],   // 0.30: real guns
@@ -593,7 +596,7 @@ window.DM = window.DM || {};
   D.SHOP = [ // [item, count, price, min trader level, chance]
     ['beans', 3, 9, 1, .9], ['water', 3, 8, 1, .9], ['snack', 3, 5, 1, .6], ['coffee', 2, 7, 1, .5], ['bandage', 3, 12, 1, .8], ['meds', 2, 24, 1, .6], ['lockpick', 3, 14, 1, .8],
     ['arrow', 10, 3, 1, .8], ['cloth', 4, 4, 1, .5], ['tape', 2, 8, 1, .5], ['nails', 12, 1, 1, .5], ['wood', 4, 4, 1, .5], ['crowbar', 1, 60, 1, .6], ['bat', 1, 45, 1, .5], ['knife', 1, 25, 1, .5],
-    ['backpack', 1, 150, 2, 1], ['machete', 1, 90, 2, .5], ['ammo', 15, 2, 2, .6], ['prybar', 1, 65, 2, .5], ['axe', 1, 120, 3, .5], ['bow', 1, 130, 3, .4], ['lockset', 1, 80, 3, .5],
+    ['backpack', 1, 150, 2, 1], ['machete', 1, 90, 2, .5], ['ammo', 10, 3, 2, .4], ['prybar', 1, 65, 2, .5], ['axe', 1, 120, 3, .5], ['bow', 1, 130, 3, .4], ['lockset', 1, 80, 3, .5],
     ['key', 1, 30, 2, .35], ['bp_*', 1, 110, 2, .45], ['bp_*', 1, 110, 4, .6],
     ['antibio', 1, 45, 2, .5],
     ['shells', 10, 4, 3, .5], ['pistol', 1, 240, 4, .3], ['shotgun', 1, 320, 5, .25], ['nailgun', 1, 110, 3, .3], ['pan', 1, 20, 1, .3], ['turkeysq', 1, 25, 1, .25],   // 0.30

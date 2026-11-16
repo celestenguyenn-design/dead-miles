@@ -2194,6 +2194,9 @@
       acts.innerHTML = `<span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}</span>`;
       if (it.w) { const b = document.createElement('button'); b.textContent = 'Equip'; b.onclick = ev => { ev.stopPropagation(); equipFromPack(sel); openPack(); }; acts.appendChild(b); }
       if (it.use) { const b = document.createElement('button'); b.textContent = it.use; b.onclick = ev => { ev.stopPropagation(); useItem(sel); }; acts.appendChild(b); }
+      if (it.mod) { const b = document.createElement('button'); b.textContent = `Fit (${it.mod} mod)`; b.onclick = ev => {   // 0.44.1: fit a weapon mod mid-run
+        ev.stopPropagation(); const sv = S(); sv.mods = sv.mods || {}; const old = sv.mods[it.mod]; e.n--; if (!e.n) G.pack.splice(sel, 1);
+        sv.mods[it.mod] = e.k; if (old) addToPack(old, 1); SFX.play('pick'); toast(`${it.n} fitted${old ? ' - ' + ITEMS[old].n.toLowerCase() + ' back in your pack' : ''}`, 1.8); lastHud = ''; openPack(); }; acts.appendChild(b); }
       const d = document.createElement('button'); d.className = 'ghost'; d.textContent = 'Drop';
       d.onclick = ev => { ev.stopPropagation(); dropItem(sel); }; acts.appendChild(d);
     }
