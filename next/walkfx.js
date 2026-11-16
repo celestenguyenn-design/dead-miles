@@ -100,6 +100,71 @@ window.DM = window.DM || {};
       <div class="cplist">${w.bag.map((c, i) => `<div class="cpbuy"><div><b>${esc(D().ITEMS[c.k].n)}</b><span>${c.got >= c.need ? 'Ready!' : `${fmt(c.got)} / ${fmt(c.need)} steps`}</span><div class="cxbar"><i style="width:${Math.min(100, c.got / c.need * 100)}%"></i></div></div><button class="mbtn sm${c.got >= c.need ? '' : ' ghost'}" data-wc="${i}"${c.got >= c.need ? '' : ' disabled'}>Open</button></div>`).join('') || '<p class="mp dim">Empty. Tap a walking cache in your pack or stash, then "Walk it open".</p>'}</div>`;
   };
   W.bindCaches = function (root) { root.querySelectorAll('[data-wc]').forEach(b => b.onclick = () => W.open(+b.dataset.wc)); };
+  // ---------------------------------------------------------------- 0.48 daily bounties + escorts
+  // Bounties: 3 a day (one about walking at a time of day, two others), seeded by the date. Progress is measured from the
+  // day's first look (SV.wfx.bd = { day, w0, e0, r0, k0, p0, done: [], claimed: [], all }). Each pays caps + a little
+  // something; all 3 = a capsule token. Escort: one survivor a day asks to be walked somewhere safe - accept, walk N
+  // steps before midnight, they reach safety (sometimes they join your crew). Nothing bad happens if you don't.
+  const BT = {
+    morning: { t: 'Early bird', d: 'Walk 2,000 steps before noon', ok: (b, v, h) => h < 12 && v.walked - b.w0 >= 2000, prog: (b, v) => Math.min(2000, v.walked - b.w0) + '/2,000', r: [['coffee', 2]] },
+    evening: { t: 'Night walk', d: 'Walk 1,000 steps after 6 PM', ok: (b, v, h) => b.e0 != null && v.walked - b.e0 >= 1000, prog: (b, v) => b.e0 == null ? 'after 6 PM' : Math.min(1000, v.walked - b.e0) + '/1,000', r: [['battery', 1]] },
+    total: { t: 'Long haul', d: 'Walk 6,000 steps today', ok: (b, v) => v.walked - b.w0 >= 6000, prog: (b, v) => fmt(Math.min(6000, v.walked - b.w0)) + '/6,000', r: [['bandage', 1]] },
+    loot: { t: 'Scavenger', d: 'Go into 2 houses', ok: (b, v) => (v.stats.runs || 0) - b.r0 >= 2, prog: (b, v) => Math.min(2, (v.stats.runs || 0) - b.r0) + '/2', r: [['lockpick', 2]] },
+    kills: { t: 'Thin the herd', d: 'Kill 15 zombies', ok: (b, v) => (v.stats.kills || 0) - b.k0 >= 15, prog: (b, v) => Math.min(15, (v.stats.kills || 0) - b.k0) + '/15', r: [['scrap', 2]] },
+    map: { t: 'Explorer', d: 'Visit 2 strange places on the map', ok: b => (DM.MapPOI ? DM.MapPOI._st().n : 0) - b.p0 >= 2, prog: b => Math.min(2, (DM.MapPOI ? DM.MapPOI._st().n : 0) - b.p0) + '/2', r: [['tape', 1]] },
+  };
+  const ESC = [['Lena', 'her sister\'s place in the next borough'], ['Old Amos', 'the church shelter'], ['Kai and his dog', 'the rooftop farm'], ['Rosa', 'the pier where the boats come'], ['Mr. Okafor', 'his daughter\'s apartment'], ['Two kids', 'the school shelter']];
+  function bd() {
+    const v = SV(), w = st(); let b = w.bd;
+    if (!b || b.day !== today()) {
+      const r = D().mulberry32(D().hashStr('bounty' + today()) >>> 0), walk = r() < .5 ? 'morning' : r() < .5 ? 'evening' : 'total', rest = ['loot', 'kills', 'map', 'total'].filter(k => k !== walk);
+      const two = []; while (two.length < 2) { const k = rest[Math.floor(r() * rest.length)]; if (!two.includes(k)) two.push(k); }
+      const e = ESC[Math.floor(r() * ESC.length)];
+      b = w.bd = { day: today(), list: [walk, ...two], w0: v.walked || 0, e0: null, r0: v.stats.runs || 0, k0: v.stats.kills || 0, p0: DM.MapPOI ? DM.MapPOI._st().n : 0, claimed: [], all: 0,
+        esc: { who: e[0], to: e[1], need: 3000 + Math.floor(r() * 4) * 500, st: 'offer', s0: 0 } };
+    }
+    if (b.e0 == null && new Date().getHours() >= 18) b.e0 = v.walked || 0;
+    return b;
+  }
+  W.bounty = () => { const v = SV(), b = bd(), h = new Date().getHours(); return b.list.map(k => ({ k, B: BT[k], done: b.claimed.includes(k) || BT[k].ok(b, v, h), claimed: b.claimed.includes(k) })); };
+  W.claimBounty = function (k) {
+    const b = bd(), x = W.bounty().find(y => y.k === k); if (!x || !x.done || x.claimed) return;
+    b.claimed.push(k); SV().trader.caps += 20; G().routeApi.toStash(x.B.r.map(([kk, n]) => ({ k: kk, n })));
+    let msg = `Bounty "${x.B.t}" done: +20 caps`;
+    if (b.claimed.length === b.list.length && !b.all) { b.all = 1; if (DM.Gacha) DM.Gacha.state().tok++; msg += ' · all 3 today: +1 capsule token!'; }
+    G().save(); try { DM.E.SFX.play('pick'); } catch (e) { /* ignore */ } toast(msg, 2.6);
+  };
+  W.escort = () => bd().esc;
+  W.escortAccept = function () { const e = bd().esc; if (e.st !== 'offer') return; e.st = 'on'; e.s0 = SV().walked || 0; G().save(); toast(`${e.who} walks with you. ${fmt(e.need)} steps to ${e.to} - before midnight.`, 3); };
+  W.escortLeft = () => { const e = bd().esc; return e.st === 'on' ? Math.max(0, e.need - ((SV().walked || 0) - e.s0)) : e.need; };
+  W.escortDone = function () {
+    const e = bd().esc; if (e.st !== 'on' || W.escortLeft() > 0) return;
+    e.st = 'done'; SV().trader.caps += 40; if (DM.Skills) DM.Skills.addXP(30);
+    const join = Math.random() < .2 && DM.Crew && DM.Crew.free && DM.Crew.free() > 0 && !/kids|dog/.test(e.who);
+    if (join) DM.Crew.joinHelped(e.who.replace(/^(Old |Mr\. )/, ''), D().hashStr(e.who + today()));
+    G().save(); try { DM.E.SFX.play('pick'); } catch (x) { /* ignore */ }
+    toast(`${e.who} made it to ${e.to}. +40 caps, +30 XP${join ? ` - and ${e.who.replace(/^(Old |Mr\. )/, '')} asks to join your crew!` : ''}`, 3.6);
+  };
+  W.bountyTile = function () {
+    if (!SV().tutorialDone) return null;
+    const bs = W.bounty(), ready = bs.filter(x => x.done && !x.claimed).length, claimed = bs.filter(x => x.claimed).length, e = W.escort(), escReady = e.st === 'on' && W.escortLeft() <= 0;
+    return { k: 'bounty', c: '#e0b94a', n: 'Daily bounties', sub: `${claimed}/3 done${e.st === 'on' ? ` · escort: ${fmt(W.escortLeft())} steps` : e.st === 'offer' ? ' · someone needs an escort' : ''}`, hot: ready || escReady ? 'Claim' : '' };
+  };
+  W.bountyHTML = function () {
+    const bs = W.bounty(), b = bd(), v = SV(), e = b.esc;
+    return `<div class="kick">Daily bounties · new ones at midnight</div><h3>${bs.filter(x => x.claimed).length} of 3 done</h3>
+      <div class="cplist">${bs.map(x => `<div class="cpbuy"><div><b>${esc(x.B.t)}</b><span>${esc(x.B.d)} · ${x.claimed ? 'claimed' : esc(x.B.prog(b, v))}</span></div><button class="mbtn sm${x.done && !x.claimed ? '' : ' ghost'}" data-bt="${x.k}"${x.done && !x.claimed ? '' : ' disabled'}>${x.claimed ? '✓' : '20 caps'}</button></div>`).join('')}</div>
+      <p class="mp dim">Finish all 3 for a capsule token.</p>
+      <div class="kick sect" style="margin-top:12px">Escort</div>
+      ${e.st === 'offer' ? `<p class="mp"><b>${esc(e.who)}</b> need${/ and |kids/.test(e.who) ? '' : 's'} to get to ${esc(e.to)}. Walk <b>${fmt(e.need)} steps</b> before midnight with them.</p><button class="mbtn" id="escGo">"I'll get you there."</button>`
+        : e.st === 'on' ? `<p class="mp"><b>${esc(e.who)}</b> walking with you to ${esc(e.to)}: ${W.escortLeft() > 0 ? `<b>${fmt(W.escortLeft())}</b> steps to go` : '<b>you made it!</b>'}</p>${W.escortLeft() <= 0 ? '<button class="mbtn" id="escDone">See them safe</button>' : ''}`
+        : `<p class="mp dim">${esc(e.who)} made it to ${esc(e.to)}. Someone new tomorrow.</p>`}`;
+  };
+  W.bindBounty = function (root, re) {
+    root.querySelectorAll('[data-bt]').forEach(b => b.onclick = () => { W.claimBounty(b.dataset.bt); re(); });
+    const g = root.querySelector('#escGo'); if (g) g.onclick = () => { W.escortAccept(); re(); };
+    const d = root.querySelector('#escDone'); if (d) d.onclick = () => { W.escortDone(); re(); };
+  };
   const css = document.createElement('style'); css.textContent = `
     .wrcard { margin: 10px 0 4px; padding: 10px; border-radius: 16px; background: rgba(17,20,47,.75); border: 2.5px solid #d9a46a; }
     .wrhead { display: flex; justify-content: space-between; align-items: center; } .wrhead .kick { color: #d9a46a; }

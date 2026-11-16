@@ -1107,6 +1107,13 @@ in my backpack it zooms my screen all the way to the top")
 - Still to build from the 2026-11-16 list: daily step bounties, escorts, neighbourhood stamps, power walk, the journal
   (page-turn animation + sound).
 
+## Done in 0.48.0 - daily bounties + escorts (walkfx.js)
+- 3 bounties a day seeded by the date: one walking-at-a-time (2,000 before noon / 1,000 after 6 PM / 6,000 today) plus
+  two of: 6,000 today, 2 houses, 15 kills, 2 strange map places. Progress from the day's first look (SV.wfx.bd). 20 caps
+  + a small item each; all 3 -> a capsule token. Home tile "Daily bounties".
+- Escort: one survivor a day (6 names), accept -> walk 3,000-4,500 steps before midnight -> 40 caps, 30 XP, 20% they
+  join the crew (bunk free). No penalty for ignoring it.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

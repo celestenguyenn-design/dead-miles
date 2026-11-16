@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.47.0';
+const NEXT_VERSION = '0.48.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1497,7 +1497,7 @@ const NEXT_VERSION = '0.47.0';
     }
     if (DM.Advent && SV.tutorialDone) { const at = DM.Advent.tile(); if (at) t.unshift(at); }   // 0.32: December 1-24
     if (BS.raidTile && SV.tutorialDone) { const rt = BS.raidTile(); if (rt) t.unshift(rt); }   // 0.33: base raids
-    if (DM.WalkFX) { const wc = DM.WalkFX.tile(); if (wc) t.unshift(wc); }   // 0.47: walking caches
+    if (DM.WalkFX) { const wc = DM.WalkFX.tile(); if (wc) t.unshift(wc); const bt = DM.WalkFX.bountyTile(); if (bt) t.push(bt); }   // 0.47 walking caches; 0.48 bounties
     if (DM.Camps && SV.tutorialDone) { const cp = DM.Camps.tile(); if (cp) t.push(cp); }   // 0.46: camps
     if (DM.Social && SV.tutorialDone) { const so = DM.Social.tile(); if (so) t.push(so); }   // 0.40: party walk + friends race
     if (DM.Gifts) DM.Gifts.check();   // 0.41: gifts from friends land in the stash
@@ -1511,14 +1511,15 @@ const NEXT_VERSION = '0.47.0';
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
     cardSheet = k;
-    const html = k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
+    const html = k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
     sheetOpen(`<div class="cardsheet" data-cs="${k}">${html}</div><button class="mbtn ghost" id="csDone">Close</button>`);
     const el = $('#msheet'), root = el.querySelector('.cardsheet');
     el.onclick = e => { if (e.target === el) closeCardSheet(); };
     $('#csDone').onclick = () => { SFX.play('ui'); closeCardSheet(); };
     // actions that leave the menu (a fight, a shift, back into a run) close the sheet first
     root.addEventListener('click', e => { if (e.target.closest('[data-boss="go"],[data-deep="resume"],#hShift')) { cardSheet = null; sheetClose(); } }, true);
-    if (k === 'caches') DM.WalkFX.bindCaches(root);
+    if (k === 'bounty') { const w = root.querySelector('.btwrap'), re = () => { w.innerHTML = DM.WalkFX.bountyHTML(); DM.WalkFX.bindBounty(w, re); }; DM.WalkFX.bindBounty(w, re); }
+    else if (k === 'caches') DM.WalkFX.bindCaches(root);
     else if (k === 'camps') { const w = root.querySelector('.cpwrap'), re = () => { w.innerHTML = DM.Camps.html(); DM.Camps.bind(w, re); }; DM.Camps.bind(w, re); }
     else if (k === 'social') { publish(); const w = root.querySelector('.sowrap'), re = () => { w.innerHTML = DM.Social.html(); DM.Social.bind(w, re); }; DM.Social.bind(w, re); }
     else if (k === 'codex') DM.Codex.bind(root.querySelector('.cxwrap'));
