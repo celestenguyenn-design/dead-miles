@@ -87,7 +87,7 @@
     for (let d = 0; d < n; d++) for (const m of crew()) {
       let fed = false;
       for (const k of foods) { const i = stash.findIndex(e => e.k === k); if (i < 0) continue; if (!--stash[i].n) stash.splice(i, 1); fed = true; break; }
-      if (fed) { ate++; m.hungry = 0; m.mood = Math.min(100, m.mood + 6); m.xp += 1; if (m.hp != null) m.hp = Math.min(C.maxHp(m), m.hp + 10 + (crew().some(x => x.role === 'medic' && x !== m) ? 10 : 0)); }   // 0.51: a fed night's rest heals a little (more with a medic)
+      if (fed) { ate++; m.hungry = 0; m.mood = Math.min(100, m.mood + 6); m.xp += 1; if (m.hp != null) m.hp = Math.min(C.maxHp(m), m.hp + 10 + (crew().some(x => x.role === 'medic' && x !== m) ? 10 : 0) + (v.base && v.base.built && v.base.built.campfire ? 10 : 0)); if (v.base && v.base.built && v.base.built.campfire) m.mood = Math.min(100, m.mood + 3); }   // 0.52: campfire   // 0.51: a fed night's rest heals a little (more with a medic)
       else { missed++; m.hungry++; m.mood = Math.max(0, m.mood - 22); }
     }
     if (ate) lines.push(`The crew ate ${ate} food from the stash.`);
