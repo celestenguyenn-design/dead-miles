@@ -68,8 +68,8 @@ window.DM = window.DM || {};
     if (!s.air && walked >= 300) { const sp = spots(pos, 200, 500); if (sp.length) { const [pl] = pick(sp); s.air = 1; s.drops.push({ id: 'a' + now, air: 1, lat: pl.lat, lon: pl.lon, at: pl.name, until: now + 20 * 60000 }); save(); sfx('alert'); buzz([200, 100, 200]); toast(`✈️ Air drop near ${pl.name} - 20 minutes before raiders get it!`, 4); } }
     for (const d of s.drops.slice()) if (dist(d, pos) <= 25 + Math.min(15, pos.acc / 2)) {
       s.drops = s.drops.filter(x => x !== d); save();
-      if (d.air) { caps(30); const tk = token(.5); reward('✈️ Air drop', d.at, give(rollItems('hordecrate', 2)) + ', 30 caps' + (tk ? ', a capsule token' : '')); }
-      else reward('📦 Supply crate', d.at, give(rollItems('storage', 1).concat(rollItems('crate', 1)).concat(DM.Weather && DM.Weather.night && DM.Weather.night() ? rollItems('storage', 1).slice(0, 1) : [])));   // 0.39: night crates hold one more
+      if (d.air) { caps(30); const tk = token(.5); reward('✈️ Air drop', d.at, give(rollItems('hordecrate', 2).concat(Math.random() < .5 ? [['cache5', 1]] : [])) + ', 30 caps' + (tk ? ', a capsule token' : '')); }
+      else reward('📦 Supply crate', d.at, give(rollItems('storage', 1).concat(rollItems('crate', 1), Math.random() < .2 ? [['cache2', 1]] : []).concat(DM.Weather && DM.Weather.night && DM.Weather.night() ? rollItems('storage', 1).slice(0, 1) : [])));   // 0.39: night crates hold one more
     }
     // radio call
     if (s.radio && s.radio.until < now) { toast(`📻 The radio goes quiet. You did not make it to ${s.radio.at} in time.`, 3.4); s.radio = null; save(); }
