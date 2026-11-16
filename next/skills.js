@@ -145,6 +145,7 @@ window.DM = window.DM || {};
       const E = DM.E; if (E && E.SFX && E.SFX.ac) [523, 659, 784].forEach((f, i) => E.SFX.tone('triangle', f, f * 1.01, .22, .06, i * .08));
     }
     if (up > 0 && DM.Game && DM.Game.onLevel) DM.Game.onLevel(SK.level(s));
+    if (up > 0 && DM.Journal) DM.Journal.note(`Reached level ${SK.level(s)}.`);
     return up;
   };
   SK.xpLine = (s = S()) => { const L = SK.level(s), a = D.XPCUM(L), b = D.XPCUM(L + 1), x = +s.xp || 0; return { L, cur: Math.floor(x - a), need: b - a, pct: Math.max(0, Math.min(100, (x - a) / (b - a) * 100)) }; };

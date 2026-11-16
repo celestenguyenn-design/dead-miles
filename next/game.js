@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.49.0';
+const NEXT_VERSION = '0.50.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1209,6 +1209,7 @@ const NEXT_VERSION = '0.49.0';
   function renderHome0() {
     if (!SV || !SV.survivor || DM.scene) return;
     if (DM.WalkFX) DM.WalkFX.tick();   // 0.47: walk finds, gear upkeep, walking caches
+    if (DM.Journal) DM.Journal.tick();   // 0.50: the survival log
     if (DM.Title && DM.Title.up) return;   // 0.22: the title screen is still up; its tap boots the home (no tips under it)
     rollDay();
     foodTick();
@@ -1502,6 +1503,7 @@ const NEXT_VERSION = '0.49.0';
     if (DM.Social && SV.tutorialDone) { const so = DM.Social.tile(); if (so) t.push(so); }   // 0.40: party walk + friends race
     if (DM.Gifts) DM.Gifts.check();   // 0.41: gifts from friends land in the stash
     if (window.NET && NET.ok && NET.name && SV.survivor.name === 'Survivor') publish();   // 0.42.1: pick up the account name
+    if (DM.Journal) { const jt = DM.Journal.tile(); if (jt) t.push(jt); }   // 0.50
     if (DM.Codex && SV.tutorialDone) { DM.Codex.check(); const ct = DM.Codex.tile(); if (ct) t.push(ct); }   // 0.35: bestiary + feats
     const gn = BS.gardenNote(); if (gn) t.push({ k: 'garden', c: '#93a86c', n: 'Garden', sub: gn, hot: '' });
     const ev = eventBanner();
@@ -1548,6 +1550,7 @@ const NEXT_VERSION = '0.49.0';
       SFX.play('ui'); const k = x.dataset.tile;
       if (k === 'garden') goBase();
       else if (k === 'horde') openCardSheet('horde');
+      else if (k === 'journal') DM.Journal.open();   // 0.50
       else if (k === 'daily') { tab('houses'); const c = $('#dlyCard'); if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 1400); } }
       else openCardSheet(k);
     });
