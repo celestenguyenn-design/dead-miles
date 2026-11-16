@@ -1164,6 +1164,23 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   stove, fridge, desk, shelf, trash can, side table).
 - Fix: base no longer shows the night/weather loot bonus.
 
+## Done in 0.53.0 (owner: "more stuff ... definitely more walking related stuff + looting")
+- Collections (collect.js, DM.Collect): 6 sets x 5. Cards (desks, nightstands, books), records (hutches, shelves, TVs),
+  snow globes (side tables, registers), Mall Rangers figures (wardrobes, attics, locked rooms), license plates
+  (garages, cars, workbenches), and roadside postcards, which only come from walking (walk finds, walking caches,
+  map places). Piece 5 of each set is rare. New pieces file themselves on the home screen and take no bag space.
+  Doubles count as junk for Dot, or can be gifted. A set pays 120 caps + 1 token; all six pay 400 caps + 3 tokens.
+  'col_*' in D.LOOT is resolved by a D.rollLoot wrapper (house.js now late-binds rollLoot).
+  Measured: 0.85 collectibles a house (audit2, 150 houses).
+- Walking charms (charms.js, DM.Charm): one slot, survivor.charm.
+  - Pedometer: walk find every 750 steps.
+  - Map case: 16 finds a day.
+  - Rabbit's foot: rare walk finds 2x.
+  - Brass compass: caches open 25% faster.
+  - Walkman: gear upkeep 2x.
+  - Canteen: +8 thirst per 1,000 steps.
+  Charms come from walk finds, 5/10 km caches, attics, locked rooms, horde crates, map places, and Dot (level 3+).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

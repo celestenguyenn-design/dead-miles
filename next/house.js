@@ -7,7 +7,7 @@
   const P = ART.P, E = DM.E, D = DM.D;
   const { T, WH, WT, PSCALE, ZSCALE, $, DEV, SFX, clamp, lerp, angDiff, rectDist, toast, buzz, keys, btn } = E;
   const cv = E.cv, ctx = E.ctx;
-  const { ITEMS, stackMax, toStacks, rollLoot, LOCKS, EVENT, WEAPONS } = D;
+  const { ITEMS, stackMax, toStacks, LOCKS, EVENT, WEAPONS } = D; const rollLoot = (k, r) => D.rollLoot(k, r);   // 0.53: late-bound (collect.js / charms.js wrap it)
   const EVS = DM.Events, EVA = D.EV;   // the running seasonal event (events.js) or null
   const F = DM.Food;                   // 0.8: hunger + thirst (food.js)
   const SK = DM.Skills, INF = DM.Inf;  // 0.13: skill trees (skills.js), special infected (infected.js)

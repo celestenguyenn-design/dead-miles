@@ -19,14 +19,22 @@ window.DM = window.DM || {};
   const FIND_STEP = 1000, FIND_MAX = 12, FIX_STEP = 1500, BAG = 2;
   // what turns up on a walk (weights): common junk and supplies; rarely something good
   const FINDS = [[['scrap', 1], 14], [['cloth', 1], 10], [['wood', 1], 8], [['nails', 3], 8], [['beans', 1], 7], [['water', 1], 7], [['snack', 1], 6], [['tape', 1], 6],
-    [['battery', 1], 4], [['lockpick', 1], 4], [['bandage', 1], 3], [['drink', 1], 4], [['book', 1], 3], [['cache2', 1], 2], [['bp_*', 1], .7], [['cache5', 1], .5]];
-  const WT = FINDS.reduce((a, f) => a + f[1], 0);
+    [['battery', 1], 4], [['lockpick', 1], 4], [['bandage', 1], 3], [['drink', 1], 4], [['book', 1], 3], [['cache2', 1], 2], [['bp_*', 1], .7], [['cache5', 1], .5],
+    [['col_*', 1], 3], [['charm_*', 1], .3]];   // 0.53: collectibles (mostly roadside postcards) + walking charms
+  const LUCKY = { cache2: 1, cache5: 1, 'bp_*': 1, 'col_*': 1, 'charm_*': 1 };   // the Rabbit's foot doubles these
+  const on = k => DM.Charm && DM.Charm.on(k);
+  const findStep = () => on('pedo') ? 750 : FIND_STEP, findMax = () => on('mapcase') ? 16 : FIND_MAX;
+  const wOf = f => f[1] * (LUCKY[f[0][0]] && on('rabbit') ? 2 : 1);
   function st() {
     const v = SV(); v.wfx = v.wfx || { mark: v.walked || 0, day: '', finds: 0, left: [], fix: v.walked || 0, bag: [] };
     const w = v.wfx; if (w.day !== today()) { w.day = today(); w.finds = 0; }
     return w;
   }
-  function pick() { let x = Math.random() * WT; for (const [it, w] of FINDS) { x -= w; if (x <= 0) return it[0] === 'bp_*' ? [D().pickBP(Math.random), 1] : it; } return FINDS[0][0]; }
+  function pick() {
+    const WT = FINDS.reduce((a, f) => a + wOf(f), 0); let x = Math.random() * WT;
+    for (const f of FINDS) { x -= wOf(f); if (x <= 0) { const it = f[0]; return it[0] === 'bp_*' ? [D().pickBP(Math.random), 1] : it[0] === 'col_*' ? (DM.Collect ? [DM.Collect.pickWalk(), 1] : ['scrap', 1]) : it[0] === 'charm_*' ? (DM.Charm ? [DM.Charm.pick(), 1] : ['scrap', 1]) : it; } }
+    return FINDS[0][0];
+  }
   // ---------------------------------------------------------------- process new steps
   W.tick = function () {
     const v = SV(); if (!v || !v.survivor) return;
@@ -34,10 +42,13 @@ window.DM = window.DM || {};
     if (walked < w.mark) w.mark = walked;   // a step correction took steps away
     const delta = walked - w.mark; if (delta <= 0) return;
     // walk report
-    let n = Math.floor((walked - w.mark) / FIND_STEP);
+    const FS = findStep(), FM = findMax();
+    let n = Math.floor((walked - w.mark) / FS);
     const got = [];
-    while (n > 0 && w.finds < FIND_MAX) { got.push(pick()); w.finds++; n--; }
-    w.mark += Math.floor(delta / FIND_STEP) * FIND_STEP;
+    while (n > 0 && w.finds < FM) { got.push(pick()); w.finds++; n--; }
+    w.mark += Math.floor(delta / FS) * FS;
+    // 0.53 canteen: +8 thirst every 1,000 steps
+    if (on('canteen')) { w.cant = w.cant == null ? walked - delta : w.cant; const c = Math.floor((walked - w.cant) / 1000); if (c > 0) { w.cant += c * 1000; const f = v.survivor.food; if (f) f.t = Math.min(100, f.t + 8 * c); } } else w.cant = null;
     if (got.length) {
       const stacks = got.map(([k, c]) => ({ k, n: c }));
       const lost = G().routeApi.toStash(stacks.map(e => Object.assign({}, e)));
@@ -45,15 +56,15 @@ window.DM = window.DM || {};
       if (lost && lost.length) toast('Your stash is full - some walk finds were left behind', 2.4);
     }
     // gear upkeep
-    const fixes = Math.floor((walked - w.fix) / FIX_STEP);
+    const FX = on('walkman') ? FIX_STEP / 2 : FIX_STEP, fixes = Math.floor((walked - w.fix) / FX);
     if (fixes > 0) {
-      w.fix += fixes * FIX_STEP;
+      w.fix += fixes * FX;
       const s = v.survivor, h = s.hands;
       if (h && h.d != null) { const mx = D().wMax(h); h.d = Math.min(mx, h.d + Math.ceil(mx * .04 * fixes)); }
       if (s.armor && DM.Armor) { const A = D().ITEMS[s.armor.k] && D().ITEMS[s.armor.k].armor; if (A) s.armor.d = Math.min(A.dur, DM.Armor.dur(s.armor) + Math.ceil(A.dur * .04 * fixes)); }
     }
     // walking caches
-    for (const c of w.bag) if (c.got < c.need) { c.got = Math.min(c.need, c.got + delta); if (c.got >= c.need) toast(`📦 Your ${D().ITEMS[c.k].n.toLowerCase()} is open! Collect it on the home screen`, 3); }
+    for (const c of w.bag) if (c.got < c.need) { c.got = Math.min(c.need, c.got + Math.round(delta * (on('compass') ? 1.25 : 1))); if (c.got >= c.need) toast(`📦 Your ${D().ITEMS[c.k].n.toLowerCase()} is open! Collect it on the home screen`, 3); }
     G().save();
   };
   // ---------------------------------------------------------------- the walk report card (home screen)
@@ -61,7 +72,7 @@ window.DM = window.DM || {};
     const w = st(); if (!w.left.length) return '';
     return `<div class="wrcard"><div class="wrhead"><span class="kick">🚶 On your walk</span><button class="gdx" id="wrOk">OK</button></div>
       <div class="wrlist">${w.left.map(([k, n]) => `<span>${(typeof ART !== 'undefined' && ART.iconURL[(D().ITEMS[k] || {}).i]) ? `<img alt="" src="${ART.iconURL[D().ITEMS[k].i]}">` : ''}${n > 1 ? n + ' ' : ''}${esc((D().ITEMS[k] || { n: k }).n.toLowerCase())}</span>`).join('')}</div>
-      <p class="wrsub">Picked up along the way - it's in your stash. 1 find every ${fmt(FIND_STEP)} steps (${w.finds}/${FIND_MAX} today). Walking also keeps your weapon and armor in shape.</p></div>`;
+      <p class="wrsub">Picked up along the way - it's in your stash. 1 find every ${fmt(findStep())} steps (${w.finds}/${findMax()} today). Walking also keeps your weapon and armor in shape.</p></div>`;
   };
   W.bindReport = function (onDone) { const b = document.getElementById('wrOk'); if (b) b.onclick = () => { st().left = []; G().save(); onDone(); }; };
   // ---------------------------------------------------------------- walking caches
@@ -73,13 +84,15 @@ window.DM = window.DM || {};
     w.bag.push({ k: e.k, need: it.wcache, got: 0 }); G().save(); toast(`${it.n} is in your cache bag - walk ${fmt(it.wcache)} steps to open it`, 2.6);
     return true;
   };
-  const HAUL = { cache2: { caps: 15, rolls: [['storage', 1], ['crate', 1]] }, cache5: { caps: 35, rolls: [['hordecrate', 1], ['cache', 1]], tok: .3 }, cache10: { caps: 80, rolls: [['hordecrate', 2], ['safe', 1]], tok: 1, bp: 1, master: .3 } };
+  const HAUL = { cache2: { caps: 15, rolls: [['storage', 1], ['crate', 1]] }, cache5: { caps: 35, rolls: [['hordecrate', 1], ['cache', 1]], tok: .3, charm: .25, card: .5 }, cache10: { caps: 80, rolls: [['hordecrate', 2], ['safe', 1]], tok: 1, bp: 1, master: .3, charm: .5, card: 1 } };
   W.open = function (i) {
     const w = st(), c = w.bag[i]; if (!c || c.got < c.need) return;
     w.bag.splice(i, 1);
     const H = HAUL[c.k], keys = []; DM.Journal && DM.Journal.note(`Walked a ${c.k.replace('cache', '')} km cache open.`);
     for (const [t, n] of H.rolls) for (let j = 0; j < n; j++) keys.push(...D().rollLoot(t, Math.random));
     if (H.bp) keys.push(D().pickBP(Math.random));
+    if (H.charm && DM.Charm && Math.random() < H.charm) keys.push(DM.Charm.pick());   // 0.53
+    if (H.card && DM.Collect && Math.random() < H.card) keys.push(DM.Collect.pickWalk());
     const stacks = D().toStacks(keys, Math.random);
     if (H.master && Math.random() < H.master) { const k = ['machete', 'axe', 'spikedbat', 'pistol', 'shotgun', 'baton', 'bow'][Math.floor(Math.random() * 7)], e = { k, n: 1, q: 5 }; e.d = D().wMax(e); stacks.push(e); }
     const lost = G().routeApi.toStash(stacks.map(e => Object.assign({}, e)));

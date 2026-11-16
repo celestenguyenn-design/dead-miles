@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.52.0';
+const NEXT_VERSION = '0.53.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -984,7 +984,7 @@ const NEXT_VERSION = '0.52.0';
     for (const [from, list] of [['pack', s.pack], ['stash', s.stash]]) list.forEach((e, i) => { const v = D.valueOf(e.k, e.d, e.q); if (D.VALUE[e.k] === 0 || D.ITEMS[e.k].quest) return; rows.push({ from, i, e, v }); });
     // 0.29.3 (owner: "in dots shop we should have an option to auto sell junk with a button"): everything marked Sell
     // (no crafting / base use) from the pack and the stash, in one go - tap twice
-    const junk = rows.filter(r => D.cat(r.e.k) === 'sell'), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(r.v * r.e.n)), 0);
+    const junk = rows.filter(r => D.cat(r.e.k) === 'sell' || (D.cat(r.e.k) === 'col' && DM.Collect && DM.Collect.has(r.e.k))), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(r.v * r.e.n)), 0);
     const ex = extras(s), sw = spareWeapons(s), keys = +s.keys || 0;
     el.innerHTML = `<div class="kick sect">Sell to Dot · she pays low</div>`
       + (keys ? `<div class="shoprow">${icon('key')}<div><b>Brass keys x${keys}</b><span>keyring · Dot collects them</span></div><div style="display:flex;flex-direction:column;gap:4px"><button class="mbtn sm" id="tKey1">Sell 1 · ${icon('caps')}15</button>${keys >= 10 ? `<button class="mbtn sm ghost" id="tKey3">10 for a blueprint</button>` : ''}</div></div>` : '')
@@ -1219,6 +1219,7 @@ const NEXT_VERSION = '0.52.0';
   function renderHome0() {
     if (!SV || !SV.survivor || DM.scene) return;
     if (DM.WalkFX) DM.WalkFX.tick();   // 0.47: walk finds, gear upkeep, walking caches
+    if (DM.Collect) DM.Collect.file();   // 0.53: new collectibles file themselves
     if (DM.Journal) DM.Journal.tick();   // 0.50: the survival log
     if (DM.Title && DM.Title.up) return;   // 0.22: the title screen is still up; its tap boots the home (no tips under it)
     rollDay();
@@ -1514,6 +1515,7 @@ const NEXT_VERSION = '0.52.0';
     if (DM.Gifts) DM.Gifts.check();   // 0.41: gifts from friends land in the stash
     if (window.NET && NET.ok && NET.name && SV.survivor.name === 'Survivor') publish();   // 0.42.1: pick up the account name
     if (DM.Journal) { const jt = DM.Journal.tile(); if (jt) t.push(jt); }   // 0.50
+    if (DM.Collect && SV.tutorialDone) { const ct = DM.Collect.tile(); if (ct) t.push(ct); }   // 0.53
     if (DM.Codex && SV.tutorialDone) { DM.Codex.check(); const ct = DM.Codex.tile(); if (ct) t.push(ct); }   // 0.35: bestiary + feats
     const gn = BS.gardenNote(); if (gn) t.push({ k: 'garden', c: '#93a86c', n: 'Garden', sub: gn, hot: '' });
     const ev = eventBanner();
@@ -1523,7 +1525,7 @@ const NEXT_VERSION = '0.52.0';
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
     cardSheet = k;
-    const html = k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
+    const html = k === 'collect' ? `<div class="clwrap">${DM.Collect.html()}</div>` : k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
     sheetOpen(`<div class="cardsheet" data-cs="${k}">${html}</div><button class="mbtn ghost" id="csDone">Close</button>`);
     const el = $('#msheet'), root = el.querySelector('.cardsheet');
     el.onclick = e => { if (e.target === el) closeCardSheet(); };
@@ -1535,6 +1537,7 @@ const NEXT_VERSION = '0.52.0';
     else if (k === 'camps') { const w = root.querySelector('.cpwrap'), re = () => { w.innerHTML = DM.Camps.html(); DM.Camps.bind(w, re); }; DM.Camps.bind(w, re); }
     else if (k === 'social') { publish(); const w = root.querySelector('.sowrap'), re = () => { w.innerHTML = DM.Social.html(); DM.Social.bind(w, re); }; DM.Social.bind(w, re); }
     else if (k === 'codex') DM.Codex.bind(root.querySelector('.cxwrap'));
+    else if (k === 'collect') DM.Collect.bind();
     else if (k === 'raid') { const g = root.querySelector('#raidGo'); if (g) g.onclick = () => { SFX.play('ui'); cardSheet = null; sheetClose(); BS.raidDefend(); }; else { BS.raidSeen(); } }
     else if (k === 'advent') DM.Advent.bind(root.querySelector('.advwrap'));
     else if (k === 'boss') DM.Boss.bind(root);
@@ -1650,7 +1653,7 @@ const NEXT_VERSION = '0.52.0';
   const catTag = k => { const c = D.cat(k); return `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
   Game.catTag = catTag;
   const pawnVal = r => Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n * .5));   // 0.26.3: quick sell, half price
-  const junkOf = s => s.stash.map((e, i) => ({ e, i })).filter(r => D.cat(r.e.k) === 'sell' && D.VALUE[r.e.k] !== 0);
+  const junkOf = s => s.stash.map((e, i) => ({ e, i })).filter(r => (D.cat(r.e.k) === 'sell' || (D.cat(r.e.k) === 'col' && DM.Collect && DM.Collect.has(r.e.k))) && D.VALUE[r.e.k] !== 0);   // 0.53: collectible doubles count as junk
   function sortList(list) { D.mergeStacks(list); const o = k => D.CAT_ORDER.indexOf(D.cat(k)); list.sort((a, b) => o(a.k) - o(b.k) || D.ITEMS[a.k].n.localeCompare(D.ITEMS[b.k].n)); }
   function renderStash() {
     if (stashHost && !document.body.contains(stashHost)) stashHost = null;
@@ -1673,6 +1676,7 @@ const NEXT_VERSION = '0.52.0';
         <button class="eqslot${h ? ' wq q' + D.qOf(h) : ''}${sel && sel.from === 'hands' ? ' sel' : ''}" ${h ? `data-from="hands" data-i="0" style="--qc:${D.QUAL[D.qOf(h)].c}"` : 'id="eqFists"'}><i class="eqk">Weapon · hand</i>${h ? icon(h.k) : '<span class="eqnone">✊</span>'}<b>${h ? esc(hw.n) : 'Fists'}</b>${h ? qTag(h) : ''}<span>${hd} dmg${h && h.d != null ? ` · ${Math.round(Math.min(1, h.d / D.wMax(h)) * 100)}%` : ''}</span>${h && h.d != null ? `<i class="dur"><i style="width:${Math.max(4, Math.min(100, h.d / D.wMax(h) * 100))}%"></i></i>` : ''}</button>
         ${(() => { const ar = s.armor && D.ITEMS[s.armor.k] && D.ITEMS[s.armor.k].armor ? s.armor : null, ad = ar && D.ITEMS[ar.k].armor;   // 0.28: the body armor slot
           return `<button class="eqslot armor${sel && sel.from === 'armor' ? ' sel' : ''}" ${ar ? 'data-from="armor" data-i="0"' : 'id="eqNoArmor"'}><i class="eqk">Armor · body</i>${ar ? icon(ar.k) : '<span class="eqnone">🦺</span>'}<b>${ar ? esc(D.ITEMS[ar.k].n) : 'No armor'}</b><span>${ar ? `-${Math.round(ad.red * 100)}% damage · ${DM.Armor.dur(ar)}/${ad.dur}` : 'Find or craft some'}</span>${ar ? `<i class="dur"><i style="width:${Math.round(DM.Armor.dur(ar) / ad.dur * 100)}%"></i></i>` : ''}</button>`; })()}
+        ${DM.Charm ? DM.Charm.slotHTML(s, icon, esc) : ''}
         <button class="eqslot quiv${sel && sel.from === 'quiver' ? ' sel' : ''}" data-from="quiver" data-i="0"><i class="eqk">Quiver</i>${(s.quiver || {}).n ? icon('arrow') : `<img class="dim" alt="" src="${ART.iconURL.arrow}">`}<b>${(s.quiver || {}).n || 0} arrow${(s.quiver || {}).n === 1 ? '' : 's'}</b><span>max ${D.QUIVER} · no pack slot</span></button>
         <button class="eqslot pouch${sel && sel.from === 'pouch' ? ' sel' : ''}" data-from="pouch" data-i="0"><i class="eqk">Ammo pouch</i>${icon('ammo')}<b>${(s.pouch || {}).ammo || 0} 9mm · ${(s.pouch || {}).shells || 0} shells</b><span>max ${D.POUCH.ammo} / ${D.POUCH.shells} · no pack slot</span></button>
         <div class="eqslot"><i class="eqk">Backpack</i>${s.packBonus ? icon(s.packBonus >= 4 ? 'backpack' : 'packplus') : `<img class="dim" alt="" src="${ART.iconURL.backpack}">`}<b>${packSlots()} slots</b><span>${s.packBonus ? `+${s.packBonus} from upgrades` : 'No upgrade yet'}</span></div>
@@ -1701,6 +1705,7 @@ const NEXT_VERSION = '0.52.0';
     el.querySelectorAll('#gtabs button').forEach(b => { b.classList.toggle('on', b.dataset.g === gTab); b.onclick = () => { if (gTab === b.dataset.g) return; gTab = b.dataset.g; sel = null; SFX.play('ui'); renderStash(); }; });
     if (el.querySelector('#eqWard')) el.querySelector('#eqWard').onclick = () => { SFX.play('ui'); sel = null; stashHost = null; if (DM.scene) { toast('The wardrobe is on the home screen', 1.6); return; } editLook('wardrobe'); };
     if (el.querySelector('#eqNoArmor')) el.querySelector('#eqNoArmor').onclick = () => toast(s.pack.concat(s.stash).some(e => D.ITEMS[e.k] && D.ITEMS[e.k].armor) ? 'Open Backpack or Stash, tap the armor, then Wear' : 'Armor: coat closets, gym lockers, garages, police stations, horde crates, Dot - or craft a padded jacket', 2.6);
+    if (el.querySelector('#eqCharm')) el.querySelector('#eqCharm').onclick = () => { SFX.play('ui'); DM.Charm.tap(s, k => addTo(s.pack, packSlots(), k, 1) || addTo(s.stash, stashSlots(), k, 1), m => { sel = null; Game.save(); renderStash(); if (m) toast(m, 1.6); }, toast); };
     if (el.querySelector('#eqFists')) el.querySelector('#eqFists').onclick = () => toast(s.pack.concat(s.stash).some(e => D.isWeapon(e.k)) ? 'Open Backpack or Stash, tap a weapon, then Equip' : 'No weapon yet - they turn up in kitchens, garages and lockers', 2);
     if (el.querySelector('#gSkills')) el.querySelector('#gSkills').onclick = () => { SFX.play('ui'); DM.Skills.open(() => renderHome()); };
     if (el.querySelector('#gFood')) el.querySelector('#gFood').onclick = () => { SFX.play('ui'); openFood(); };
@@ -1828,6 +1833,11 @@ const NEXT_VERSION = '0.52.0';
         s.armor.d = Math.min(it.armor.dur, DM.Armor.dur(s.armor) + Math.round(it.armor.dur * .5)); done('Patched up');
       }]);
     }
+    // 0.53 walking charms: one slot; the old one goes back to the stash
+    if (it.charm && (sel.from === 'pack' || sel.from === 'stash')) btns.push([`Wear · ${it.tag}`, () => {
+      const old = DM.Charm.wear(s, s[sel.from], sel.i); if (old) addTo(s.stash, stashSlots(), old, 1) || addTo(s.pack, packSlots(), old, 1);
+      done(`Wearing the ${it.n.toLowerCase()}${old ? ` (${D.ITEMS[old].n.toLowerCase()} back in the stash)` : ''}`);
+    }, 'big']);
     // 0.36 weapon mods: fit into the melee / ranged mod slot (the old one goes back to the stash)
     if (it.mod && (sel.from === 'pack' || sel.from === 'stash')) btns.push([`Fit · ${it.mod} mod slot`, () => {
       s.mods = s.mods || {}; const old = s.mods[it.mod];
