@@ -130,7 +130,7 @@
     }
     // 0.54 (owner: "zombies should also be harder"): higher gamestage = up to 3 extra zombies, next to ones already there (seeded, so a resumed run matches)
     if (!G.dly && L.type !== 'base' && !opts.camp && houseZs.length) {
-      const ex = Math.floor(gsFx().t * 3.4), r = D.mulberry32(((L.seed || 7) * 31 + 5) >>> 0);
+      const ex = Math.floor(gsFx().t * 3.4) + (L.namedZ || 0), r = D.mulberry32(((L.seed || 7) * 31 + 5) >>> 0);
       for (let i = 0; i < ex; i++) { const o = houseZs[Math.floor(r() * houseZs.length)], z = mkZombie(o.x + (r() - .5) * T * .8, o.y + (r() - .5) * T * .6, 'idle', null); G.zs.push(z); houseZs.push(z); }
     }
     // the event mini-boss (zombie turkey, Krampus walker) in about 1 in 3 yards / kitchens

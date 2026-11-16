@@ -1198,6 +1198,16 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   - Health up to +130% (was +60), bites +80% (was +40), speed +25%, specials +30%.
   - Houses add up to 3 extra zombies with gamestage (seeded). Not added to daily houses, the base or camps.
 
+## Done in 0.55.0 - rare named houses (named.js, DM.Named) (owner: "I like 3 as well")
+- When a house is scouted, about 1 in 12 (seeded) becomes somebody's place. Each kind has its own loot, extra guards and one jackpot.
+  - The Collector's house: collectibles in most furniture, decor, and the rare 5th piece of a set you're missing. +2 zombies.
+  - Prepper's bunker: food, water, ammo and meds, plus a riot vest, a 5 km cache, a gun and antibiotics. +3 zombies.
+  - Pawn shop: weapons, jewelry and mods; jackpot is a katana, crossbow or gun. +2 zombies. Only bodegas, laundromats and auto shops.
+  - Hoarder's house: materials and junk, plus 2 blueprints and a hiking backpack. +1 zombie.
+- The house card shows the name with a coloured border. The Crew can't search these houses.
+- Implementation: extras go in as f.extra (prepRun, guarded by L._named), and L.namedZ adds to the extra zombies in house.js.
+- Measured in a test run: 17-54 extra items per named house.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.54.0';
+const NEXT_VERSION = '0.55.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -239,7 +239,9 @@ const NEXT_VERSION = '0.54.0';
     const seed = D.hashStr(SV.seedBase + ':' + seq);
     const type = pickType(w, D.mulberry32(seed ^ 0x9e3779b9));
     const L = layoutOf({ type, seed, gv: GV });
-    SV.houses.push({ id: 'h' + seq, type, seed, gv: GV, day: day || SV.day.key, status: 'new', address: L.address, danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies });
+    const hh = { id: 'h' + seq, type, seed, gv: GV, day: day || SV.day.key, status: 'new', address: L.address, danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies };
+    if (DM.Named) DM.Named.tag(hh);   // 0.55: about 1 in 12 is somebody's place (collector, prepper, pawn shop, hoarder)
+    SV.houses.push(hh);
   }
   const cache = new Map();
   const GV = 5;   // 0.26.10: more key spots (locked rooms, parked cars). 0.10: rarer key spots with prizes. 0.9: generator version for newly scouted houses (older houses keep the layout they were scouted with)
@@ -392,6 +394,7 @@ const NEXT_VERSION = '0.54.0';
         L.furn = L.furn.slice(); L.furn[i] = Object.assign({}, f, { extra: (f.extra || []).concat(D.pickCos([h.type], rnd)), noEmpty: 1 });
       }
     }
+    if (h.named && DM.Named && !h.daily) { L.furn = DM.Named.prepRun(h, L); setTimeout(() => toast(DM.Named.intro(h), 4), 900); }   // 0.55 named houses
     if (h.route && DM.Route) L.furn = DM.Route.prepRun(h, L);   // 0.21 route: an elite stop hides a guaranteed jackpot
     // 0.19: the gamestage is snapshotted on the house when the run starts and reused on resume, so a resumed run meets the
     // same zombies. A run started before 0.19 has none: it resumes at gamestage 0 (exactly the zombies it had). Tutorial: none.
@@ -1371,14 +1374,15 @@ const NEXT_VERSION = '0.54.0';
       if (!done && !far && h.type !== 'tutorial') { const HL = layoutOf(h); if (HL.car) tags.push('<b class="keytag">🔑 locked car</b>'); if (HL.keyRoom) tags.push(`<b class="keytag">🔑 locked room${HL.keyRoom.keyHere ? ' · key inside' : ''}</b>`);   // 0.8: brass-key spots (0.26.10: key inside)
         const ip = DM.Inf.plan(HL, h.gs != null ? h.gs : gstage), ni = ip.kinds.filter(Boolean).length, nz = (HL.zombies || []).length + ip.extra;   // 0.13: special infected (danger 3+)
         tags[1] = `${nz} zombie${nz === 1 ? '' : 's'}`; if (ni) tags.push(`<b class="inftag">☣ ${ni} special infected</b>`); }
-      if (h.route && !done && DM.Route) tags.push(DM.Route.tagHTML(h));   // 0.21 route: picked on the route map
-      return `<div class="hcard${done ? ' done' : ''}${h.type === 'tutorial' ? ' tut' : ''}${q ? ' quest' : ''}">
+      if (h.route && !done && DM.Route) tags.push(DM.Route.tagHTML(h));
+      const NM = h.named && DM.Named && DM.Named.KINDS[h.named]; if (NM && !done) tags.unshift(DM.Named.tagHTML(h));   // 0.55   // 0.21 route: picked on the route map
+      return `<div class="hcard${done ? ' done' : ''}${h.type === 'tutorial' ? ' tut' : ''}${q ? ' quest' : ''}${NM && !done ? ' named' : ''}"${NM ? ` style="--nc:${NM.c}"` : ''}>
         ${typeIcon(h.type)}
-        <div class="hinfo"><div class="hname">${T.n} <em>${T.size}</em>${h.landmark ? ` <em class="first lmk">${PIN}landmark</em>` : ''}${h.type === 'tutorial' ? ' <em class="first">first house</em>' : ''}${q ? ` <em class="first">quest: ${D.QUESTS[q.type].n.toLowerCase()}</em>` : ''}</div>
+        <div class="hinfo"><div class="hname">${NM ? esc(NM.n) : T.n} <em>${T.size}</em>${h.landmark ? ` <em class="first lmk">${PIN}landmark</em>` : ''}${h.type === 'tutorial' ? ' <em class="first">first house</em>' : ''}${q ? ` <em class="first">quest: ${D.QUESTS[q.type].n.toLowerCase()}</em>` : ''}</div>
           <div class="haddr">${esc(h.address)}</div>
           <div class="hmeta"><span class="danger">${SKULL.repeat(h.danger)}<span class="dim">${SKULL.repeat(5 - h.danger)}</span></span><span>${tags.join(' · ')}</span></div>
           <div class="hdays">${q ? (far ? `${Math.max(0, Math.ceil(q.away - ((SV.walked || 0) - q.base))).toLocaleString('en-US')} steps away` : q.done ? 'Job done - see Dot' : 'Reached · no rush') : done ? (h.status === 'auto' ? 'Crew searched' : 'Looted') : h.type === 'tutorial' ? 'Start here' : left <= 1 ? 'Gone tomorrow' : left + ' days left'}</div></div>
-        ${nqb && nqb.btn ? `<div class="hbtns">${nqb.btn}</div>` : done || far ? '' : q ? `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Go</button></div>` : `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Loot</button>${h.type === 'tutorial' ? '' : `<button class="mbtn ghost" data-auto="${h.id}">Crew</button>`}</div>`}
+        ${nqb && nqb.btn ? `<div class="hbtns">${nqb.btn}</div>` : done || far ? '' : q ? `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Go</button></div>` : `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Loot</button>${h.type === 'tutorial' || NM ? '' : `<button class="mbtn ghost" data-auto="${h.id}">Crew</button>`}</div>`}
       </div>`;
     }).join('');
     const find = id => id === 'tutorial' ? { id: 'tutorial', type: 'tutorial', seed: 0, status: 'new' } : SV.houses.find(h => h.id === id);
