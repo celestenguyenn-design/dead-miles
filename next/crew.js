@@ -399,6 +399,7 @@
       const dmg = (16 + 3 * lv) * (role === 'guard' ? 1.5 : 1);
       DM.House.hurtZombie(tgt, dmg, Math.atan2(tgt.y - e.y, tgt.x - e.x), true); SFX.play('swing');
     }
+    if (role === 'medic') { e.mt = (e.mt || 20) - dt; if (e.mt <= 0) { e.mt = 20; const all = (R.fighters || []).concat(R.mate ? [R.mate] : []).filter(x => !x.gone && x !== e && x.hp < x.maxHp * .7); const w = all.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0]; if (w && dist(w, e) < 6 * T) { w.hp = Math.min(w.maxHp, w.hp + 15 + 3 * lv); toast(`${e.m.name} patches up ${w.m.name}`, 1.4); } } }   // 0.46.2: medics heal the crew too
     if (role === 'medic' && !e.healed && p.hp > 0 && p.hp < DM.D.maxHp(DM.S) * .4) { e.healed = 1; p.hp = Math.min(DM.D.maxHp(DM.S), p.hp + 12 + 3 * lv); toast(`${e.m.name} patches you up (+${12 + 3 * lv} HP)`, 2); SFX.play('pick'); }
   }
   C.mateFind = () => R && R.mate && R.mate.m.role === 'scavenger' ? .1 + .02 * C.lv(R.mate.m) : 0;   // house.js: extra-find chance
@@ -518,6 +519,13 @@
       const s = R.stray, food = s.trust < .6 && hasFood();
       A(s, food ? 'Offer food' : 'Coax', `the ${s.pet.kind}`, () => coax(food), { dur: food ? .9 : 1.1, verb: 'coaxing', rect: { x: s.x - 22, y: s.y - 10, w: 44, h: 22 } });
     }
+    // 0.46.2 (owner: "is there no way to heal our crew when we take it out with us?"): walk up to a hurt companion or ally
+    // and patch them up with a bandage (+35 HP) or painkillers (+60) from your pack
+    for (const e of (R.fighters || []).concat(R.mate ? [R.mate] : [])) {
+      if (e.gone || e.hp >= e.maxHp || Math.hypot(e.x - g.p.x, e.y - g.p.y) > 1.6 * T) continue;
+      const k = g.pack.some(x => x.k === 'bandage') ? 'bandage' : g.pack.some(x => x.k === 'meds') ? 'meds' : null;
+      if (k) A(e, 'Patch up', `${e.m.name} (${D.ITEMS[k].n.toLowerCase()})`, () => { const i = g.pack.findIndex(x => x.k === k); if (i < 0) return; if (!--g.pack[i].n) g.pack.splice(i, 1); const h = k === 'meds' ? 60 : 35; e.hp = Math.min(e.maxHp, e.hp + h); SFX.play('pick'); toast(`${e.m.name} +${h} HP`, 1.4); }, { dur: .9, verb: 'patching up' });
+    }
     if (R.kind === 'base') for (const e of R.ents) {
       if (e.m) A(e, 'Talk', e.m.name, () => chat(e.m));
       else A(e, 'Pet', e.pet.name, () => { e.heart = 1.6; e.wait = 2; if (e.pet.kind === 'cat') meow(); else bark(); toast(`${e.pet.name} leans into the scratch`, 1.4); }, { verb: 'petting' });
@@ -613,6 +621,7 @@
           <span>${nx ? `Lv ${lv + 1}: ${Math.floor(m.xp)}/${nx}` : 'Max level'}</span><i class="cbar"><i style="width:${nx ? Math.min(100, (m.xp - LVX[lv - 1]) / (nx - LVX[lv - 1]) * 100) : 100}%"></i></i></div>
           <div class="cpast">${esc(m.name)} ${esc(m.past)}.${m.hungry ? ` <b class="bad">Hungry ${m.hungry} day${m.hungry > 1 ? 's' : ''}${m.hungry >= 2 ? ' - leaves tomorrow without food!' : ''}</b>` : ''}</div>
           ${m.mate ? '<span class="pactive">Comes along on runs</span> <button class="linkbtn" data-mate="">Leave at base</button>' : `<button class="mbtn sm ghost" data-mate="${m.id}">Take on runs</button>`}
+          ${m.hurt === dayNo() ? `<button class="mbtn sm ghost" data-heal="${m.id}">Patch up · 2 bandages</button>` : ''}
           <button class="linkbtn" data-dis="${m.id}">Dismiss</button></div></div>`; }).join('')
         : '<div class="empty">No crew yet. About 1 house in 25 has someone hiding in a closet or a secret room - more in mansions and police stations.</div>'}
       <div class="kick sect">Strays · ${pl.length}/${C.MAX_PETS}</div>
@@ -634,6 +643,7 @@
       const m = crew().find(x => x.id === b.dataset.dis); v.crew.list = v.crew.list.filter(x => x !== m); G().save(); toast(`${m.name} packs a bag and heads off. "Good luck."`, 2.2); C.openSheet();
     });
     // 0.37 (owner liked "companion on runs"): one crew member can follow her into houses and fight beside her
+    el.querySelectorAll('[data-heal]').forEach(b => b.onclick = () => { const m = crew().find(x => x.id === b.dataset.heal); if (!m) return; if (G().countItem('bandage') < 2) { toast('Needs 2 bandages (pack or stash)', 1.8); return; } G().takeItems('bandage', 2); m.hurt = 0; m.mood = Math.min(100, m.mood + 4); G().save(); SFX.play('pick'); toast(`${m.name} is patched up and ready`, 1.8); C.openSheet(); });   // 0.46.2
     el.querySelectorAll('[data-mate]').forEach(b => b.onclick = () => { for (const m of crew()) m.mate = !!b.dataset.mate && m.id === b.dataset.mate; G().save(); SFX.play('ui'); if (b.dataset.mate) toast(`${crew().find(m => m.mate).name} will come along on your runs`, 2); C.openSheet(); });
     el.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { for (const p of pets()) p.active = p.id === b.dataset.act; G().save(); SFX.play('ui'); C.openSheet(); });
     el.querySelectorAll('[data-ren]').forEach(b => b.onclick = () => { const p = pets().find(x => x.id === b.dataset.ren); renameSheet(p); });

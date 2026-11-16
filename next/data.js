@@ -149,7 +149,9 @@ window.DM = window.DM || {};
     shoes: { out: ['shoes', 1], in: { cloth: 3, tape: 1 }, n: 'Quiet shoes (footsteps -30%)' },
     lockset: { out: ['lockset', 1], in: { lockpick: 2, scrap: 2, tape: 1 }, n: 'Lockpick set (easier locks)' },
     prybar: { out: ['prybar', 1], in: { scrap: 5, tape: 1 }, n: 'Pry bar (quiet prying)' },
-    armor_pad: { out: ['armor_pad', 1], in: { cloth: 5, tape: 2 }, n: 'Padded jacket (armor, -10% damage)' },   // 0.28
+    armor_pad: { out: ['armor_pad', 1], in: { cloth: 5, tape: 2 }, n: 'Padded jacket (armor, -10% damage)' },   // 0.28; 0.46.2 everyone knows it
+    armor_sport: { out: ['armor_sport', 1], in: { cloth: 4, scrap: 4, tape: 3 }, n: 'Sports pads (armor, -15% damage)' },   // 0.46.2: blueprint
+    armor_riot: { out: ['armor_riot', 1], in: { scrap: 10, cloth: 4, tape: 4, nails: 10 }, n: 'Riot vest (armor, -25% damage)' },   // 0.46.2: blueprint
     bow: { out: ['bow', 1], in: { wood: 3, cloth: 2, tape: 1 }, n: 'Hunting bow' },   // 0.29.2: hunters know it from the start
     knuckles: { out: ['knuckles', 1], in: { scrap: 3, tape: 1 }, n: 'Brass knuckles' },   // 0.30: everyone knows it
     pipegun: { out: ['pipegun', 1], in: { scrap: 6, tape: 2, wood: 1 }, n: 'Pipe pistol (shoots 9mm)' },   // 0.42: everyone knows it
@@ -163,7 +165,7 @@ window.DM = window.DM || {};
     mod_scope: { out: ['mod_scope', 1], in: { scrap: 3, tape: 1, battery: 1 }, n: 'Scope (ranged mod)' },
     mod_silencer: { out: ['mod_silencer', 1], in: { scrap: 4, cloth: 2, tape: 1 }, n: 'Silencer (ranged mod)' },
   };
-  D.BASIC = ['bandage', 'lockpick', 'knuckles', 'mod_grip', 'mod_nails', 'pipegun', 'baton', 'bandage2'];
+  D.BASIC = ['bandage', 'lockpick', 'knuckles', 'mod_grip', 'mod_nails', 'pipegun', 'baton', 'bandage2', 'armor_pad'];
   // ---------------------------------------------------------------- 0.15: item categories (shown on pack / stash / loot cards)
   // owner: "inventory items should tell us 'materials' like for crafting or should be 'sold' - there's a lot of random shit like paperbacks"
   D.CATS = {
