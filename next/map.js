@@ -704,7 +704,7 @@ way[building]->.b;.b out skel geom qt;
     .mvnext em { flex: none; font-style: normal; font-size: 15px; font-weight: 900; color: var(--ora); }
     .mvfx { position: absolute; left: 10px; right: 10px; bottom: calc(118px + var(--sb, 0px)); z-index: 6; display: grid; gap: 4px; pointer-events: none; }
     .mvfx .fxl { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 10px; background: rgba(17,20,47,.88); border: 2px solid #3d2d61; font-size: 12px; color: #f6e3bb; }
-    .mvfx .fxl.hot { border-color: #f0c23d; } .mvfx .fxl span { color: #9d90bf; font-weight: 800; white-space: nowrap; }
+    .mvfx .fxl.hot { border-color: #f0c23d; } .mvfx .fxl.tap { pointer-events: auto; cursor: pointer; } .mvfx .fxl.tap:active { background: rgba(61,45,97,.95); } .mvfx .fxl span { color: #9d90bf; font-weight: 800; white-space: nowrap; }
     .mvfx .fxb { display: flex; gap: 6px; pointer-events: auto; } .mvfx .fxb button { flex: 1; padding: 6px 8px; border-radius: 10px; background: rgba(17,20,47,.88); border: 2px solid #5a4a86; color: #f6e3bb; font: 800 11px Inter, system-ui, sans-serif; }
     .mvpocket .pkline.fx { color: #b0a060; font-size: 14px; }
     .mvpocket { position: absolute; inset: 0; z-index: 30; display: none; place-items: center; background: #020208; color: #6a6090; touch-action: none; -webkit-user-select: none; user-select: none; }
@@ -842,12 +842,21 @@ way[building]->.b;.b out skel geom qt;
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmtD = d => d < 1000 ? Math.max(5, Math.round(d / 5) * 5) + ' m' : (d / 1000).toFixed(1) + ' km';
   // 0.29: the map's jobs (mapfx.js) under the card: what is out there, how far, how long; Dot's delivery; fog on/off
+  function focusOn(lat, lon, label) {
+    if (!O.set) return;
+    M.follow = false; $('#mvMe').classList.add('on');
+    M.cam.x = wx(lon); M.cam.y = wy(lat); M.ping = { lat, lon, t: performance.now() }; M.dirty = true;
+    DM.E.SFX && DM.E.SFX.play && DM.E.SFX.play('ui');
+    if (label) message('', ''), DM.E.toast && DM.E.toast(`${label} - tap the target button to come back to you`, 2.6);
+  }
   function renderFx() {
     const el = $('#mvFx'); if (!el || !DM.MapFX) return;
     const ls = DM.MapFX.lines(M.pos), off = DM.MapFX.canOffer();
     const key = JSON.stringify([ls, off, DM.MapFX.fogOn(), DM.MapFX.cells(), DM.MapQ && DM.MapQ.active()]); if (key === M.fxKey) return; M.fxKey = key;
-    el.innerHTML = ls.map(l => `<div class="fxl${l.hot ? ' hot' : ''}"><b>${esc(l.t)}</b><span>${esc(l.s)}</span></div>`).join('')
+    el.innerHTML = ls.map((l, i) => `<div class="fxl${l.hot ? ' hot' : ''}${l.lat != null ? ' tap' : ''}" data-fx="${i}"><b>${esc(l.t)}</b><span>${esc(l.s)}${l.lat != null ? ' ›' : ''}</span></div>`).join('')
       + `<div class="fxb">${DM.MapQ && DM.MapQ.active() ? '<button id="fxQuit">✕ Drop quest</button>' : ''}${off ? '<button id="fxDeliv">🚚 Dot\'s delivery</button>' : ''}<button id="fxFog">🌫️ Fog ${DM.MapFX.fogOn() ? 'on' : 'off'} · ${DM.MapFX.cells().toLocaleString('en-US')} cleared</button></div>`;
+    // 0.46.3 (owner: "if I click one of the quests ... it should show me where on the map"): tap a line -> the map flies there
+    el.querySelectorAll('[data-fx]').forEach(row => row.onclick = () => { const l = ls[+row.dataset.fx]; if (l && l.lat != null) focusOn(l.lat, l.lon, l.t); });
     const d = $('#fxDeliv'); if (d) d.onclick = () => { DM.MapFX.offer(M.pos); M.fxKey = ''; renderFx(); };
     { const q = $('#fxQuit'); if (q) { let sure = 0; q.onclick = () => { if (!sure) { sure = 1; q.textContent = 'Tap again to drop it'; return; } DM.MapQ.drop(); M.fxKey = ''; renderFx(); }; } }
     $('#fxFog').onclick = () => { DM.MapFX.toggleFog(); M.fxKey = ''; M.dirty = true; renderFx(); };
@@ -1189,7 +1198,8 @@ way[building]->.b;.b out skel geom qt;
       } else if (M.guess) { x.beginPath(); x.arc(px, py, Math.min(M.guess.acc * c.s, 400), 0, 6.2832); x.fillStyle = 'rgba(157,144,191,.08)'; x.fill(); }
     }
     drawPlaces(x, t, SX, SY);
-    if (DM.MapFX) DM.MapFX.drawMarks(x, t, SX, SY, wx, wy);   // 0.29: crates, air drops, radio calls, Dot's delivery
+    if (DM.MapFX) DM.MapFX.drawMarks(x, t, SX, SY, wx, wy);
+    if (M.ping) { const age = (performance.now() - M.ping.t) / 1000; if (age > 5) M.ping = null; else { const px = SX(wx(M.ping.lon)), py = SY(wy(M.ping.lat)) - 20; for (let k = 0; k < 2; k++) { const a = ((age * 1.4 + k * .5) % 1); x.beginPath(); x.arc(px, py, 18 + a * 46, 0, 6.3); x.strokeStyle = `rgba(240,123,60,${(1 - a) * .9})`; x.lineWidth = 4; x.stroke(); } } }   // 0.46.3: where you tapped   // 0.29: crates, air drops, radio calls, Dot's delivery
     // her: the game's own survivor sprite, walking when she moves
     if (P) {
       x.fillStyle = 'rgba(9,8,26,.55)'; x.beginPath(); x.ellipse(px, py + 1, 13, 4.5, 0, 0, 6.2832); x.fill();

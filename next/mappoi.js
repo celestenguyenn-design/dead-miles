@@ -120,7 +120,7 @@ window.DM = window.DM || {};
     if (!pos) return [];
     const s = st(); if (s.n >= DAY_CAP) return [{ t: '🗺️ Done exploring for today', s: 'new places tomorrow' }];
     const near = P.list().filter(p => !usedUp(p)).map(p => [p, dist(p, pos)]).sort((a, b) => a[1] - b[1])[0];
-    return near ? [{ t: `${KINDS[near[0].k].g} ${KINDS[near[0].k].n} · ${near[0].at}`, s: fmtD(near[1]) }] : [];
+    return near ? [{ t: `${KINDS[near[0].k].g} ${KINDS[near[0].k].n} · ${near[0].at}`, s: fmtD(near[1]), lat: near[0].lat, lon: near[0].lon }] : [];
   };
   P.drawMarks = function (x, t, SX, SY, wx, wy) {
     const mark = FX().mark; if (!mark) return;
