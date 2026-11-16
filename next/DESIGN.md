@@ -1029,6 +1029,11 @@ either more things to craft, more storage or stacks, and reduce certain drop per
   RULE OF THUMB for new loot: re-run the audit; a consumable should come out below what a day of play uses.
 - In-run backpack: weapon mods have "Fit (melee/ranged mod)".
 
+## Done in 0.44.2 (owner: "I'm in a deep run on the last house. I can't leave")
+- deep.js wayOut(): the FLOOR chip is tappable ("tap: way out" / "tap: get out"). Any floor: a toast with the direction
+  and distance to the stairwell. Last floor: a card - walk there, or Leave now (opens the usual fire-exit choice ->
+  Get out; loot goes to the stash as normal).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
