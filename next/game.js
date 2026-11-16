@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.46.1';
+const NEXT_VERSION = '0.46.2';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -53,7 +53,7 @@ const NEXT_VERSION = '0.46.1';
     v.walked = v.walked || 0;
     v.base = DM.Base.norm(v.base, v);       // phase 4: the base (pool, pieces, garden, decor)
     v.horde = DM.Base.normHorde(v.horde);   // phase 4: horde night (shifts, reports waiting to send, results)
-    if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); if (s.job === 'hunter' && !s.known.includes('bow')) s.known.push('bow'); /* 0.29.2: hunters can always make a bow */ if (!s.known.includes('knuckles')) s.known.push('knuckles'); /* 0.30 */ for (const r of ['mod_grip', 'mod_nails', 'pipegun', 'baton', 'bandage2']) if (!s.known.includes(r)) s.known.push(r); /* 0.36, 0.42 */ if (!v.stack42 && s.stash && s.pack) { D.mergeStacks(s.stash); D.mergeStacks(s.pack); v.stack42 = 1; } /* 0.42: bigger stacks - merge the old small ones once */ s.packBonus = s.packBonus || 0; }
+    if (v.survivor) { const s = v.survivor; s.look = ART.LOOK.norm(s.look); if (!s.known) s.known = D.BASIC.concat(s.job === 'hunter' ? ['arrow'] : []); if (s.job === 'hunter' && !s.known.includes('bow')) s.known.push('bow'); /* 0.29.2: hunters can always make a bow */ if (!s.known.includes('knuckles')) s.known.push('knuckles'); /* 0.30 */ for (const r of ['mod_grip', 'mod_nails', 'pipegun', 'baton', 'bandage2', 'armor_pad']) if (!s.known.includes(r)) s.known.push(r); /* 0.36, 0.42, 0.46.2 */ if (!v.stack42 && s.stash && s.pack) { D.mergeStacks(s.stash); D.mergeStacks(s.pack); v.stack42 = 1; } /* 0.42: bigger stacks - merge the old small ones once */ s.packBonus = s.packBonus || 0; }
     if (v.survivor) { D.mergeStacks(v.survivor.pack); D.mergeStacks(v.survivor.stash); }   // 0.26.3: bigger stacks - fold old ones together
     v.trader.event = v.trader.event || null;   // phase 5a: Dot's seasonal job chain { key, step, kills, base }
     v.tips = v.tips || {};                  // phase 5: first-time tips already shown

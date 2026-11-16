@@ -1077,6 +1077,13 @@ in my backpack it zooms my screen all the way to the top")
 - renderHome() now keeps #menu's scroll position on every redraw (renderHome0 is the old body).
 - Server cleanup: removed the zz-next-test-* parties and test accounts (they showed in the party list).
 
+## Done in 0.46.2 (owner: "I still don't see any armor to craft"; "no way to heal our crew when we take it out with us?")
+- Armor recipes: padded jacket is now known by everyone (BASIC + migrate); new blueprint recipes Sports pads (cloth 4,
+  scrap 4, tape 3) and Riot vest (scrap 10, cloth 4, tape 4, nails 10).
+- crew.js: walk up to a hurt companion / ally in a fight -> "Patch up" with a bandage (+35) or painkillers (+60) from the
+  pack; medics heal the most-hurt crew mate nearby every 20 s; at home a member who fell back hurt can be patched up
+  with 2 bandages (crew sheet) to fight again today.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
