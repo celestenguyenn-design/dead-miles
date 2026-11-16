@@ -96,6 +96,28 @@ window.DM = window.DM || {};
     return out;
   };
 
+  // 0.46 camps (camps.js): a garrison that holds the camp. They stand guard inside, never loot, never run, wake their
+  // friends when one spots her, and do not give up the chase. spec = { n, hpMul, dmgMul, leader: { hp, name } }
+  R.spawnCamp = function (spec) {
+    const G = H.G(), L = H.L(), t = T(), street = H.street();
+    G.raid = G.raid || { n: 0, kinds: [], wpn: [], looks: [], at: 0, pct: 0, on: false, ents: [] };
+    const spots = G.furn.filter(f => f.room && f.room !== street && !f.secretLoot && !f.keyRoom && !(L.rooms[f.room] && (L.rooms[f.room].hidden || L.rooms[f.room].isolated)));
+    for (let i = spots.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [spots[i], spots[j]] = [spots[j], spots[i]]; }
+    const looks = [0, 1, 2, 3]; R.ensureRigs({ looks });
+    const out = [];
+    for (let i = 0; i < spec.n; i++) {
+      const f = spots[i % Math.max(1, spots.length)]; if (!f) break;
+      const gun = i % 3 === 2, lead = spec.leader && i === 0, K = R.KINDS[gun ? 'gunner' : 'brute'];
+      let x = (f.tx + (f.tw || 1) / 2) * t, y = (f.ty + (f.th || 1) + .5) * t;
+      if (H.hit({ hw: 12, hh: 8 }, x, y)) y = (f.ty - .5) * t;
+      const z = H.mk(x, y, 'guard', f.room), hp = Math.round((lead ? spec.leader.hp : K.hp) * (spec.hpMul || 1));
+      Object.assign(z, { raider: 1, camp: 1, rk: gun ? 'gunner' : 'brute', wpn: gun ? 'pistol' : lead ? 'axe' : MELEE[i % MELEE.length], look: i % 4, hp, maxHp: hp, bag: [], looted: 0, maxLoot: 0,
+        delay: 0, thinkT: Math.random() * .3, lostT: 0, aggro: 0, fled: 0, flip: Math.random() < .5, fx: 0, fy: 1, seen: 0, dmgMul: (spec.dmgMul || 1) * (lead ? 1.4 : 1), leader: lead ? spec.leader.name : null, scale: lead ? 1.15 : 1 });
+      G.zs.push(z); out.push(z);
+    }
+    G.raid.on = true; G.raid.ents = out; G.raid.t0 = G.t; G.raid.camp = 1;
+    return out;
+  };
   // ---- containers they go for: unsearched, unlocked, ordinary rooms (never secrets, locked rooms, cars)
   function targets(G, L) {
     const p = G.p, cur = p.search && p.search.it && p.search.it.obj;
@@ -187,15 +209,21 @@ window.DM = window.DM || {};
       if (seesPlayer(z)) {
         if (!z.aggro) { z.alertT = 1.1; if (!G.raid.spotted) { G.raid.spotted = 1; H.toast('A raider spotted you!', 1.6); } }
         z.aggro = 1; z.lastSeen = { x: p.x, y: p.y }; z.lostT = 0; z.seen = 1;
+        if (z.camp) for (const o of G.zs) if (o.camp && !o.dead && !o.aggro && Math.hypot(o.x - z.x, o.y - z.y) < 7 * t) { o.aggro = 1; o.lastSeen = { x: p.x, y: p.y }; }   // 0.46: the camp wakes up
       }
       pokeZombies(z);
     }
-    if (!z.fled && z.hp <= z.maxHp * .3 && !busy) {
+    if (!z.fled && !z.camp && z.hp <= z.maxHp * .3 && !busy) {
       z.fled = 1; z.st = 'flee'; z.stT = 0; release(z); z.path = null; z.alertT = 1;
       H.toast('A raider is running for the door!', 1.6);
     }
     const tgt = () => (alive(z.zt) ? z.zt : z.aggro && p.st !== 'down' ? p : null);
     switch (z.st) {
+      case 'guard': {   // 0.46 camps: hold position until she shows up
+        if (tgt()) { z.st = 'fight'; z.stT = 0; z.path = null; break; }
+        if (z.aggro && z.lastSeen) { const d = stepTo(z, Math.floor(z.lastSeen.x / t), Math.floor(z.lastSeen.y / t), z.lastSeen.x, z.lastSeen.y); if (d) { spd = K.walk * t; vx = d.x; vy = d.y; face(z, vx); } }
+        break;
+      }
       case 'goto': {
         if (tgt()) { release(z); z.st = 'fight'; z.stT = 0; break; }
         if (!z.goal || z.goal.f.searched) { if (!pickTarget(z)) { z.st = 'leave'; z.path = null; break; } }
@@ -230,11 +258,11 @@ window.DM = window.DM || {};
       }
       case 'fight': {
         const tg = tgt();
-        if (!tg) { z.st = z.looted >= z.maxLoot ? 'leave' : 'goto'; z.stT = 0; z.path = null; break; }
+        if (!tg) { z.st = z.camp ? 'guard' : z.looted >= z.maxLoot ? 'leave' : 'goto'; z.stT = 0; z.path = null; break; }
         const dx = tg.x - z.x, dy = tg.y - z.y, d = Math.hypot(dx, dy), see = H.los(z.x, z.y - 30, tg.x, tg.y - 30);
         if (tg === p) {
           if (!see) z.lostT += dt; else z.lostT = 0;
-          if (z.lostT > 5) { z.aggro = 0; z.lostT = 0; z.st = 'goto'; z.stT = 0; break; }
+          if (z.lostT > 5) { if (z.camp) { z.lostT = 0; } else { z.aggro = 0; z.lostT = 0; z.st = 'goto'; z.stT = 0; break; } }   // 0.46: a camp does not forget her
         }
         face(z, dx);
         if (z.rk === 'gunner' && tg === p && d > 1.6 * t) {
@@ -414,6 +442,8 @@ window.DM = window.DM || {};
       ctx.save(); ctx.globalAlpha = lock ? .65 + .3 * Math.sin(G.t * 40) : .35; ctx.strokeStyle = '#ff5a48'; ctx.lineWidth = lock ? 3 : 2; ctx.setLineDash(lock ? [] : [8, 6]);
       ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + dx / d * len, sy + dy / d * len); ctx.stroke(); ctx.restore();
     }
+    if (z.leader) { ctx.save(); ctx.font = '900 12px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#11142f'; ctx.strokeText('☠ ' + z.leader, z.x, z.y - 118); ctx.fillStyle = '#ff8a7a'; ctx.fillText('☠ ' + z.leader, z.x, z.y - 118);
+      const w = 50; ctx.fillStyle = '#11142f'; ctx.fillRect(z.x - w / 2 - 1, z.y - 113, w + 2, 6); ctx.fillStyle = '#ff6b5a'; ctx.fillRect(z.x - w / 2, z.y - 112, w * Math.max(0, z.hp / z.maxHp), 4); ctx.restore(); }   // 0.46: the camp leader
     if (z.alertT > 0 || z.st === 'windup' || z.st === 'aim') {
       const red = z.st === 'windup' || z.st === 'aim', x = z.x, y = z.y - 104, sc = red ? 1 + Math.sin(G.t * 30) * .08 : 1;
       ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);

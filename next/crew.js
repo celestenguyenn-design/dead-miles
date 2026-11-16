@@ -301,6 +301,8 @@
     if (R.kind === 'house' && !R.extra.noMate) { const m = crew().find(x => x.mate && !x.hungry && x.hurt !== dayNo()); if (m) { C.ensureRig(m.id, m.look); R.mate = Object.assign({ m, x: p.x + 30, y: p.y + 8, vx: 0, vy: 0, hw: 10, hh: 7, ph: 0, flip: false, cd: 1, swing: 0, healed: 0 }, fhp(m)); } }
     // 0.42.1 (owner: "my crew members were useless during horde night, they weren't there"): on watch shifts and base raids
     // every fed crew member is out in the yard fighting
+    // 0.46 camp raids: party mates rallied at the camp fight beside her (AI, with their name over their head)
+    if (R.extra.allies && R.extra.allies.length) { R.fighters = R.fighters || []; R.extra.allies.forEach((a, i) => { const nm = newMember(D.hashStr('ally:' + a.handle)), m = { id: 'ally_' + a.handle, name: a.name, look: nm.look, role: 'guard', xp: LVX[Math.min(4, Math.max(0, Math.floor((a.level || 1) / 4)))] || 0, ally: 1 }; C.ensureRig(m.id, m.look); R.fighters.push(Object.assign(fhp(m), { m, x: p.x + (i % 2 ? 36 : -36), y: p.y + 24 + i * 6, vx: 0, vy: 0, hw: 10, hh: 7, ph: 0, flip: false, cd: .8 + i * .2, swing: 0, healed: 1, roam: 1 })); }); }
     if (R.kind === 'shift') { R.fighters = crew().filter(m => !m.hungry && m.hurt !== dayNo()).map((m, i) => { C.ensureRig(m.id, m.look); return Object.assign(fhp(m), { m, x: p.x + (i % 2 ? 40 : -40) + (i >> 1) * 30, y: p.y + 20, vx: 0, vy: 0, hw: 10, hh: 7, ph: 0, flip: false, cd: 1 + i * .3, swing: 0, healed: 0, roam: 1 }); }); }
     if (R.npcSpec) {
       const f = g.furn[R.npcSpec.fi];
@@ -370,7 +372,7 @@
   function hurtMate(e, g) {
     e.hitT -= g.dtLast || .016; e.flash = Math.max(0, e.flash - (g.dtLast || .016) * 3);
     if (e.hitT > 0) return;
-    const z = g.zs.find(z => !z.dead && !z.raider && z.st !== 'sleep' && z.st !== 'idle' && z.st !== 'rise' && dist(z, e) < .85 * T);
+    const z = g.zs.find(z => !z.dead && (!z.raider || (z.camp && z.aggro)) && z.st !== 'sleep' && z.st !== 'idle' && z.st !== 'rise' && z.st !== 'guard' && dist(z, e) < .85 * T);
     if (!z) { e.hitT = .3; return; }
     e.hitT = 1.2; e.hp -= Math.round(9 * (z.dmgMul || 1)); e.flash = 1; SFX.play('hurt');
     if (e.hp <= 0) {
@@ -384,7 +386,7 @@
     g.dtLast = dt; hurtMate(e, g); if (e.gone) return;
     e.cd = Math.max(0, e.cd - dt); e.swing = Math.max(0, e.swing - dt);
     let tgt = null, bd = 1e9;
-    for (const z of g.zs) { if (z.dead || z.raider || (z.st === 'rise' && z.stT < .3) || z.st === 'sleep') continue; const dz = dist(z, e); if (dz < bd && (dz < 1.6 * T || dist(z, p) < 4 * T || (e.roam && dz < 7 * T))) { bd = dz; tgt = z; } }
+    for (const z of g.zs) { if (z.dead || (z.raider && !z.camp) || (z.st === 'rise' && z.stT < .3) || z.st === 'sleep') continue; const dz = dist(z, e); if (dz < bd && (dz < 1.6 * T || dist(z, p) < 4 * T || (e.roam && dz < 7 * T))) { bd = dz; tgt = z; } }
     const d = dist(e, p);
     if (e.roam && tgt && dist(tgt, e) > 1.1 * T) { walkTo(e, tgt.x, tgt.y, 2.4 * T, dt); }   // shift / raid: go after anything in the yard
     else

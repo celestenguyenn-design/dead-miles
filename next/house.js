@@ -39,7 +39,7 @@
   const extraChance = () => .04 * (scavLvl() - 1) + (job() === 'scavenger' ? .1 : 0) + SK.extraFind() + (DM.Crew && DM.Crew.mateFind ? DM.Crew.mateFind() : 0) + wxB().find;   // 0.37: a scavenger companion; 0.39 weather / night
   // 0.39 weather / night bonus for this run (none in the daily house, the base, or boss fights)
   const wxB = () => (G && G.wxb) || { xp: 1, find: 0, zhp: 1, zsight: 1 };
-  const packSlots = () => 12 + (S().packBonus || 0) + SK.packBonus();   // 0.13: Pack rat is a Scavenging rank
+  const packSlots = () => 12 + (S().packBonus || 0) + (S().warPack || 0) + SK.packBonus();   // 0.46: + War chest slots   // 0.13: Pack rat is a Scavenging rank
   const keen = () => SK.keen();                                         // 0.13: Keen eye is a Scavenging rank
   const gatePct = () => job() === 'scavenger' ? .65 : .75;
   const LOCK_EASE = () => (job() === 'thief' ? 1.6 : 1) * (S().lockset ? 1.25 : 1) * SK.lockWide();   // the Thief job widens sweet spots
@@ -133,6 +133,7 @@
     if (bs) { const bz = mkZombie(bs.x * T, bs.y * T, 'idle', bs.where === 'yard' ? streetRoom() : null); Object.assign(bz, { kind: bs.kind, hp: bs.hp, maxHp: bs.hp, boss: 1 }, bs.props); G.zs.push(bz); }
     if (opts.resume) restoreRun(opts.resume);
     buildWalls(); buildSolid();
+    if (opts.camp && RA && !opts.resume) RA.spawnCamp(opts.camp);   // 0.46: a camp's garrison (camps.js)
     spawnInfected(houseZs);
     houseZs.forEach((z, i) => { z.zi = i; });   // 0.18: a stable index (seeded corpse loot, dead-on-resume for the daily house)
     if (G.dly && opts.resume && Array.isArray(opts.resume.zd)) G.zs = G.zs.filter(z => z.zi == null || !opts.resume.zd.includes(z.zi));
@@ -1271,6 +1272,7 @@
     }
     updateArrows(dt);
     if (RA) RA.updateShots(dt);
+    if (G.raid && G.raid.camp && !G.campWon && G.raid.ents.length && G.raid.ents.every(z => z.dead)) { G.campWon = 1; if (opts.onCampWin) opts.onCampWin(); }   // 0.46
     updateClouds(dt);
     // the third zombie wanders in from the street
     if (!G.z3 && L.wanderer !== false && (G.t > (L.wandererT || 70) || (G.stats.searched >= 9 && G.t > 35))) {

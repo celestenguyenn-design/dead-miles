@@ -47,6 +47,7 @@ window.DM = window.DM || {};
     { id: 'samaritan', t: 'Good Samaritan', d: 'Finish 5 map quests.', v: () => (DM.MapQ && DM.MapQ._st ? DM.MapQ._st().total : 0) || 0, need: 5, caps: 60 },
     { id: 'coast', t: 'Signal Keeper', d: 'Finish the 3-day story "The Coast Signal" (map quests).', v: () => ((DM.MapQ && DM.MapQ._st().story) || {}).coast || 0, need: 3, caps: 80 },
     { id: 'courier', t: 'Courier\'s Friend', d: 'Finish the legendary Courier\'s long delivery.', v: () => (DM.MapQ && DM.MapQ._st().legDone) || 0, need: 1, caps: 80 },
+    { id: 'governor', t: 'The Governor', d: 'Take 5 camps (map raids).', v: () => st().flags.camps || 0, need: 5, caps: 120 },
     { id: 'cat', t: 'Cat Whisperer', d: 'Share a snack with the bodega cat (map encounter).', v: () => st().flags.cat || 0, need: 1, caps: 20 },
     { id: 'drip', t: 'Fashionista', d: 'Own 15 cosmetics.', v: cosOwned, need: 15, caps: 50 },
     { id: 'arch', t: 'Architect', d: 'Build 10 tiers of base pieces.', v: built, need: 10, caps: 60 },
