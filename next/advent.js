@@ -46,7 +46,7 @@ window.DM = window.DM || {};
     if (n === 18) return { caps: 60, items: [['bp_*', 1], ['meds', 2]] };
     if (n === 12) return { caps: 40, items: [['xlights', 1], ['battery', 2]] };
     if (n === 6) return { caps: 30, tokens: 1, items: [['candy', 4]] };
-    const small = [[['candy', 3]], [['gift', 1]], [['meds', 1], ['bandage', 2]], [['ammo', 10]], [['shells', 6]], [['battery', 2], ['tape', 1]], [['beans', 2], ['water', 2]], [['lockpick', 3]], [['d_lights', 1]], [['coffee', 2], ['snack', 2]]];
+    const small = [[['candy', 3]], [['gift', 1]], [['meds', 1], ['bandage', 2]], [['ammo', 6]], [['shells', 6]], [['battery', 2], ['tape', 1]], [['beans', 2], ['water', 2]], [['lockpick', 3]], [['d_lights', 1]], [['coffee', 2], ['snack', 2]]];
     const p = { caps: 10 + Math.floor(r() * 4) * 5, items: pick(small) };
     if (r() < .2) p.tokens = 1;
     return p;

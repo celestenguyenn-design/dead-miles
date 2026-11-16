@@ -1020,6 +1020,15 @@ either more things to craft, more storage or stacks, and reduce certain drop per
   there first from any loot / reward / stash transfer (give, toStash, house addToPack), counted by countItem/takeItems.
   Gear > Equipped has an Ammo pouch card (fill from stash/pack, put in stash). Old pack ammo moves in on load.
 
+## Done in 0.44.1 (owner: "there's sooo much 9mm ammo. Please check when things are too much of an abundance")
+- Measured with a 60-house simulation (layoutOf + toStacks over every container; scratch audit.js): per house, before ->
+  after: 9mm 6.6 -> 1.5, painkillers 1.5 -> 0.7, batteries 1.9 -> 1.3, nails 3.4 -> 1.7 (cloth ~2, scrap ~1.9 kept:
+  crafting staples). Changes: 9mm 2-5 a find (was 4-12), shells 1-3, nails 2-5; LOOT weights 9mm x0.35, meds x0.3,
+  batteries x0.42, nails x0.75 (cut weight -> empty draw); no container guarantees 9mm or painkillers any more.
+  Smaller 9mm rewards: Dot (10 for 3 caps, rarer), NPC bonus 6, radio call 6, advent 6, weapons cache 5.
+  RULE OF THUMB for new loot: re-run the audit; a consumable should come out below what a day of play uses.
+- In-run backpack: weapon mods have "Fit (melee/ranged mod)".
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
