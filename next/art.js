@@ -551,6 +551,9 @@ const ART = (() => {
     ring: `<ellipse cx="0" cy="6" rx="18" ry="14" fill="none" stroke="#11142f" stroke-width="9"/><ellipse cx="0" cy="6" rx="18" ry="14" fill="none" stroke="#e0b94a" stroke-width="5"/>
       <path d="M-8,-10 L0,-20 L8,-10 L0,-4 Z" fill="#9fe0e6" stroke="#11142f" stroke-width="2.4" stroke-linejoin="round"/>`,
   });
+  Object.assign(EXTRA_ICONS, {   // 0.47: walking caches (a strapped crate with the distance on it)
+    ...Object.fromEntries([['cache2', '2', '#93a86c'], ['cache5', '5', '#5ab4ff'], ['cache10', '10', '#ffd23c']].map(([k, t, c]) => [k, `<g stroke="#11142f" stroke-width="2.6" stroke-linejoin="round"><rect x="-26" y="-18" width="52" height="38" rx="5" fill="#8a5a34"/><rect x="-26" y="-18" width="52" height="10" fill="#a8703f"/><rect x="-4" y="-18" width="8" height="38" fill="${c}"/><circle cx="0" cy="6" r="13" fill="#11142f"/><text x="0" y="11" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-weight="900" font-size="${t.length > 1 ? 13 : 16}" fill="${c}" stroke="none">${t}</text></g>`])),
+  });
   Object.assign(EXTRA_ICONS, {   // 0.36: weapon mods
     mod_grip: `<g transform="rotate(-35)" stroke="#11142f" stroke-width="2.6"><rect x="-8" y="-28" width="16" height="56" rx="6" fill="#5a4a86"/>${[-18, -6, 6, 18].map(y => `<path d="M-8,${y - 4} L8,${y + 4}" stroke="#b98cf0" stroke-width="3"/>`).join('')}</g>`,
     mod_nails: `<g stroke="#11142f" stroke-width="2.4">${[[-16, -8], [0, -14], [16, -8], [-8, 8], [8, 8]].map(([x, y]) => `<g transform="translate(${x} ${y}) rotate(${x})"><rect x="-2.5" y="-12" width="5" height="22" fill="#b9bdcc"/><rect x="-6" y="-14" width="12" height="4" rx="1.5" fill="#9aa0b4"/></g>`).join('')}</g>`,

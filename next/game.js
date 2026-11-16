@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.46.4';
+const NEXT_VERSION = '0.47.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1208,6 +1208,7 @@ const NEXT_VERSION = '0.46.4';
   function renderHome() { const m = $('#menu'), y = m ? m.scrollTop : 0; renderHome0(); if (m && y) { m.scrollTop = y; requestAnimationFrame(() => { m.scrollTop = y; }); } }   // 0.46.1: a redraw keeps the scroll position
   function renderHome0() {
     if (!SV || !SV.survivor || DM.scene) return;
+    if (DM.WalkFX) DM.WalkFX.tick();   // 0.47: walk finds, gear upkeep, walking caches
     if (DM.Title && DM.Title.up) return;   // 0.22: the title screen is still up; its tap boots the home (no tips under it)
     rollDay();
     foodTick();
@@ -1241,6 +1242,7 @@ const NEXT_VERSION = '0.46.4';
           ${IS_IOS && window.NET && NET.ok ? '<button class="mbtn sm" id="mSyncNow" style="width:100%;margin:8px 0 0">Sync my steps now</button>' : ''}
         </div>
       </div>
+      ${SV.tutorialDone && DM.WalkFX ? DM.WalkFX.reportHTML() : ''}
       ${SV.tutorialDone ? guideCard() : ''}
       ${gated ? homeTiles() : eventBanner()}
       <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Walks && unl('walks') ? `<button data-t="walks">Walks${DM.Walks.claimable() && curTab !== 'walks' ? '<i class="tbadge">!</i>' : ''}</button>` : ''}${SV.tutorialDone && DM.Gacha && unl('gacha') ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA && unl('event') ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}<button data-t="help" class="helptab" aria-label="Help for this tab">?</button></div>
@@ -1462,6 +1464,7 @@ const NEXT_VERSION = '0.46.4';
     return `<div class="gdcard"><div class="gdhead"><span class="kick">What to do next</span><button class="gdx" id="gdHide" aria-label="Hide">Hide</button></div>${st.map((x, i) => `<button class="gdrow" data-gd="${x.k}"><i>${i + 1}</i><span><b>${esc(x.t)}</b><em>${esc(x.sub)}</em></span><u>›</u></button>`).join('')}</div>`;
   }
   function bindGuide() {
+    if (DM.WalkFX) DM.WalkFX.bindReport(() => renderHome());
     const h = $('#gdHide'); if (h) h.onclick = () => { SV.guideOff = 1; Game.save(); renderHome(); };
     const sh = $('#gdShow'); if (sh) sh.onclick = () => { SV.guideOff = 0; Game.save(); renderHome(); };
     document.querySelectorAll('[data-gd]').forEach(b => b.onclick = () => {
@@ -1494,6 +1497,7 @@ const NEXT_VERSION = '0.46.4';
     }
     if (DM.Advent && SV.tutorialDone) { const at = DM.Advent.tile(); if (at) t.unshift(at); }   // 0.32: December 1-24
     if (BS.raidTile && SV.tutorialDone) { const rt = BS.raidTile(); if (rt) t.unshift(rt); }   // 0.33: base raids
+    if (DM.WalkFX) { const wc = DM.WalkFX.tile(); if (wc) t.unshift(wc); }   // 0.47: walking caches
     if (DM.Camps && SV.tutorialDone) { const cp = DM.Camps.tile(); if (cp) t.push(cp); }   // 0.46: camps
     if (DM.Social && SV.tutorialDone) { const so = DM.Social.tile(); if (so) t.push(so); }   // 0.40: party walk + friends race
     if (DM.Gifts) DM.Gifts.check();   // 0.41: gifts from friends land in the stash
@@ -1507,14 +1511,15 @@ const NEXT_VERSION = '0.46.4';
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
     cardSheet = k;
-    const html = k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
+    const html = k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
     sheetOpen(`<div class="cardsheet" data-cs="${k}">${html}</div><button class="mbtn ghost" id="csDone">Close</button>`);
     const el = $('#msheet'), root = el.querySelector('.cardsheet');
     el.onclick = e => { if (e.target === el) closeCardSheet(); };
     $('#csDone').onclick = () => { SFX.play('ui'); closeCardSheet(); };
     // actions that leave the menu (a fight, a shift, back into a run) close the sheet first
     root.addEventListener('click', e => { if (e.target.closest('[data-boss="go"],[data-deep="resume"],#hShift')) { cardSheet = null; sheetClose(); } }, true);
-    if (k === 'camps') { const w = root.querySelector('.cpwrap'), re = () => { w.innerHTML = DM.Camps.html(); DM.Camps.bind(w, re); }; DM.Camps.bind(w, re); }
+    if (k === 'caches') DM.WalkFX.bindCaches(root);
+    else if (k === 'camps') { const w = root.querySelector('.cpwrap'), re = () => { w.innerHTML = DM.Camps.html(); DM.Camps.bind(w, re); }; DM.Camps.bind(w, re); }
     else if (k === 'social') { publish(); const w = root.querySelector('.sowrap'), re = () => { w.innerHTML = DM.Social.html(); DM.Social.bind(w, re); }; DM.Social.bind(w, re); }
     else if (k === 'codex') DM.Codex.bind(root.querySelector('.cxwrap'));
     else if (k === 'raid') { const g = root.querySelector('#raidGo'); if (g) g.onclick = () => { SFX.play('ui'); cardSheet = null; sheetClose(); BS.raidDefend(); }; else { BS.raidSeen(); } }
@@ -1835,6 +1840,8 @@ const NEXT_VERSION = '0.46.4';
       for (const x of stacks) { const left = give(x.k, x.n, x.d, x.q); if (left) lost.push({ k: x.k, n: left }); }
       done(); showResult('Gift box', stacks, lost, 'Somebody wrapped this before it all went bad. It went into your pack (the stash if the pack is full).', 'Opened');
     }, 'big']);
+    // 0.47: a walking cache goes in the cache bag; steps open it
+    if (it.wcache && (sel.from === 'pack' || sel.from === 'stash') && DM.WalkFX) btns.push([`Walk it open · ${(it.wcache).toLocaleString('en-US')} steps`, () => { if (DM.WalkFX.bagIt(e, s[sel.from])) done(); }, 'big']);
     // 0.41: gift it to a friend (gifts.js; signed-in players)
     if ((sel.from === 'pack' || sel.from === 'stash') && !it.quest && DM.Gifts && DM.Gifts.can()) { const list = s[sel.from]; btns.push(['🎁 Gift to a friend', () => { sel = null; itemPop(null); DM.Gifts.open(e, list, () => reHost()); }]); }
     // 0.24.5 (owner: "make a discard button so we don't have to drop it"): throw it away from the pack or the stash, tap twice

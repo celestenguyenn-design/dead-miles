@@ -1096,6 +1096,17 @@ in my backpack it zooms my screen all the way to the top")
   tier whose max fits it back. The owner's cloud save showed the axe as { d: 80, no q } = exactly a Masterwork axe's max.
   RULE: anything that moves weapon stacks must carry d AND q.
 
+## Done in 0.47.0 (owner: "build the unbuilt stuff" + "walking caches") - walkfx.js (DM.WalkFX), runs off SV.walked
+- Walk report: every 1,000 steps a find (weighted FINDS table: junk / supplies, rarely a 2 km cache, a blueprint, a 5 km
+  cache) straight to the stash, max 12 a day; "On your walk" card on home until OK. mark starts at the current total.
+- Gear upkeep: every 1,500 steps the weapon in hand and the worn armor get 4% of their max durability back.
+- Walking caches cache2/5/10 (2,600 / 6,500 / 13,000 steps): loot in safes, attics, caches, locked rooms, wall caches,
+  armories; map crates 20% (2 km), air drops 50% (5 km). Item popup "Walk it open" -> cache bag (2 slots); steps open
+  them; "Walking caches" home tile -> Open: rolls (storage+crate / hordecrate+cache / 2 hordecrate+safe+blueprint), caps,
+  token chance, 10 km 30% Masterwork weapon.
+- Still to build from the 2026-11-16 list: daily step bounties, escorts, neighbourhood stamps, power walk, the journal
+  (page-turn animation + sound).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
