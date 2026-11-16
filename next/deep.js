@@ -318,9 +318,27 @@
     const bz = bossZ && !bossZ.dead && L.deep.chest && g.visited[L.deep.chest.r] ? bossZ : null;   // the boss bar once its room has been seen
     const k = r.f + '|' + (bz ? Math.ceil(bz.hp) : '') + '|' + r.bossDead;
     if (k === lastChip) return; lastChip = k;
-    $('#deepchip').innerHTML = `<b>FLOOR ${r.f}/${n}</b><span>${esc(m.n)}</span>${bz ? `<i class="bbar sm"><i style="width:${Math.max(0, bz.hp / bz.maxHp * 100)}%"></i></i><em>${esc(B.boss.name)}</em>` : ''}`;
+    $('#deepchip').innerHTML = `<b>FLOOR ${r.f}/${n}</b><span>${esc(m.n)}</span><u class="dway">${r.f === n ? 'tap: get out' : 'tap: way out'}</u>${bz ? `<i class="bbar sm"><i style="width:${Math.max(0, bz.hp / bz.maxHp * 100)}%"></i></i><em>${esc(B.boss.name)}</em>` : ''}`;
     $('#deepchip').style.setProperty('--dc', B.col);
   }
+  // 0.44.2 (owner: "I'm in a deep run on the last house. I can't leave"): tap the floor chip - it says which way and how
+  // far the stairs / fire exit are; on the last floor it also offers to leave right away (the run is over anyway)
+  function wayOut() {
+    const r = run(), g = H().G; if (!r || !L || !g || g.over || cardOn) return;
+    const s = L.deep.stair, dx = (s.x + .5) * T - g.p.x, dy = (s.y + .5) * T - g.p.y, d = Math.round(Math.hypot(dx, dy) / T);
+    const dir = ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'][((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8];
+    const last = r.f === N(r);
+    SFX.play('ui'); g.exitPing = 4;
+    if (!last) { toast(d < 2 ? 'The stairs are right here' : `The stairs: about ${d} steps ${dir} (look for the green glow)`, 3); return; }
+    cardOn = true; H().pause(true);
+    $('#cardBody').innerHTML = `<div class="deepchoice" style="--dc:${DP.B[r.b].col}"><div class="kick">Last floor</div><h2>Head for the exit?</h2>
+      <p>The fire exit is about ${d} steps ${dir}${r.bossDead ? '' : ' - the boss and its supply chest are still in there'}.</p>
+      <div class="btnrow"><button id="dWalk" class="ghost">I'll walk there</button><button id="dLeave">Leave now</button></div></div>`;
+    $('#card').classList.add('on');
+    $('#dWalk').onclick = () => { $('#card').classList.remove('on'); cardOn = false; H().pause(false); };
+    $('#dLeave').onclick = () => { $('#card').classList.remove('on'); cardOn = false; H().pause(false); showChoice('stairs'); };
+  }
+  document.addEventListener('click', ev => { if (ev.target.closest && ev.target.closest('#deepchip')) wayOut(); });
   // the stairwell (a hole with steps going down) and its green EXIT glow; drawn on the floor, so fog hides it until found
   function drawUnder(c, g) {
     if (!L || !L.deep) return;
