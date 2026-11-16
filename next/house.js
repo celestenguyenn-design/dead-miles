@@ -128,6 +128,11 @@
       if (zd.sleep) { z.sleep = zd.sleep; const sf = G.furn.find(f => f.fid === zd.sleep.furn); if (sf) sf.bedOf = z; }
       G.zs.push(z); houseZs.push(z);
     }
+    // 0.54 (owner: "zombies should also be harder"): higher gamestage = up to 3 extra zombies, next to ones already there (seeded, so a resumed run matches)
+    if (!G.dly && L.type !== 'base' && !opts.camp && houseZs.length) {
+      const ex = Math.floor(gsFx().t * 3.4), r = D.mulberry32(((L.seed || 7) * 31 + 5) >>> 0);
+      for (let i = 0; i < ex; i++) { const o = houseZs[Math.floor(r() * houseZs.length)], z = mkZombie(o.x + (r() - .5) * T * .8, o.y + (r() - .5) * T * .6, 'idle', null); G.zs.push(z); houseZs.push(z); }
+    }
     // the event mini-boss (zombie turkey, Krampus walker) in about 1 in 3 yards / kitchens
     const bs = EVS && !opts.noBoss ? EVS.bossFor(L) : null;
     if (bs) { const bz = mkZombie(bs.x * T, bs.y * T, 'idle', bs.where === 'yard' ? streetRoom() : null); Object.assign(bz, { kind: bs.kind, hp: bs.hp, maxHp: bs.hp, boss: 1 }, bs.props); G.zs.push(bz); }
@@ -1011,6 +1016,7 @@
   function hitZombie(z, fa, base = 34, ranged, by) {
     const sneak = !by && (z.st === 'sleep' || z.st === 'idle' || z.st === 'search' || (z.raider && (z.st === 'loot' || z.st === 'goto') && !z.aggro)) && z.kind !== 'turkey';
     let dmg = Math.round(base * (sneak ? (SK.sneakMul() || (job() === 'hunter' ? 1.6 : 1.45)) : 1) * (!by && DM.Codex ? DM.Codex.dmgVs(z) : 1) + Math.random() * 4);   // 0.35: bestiary tiers   // 0.34: Tracker Silent kill x2
+    { const W0 = !by && !ranged ? fightW() : null; if (W0 && W0.crit && Math.random() < W0.crit) { dmg *= 2; toast(W0.critTxt || 'Critical hit!', .8); G.shake = Math.max(G.shake, 8); } }   // 0.54: golf clubs
     if (z.raider) { RA.damage(z, dmg, fa, by || null, sneak); return; }
     if (by) { z.foe = by; if (z.st === 'idle' || z.st === 'investigate' || z.st === 'search' || z.st === 'sleep') { z.st = 'chase'; z.stT = 0; z.lostT = 0; } }
     else if (ranged && z.st !== 'chase') alertZombie(z, G.p.x, G.p.y, true);
@@ -2020,7 +2026,7 @@
       $('#wpn img').src = ART.iconURL[h ? ITEMS[h.k].i : 'scrap'] || ''; $('#wpn').classList.toggle('fists', !h);
       $('#wpn i').style.width = (h && h.d != null ? Math.max(0, Math.min(1, h.d / D.wMax(h))) * 100 : 0) + '%';   // 0.19: max durability by quality
       if (h && D.qOf(h) >= 3) $('#wpn').style.setProperty('--qc', D.QUAL[D.qOf(h)].c); else $('#wpn').style.removeProperty('--qc');   // 0.19: Solid+ tint the chip
-      $('#wpn b').textContent = wk === 'bow' ? arrowsLeft() : WEAPONS[wk] && WEAPONS[wk].gun ? (G.reload ? '⟳' : `${(S().hands || {}).mag || 0}/${reserve(WEAPONS[wk].gun)}`) : ''; document.body.classList.toggle('gunheld', !!(WEAPONS[wk] && WEAPONS[wk].gun));   // 0.30: rounds left   // the quiver (plus any spare arrows in the pack)
+      $('#wpn b').textContent = WEAPONS[wk] && WEAPONS[wk].ranged && !WEAPONS[wk].gun ? arrowsLeft() : WEAPONS[wk] && WEAPONS[wk].gun ? (G.reload ? '⟳' : `${(S().hands || {}).mag || 0}/${reserve(WEAPONS[wk].gun)}`) : ''; document.body.classList.toggle('gunheld', !!(WEAPONS[wk] && WEAPONS[wk].gun));   // 0.30: rounds left   // the quiver (plus any spare arrows in the pack)
       const n = Math.round(G.noiseLvl * 5);
       noiseBars.forEach((b, i) => b.classList.toggle('on', i < n));
       $('#noise').classList.toggle('hot', n >= 4);
@@ -2481,7 +2487,7 @@
     const p = G.p;
     if (!arrowsLeft()) { toast('No arrows', 1.1); return false; }
     useArrow();
-    let best = null, bd = 8 * T * SK.bowRange() * (modOn('mod_scope') ? 1.4 : 1);   // 0.34: Tracker Eagle eye; 0.36 scope
+    let best = null, bd = 8 * T * ((weapon() && weapon().range) || 1) * SK.bowRange() * (modOn('mod_scope') ? 1.4 : 1);   // 0.34: Tracker Eagle eye; 0.36 scope
     for (const z of G.zs) {
       if (z.dead) continue;
       const dx = z.x - p.x, dy = z.y - p.y, d = Math.hypot(dx, dy);
@@ -2489,10 +2495,10 @@
     }
     let ax = p.fx, ay = p.fy;
     if (best) { const dx = best.x - p.x, dy = best.y - p.y, d = Math.hypot(dx, dy) || 1; ax = dx / d; ay = dy / d; if (Math.abs(dx) > 4) p.flip = dx < 0; p.fx = ax; p.fy = ay; }
-    const sp = 15 * T;
-    G.arrows.push({ x: p.x + ax * 16, y: p.y + ay * 10, vx: ax * sp, vy: ay * sp, z: 36, life: 1.1, qm: qMul() * (modOn('mod_scope') ? 1.1 : 1) });   // 0.19: the bow's quality
+    const BW = weapon() && weapon().ranged && !weapon().gun ? weapon() : WEAPONS.bow, sp = (BW.spd || 15) * T;   // 0.54: crossbows: faster bolts, own damage, pierce
+    G.arrows.push({ x: p.x + ax * 16, y: p.y + ay * 10, vx: ax * sp, vy: ay * sp, z: 36, life: 1.1, qm: qMul() * (modOn('mod_scope') ? 1.1 : 1), base: BW.dmg, pierce: BW.pierce || 0 });   // 0.19: the bow's quality
     if (SK.volley()) { const a2 = Math.atan2(ay, ax) + .09; G.arrows.push({ x: p.x + Math.cos(a2) * 16, y: p.y + Math.sin(a2) * 10, vx: Math.cos(a2) * sp, vy: Math.sin(a2) * sp, z: 36, life: 1.1, qm: qMul() }); }   // 0.34: Tracker Volley
-    SFX.play('bow'); emitNoise(p.x, p.y, WEAPONS.bow.noise * SK.allNoise(), false); wearWeapon();
+    SFX.play('bow'); emitNoise(p.x, p.y, ((weapon() && weapon().ranged && !weapon().gun) ? weapon() : WEAPONS.bow).noise * SK.allNoise(), false); wearWeapon();
     return true;
   }
   // 0.30: the goofy weapons each have a hit sound
@@ -2500,6 +2506,7 @@
     if (!SFX.ac) return;
     if (W.squeak) { const f = 1150 + Math.random() * 300; SFX.tone('square', f, f * 1.6, .07, .07); SFX.tone('square', f * 1.6, f * .8, .12, .06, .07); }
     if (W.bonk) { SFX.tone('triangle', 560, 400, .35, .16); SFX.tone('sine', 1120, 1000, .4, .05); }
+    if (W.saw) { SFX.tone('sawtooth', 90, 140, .18, .09); SFX.noise(.18, 'bandpass', 600, 1400, .08, 3); }   // 0.54 chainsaw
     if (W.zap) { SFX.noise(.12, 'highpass', 4000, 7000, .1, 2); SFX.tone('sawtooth', 2400, 1800, .06, .03); }
   }
   // 0.30 guns: one round (shell, nail) from the pack per shot; aims like the bow; a bullet is a fast arrow that does not drop
@@ -2544,8 +2551,10 @@
       const steps = 3;
       for (let i = 0; i < steps && a.life > 0; i++) {
         a.x += a.vx * dt / steps; a.y += a.vy * dt / steps;
-        const hitZ = G.zs.find(z => !z.dead && Math.hypot(z.x - a.x, (z.y - a.y) * 1.3) < 22);
-        if (hitZ) { hitZombie(hitZ, Math.atan2(a.vy, a.vx), a.bullet ? a.dmg : WEAPONS.bow.dmg * (a.qm || 1) * SK.bowMul(), true); a.life = 0; if (!a.bullet) landArrow(hitZ.x + (Math.random() - .5) * 20, hitZ.y + 8); break; }
+        const hitZ = G.zs.find(z => !z.dead && Math.hypot(z.x - a.x, (z.y - a.y) * 1.3) < 22 && !(a.hit && a.hit.includes(z)));
+        if (hitZ) { hitZombie(hitZ, Math.atan2(a.vy, a.vx), a.bullet ? a.dmg : (a.base || WEAPONS.bow.dmg) * (a.qm || 1) * SK.bowMul(), true);
+          if (a.pierce > 0) { a.pierce--; (a.hit = a.hit || []).push(hitZ); continue; }   // 0.54: heavy crossbow bolts go through one zombie
+          a.life = 0; if (!a.bullet) landArrow(hitZ.x + (Math.random() - .5) * 20, hitZ.y + 8); break; }
         if (overlapsSolid({ hw: 2, hh: 2 }, a.x, a.y)) { a.life = 0; if (a.bullet) puff(a.x, a.y, 30, 4, '#ffd27a', 80, .2, 2); else { SFX.play('thunk'); landArrow(a.x - a.vx * .012, a.y - a.vy * .012); } break; }
       }
       a.life -= dt;

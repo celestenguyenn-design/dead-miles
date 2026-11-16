@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.53.0';
+const NEXT_VERSION = '0.54.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -694,7 +694,7 @@ const NEXT_VERSION = '0.53.0';
   // 0.19: wDmg takes a key (Worn, as before 0.19) or an entry { k, q }; damage includes quality
   const wDmg = k => k && typeof k === 'object' ? D.wDmg(k) : k && D.ITEMS[k] && D.ITEMS[k].w ? D.wDmg({ k }) : D.WEAPONS.fists.dmg;
   const handsDmg = () => SV.survivor.hands ? D.wDmg(SV.survivor.hands) : D.WEAPONS.fists.dmg;
-  const usable = k => D.ITEMS[k].w !== 'bow' || SV.survivor.job === 'hunter' || countItem('arrow') > 0 || (DM.G && DM.G.pack && DM.G.pack.some(e => e.k === 'arrow'));
+  const usable = k => !((D.WEAPONS[D.ITEMS[k].w] || {}).ranged && !(D.WEAPONS[D.ITEMS[k].w] || {}).gun) || SV.survivor.job === 'hunter' || countItem('arrow') > 0 || (DM.G && DM.G.pack && DM.G.pack.some(e => e.k === 'arrow'));
   // s.better: the key of the best unequipped weapon found (s.betterQ its quality, 0.19)
   const betterE = s => s.better ? { k: s.better, q: s.betterQ || 2 } : null;
   Game.onWeaponLoot = function (k, inRun, q) {
@@ -1868,6 +1868,21 @@ const NEXT_VERSION = '0.53.0';
           const tgt = sel.from === 'hands' ? s.hands : e; tgt.q = q + 1; tgt.d = D.wMax({ k: e.k, q: q + 1 }); SFX.play('pick');
           done(`${it.n} is now ${D.QUAL[q + 1].n} · ${D.wDmg({ k: e.k, q: q + 1 })} dmg`);
         }]); }
+      // 0.54 class weapon upgrades (weapons2.js): bow -> crossbow -> heavy crossbow, etc. Keeps the quality, fully repaired
+      const CX = DM.W2 && DM.W2.next(s.job, e.k);
+      if (CX) { const C = CX.C, lv = DM.Skills.level(s), to = D.ITEMS[CX.to], jn = D.JOBS[s.job].n;
+        btns.push([lv < C.lvl ? `${jn} upgrade → ${to.n} · needs level ${C.lvl}` : `${jn} upgrade → ${to.n} (${C.m.map(([k, n]) => n + ' ' + D.ITEMS[k].n.toLowerCase()).join(', ')}, ${C.caps} caps)`, () => {
+          if (lv < C.lvl) return toast(`Reach level ${C.lvl} to turn it into a ${to.n.toLowerCase()}`, 2);
+          for (const [k, n] of C.m) if (countItem(k) < n) return toast(`Needs ${n} ${D.ITEMS[k].n.toLowerCase()}`, 1.8);
+          if (SV.trader.caps < C.caps) return toast(`Needs ${C.caps} caps`, 1.6);
+          for (const [k, n] of C.m) { let need = n; for (const list of [s.stash, s.pack]) for (let j = list.length - 1; j >= 0 && need; j--) if (list[j].k === k) { const t = Math.min(need, list[j].n); list[j].n -= t; need -= t; if (!list[j].n) list.splice(j, 1); } }
+          SV.trader.caps -= C.caps;
+          const tgt = sel.from === 'hands' ? s.hands : e; if (sel.from === 'hands') D.unloadGun(s); tgt.k = CX.to; tgt.d = D.wMax({ k: CX.to, q: D.qOf(tgt) }); SFX.play('pick');
+          if (DM.Journal) DM.Journal.note(`Turned my ${it.n.toLowerCase()} into a ${to.n.toLowerCase()}.`);
+          if (sel.from === 'hands' && Game.onEquip) Game.onEquip();
+          done(`${it.n} → ${to.n}! ${D.wDmg(tgt)} dmg`);
+        }, 'big']); }
+      else if (DM.W2 && DM.W2.lineOf(e.k) && DM.W2.lineOf(e.k) !== s.job) { /* another class's weapon: no button */ }
     }
     if (it.use && it.use !== 'Read' && (it.hp || it.sta || FD.isFood(e.k)) && !it.slots) btns.push([it.use, () => { if (FD.isFood(e.k)) { const m = eatEntry(s, sel.from, sel.i); done(`${FD.verb(e.k)} ${it.n.toLowerCase()} · ${m}`); return; } s.hp = Math.min(maxHp(s), s.hp + (it.hp || 0)); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(`${it.n}: +${it.hp || 0} HP`); }]);
     if (it.cure && DM.Infect) btns.push([it.use, () => { if (!DM.Infect.is(s)) return toast('You are not infected - keep them for a bite', 1.8); const m = DM.Infect.cure(s); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(m); renderHome(); }, 'big']);   // 0.18: antibiotics
