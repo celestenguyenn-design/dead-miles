@@ -96,6 +96,9 @@ window.DM = window.DM || {};
         if (o.tower && FX().reveal) extra.push(`${FX().reveal(pos, 260)} streets mapped`);
         if (o.token && DM.Gacha && Math.random() < o.token) { DM.Gacha.state().tok++; extra.push('a capsule token'); }
         if (o.weapon) { const k = ['pistol', 'shotgun', 'machete', 'axe', 'baton', 'pipegun', 'xlights', 'spikedbat'][hash(p.id) % 8], e = { k, n: 1, q: 3 + (Math.random() < .25 ? 1 : 0) }; e.d = DM.D.wMax(e); DM.Game.routeApi.toStash([e]); extra.push(`a ${DM.D.QUAL[e.q].n.toLowerCase()} ${DM.D.ITEMS[k].n.toLowerCase()}`); }
+        // 0.53: strange places sometimes leave a roadside postcard (collect.js) or a walking charm (charms.js)
+        if (!res.bad && DM.Collect && Math.random() < .3) { const k = DM.Collect.pickWalk(); DM.Game.routeApi.toStash([{ k, n: 1 }]); extra.push(`a ${DM.D.ITEMS[k].n} (collectible)`); }
+        if (!res.bad && DM.Charm && Math.random() < .06) { const k = DM.Charm.pick(); DM.Game.routeApi.toStash([{ k, n: 1 }]); extra.push(`a ${DM.D.ITEMS[k].n.toLowerCase()} (walking charm)`); }
         if (o.nest) { const h = DM.Game.routeApi.addHouse(['police', 'mansion', 'school', 'pharmacy'][hash(p.id) % 4], hash(p.id + 'nest') % 1e6, {}); extra.push(`${DM.D.BTYPES[h.type].n} at ${h.address} is on your house list`); DM.Game.save(); }
         if (KINDS[p.k].weekly) s.wused[p.id] = 1; else s.used[p.id] = 1;
         s.n++; save(); DM.Game.save();
