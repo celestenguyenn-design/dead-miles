@@ -1306,5 +1306,5 @@ const ART = (() => {
   function addIcons(o) { for (const k in o) { if (/^data:/.test(o[k])) iconURL[k] = o[k]; else { EXTRA_ICONS[k] = o[k]; iconURL[k] = svgURL(o[k], '-36 -36 72 72', 96, 96); } } }
   // 0.52: the base's own paint (base.js applyPaint): override one room style's wall face and floor after houseLook(null)
   function paintRoom(k, wall, floor) { if (!WALL0) WALL0 = JSON.parse(JSON.stringify(WALLFACE)); if (wall && WALLFACE[k]) Object.assign(WALLFACE[k], wall); if (floor && FLOOR[k]) Object.assign(FLOOR[k], floor); }
-  return { addIcons, P, LOOK, rigs, buildRig, drawRig, buildIcons, iconURL, rr, blk, line, dot, hash, drawFloorTile, drawWallFace, houseLook, paintRoom, FURN, geo, candle, VB };
+  return { addIcons, P, LOOK, rigs, buildRig, drawRig, buildIcons, iconURL, rr, blk, line, dot, hash, drawFloorTile, drawWallFace, houseLook, paintRoom, FURN, geo, candle, VB, WEAPON_ART };
 })();

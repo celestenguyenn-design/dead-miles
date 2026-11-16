@@ -407,8 +407,10 @@ window.DM = window.DM || {};
     // 0.30 (owner: "zombies should be more difficult as we progress ... they're quite easy rn"): the ramp starts at
     // gamestage 4 (was 10) and goes further: HP +60% and bites +40% at 50+ (was +25/+25 at 60), specials sooner, and
     // zombies get a little quicker (spd up to +15%)
-    const t = Math.max(0, Math.min(1, ((gs || 0) - 4) / 46)), t2 = Math.max(0, Math.min(1, ((gs || 0) - 14) / 36));
-    return { t, hp: 1 + .6 * t, dmg: 1 + .4 * t, spd: 1 + .15 * t, spAdd: .15 * t, sp2: .2 * t2, qBonus: .4 * t, rare: .06 * t };
+    // 0.54 (owner: "zombies should also be harder"): steeper and further - from gamestage 3, full at 40 (was 50):
+    // HP up to +130% (was +60), bites +80% (was +40), speed +25% (was +15), specials up to +30% (was +15)
+    const t = Math.max(0, Math.min(1, ((gs || 0) - 3) / 37)), t2 = Math.max(0, Math.min(1, ((gs || 0) - 12) / 30));
+    return { t, hp: 1 + 1.3 * t, dmg: 1 + .8 * t, spd: 1 + .25 * t, spAdd: .3 * t, sp2: .3 * t2, qBonus: .45 * t, rare: .07 * t };
   };
 
   // merge rolled item keys into stacks; ammo/arrows come in handfuls; weapons carry durability

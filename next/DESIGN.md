@@ -1181,6 +1181,23 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   - Canteen: +8 thirst per 1,000 steps.
   Charms come from walk finds, 5/10 km caches, attics, locked rooms, horde crates, map places, and Dot (level 3+).
 
+## Done in 0.54.0 (owner: "new weapons ... weapon upgrades for classes. Like hunter - bow to crossbow. zombies should also be harder")
+- weapons2.js (DM.W2) adds 10 weapons. Each class has a signature line; tier 2 also drops for anyone, tier 3 only comes from a class upgrade:
+  - Hunter: bow -> crossbow -> heavy crossbow (bolts pierce 1).
+  - Brawler: bat -> sledgehammer -> demolition sledge.
+  - Thief: knife -> combat knife -> katana.
+  - Scavenger: bat -> golf club -> lucky 7-iron (crit chance; "FORE!").
+  - Mechanic: crowbar -> pipe wrench -> chainsaw (very loud).
+- Upgrading: the item popup in Gear has a "<Class> upgrade" button.
+  - Tier 2 needs level 4, 6 scrap, 2 tape and 60 caps.
+  - Tier 3 needs level 10, 12 scrap, 4 tape, 3 batteries and 150 caps.
+  - Quality is kept and the weapon is fully repaired.
+- house.js: arrow-type ranged weapons use their own dmg/spd/range/noise, plus pierce. Weapons can have crit + critTxt and a saw sound.
+  ART.WEAPON_ART is now exported.
+- Harder zombies: gsFx ramps from gamestage 3 and is full at 40.
+  - Health up to +130% (was +60), bites +80% (was +40), speed +25%, specials +30%.
+  - Houses add up to 3 extra zombies with gamestage (seeded). Not added to daily houses, the base or camps.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
