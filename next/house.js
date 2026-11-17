@@ -549,7 +549,7 @@
         const H = { x: px(s.hatch.x), y: px(s.hatch.y) }, O = { x: px(s.hole.x), y: px(s.hole.y) };
         const near = Math.hypot(p.x - H.x, p.y - H.y) < .75 * T, hr = { x: H.x - 10, y: H.y - 6, w: 20, h: 12 };
         if (s.st === 0 && gate && near && !hasItem('pole')) out.push({ obj: s, act: 'NeedTool', name: 'Attic hatch', need: 'a hook pole (it is in this house)', rect: hr, secret: true });   // 0.29.1
-        if (s.st === 0 && gate && near && hasItem('pole')) out.push({ obj: s, act: 'Pull down', name: 'attic hatch', rect: hr, noise: 3, dur: 1.2, secret: true, done: () => { s.st = 1; SFX.play('scrape'); } });
+        if (s.st === 0 && gate && near && hasItem('pole')) out.push({ obj: s, act: 'Pull down', name: 'attic hatch', rect: hr, noise: 3, dur: 1.2, secret: true, done: () => { s.st = 1; SFX.play('scrape'); { const i = G.pack.findIndex(e => e.k === 'pole'); if (i >= 0) { G.pack[i].n--; if (G.pack[i].n <= 0) G.pack.splice(i, 1); toast('The hook pole stays up there with the hatch', 1.6); } }   /* 0.57 (owner: the hook should disappear after you use it once) */ } });
         if (s.st === 1 && near) out.push({ obj: s, act: 'Climb', name: 'into the attic', rect: hr, noise: 1, dur: .6, secret: true, done: () => climb(s, true) });
         if (G.room === s.room && Math.hypot(p.x - O.x, p.y - O.y) < .8 * T) out.push({ obj: s, act: 'Climb', name: 'down the ladder', rect: { x: O.x - 14, y: O.y - 8, w: 28, h: 16 }, noise: 1, dur: .5, secret: true, done: () => climb(s, false) });
       } else if (s.type === 'panel') {
@@ -2128,7 +2128,7 @@
   }
   DM.addToPack = addToPack;
   // 0.15: every card shows the item's kind (data.js D.cat); event / quest items keep their own note
-  const ctag = (k, it) => { const c = D.cat(k); return it.tag && (c === 'event' || c === 'quest') ? `<small class="tag">${it.tag}</small>` : `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
+  const ctag = (k, it) => { const c = D.cat(k); return it.tag && (c === 'event' || c === 'quest' || it.mod || it.charm) ? `<small class="tag">${it.tag}</small>` : `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
   // 0.19.1: tap the quest chip in a run to open/close the full quest list
   document.addEventListener('click', ev => { const c = ev.target.closest && ev.target.closest('#qchip'); if (!c || !G) return; G.qOpen = !G.qOpen; lastQ = ''; SFX.play('pick'); });
   document.addEventListener('click', ev => { const c = ev.target.closest && ev.target.closest('#rld'); if (!c || !G || G.over) return; ev.stopPropagation(); startReload(); }, true);   // 0.44: the reload button
@@ -2622,7 +2622,8 @@
   };
   DM.House = {
     start(layout, o) { startRun(layout, o); document.body.classList.add('inrun'); document.body.classList.toggle('event', !!EVA); DM.scene = scene; },
-    get G() { return G; }, get L() { return L; }, zombieCount: () => G ? zombieCount() : { dead: 0, total: 0 },
+    get G() { return G; }, get L() { return L; }, rewall: () => { if (G) { buildWalls(); buildStatic(); } },   // 0.57: base windows moved
+    zombieCount: () => G ? zombieCount() : { dead: 0, total: 0 },
     // used by the base (base.js): live furniture, spawning, damage, leaving
     addFurn(d) {
       const f = Object.assign({}, d);

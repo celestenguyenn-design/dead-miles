@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.56.0';
+const NEXT_VERSION = '0.57.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1061,7 +1061,7 @@ const NEXT_VERSION = '0.56.0';
   let cre = { name: '', look: ART.LOOK.norm(null), job: 'scavenger' }, creEdit = false, idleRAF = 0;
   const LK = ART.LOOK;
   // 0.26.6: capsule hair / eye unlocks (D.LOOKUN); the free ones always open
-  const hasLook = (kind, v) => { if (kind === 'hair' ? v < LK.FREE_HAIR : LK.FREE_EYES.includes(v)) return true; const k = D.lookKey(kind, v), w = SV.survivor && SV.survivor.wardrobe; return !!(k && w && w.looks && w.looks[k]); };
+  const hasLook = (kind, v) => { if (kind === 'hair' ? (v < LK.FREE_HAIR || (LK.FREE_HAIR_X || []).includes(v)) : kind === 'eyes' ? LK.FREE_EYES.includes(v) : !D.lookKey(kind, v)) return true; /* 0.57: face / mouth unlocks */ const k = D.lookKey(kind, v), w = SV.survivor && SV.survivor.wardrobe; return !!(k && w && w.looks && w.looks[k]); };
   Game.hasLook = hasLook;
   function lookChips(kind, key, names, lk) {
     return `<div class="chips">${names.map((n, i) => { const ok = hasLook(kind, i); return `<button class="chip${lk[key] === i ? ' on' : ''}${ok ? '' : ' locked'}" data-k="${key}" data-v="${i}"${ok ? '' : ' data-lock="1"'}>${ok ? '' : '🔒 '}${n}</button>`; }).join('')}</div>`;
@@ -1076,8 +1076,8 @@ const NEXT_VERSION = '0.56.0';
       <div class="lrow"><div class="kick">Hood${lk.cos && lk.cos.hat ? ' <span class="lnote">· your hat keeps it down</span>' : ''}</div><div class="chips"><button class="chip${lk.hood ? ' on' : ''}" data-k="hood" data-v="1">Up</button><button class="chip${!lk.hood ? ' on' : ''}" data-k="hood" data-v="0">Down</button></div></div>
       <div class="lrow"><div class="kick">Eyes</div>${lookChips('eyes', 'eyes', LK.eyes, lk)}</div>
       <div class="lrow"><div class="kick">Eye colour</div>${sw('eyeC', LK.eyeCols, v => v[0], v => v[1])}</div>
-      <div class="lrow"><div class="kick">Face</div><div class="chips">${LK.faces.map((n, i) => `<button class="chip${(lk.face || 0) === i ? ' on' : ''}" data-k="face" data-v="${i}">${n}</button>`).join('')}</div></div>
-      <div class="lrow"><div class="kick">Mouth</div><div class="chips">${LK.mouths.map((n, i) => `<button class="chip${(lk.mouth || 0) === i ? ' on' : ''}" data-k="mouth" data-v="${i}">${n}</button>`).join('')}</div></div>
+      <div class="lrow"><div class="kick">Face</div>${lookChips('face', 'face', LK.faces, lk)}</div>
+      <div class="lrow"><div class="kick">Mouth</div>${lookChips('mouth', 'mouth', LK.mouths, lk)}</div>
       <div class="lrow"><div class="kick">Head size</div><div class="chips">${LK.heads.map((n, i) => `<button class="chip${(lk.head || 0) === i ? ' on' : ''}" data-k="head" data-v="${i}">${n}</button>`).join('')}</div></div>
       <div class="lrow"><div class="kick">Jacket</div>${sw('coat', LK.coats, v => v[0], v => v[2])}</div>
       <div class="lrow"><div class="kick">Pants</div>${sw('pants', LK.pants, v => v[0], v => v[1])}</div>`;
@@ -1690,7 +1690,7 @@ const NEXT_VERSION = '0.56.0';
         <button class="eqslot cos" id="eqWard"><i class="eqk">Cosmetics</i><span class="eqcos">${worn.length ? worn.slice(0, 4).map(c => `<img alt="" src="${ART.iconURL['cos_' + c]}">`).join('') : '<img alt="" src="' + ART.iconURL.cosS_beanie + '">'}</span><b>Wardrobe →</b><span>${worn.length ? worn.length + ' worn' : 'Nothing worn'}${newCos() ? ` · <em class="newtxt">${newCos()} new</em>` : ''}</span></button>
       </div>${A('hands')}${A('armor')}${A('quiver')}${A('pouch')}
       <div class="kick sect">Always with you</div>
-      ${(() => { const m = s.mods || {}, nm = k => k ? D.ITEMS[k].n : 'empty'; return `<div class="gline"><span class="gi">🔧</span><div><b>Mods · melee: ${esc(nm(m.melee))} · ranged: ${esc(nm(m.ranged))}</b><span>${m.melee || m.ranged ? 'They work on whatever weapon you hold. Fit another to swap.' : 'Craft grip wraps and nail studs at the Workbench, then tap one in your pack or stash and Fit it.'}</span></div></div>`; })()}
+      ${(() => { const m = s.mods || {}, nm = k => k ? D.ITEMS[k].n + ' (' + D.ITEMS[k].tag.replace(/^(melee|ranged) mod: /, '') + ')' : 'empty'; return `<div class="gline"><span class="gi">🔧</span><div><b>Mods · melee: ${esc(nm(m.melee))} · ranged: ${esc(nm(m.ranged))}</b><span>${m.melee || m.ranged ? 'They work on whatever weapon you hold. Fit another to swap.' : 'Craft grip wraps and nail studs at the Workbench, then tap one in your pack or stash and Fit it.'}</span></div></div>`; })()}
       <div class="gline"><span class="gi">🔑</span><div><b>Keyring · ${+s.keys || 0} brass key${(+s.keys || 0) === 1 ? '' : 's'}</b><span>Opens locked cars and key-locked rooms · no pack slot</span></div></div>
       ${gear.length ? `<div class="gline"><span class="gi">👟</span><div><b>${gear.join(' · ')}</b><span>${[s.shoes && 'footsteps -30%', s.lockset && 'wider sweet spots, picks snap less'].filter(Boolean).join(' · ')}</span></div></div>` : ''}
       <div class="kick sect">You</div>

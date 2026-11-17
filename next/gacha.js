@@ -102,7 +102,7 @@ window.DM = window.DM || {};
     const g = st(), v = SV(), P = pool(), w = own(), ev = EVA();
     const got = P.filter(k => w[k]).length;
     const resHTML = !res ? '' : res.look
-      ? `<div class="garesult" style="--rc:${RCOL[D.LOOKUN[res.look].r]}"><div class="gaitem">${lookIcon(res.look)}</div><div><i>${D.RARITY[D.LOOKUN[res.look].r].n} ${D.LOOKUN[res.look].kind === 'hair' ? 'hairstyle' : 'eyes'}</i><b>${esc(D.LOOKUN[res.look].n)}</b><span>New! Pick it in Edit look</span></div></div>`
+      ? `<div class="garesult" style="--rc:${RCOL[D.LOOKUN[res.look].r]}"><div class="gaitem">${lookIcon(res.look)}</div><div><i>${D.RARITY[D.LOOKUN[res.look].r].n} ${({ hair: 'hairstyle', eyes: 'eyes', mouth: 'mouth', face: 'face' })[D.LOOKUN[res.look].kind] || 'look'}</i><b>${esc(D.LOOKUN[res.look].n)}</b><span>New! Pick it in Edit look</span></div></div>`
       : res.cos
       ? `<div class="garesult" style="--rc:${RCOL[D.COS[res.cos].r]}"><div class="gaitem">${U().icon('cos_' + res.cos)}</div><div><i>${D.RARITY[D.COS[res.cos].r].n}</i><b>${esc(D.COS[res.cos].n)}</b><span>${res.dup ? 'You had it already - Dot bought the spare' : 'New! It is in your wardrobe'}</span></div></div>`
       : `<div class="garesult" style="--rc:#f07aa8"><div class="gaitem">${U().icon(res.decor)}</div><div><i>Holiday decor</i><b>${esc(D.ITEMS[res.decor].n)}</b><span>${res.lost ? 'Your stash is full - it was left behind' : 'In your stash - place it at the base'}</span></div></div>`;
