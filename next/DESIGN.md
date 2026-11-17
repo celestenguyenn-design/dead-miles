@@ -1224,6 +1224,20 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - The hook pole is used up when you pull down an attic hatch.
 - Weapon mods show their effect: workbench names, catLine ("Weapon mod · ..."), the Gear mods line, and loot tags.
 
+## Done in 0.58.0 - trades + cooking (trades.js, DM.Trades) (owner: "craft them into recipes ... a farming level, a chef level, crafting level ... the higher we craft our weapons ... much harder zombies, and things will start to cost a lot more to repair")
+- Three trade levels: 1 + floor(sqrt(xp/25)), max 20. Shown in Gear > You. Saved in SV.trades.
+  - Farming: 6 XP per crop harvested. +1 crop every 4 levels; seeds come back 50% of the time, up to 90%.
+  - Chef: XP per meal cooked. Recipes unlock by level; 4% per level chance of a second portion (max 60%).
+  - Crafting: XP per workbench craft (more for weapons). Crafted weapons +1 tier at level 6 and +2 at 14; 2% per level chance to save a material (max 40%); repairs cost 1 less scrap from level 5.
+- Kitchen (top of the Workbench tab): 9 meals from crops, at chef levels 1-12. Baked potatoes, herb tea, veggie stew, corn chowder, salsa & chips, carrot cake, pot pie, healing broth, survivor's feast.
+- Weapon repairs scale with quality:
+  - Rusty/Worn: 2 scrap.
+  - Solid: 3 scrap.
+  - Fine: 5 scrap + 1 tape.
+  - Masterwork: 8 scrap + 2 tape + 25 caps.
+  - +3 scrap for a class tier-3 weapon. Mechanics pay half the scrap.
+- Gamestage: quality now counts x4 (was x3), and your best class weapon adds +4 (tier 2) or +9 (tier 3). Example: a Masterwork heavy crossbow on a level 1 = gamestage 22.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
