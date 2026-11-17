@@ -192,7 +192,7 @@ const ART = (() => {
     skins: [['#f8dfc2', '#f08a6a'], ['#efc9a0', '#ea8a6a'], ['#d9a477', '#d97a5a'], ['#b97d52', '#c06650'], ['#8a5a3c', '#a8504a'], ['#5e3b27', '#8a4040']],
     hairs: ['#221d2e', '#5a3a28', '#e8c46a', '#c9602c', '#f07aa8', '#b39ae0', '#3fa7a0', '#ecebf2'],
     hairNames: ['Black', 'Brown', 'Blonde', 'Ginger', 'Pink', 'Lilac', 'Teal', 'White'],
-    styles: ['Bob', 'Long', 'Twin buns', 'Crop', 'Curls', 'Buzz', 'Ponytail', 'Mohawk', 'Afro', 'Side swoop', 'Braids', 'Spiky'],   // 0.26.6: 6-11 unlock from capsules
+    styles: ['Bob', 'Long', 'Twin buns', 'Crop', 'Curls', 'Buzz', 'Ponytail', 'Mohawk', 'Afro', 'Side swoop', 'Braids', 'Spiky', 'Long pigtails', 'Long side bangs'],   // 0.26.6: 6-11 unlock from capsules
     eyes: ['Round', 'Sleepy', 'Happy', 'Wide', 'Sharp', 'Starry', 'Dot', 'Wink'],   // 0.26.6: Round + Dot free, the rest from capsules
     eyeCols: [['#11142f', 'Dark'], ['#5a3a28', 'Brown'], ['#3f7a4a', 'Green'], ['#3a6ab8', 'Blue'], ['#6a6a80', 'Grey'], ['#7a4aa8', 'Violet'], ['#c9963a', 'Amber'], ['#a8323a', 'Red']],
     coats: [['#f07b3c', '#c95f2c', 'Ember'], ['#3fa7a0', '#2c7c77', 'Teal'], ['#9a62b8', '#744690', 'Plum'], ['#7c9a4c', '#5c7836', 'Moss'], ['#c94a4a', '#9e3434', 'Brick'], ['#e0b43c', '#b48a28', 'Mustard'],
@@ -206,6 +206,7 @@ const ART = (() => {
   LOOK.mouths = ['Smile', 'Grin', 'Cat :3', 'Smirk', 'Tongue out', 'Oh!'];
   LOOK.heads = ['Normal', 'Big', 'Extra big'];
   const HEAD_SC = [1.42, 1.55, 1.66];
+  LOOK.FREE_HAIR_X = [12, 13];   // 0.57: free extra hairstyles (owner asked for them)
   LOOK.FREE_HAIR = 6; LOOK.FREE_EYES = [0, 6];   // 0.26.6: everything else is a capsule unlock (D.LOOKUN, wardrobe.looks)
   // cos: worn cosmetics by slot ({hat, face, neck, back, outfit} -> key in COS or null); always a fresh copy
   LOOK.norm = l => { const o = typeof l === 'number' ? Object.assign({}, LOOK.def, { coat: l }) : Object.assign({}, LOOK.def, l || {}); const c = {}; for (const k in (o.cos || {})) if (o.cos[k] && COS[o.cos[k]]) c[k] = o.cos[k]; o.cos = c; return o; };
@@ -226,6 +227,12 @@ const ART = (() => {
     8: 'M-24,-128 Q-38,-150 -24,-174 Q-6,-194 16,-188 Q38,-182 38,-158 Q38,-148 30,-146 L20,-152 Q6,-150 -6,-140 L-8,-126 Q-18,-118 -24,-128 Z',
     9: 'M-20,-144 Q-21,-171 6,-171 Q26,-169 29,-152 L20,-152 Q6,-150 -6,-140 L-4,-122 Q-14,-117 -20,-124 Z',
     10: 'M-20,-144 Q-21,-171 6,-171 Q26,-169 29,-152 L20,-152 Q6,-150 -6,-140 L-6,-128 Q-16,-126 -20,-144 Z',
+    // 0.57 (owner: "a longer pigtail, long hair with side bangs")
+    12: 'M-18,-143 Q-19,-168 6,-169 Q25,-168 28,-153 L20,-152 Q6,-150 -6,-140 L-6,-128 Q-16,-126 -18,-143 Z'
+      + ' M-14,-152 Q-31,-142 -29,-118 Q-28,-98 -22,-84 Q-17,-74 -12,-80 Q-17,-96 -16,-114 Q-15,-132 -8,-144 Z'
+      + ' M24,-150 Q39,-138 37,-114 Q36,-96 31,-82 Q27,-73 22,-79 Q27,-96 27,-114 Q27,-130 20,-142 Z',
+    13: 'M-20,-144 Q-22,-171 6,-171 Q27,-169 30,-152 L22,-150 Q8,-150 -6,-140 L-4,-112 Q-4,-92 -16,-88 Q-28,-96 -27,-120 Z'
+      + ' M22,-146 Q35,-134 34,-110 Q33,-94 26,-90 Q22,-100 24,-114 Q25,-130 18,-140 Z',
     11: 'M-18,-142 L-27,-156 L-17,-160 L-21,-175 L-7,-170 L-2,-185 L8,-172 L18,-183 L20,-168 L33,-170 L28,-154 L20,-152 Q6,-150 -6,-140 L-8,-130 Q-18,-130 -18,-142 Z',
   };
   const BRAIDS = 'M-10,-128 q-5,4 0,8 q-5,4 0,8 q-5,4 0,8 q-5,4 0,8 l3,2 q4,-4 0,-8 q4,-4 0,-8 q4,-4 0,-8 q4,-4 0,-8 Z';
@@ -241,6 +248,8 @@ const ART = (() => {
     8: 'M-13,-148 Q-14,-158 -6,-160 Q-4,-170 6,-168 Q12,-174 20,-168 Q30,-168 30,-156 Q34,-150 30,-146 Q26,-152 22,-150 Q20,-156 13,-152 Q8,-158 2,-152 Q-4,-156 -8,-150 Q-11,-146 -13,-148 Z',
     9: 'M-12,-148 Q-10,-172 14,-168 Q31,-164 31,-146 Q30,-138 24,-141 Q22,-150 12,-151 Q2,-152 -4,-149 Q-8,-148 -12,-148 Z',
     10: 'M-12,-148 Q-8,-171 6,-168 L7,-152 Q0,-156 -12,-148 Z M8,-168 Q29,-166 30,-147 Q22,-156 9,-152 Z',
+    12: 'M-12,-148 Q-8,-171 14,-167 Q29,-163 30,-147 Q24,-154 18,-152 Q12,-158 4,-152 Q-4,-156 -12,-148 Z',
+    13: 'M20,-169 Q-6,-173 -12,-158 Q-16,-148 -13,-134 Q-6,-139 0,-146 Q10,-153 22,-152 Q27,-151 30,-146 Q33,-158 28,-165 Q25,-169 20,-169 Z',
     11: 'M-12,-148 L-10,-164 L-2,-158 L4,-171 L10,-160 L18,-171 L20,-158 L30,-163 L30,-147 Q24,-152 18,-148 Q12,-154 6,-148 Q0,-154 -6,-148 Q-9,-152 -12,-148 Z',
   };
   // 0.26.6 eye styles: replace the baked eye lines 97-100 (left eye x 5, right eye x 20.4, y -139). c = iris colour.
@@ -254,8 +263,23 @@ const ART = (() => {
     6: c => [`<circle cx="5.4" cy="-139" r="2.8" fill="${c}"/>`, `<circle cx="20.6" cy="-139" r="2.8" fill="${c}"/>`, '<circle cx="6.2" cy="-140" r=".8" fill="#ffffff"/><circle cx="21.4" cy="-140" r=".8" fill="#ffffff"/>', ''],
     7: c => [`<ellipse cx="5" cy="-139" rx="4.3" ry="5.8" fill="${c}"/>`, SL('M16.4,-138 Q20.4,-142.6 24.4,-138', P.INK, 2.8), '<circle cx="6.6" cy="-141.4" r="1.8" fill="#ffffff"/>', '<circle cx="3.6" cy="-136.4" r=".85" fill="#ffffff"/>'],
   };
+  // 0.56 mouths (0 = the baked smile); 0.57: capsule unlocks
+  const MOUTHS = {
+          1: SP('M10,-128.6 Q13.6,-129.4 17.4,-128.6 Q16.8,-123.2 13.6,-123 Q10.6,-123.2 10,-128.6 Z', '#7a2a3a', 1.5) + SD('M11.6,-124.6 Q13.6,-126.4 15.8,-124.6 Q13.6,-123.2 11.6,-124.6 Z', '#f07aa8'),
+          2: SL('M10,-128.2 Q11.8,-125.4 13.6,-127.6 Q15.4,-125.4 17.2,-128.2', P.INK, 1.5),
+          3: SL('M11,-126.4 Q14.6,-126.6 17.6,-129.6', P.INK, 1.6),
+          4: SL('M10.4,-127.8 Q13.6,-125.4 16.8,-127.8', P.INK, 1.5) + SP('M12.4,-126.4 Q12.6,-122.6 14.2,-122.6 Q15.8,-122.6 15.6,-126.2 Z', '#f07aa8', 1.1),
+          5: `<ellipse cx="13.6" cy="-126.4" rx="2" ry="2.6" fill="#7a2a3a" stroke="${P.INK}" stroke-width="1.3"/>`,
+        };
   // 0.26.6: a head-only preview for capsule hair / eye unlocks (and the look editor's locked chips)
   LOOK.previewSVG = function (kind, v) {
+    if (kind === 'mouth' || kind === 'face') {   // 0.57: capsule mouths + blush
+      const sk2 = LOOK.skins[1][0], e0 = EYES[0](LOOK.eyeCols[0][0]);
+      const mouth = kind === 'mouth' ? (MOUTHS[v] || '') : SL('M11.2,-127 Q13.6,-127.9 16,-126.8', P.INK, 1.5);
+      const blush = kind === 'face' && v === 2 ? `<ellipse cx="2.4" cy="-130.6" rx="4.2" ry="2.5" fill="#ff8aa8" opacity=".7"/><ellipse cx="23.6" cy="-130.6" rx="4.2" ry="2.5" fill="#ff8aa8" opacity=".7"/>` : '';
+      const body2 = `<ellipse cx="8" cy="-142" rx="20" ry="21" fill="${sk2}" stroke="${P.INK}" stroke-width="3.4"/>` + SP(FRINGE[3], '#5a3a28', 3.4) + e0.join('') + blush + mouth;
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-14 -164 44 44" width="96" height="96">${body2}</svg>`;
+    }
     const hc = '#5a3a28', sk = LOOK.skins[1][0], st = kind === 'hair' ? v : 3, ey = kind === 'eyes' ? v : 0;
     let back = SP(HAIR_BACK[st] || HAIR_BACK[0], hc, 3.4); if (st === 2) back = SP('M-12,-168 a8,8 0 1 0 0.1,0 Z', hc, 3.4) + SP('M8,-174 a8,8 0 1 0 0.1,0 Z', hc, 3.4) + back;
     if (st === 10) back += SP(BRAIDS, hc, 2.4);
@@ -277,18 +301,21 @@ const ART = (() => {
         if (st === 4) extra = SP('M-10,-128 Q-16,-122 -12,-114 Q-6,-112 -4,-120 Z', hc, 3.2);
         if (st === 6) extra = SP('M-8,-128 Q-16,-118 -12,-106 L-6,-108 Q-8,-118 -3,-126 Z', hc, 3.2);   // ponytail peeks out
         if (st === 10) extra = SP(BRAIDS, hc, 3);
+        if (st === 12) extra = SP('M-9,-127 Q-19,-112 -15,-90 Q-13,-82 -8,-86 Q-11,-104 -3,-124 Z', hc, 3.2) + SP('M21,-125 Q31,-110 28,-90 Q26,-82 21,-87 Q24,-104 17,-122 Z', hc, 3.2);   // 0.57 pigtails out of the hood
+        if (st === 13) extra = SP('M-6,-130 Q-12,-118 -8,-102 L-2,-104 Q-4,-118 0,-128 Z', hc, 3.2);
         L[95] = SP(FRINGE[st] || FRINGE[0], hc) + extra;
         L[96] = st === 5 || st === 3 ? '' : SL(st === 4 ? 'M-11,-150 Q-16,-144 -12,-138 M29,-150 Q33,-144 30,-138' : 'M-11,-150 Q-17,-144 -14,-136 M29,-150 Q34,-143 30,-136 M10,-163 Q15,-156 11,-149', hc, 2.2);
       } else {
         let back = SP(HAIR_BACK[st] || HAIR_BACK[0], hc); if (st === 10) back += SP(BRAIDS, hc, 3);
         if (st === 2) back = SP('M-12,-168 a8,8 0 1 0 0.1,0 Z', hc) + SP('M8,-174 a8,8 0 1 0 0.1,0 Z', hc) + back;
+        if (st === 12) back += `<ellipse cx="-21" cy="-133" rx="5" ry="3.6" fill="#e8609a" stroke="${P.INK}" stroke-width="2.4"/><ellipse cx="32" cy="-131" rx="5" ry="3.6" fill="#e8609a" stroke="${P.INK}" stroke-width="2.4"/>`;
         const shade = st === 5 ? '' : SD(st === 1 ? 'M-20,-130 Q-24,-112 -16,-104 L-8,-104 Q-14,-118 -12,-132 Z' : 'M-18,-140 Q-20,-150 -12,-158 Q-14,-146 -12,-136 Z', 'rgba(17,20,47,.22)');
         const hoodDown = SP('M-22,-124 Q-28,-110 -16,-106 Q2,-103 18,-108 Q22,-114 16,-118 Q-2,-112 -22,-124 Z', '#f07b3c');   // bunched hood at the neck
         const ear = `<ellipse cx="-9" cy="-138" rx="5" ry="6.4" fill="${sk[0]}" stroke="${P.INK}" stroke-width="3.2"/>`;
         L[91] = back + shade + hoodDown + ear;
         L[92] = ''; L[93] = '';
         L[95] = SP(FRINGE[st] || FRINGE[0], hc);
-        L[96] = st === 4 ? SL('M-4,-176 q4,-4 8,0 M14,-176 q4,-4 8,0 M-20,-160 q-2,-5 2,-8', 'rgba(17,20,47,.35)', 1.6) : st === 1 || st === 0 ? SL('M-11,-150 Q-17,-144 -14,-136 M10,-163 Q15,-156 11,-149', 'rgba(17,20,47,.3)', 1.6) : '';
+        L[96] = st === 13 ? SL('M18,-166 Q4,-162 -6,-148 M24,-162 Q14,-156 6,-150', 'rgba(17,20,47,.35)', 1.6) : st === 4 ? SL('M-4,-176 q4,-4 8,0 M14,-176 q4,-4 8,0 M-20,-160 q-2,-5 2,-8', 'rgba(17,20,47,.35)', 1.6) : st === 1 || st === 0 ? SL('M-11,-150 Q-17,-144 -14,-136 M10,-163 Q15,-156 11,-149', 'rgba(17,20,47,.3)', 1.6) : '';
       }
       if (lk.eyes || lk.eyeC) { const ec = (LOOK.eyeCols[lk.eyeC] || LOOK.eyeCols[0])[0], E2 = (EYES[lk.eyes] || EYES[0])(ec); L[97] = E2[0]; L[98] = E2[1]; if (E2.length > 2) { L[99] = E2[2]; L[100] = E2[3]; } }   // 0.26.6
       if (m) {
@@ -315,13 +342,7 @@ const ART = (() => {
       }
       if (lk.mouth) {
         const mi = at('M11.2,-127 Q13.6,-127.9 16,-126.8');
-        const M = {
-          1: SP('M10,-128.6 Q13.6,-129.4 17.4,-128.6 Q16.8,-123.2 13.6,-123 Q10.6,-123.2 10,-128.6 Z', '#7a2a3a', 1.5) + SD('M11.6,-124.6 Q13.6,-126.4 15.8,-124.6 Q13.6,-123.2 11.6,-124.6 Z', '#f07aa8'),
-          2: SL('M10,-128.2 Q11.8,-125.4 13.6,-127.6 Q15.4,-125.4 17.2,-128.2', P.INK, 1.5),
-          3: SL('M11,-126.4 Q14.6,-126.6 17.6,-129.6', P.INK, 1.6),
-          4: SL('M10.4,-127.8 Q13.6,-125.4 16.8,-127.8', P.INK, 1.5) + SP('M12.4,-126.4 Q12.6,-122.6 14.2,-122.6 Q15.8,-122.6 15.6,-126.2 Z', '#f07aa8', 1.1),
-          5: `<ellipse cx="13.6" cy="-126.4" rx="2" ry="2.6" fill="#7a2a3a" stroke="${P.INK}" stroke-width="1.3"/>`,
-        }[lk.mouth];
+        const M = MOUTHS[lk.mouth];
         if (mi > 0 && M) L[mi] = L[mi].replace(/<path d="M11\.2,-127[^>]*\/>/, M);
       }
       if (lk.head) { const sc = HEAD_SC[lk.head] || HEAD_SC[0]; for (let i = 0; i < L.length; i++) if (L[i].includes('scale(1.42)')) L[i] = L[i].replace('scale(1.42)', `scale(${sc})`); }

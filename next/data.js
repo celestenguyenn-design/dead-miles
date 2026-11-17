@@ -179,10 +179,10 @@ window.DM = window.DM || {};
     xlights: { out: ['xlights', 1], in: { battery: 2, cloth: 1, tape: 2 }, n: 'Light-string whip' },
     nailgun: { out: ['nailgun', 1], in: { scrap: 6, battery: 2, tape: 2 }, n: 'Nail gun (shoots nails)' },
     shells: { out: ['shells', 6], in: { scrap: 2, ammo: 4 }, n: 'Shotgun shells' },
-    mod_grip: { out: ['mod_grip', 1], in: { cloth: 2, tape: 2 }, n: 'Grip wrap (melee mod)' },          // 0.36: everyone knows it
-    mod_nails: { out: ['mod_nails', 1], in: { nails: 10, tape: 1, scrap: 1 }, n: 'Nail studs (melee mod)' },   // 0.36: everyone knows it
-    mod_scope: { out: ['mod_scope', 1], in: { scrap: 3, tape: 1, battery: 1 }, n: 'Scope (ranged mod)' },
-    mod_silencer: { out: ['mod_silencer', 1], in: { scrap: 4, cloth: 2, tape: 1 }, n: 'Silencer (ranged mod)' },
+    mod_grip: { out: ['mod_grip', 1], in: { cloth: 2, tape: 2 }, n: 'Grip wrap (melee mod: swings 15% faster)' },          // 0.36: everyone knows it
+    mod_nails: { out: ['mod_nails', 1], in: { nails: 10, tape: 1, scrap: 1 }, n: 'Nail studs (melee mod: +15% damage)' },   // 0.36: everyone knows it
+    mod_scope: { out: ['mod_scope', 1], in: { scrap: 3, tape: 1, battery: 1 }, n: 'Scope (ranged mod: aims 40% further, +10% damage)' },
+    mod_silencer: { out: ['mod_silencer', 1], in: { scrap: 4, cloth: 2, tape: 1 }, n: 'Silencer (ranged mod: guns 60% quieter)' },
   };
   D.BASIC = ['bandage', 'lockpick', 'knuckles', 'mod_grip', 'mod_nails', 'pipegun', 'baton', 'bandage2', 'armor_pad'];
   // ---------------------------------------------------------------- 0.15: item categories (shown on pack / stash / loot cards)
@@ -220,6 +220,7 @@ window.DM = window.DM || {};
     if (k === 'arrow') return 'Ammo · for the bow (fill the quiver)';
     if (c === 'col') { const it = D.ITEMS[k], X = DM.Collect && DM.Collect.has(k); return `Collectible · ${it.setN}${X ? ' · you have it - sell or gift' : ' · new! files itself at home'}`; }
     if (D.ITEMS[k] && D.ITEMS[k].charm) return 'Walking charm · ' + D.ITEMS[k].tag;
+    if (D.ITEMS[k] && D.ITEMS[k].mod) return 'Weapon mod · ' + D.ITEMS[k].tag.replace(/^(melee|ranged) mod: /, '$1: ') + ' · tap it, then Fit';   // 0.57 (owner: mods should say what they do)
     if (c === 'tool') return C.n + (k === 'lockpick' ? ' · picks locks, and a material' : ' · opens attic hatches');
     return C.n;
   };
@@ -274,6 +275,10 @@ window.DM = window.DM || {};
     hair11: { n: 'Spiky', kind: 'hair', v: 11, r: 'r' }, hair7: { n: 'Mohawk', kind: 'hair', v: 7, r: 'e' }, hair8: { n: 'Afro', kind: 'hair', v: 8, r: 'e' },
     eyes1: { n: 'Sleepy eyes', kind: 'eyes', v: 1, r: 'c' }, eyes2: { n: 'Happy eyes', kind: 'eyes', v: 2, r: 'c' }, eyes7: { n: 'Wink', kind: 'eyes', v: 7, r: 'r' },
     eyes4: { n: 'Sharp eyes', kind: 'eyes', v: 4, r: 'r' }, eyes3: { n: 'Wide eyes', kind: 'eyes', v: 3, r: 'r' }, eyes5: { n: 'Starry eyes', kind: 'eyes', v: 5, r: 'e' },
+    // 0.57 (owner: "make the blush a Gachapon cosmetic. Make the mouths ... Gachapon as well")
+    face2: { n: 'Rosy blush', kind: 'face', v: 2, r: 'r' },
+    mouth1: { n: 'Grin', kind: 'mouth', v: 1, r: 'c' }, mouth3: { n: 'Smirk', kind: 'mouth', v: 3, r: 'c' }, mouth5: { n: 'Oh! mouth', kind: 'mouth', v: 5, r: 'c' },
+    mouth2: { n: 'Cat mouth :3', kind: 'mouth', v: 2, r: 'r' }, mouth4: { n: 'Tongue out', kind: 'mouth', v: 4, r: 'e' },
   };
   D.lookKey = (kind, v) => Object.keys(D.LOOKUN).find(k => D.LOOKUN[k].kind === kind && D.LOOKUN[k].v === v) || null;
   D.cosHint = k => { const c = D.COS[k]; return { loot: 'Found in houses', corpse: 'Found on zombies', police: 'Police stations', mansion: 'Mansions', horde: 'Horde-night crates', quest: "Dot's quest rewards", trader: 'Trader level ' + c.lv, event: D.EVHINT[k] || 'Seasonal event', gacha: 'Capsule machine', festive: 'Deck the base', boss: D.BOSSHINT[k] || 'Weekly boss' }[c.src]; };

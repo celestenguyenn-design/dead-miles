@@ -1215,6 +1215,15 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   - Head size: Normal 1.42 / Big 1.55 / Extra big 1.66.
 - In LOOK.patch, colour-half lines are found by content (after the outline/colour split), not by index.
 
+## Done in 0.57.0 (owner: more hairstyles, blush and mouths from the capsule machine, floors not painting, "can't move my windows", hook pole should go after one use, mods should say what they do)
+- 2 new free hairstyles: Long pigtails (12, pink scrunchies) and Long side bangs (13, a swept fringe). Listed in LOOK.FREE_HAIR_X.
+- Rosy blush (face 2) and the 5 mouths are capsule unlocks in D.LOOKUN (kinds 'face' and 'mouth'). Clean face, the smile and head size stay free.
+  Face/mouth previews come from LOOK.previewSVG.
+- Base floor paint: the floor is a cached canvas. DM.House.rewall() now rebuilds the walls and the floor; paint calls it.
+- Windows and the clock on the shack's front/back wall can be moved in Decorate (tap one, then tap a wall tile). Saved in base.walls.
+- The hook pole is used up when you pull down an attic hatch.
+- Weapon mods show their effect: workbench names, catLine ("Weapon mod · ..."), the Gear mods line, and loot tags.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

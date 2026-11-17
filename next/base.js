@@ -226,6 +226,10 @@
     for (const k in SPOTS) { if (k === ignore) continue; const [x, y, w, h] = spotOf(k); for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) R.add((x + i) + ',' + (y + j)); if (k === 'chest' || k === 'bench') R.add(x + ',' + (y + h)); }
     return R;
   }
+  const WALL_DEF = { '7,11': 'window', '11,11': 'window', '12,11': 'window', '8,5': 'window', '10,5': 'clock' };
+  const WALL_N = { window: 'window', clock: 'clock' };
+  // a tap on (or just above) a shack wall: the wall tile it means, or null
+  const wallTile = (tx, ty) => { for (const y of [ty, ty + 1]) if ((y === SY0 || y === SY1) && tx > SX0 && tx < SX1 && !(tx === DOOR[0] && y === DOOR[1])) return [tx, y]; return null; };
   function layout() {
     const rows = [];
     for (let y = 0; y < MH; y++) {
@@ -240,7 +244,7 @@
       id: 'base', type: 'base', name: 'Your base', address: 'your base', rows, doors: { [DOOR.join(',')]: 'i' },
       rooms: { Y: { name: 'Yard', style: 'Y' }, X: { name: 'Outside the walls', style: 'X' }, i: { name: 'Shack', style: 'w' } },
       street: 'Y', streetY: MH + 6, noStreet: true, stoop: { x: 10 }, frontDoor: DOOR.join(','), start: { x: 9.5, y: 13.5 },
-      decor: { '7,11': 'window', '11,11': 'window', '12,11': 'window', '8,5': 'window', '10,5': 'clock' },
+      decor: Object.assign({}, (base() && base().walls) || WALL_DEF),   // 0.57: windows + clock can be moved (Decorate)
       rugs: [], zombies: [], secrets: [], furn: [], wanderer: false, emptyPct: 0,
     };
   }
@@ -666,6 +670,17 @@
       const o = { id: 'd' + (++base().seq), k: S.pend, x, y, r: 0, m: 0, rv: 2 }; base().decor.push(o); S.sel = o.id; S.pend = null;
       G().save(); syncDecor(); SFX.play('pick'); editBar(); toast('Placed. Tap it to move, turn or store it.', 1.8); return true;
     }
+    // 0.57 (owner: "I also still can't move my windows"): windows and the clock on the shack walls
+    if (S.wsel) {
+      const wt = wallTile(tx, ty); if (!wt) { toast('Windows go on the front or back wall of the shack', 1.8); return true; }
+      const L0 = House().L, k = wt.join(','); if (k === S.wsel) { S.wsel = null; editBar(); return true; }
+      if (L0.decor[k] && WALL_N[L0.decor[k]]) { toast('There is already something there', 1.4); return true; }
+      if (occ('wall').has(k)) { toast('A poster is in the way', 1.4); return true; }
+      const b = base(), w = Object.assign({}, b.walls || WALL_DEF), kind = w[S.wsel]; delete w[S.wsel]; w[k] = kind; b.walls = w;
+      delete L0.decor[S.wsel]; L0.decor[k] = kind; S.wsel = null; G().save(); House().rewall(); SFX.play('pick'); editBar(); toast(`${kind === 'clock' ? 'Clock' : 'Window'} moved`, 1.4); return true;
+    }
+    { const L0 = House().L, wt = wallTile(tx, ty), kind = wt && L0.decor[wt.join(',')];
+      if (!S.psel && kind && WALL_N[kind] && !decorAt(wx, wy)) { S.wsel = wt.join(','); S.sel = null; S.psel = null; SFX.play('ui'); editBar(); return true; } }
     // 0.52: moving a build piece - picked one: this tap places it (its top-left at the tapped tile, centred)
     if (S.psel) {
       const k = S.psel, [, , w, h] = spotOf(k), x = tx - Math.floor((w - 1) / 2), y = ty - Math.floor((h - 1) / 2), R = reserved(k), taken = occ('floor');
@@ -699,7 +714,7 @@
   function openPaint() {
     const p = base().paint, row = (lab, list, key) => `<div class="kick sect">${lab}</div><div class="chips">${list.map((x, i) => `<button class="chip${(p[key] || 0) === i ? ' on' : ''}" data-pt="${key}:${i}"${x[1] && Array.isArray(x[1]) ? ` style="border-color:${x[1][0]}"` : ''}>${x[1] && Array.isArray(x[1]) ? `<i style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${x[1][0]};margin-right:5px;vertical-align:-1px"></i>` : ''}${esc(x[0])}</button>`).join('')}</div>`;
     panel(`<div class="kick">Decorate</div><h3>Paint the shack</h3>${row('Walls', WALLS, 'wall')}${row('Wall style', WKIND, 'wkind')}${row('Floor', FLOORS, 'floor')}<p class="mp dim">Free - change it whenever you like.</p><button class="mbtn" data-close>Done</button>`, 1);
-    $('#msheet').querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { const [k, i] = b.dataset.pt.split(':'); p[k] = +i; G().save(); ART.houseLook(null); B.applyPaint(); const g = House().G; if (g) { g.wallCache = null; g.floorCache = null; } if (House().refresh) House().refresh(); SFX.play('pick'); openPaint(); });
+    $('#msheet').querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { const [k, i] = b.dataset.pt.split(':'); p[k] = +i; G().save(); ART.houseLook(null); B.applyPaint(); const g = House().G; if (g) { g.wallCache = null; g.floorCache = null; } if (House().refresh) House().refresh(); if (House().rewall) House().rewall();   /* 0.57: the floor is a cached layer - redraw it now */ SFX.play('pick'); openPaint(); });
   }
   function decorCounts() { // what can be placed: the decor box, then stash, then pack
     const c = {}; for (const k in base().box) if (base().box[k] > 0) c[k] = (c[k] || 0) + base().box[k];
@@ -716,10 +731,10 @@
   }
   function editBar() {
     const el = $('#editbar'), sel = S.sel && base().decor.find(o => o.id === S.sel);
-    el.innerHTML = `<div class="ehint">${S.psel ? `Moving the <b>${esc(MOVABLE[S.psel].toLowerCase())}</b> · tap where it goes` : S.pend ? `Tap where the <b>${D.ITEMS[S.pend].n.toLowerCase()}</b> goes` : sel ? `<b>${D.ITEMS[sel.k].n}</b> · tap a spot to move it` : 'Tap decor or a build piece (chest, workbench...) to move it'}</div>
+    el.innerHTML = `<div class="ehint">${S.wsel ? `Moving the <b>${House().L.decor[S.wsel] === 'clock' ? 'clock' : 'window'}</b> · tap a spot on the front or back wall` : S.psel ? `Moving the <b>${esc(MOVABLE[S.psel].toLowerCase())}</b> · tap where it goes` : S.pend ? `Tap where the <b>${D.ITEMS[S.pend].n.toLowerCase()}</b> goes` : sel ? `<b>${D.ITEMS[sel.k].n}</b> · tap a spot to move it` : 'Tap decor, a build piece (chest, workbench...) or a window to move it'}</div>
       <div class="erow">${S.pend ? '<button class="mbtn sm ghost" id="eCancel">Cancel</button>' : `<button class="mbtn sm" id="eBox">Decor box</button>${sel ? `${D.DECOR[sel.k].wall ? '' : '<button class="mbtn sm ghost" id="eRot">Rotate</button>'}<button class="mbtn sm ghost" id="eFlip">Turn</button>` + '<button class="mbtn sm ghost" id="eStore">Store</button>' : ''}`}<button class="mbtn sm ghost" id="ePaint">Paint</button><button class="mbtn sm" id="eDone">Done</button></div>`;
     const on = (id, fn) => { const b = $('#' + id); if (b) b.onclick = e => { e.stopPropagation(); SFX.play('ui'); fn(); }; };
-    on('eBox', openDecorBox); on('eCancel', () => { S.pend = null; S.psel = null; editBar(); }); on('eDone', () => { S.psel = null; setEdit(false); }); on('ePaint', openPaint);
+    on('eBox', openDecorBox); on('eCancel', () => { S.pend = null; S.psel = null; S.wsel = null; editBar(); }); on('eDone', () => { S.psel = null; S.wsel = null; setEdit(false); }); on('ePaint', openPaint);
     // 0.26.1 (owner: "Decorate should have a rotate not just a turn"): Rotate = a quarter turn (front, side, back, other
     // side; long pieces turn their footprint), Turn = mirror left/right
     on('eRot', () => { const r = ((sel.r || 0) + 1) % 4, why = fits(sel.k, sel.x, sel.y, r, sel.id); if (why) { toast('No room to rotate it here', 1.4); return; } sel.r = r; G().save(); syncDecor(); });
