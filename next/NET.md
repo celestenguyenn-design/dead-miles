@@ -43,6 +43,7 @@ anon only:
 | `next_party_get(h,t,code)` | `{ok, party:{code,members,data,created,mine}}`. Empty code = the party I am in. |
 | `next_party_shift(h,t,code,week,kills,defense)` | `{ok, code, week, members, horde:{shifts:{handle:{k,d,n,at}}}, mine}`. Adds one watch shift to `next_parties.data.horde[week]`. `week` must be a Sunday within 8 days of today; kills clamped 0..200 (total 1200), defense 0..500; max 6 shifts per member per week (`error:'max'`). Errors: `auth`, `code`, `member`, `week`. Weeks older than 35 days are pruned; other `data` keys are kept. Migration `next_party_shift` (2026-11-13). |
 | `next_daily_submit(h,t,day,score,detail jsonb)` | 0.18, **not applied yet - SQL in `next/daily.sql`**. `{ok:true, best}` (best = the stored score). The FIRST submission per handle per New York day is kept; later ones change nothing. `day` must be today or yesterday (New York) else `error:'day'`; score clamped 0..100000; detail ≤2 KB object. Table `next_daily` (day, handle) pk. |
+| `next_push_save(h,t,endpoint,p256dh,auth,tz,plan)` | 0.64, `next/push.sql`. `{ok}` / `error:'auth'|'format'|'too_big'` (plan array ≤4 KB). Upsert by endpoint. `next_push_drop(h,t,endpoint)` removes it. `next_push_targets/_mark/_gone(secret,...)` are for push-send.js only (push_ok). |
 | `next_daily_board(day)` | 0.18. `[{handle, name, score, detail, at}]`, score desc, top 50. `name` from `next_board`, else the handle. |
 
 Existing RPCs used as they are: `register_player`, `recover_login`, `set_recovery`,
