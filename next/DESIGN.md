@@ -1255,6 +1255,13 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   The party sheet has an "Invite friends" list from the board plus a handle box. checkInvites() on the home screen shows a Join / No thanks card.
 - Item popup buttons wrap and grow to fit (.sact .mbtn, .mbtn.eqbig); the popup scrolls if it's tall.
 
+## Done in 0.61.0 (owner + Isabel: wood and duct tape run out; "lower resources some more"; scarce on purpose, "walk and get it")
+- Houses: cloth, nails and scrap x0.78 in every LOOT table (the cut becomes empty draws). Wood and duct tape unchanged.
+  Audit of 60 houses, per house: cloth 1.85 -> 1.1, nails 1.8 -> 1.0, scrap 1.7 -> 1.3, tape ~0.7, wood ~0.4. 60 houses is a noisy sample (about 20%).
+- Walk finds, still 1 item each: wood 8 -> 10, tape 6 -> 8, scrap 14 -> 12, cloth 10 -> 8.
+  A full day of 12 finds gives about 1.2 wood and 0.9 tape (was 0.9 and 0.7).
+- Idea, not done: typed steps count the same as phone steps. The owner thinks one player types a lot (75k steps in 4 days).
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

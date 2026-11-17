@@ -18,7 +18,8 @@ window.DM = window.DM || {};
   const today = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
   const FIND_STEP = 1000, FIND_MAX = 12, FIX_STEP = 1500, BAG = 2;
   // what turns up on a walk (weights): common junk and supplies; rarely something good
-  const FINDS = [[['scrap', 1], 14], [['cloth', 1], 10], [['wood', 1], 8], [['nails', 3], 8], [['beans', 1], 7], [['water', 1], 7], [['snack', 1], 6], [['tape', 1], 6],
+  const FINDS = [[['scrap', 1], 12], [['cloth', 1], 8],   // 0.61: a little more wood + tape, a little less scrap + cloth
+    [['wood', 1], 10], [['nails', 3], 8], [['beans', 1], 7], [['water', 1], 7], [['snack', 1], 6], [['tape', 1], 8],
     [['battery', 1], 4], [['lockpick', 1], 4], [['bandage', 1], 3], [['drink', 1], 4], [['book', 1], 3], [['cache2', 1], 2], [['bp_*', 1], .7], [['cache5', 1], .5],
     [['col_*', 1], 3], [['charm_*', 1], .3]];   // 0.53: collectibles (mostly roadside postcards) + walking charms
   const LUCKY = { cache2: 1, cache5: 1, 'bp_*': 1, 'col_*': 1, 'charm_*': 1 };   // the Rabbit's foot doubles these

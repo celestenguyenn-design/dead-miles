@@ -525,6 +525,9 @@ window.DM = window.DM || {};
   // weapons a house (0.47 kitchen knives) and ~1.9 sell-only junk; weapons never stack. Weapons x0.5 (knives x0.3), junk
   // x0.6 in every LOOT table (cut weight -> empty draws). Jackpots unchanged. Building materials untouched.
   for (const t in D.LOOT) { const w = D.LOOT[t][1]; for (const k of Object.keys(w)) { if (k === '__none' || !D.ITEMS[k]) continue; const m = k === 'knife' ? .3 : k === 'key' ? .45 : D.isWeapon(k) ? .5 : D.cat(k) === 'sell' ? .6 : 1; /* 0.50.2: brass keys x0.45 */ if (m < 1) { const cut = w[k] * (1 - m); w[k] = +(w[k] * m).toFixed(3); w.__none = +((w.__none || 0) + cut).toFixed(3); } } }
+  // 0.61 (owner: "lowering resources some more" - cloth, nails and scrap piled up): x0.78 in every LOOT table
+  // (the cut becomes empty draws). Wood and duct tape stay as they are: scarce on purpose, walking brings a little more.
+  for (const t in D.LOOT) { const w = D.LOOT[t][1]; for (const k of ['cloth', 'nails', 'scrap']) if (w[k]) { const cut = w[k] * .22; w[k] = +(w[k] * .78).toFixed(3); w.__none = +((w.__none || 0) + cut).toFixed(3); } }
   // 0.10: the one guaranteed prize in a key-locked room / car trunk (gen.js jackpots). Each entry: [weight, items].
   D.JACK = {
     gun: [[3, ['pistol', 'ammo', 'ammo']], [2, ['shotgun', 'shells', 'shells']], [2, ['ammo', 'ammo', 'ammo', 'ammo', 'ammo', 'ammo']], [1, ['machete']], [1, ['spikedbat']], [1, ['axe']], [1, ['cosP_*']], [1, ['lockset']]],   // 0.30: real guns
