@@ -1294,7 +1294,21 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   - Ending the partnership deletes the shared days.
 - Radio lines: neighborhood 50% / 100%, partner nudges, radio contact, pair requests.
 
-## NEXT UP (handoff, updated 2026-11-14)
+## NEXT UP (handoff, updated 2026-11-17 - read this first in a new chat)
+### 0. Open decisions / requests from the owner (2026-11-17)
+- Isabel ('isa') is on NET.cfg.trustedTyped (net.js), so her TYPED steps are recorded as phone steps. That means they
+  count everywhere as "real" steps, including the 0.63 city horde / neighborhood / co-op and the buddy and supply runs.
+  The owner doubts some of her numbers (91k steps in a week); her phone sync does not work. ASK the owner whether to keep her trusted.
+- "Can we send notifications to play": real push (app closed) is NOT built. It needs a service worker push handler,
+  Web Push VAPID keys (private key as a Supabase Edge Function secret), a push_subscriptions table, and an Edge Function
+  on a schedule. On iPhone it only works when the game is added to the Home Screen (iOS 16.4+).
+  The radio notifications in life.js only fire while the page is alive.
+- 0.63 city / co-op is untested with real players: the owner will test with Isabel.
+- Active players (next_saves, 2026-11-17): isa, celeste, bayside-queens (Anson) and bubba play regularly; brooklyn (David),
+  tiff and bob drop in; sheepshead and tomsoo never started. The city horde minimum of 200k a week is reachable by this group.
+- Supabase MCP apply_migration times out waiting for an approval the owner doesn't see. The owner can paste SQL in the
+  dashboard's SQL Editor instead (that is how city.sql was applied). execute_sql works.
+### (older handoff, 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
 ### 2. Owner's list (2026-11-14), still to do, in this order
