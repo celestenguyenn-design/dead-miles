@@ -1277,6 +1277,23 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - First-steps crate: life.first = 'new' is set only when a character is made from 0.62 on. At 300 walked steps: a 2 km cache, supplies and 30 caps.
   Existing saves never get it. Step setup stays mandatory, as before.
 
+## Done in 0.63.0 - city.js (DM.City) + city.sql (owner: weekly city horde, reclaim the neighborhood, long-distance survivors "cannot be unlocked by ONE person only ... a coop thing")
+- Server (city.sql; the owner ran it in the SQL editor because the MCP approval kept timing out):
+  - City: next_city(week, handle, hood, steps), with next_city_report and next_city_get (totals per hood, no handles).
+  - Pairs: next_pairs, next_pair_asks, next_pair_days, with next_pair_ask / _answer / _leave / _sync.
+  - Tested with throwaway players inside a rolled-back DO block.
+- Only real steps are sent (phone + walk per day, SV.city.days by ISO date; typed never counts). Reports go out every 3 minutes from the home screen.
+- Reclaim: pick a neighborhood from a fixed list (Brooklyn / Manhattan / Queens / Bronx / Staten Island / Georgia / elsewhere).
+  - 60k steps per walker clears it (% = steps / (60k x walkers)).
+  - Cleared at week's end: +50 caps + 1 token for everyone there who walked 5k+.
+- City horde: the horde-night week (Sunday 9 PM New York). Goal = max(200k, 45k x players).
+  - Reached: everyone with 5k+ that week claims 100 caps + 2 tokens, from last week's data in the sheet.
+- Long-distance survivors: one partner each, and both must say yes. Shared steps = min(mine, theirs) since pairing.
+  - Tiers at 15k / 50k / 120k / 250k pay caps, tokens and items (TV stand, hiking backpack, hero cape, bat wings). Each partner claims their own.
+  - Radio contact: both 3k+ real steps the same day = +1 token and 15 caps each.
+  - Ending the partnership deletes the shared days.
+- Radio lines: neighborhood 50% / 100%, partner nudges, radio contact, pair requests.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
