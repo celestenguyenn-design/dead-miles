@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.58.0';
+const NEXT_VERSION = '0.59.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -843,12 +843,15 @@ const NEXT_VERSION = '0.58.0';
     if (benchHost && !document.body.contains(benchHost)) benchHost = null;
     const s = SV.survivor, el = benchHost || $('#mpane');
     if (benchHost && benchSel) { el.innerHTML = benchDetailHTML(benchSel); bindDetail(el); return; }
-    const unknown = Object.keys(D.RECIPES).filter(k => !s.known.includes(k));
-    el.innerHTML = (DM.Trades ? `<div class="ktwrap">${DM.Trades.kitchenHTML(icon)}</div>` : '') + `<div class="kick sect">Workbench · ${s.known.length} recipe${s.known.length === 1 ? '' : 's'} known · 🔨 Crafting level ${DM.Trades ? DM.Trades.lvl('craft') : 1}</div><div class="benchhint">Tap a recipe to see what it does and where to find each material.</div>` + benchRows(s.known, true)
-      + (unknown.length ? `<div class="kick sect">Not learned yet · ${unknown.length}</div>` + benchRows(unknown, false) : '')
-      + `<div class="empty">${unknown.length ? 'Blueprints: Dot trades them, and some turn up in hidden stashes and safes.' : 'You know every blueprint so far.'}<br>Materials come from the stash and the pack.</div>`;
+    const inCat = k => benchCat === 'all' || grpOf(D.RECIPES[k].out[0]) === benchCat;
+    const unknown = Object.keys(D.RECIPES).filter(k => !s.known.includes(k) && inCat(k)), known = s.known.filter(k => D.RECIPES[k] && inCat(k));
+    const bar = `<div class="catf">${[['all', 'All']].concat(DM.Trades ? [['kitchen', '🍳 Kitchen']] : [], CATF.slice(1).filter(([g]) => Object.keys(D.RECIPES).some(k => grpOf(D.RECIPES[k].out[0]) === g))).map(([g, lab]) => `<button class="chip${benchCat === g ? ' on' : ''}" data-bc="${g}">${lab}</button>`).join('')}</div>`;   // 0.59: bench tabs
+    el.innerHTML = bar + (benchCat === 'kitchen' && DM.Trades ? `<div class="ktwrap">${DM.Trades.kitchenHTML(icon)}</div>` : `<div class="kick sect">Workbench · ${s.known.length} recipe${s.known.length === 1 ? '' : 's'} known · 🔨 Crafting level ${DM.Trades ? DM.Trades.lvl('craft') : 1}</div><div class="benchhint">Tap a recipe to see what it does and where to find each material.${benchCat === 'all' && DM.Trades ? ' Cooking is in the 🍳 Kitchen tab.' : ''}</div>` + benchRows(known, true)
+      + (unknown.length ? `<div class="kick sect">Not learned yet · ${unknown.length}</div>` + benchRows(unknown, false) : ''))
+      + (benchCat === 'kitchen' ? '' : `<div class="empty">${unknown.length ? 'Blueprints: Dot trades them, and some turn up in hidden stashes and safes.' : 'You know every blueprint so far.'}<br>Materials come from the stash and the pack.</div>`);
     el.querySelectorAll('[data-craft]').forEach(b => b.onclick = e => { e.stopPropagation(); craft(b.dataset.craft); });
     if (DM.Trades) DM.Trades.bindKitchen(el, () => reHost());
+    el.querySelectorAll('[data-bc]').forEach(b => b.onclick = () => { if (benchCat === b.dataset.bc) return; benchCat = b.dataset.bc; SFX.play('ui'); renderBench(); });
     el.querySelectorAll('[data-rec]').forEach(b => b.onclick = () => { SFX.play('ui'); openRecipe(b.dataset.rec); });
   }
   function benchDetailHTML(k) {
@@ -1059,7 +1062,7 @@ const NEXT_VERSION = '0.58.0';
   function hideMenu() { $('#menu').classList.add('off'); }
   function showMenu() { $('#menu').classList.remove('off'); }
   let curTab = 'houses';
-  function tab(t) { curTab = t; if (t === 'stash' && SV.survivor.better) { SV.survivor.better = null; Game.save(); } document.querySelectorAll('#mtabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); renderHome(); }
+  function tab(t) { curTab = t; sel = null; { const ip = $('#ipop'); if (ip) ip.classList.remove('on'); }   /* 0.59: an item popup never follows you to another tab */ if (t === 'stash' && SV.survivor.better) { SV.survivor.better = null; Game.save(); } document.querySelectorAll('#mtabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); renderHome(); }
 
   // ---- character creation / edit look
   let cre = { name: '', look: ART.LOOK.norm(null), job: 'scavenger' }, creEdit = false, idleRAF = 0;
@@ -1660,6 +1663,15 @@ const NEXT_VERSION = '0.58.0';
   // ---- pack & stash (0.15: split into Equipped / Backpack / Stash sub-tabs; every item shows its category)
   let sel = null; // {from:'pack'|'stash'|'hands'|'quiver', i}
   let gTab = 'gear';   // which sub-tab of the Gear tab is showing
+  // 0.59 (owner: "the workbench and our stash ... should have their own separate tabs, like weapons, armor, ammo, food")
+  const CATF = [['all', 'All'], ['weapon', 'Weapons'], ['gear', 'Armor & gear'], ['ammo', 'Ammo'], ['food', 'Food'], ['med', 'Meds'], ['mat', 'Materials'], ['other', 'Other']];
+  const grpOf = k => { const c = D.cat(k); return c === 'weapon' ? 'weapon' : c === 'gear' || c === 'tool' ? 'gear' : c === 'ammo' ? 'ammo' : c === 'food' || c === 'drink' ? 'food' : c === 'med' ? 'med' : c === 'mat' || c === 'seed' ? 'mat' : 'other'; };
+  Game.grpOf = grpOf;
+  let catF = 'all', benchCat = 'all';
+  function catBar(list, cur, attr) {   // chips for the groups that have something in them
+    const n = {}; for (const k of list) { const g = grpOf(k); n[g] = (n[g] || 0) + 1; }
+    return `<div class="catf">${CATF.filter(([g]) => g === 'all' || n[g]).map(([g, lab]) => `<button class="chip${cur === g ? ' on' : ''}" ${attr}="${g}">${lab}${g === 'all' ? '' : `<small>${n[g]}</small>`}</button>`).join('')}</div>`;
+  }
   const subOf = from => from === 'pack' ? 'pack' : from === 'stash' ? 'stash' : 'gear';
   const catTag = k => { const c = D.cat(k); return `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
   Game.catTag = catTag;
@@ -1704,16 +1716,19 @@ const NEXT_VERSION = '0.58.0';
       <button class="gline tap" id="gFood"><span class="gi">🍗</span><div><b>Eat &amp; drink</b><span>Hunger ${Math.round(f.h)} · Thirst ${Math.round(f.t)}</span></div><em>›</em></button>`;
     } else if (gTab === 'pack') {
       body = `<div class="ghead"><span class="kick">Backpack · ${s.pack.length}/${packSlots()} slots</span>${s.pack.length > 1 ? '<button class="mini" id="sSortP">Sort</button>' : ''}</div>
-      <div class="grid g4">${s.pack.map((e, i) => slot(e, 'pack', i)).join('')}${empty(packSlots() - s.pack.length)}</div>${A('pack')}
+      ${(() => { if (catF !== 'all' && !s.pack.some(e => grpOf(e.k) === catF)) catF = 'all'; return s.pack.length > 3 ? catBar(s.pack.map(e => e.k), catF, 'data-cf') : ''; })()}
+      <div class="grid g4">${s.pack.map((e, i) => catF === 'all' || grpOf(e.k) === catF ? slot(e, 'pack', i) : '').join('')}${catF === 'all' ? empty(packSlots() - s.pack.length) : ''}</div>${A('pack')}
       ${!s.pack.length ? '<div class="ghint">Empty. Whatever you loot goes here; anything that does not fit is left on the floor.</div>' : !sel ? `<div class="ptools"><button class="mbtn sm" id="sAll">Stash all</button></div><div class="ghint">Tap an item to eat, equip, use or move it.</div>` : ''}`;
     } else {
       const junk = junkOf(s), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n)), 0), away = dotLeft(), shut = !away && dotDone();
       body = `<div class="ghead"><span class="kick">${stashHost ? 'Stash chest' : 'Stash chest · at your base'} · ${s.stash.length}/${stashSlots()}</span>${s.stash.length > 1 ? '<button class="mini" id="sSortS">Sort</button>' : ''}</div>
-      <div class="grid g5">${s.stash.map((e, i) => slot(e, 'stash', i)).join('')}${empty(Math.min(s.stash.length ? (5 - s.stash.length % 5) % 5 + 5 : 10, stashSlots() - s.stash.length))}</div>${A('stash')}
+      ${(() => { if (catF !== 'all' && !s.stash.some(e => grpOf(e.k) === catF)) catF = 'all'; return s.stash.length > 5 ? catBar(s.stash.map(e => e.k), catF, 'data-cf') : ''; })()}
+      <div class="grid g5">${s.stash.map((e, i) => catF === 'all' || grpOf(e.k) === catF ? slot(e, 'stash', i) : '').join('')}${catF !== 'all' ? '' : empty(Math.min(s.stash.length ? (5 - s.stash.length % 5) % 5 + 5 : 10, stashSlots() - s.stash.length))}</div>${A('stash')}
       ${!s.stash.length ? '<div class="ghint">Nothing stored yet. Move things here from the Backpack tab so a bad run cannot cost you them.</div>' : ''}
       ${junk.length && !sel ? `<div class="ptools"><button class="mbtn sm${away || shut ? ' ghost' : ''}" id="sJunk">${away || shut ? `Quick sell junk · half price · ${icon('caps')}${junk.reduce((a, r) => a + pawnVal(r), 0)}` : `Sell junk to Dot · ${icon('caps')}${jv}`}</button></div>` : ''}`;
     }
     el.innerHTML = seg + body;
+    el.querySelectorAll('[data-cf]').forEach(b => b.onclick = () => { if (catF === b.dataset.cf) return; catF = b.dataset.cf; sel = null; SFX.play('ui'); renderStash(); });
     el.querySelectorAll('#gtabs button').forEach(b => { b.classList.toggle('on', b.dataset.g === gTab); b.onclick = () => { if (gTab === b.dataset.g) return; gTab = b.dataset.g; sel = null; SFX.play('ui'); renderStash(); }; });
     if (el.querySelector('#eqWard')) el.querySelector('#eqWard').onclick = () => { SFX.play('ui'); sel = null; stashHost = null; if (DM.scene) { toast('The wardrobe is on the home screen', 1.6); return; } editLook('wardrobe'); };
     if (el.querySelector('#eqNoArmor')) el.querySelector('#eqNoArmor').onclick = () => toast(s.pack.concat(s.stash).some(e => D.ITEMS[e.k] && D.ITEMS[e.k].armor) ? 'Open Backpack or Stash, tap the armor, then Wear' : 'Armor: coat closets, gym lockers, garages, police stations, horde crates, Dot - or craft a padded jacket', 2.6);

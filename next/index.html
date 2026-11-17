@@ -433,6 +433,9 @@
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { height: 34px; padding: 0 12px; border-radius: 11px; background: rgba(17,20,47,.7); border: 2.5px solid var(--plum); color: var(--mute); font-size: 13px; font-weight: 900; }
   .chip.on { background: var(--crm); color: var(--ink); border-color: var(--ink); }
+  /* 0.59: category tabs for the pack, stash and workbench */
+  .catf { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; margin: 4px 0 8px; padding-bottom: 2px; scrollbar-width: none; } .catf::-webkit-scrollbar { display: none; }
+  .catf .chip { flex: none; height: 32px; padding: 0 10px; font-size: 12px; } .catf .chip small { opacity: .7; margin-left: 3px; }
   .mbtn.big.ghost { margin-top: 8px; }
   .portwrap { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; }
   .editlook { margin-top: -4px; padding: 4px 9px; border-radius: 9px; background: var(--plum); border: 2px solid var(--ink); color: var(--crm); font-size: 10px; font-weight: 900; letter-spacing: .04em; }
@@ -924,55 +927,55 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.58.0"></script>
-<script src="art.js?v=0.58.0"></script>
-<script src="net.js?v=0.58.0"></script>
-<script src="netpanel.js?v=0.58.0"></script>
-<script src="syncguide.js?v=0.58.0"></script>
-<script src="events.js?v=0.58.0"></script>
-<script src="data.js?v=0.58.0"></script>
-<script src="food.js?v=0.58.0"></script>
-<script src="skills.js?v=0.58.0"></script>
-<script src="infection.js?v=0.58.0"></script>
-<script src="infected.js?v=0.58.0"></script>
-<script src="engine.js?v=0.58.0"></script>
-<script src="music.js?v=0.58.0"></script>
-<script src="weather.js?v=0.58.0"></script>
-<script src="gen.js?v=0.58.0"></script>
-<script src="raiders.js?v=0.58.0"></script>
-<script src="house.js?v=0.58.0"></script>
-<script src="horde.js?v=0.58.0"></script>
-<script src="base.js?v=0.58.0"></script>
-<script src="armor.js?v=0.58.0"></script>
-<script src="walks.js?v=0.58.0"></script>
-<script src="npcq.js?v=0.58.0"></script>
-<script src="crew.js?v=0.58.0"></script>
-<script src="boss.js?v=0.58.0"></script>
-<script src="daily.js?v=0.58.0"></script>
-<script src="gacha.js?v=0.58.0"></script>
-<script src="tour.js?v=0.58.0"></script>
-<script src="deep.js?v=0.58.0"></script>
-<script src="route.js?v=0.58.0"></script>
-<script src="advent.js?v=0.58.0"></script>
-<script src="install.js?v=0.58.0"></script>
-<script src="logo.js?v=0.58.0"></script>
-<script src="title.js?v=0.58.0"></script>
-<script src="game.js?v=0.58.0"></script>
-<script src="codex.js?v=0.58.0"></script>
-<script src="social.js?v=0.58.0"></script>
-<script src="gifts.js?v=0.58.0"></script>
-<script src="mvt.js?v=0.58.0"></script>
-<script src="mapfx.js?v=0.58.0"></script>
-<script src="mapquest.js?v=0.58.0"></script>
-<script src="mappoi.js?v=0.58.0"></script>
-<script src="camps.js?v=0.58.0"></script>
-<script src="walkfx.js?v=0.58.0"></script>
-<script src="journal.js?v=0.58.0"></script>
-<script src="collect.js?v=0.58.0"></script>
-<script src="charms.js?v=0.58.0"></script>
-<script src="weapons2.js?v=0.58.0"></script>
-<script src="named.js?v=0.58.0"></script>
-<script src="trades.js?v=0.58.0"></script>
-<script src="map.js?v=0.58.0"></script>
+<script src="s2art.js?v=0.59.0"></script>
+<script src="art.js?v=0.59.0"></script>
+<script src="net.js?v=0.59.0"></script>
+<script src="netpanel.js?v=0.59.0"></script>
+<script src="syncguide.js?v=0.59.0"></script>
+<script src="events.js?v=0.59.0"></script>
+<script src="data.js?v=0.59.0"></script>
+<script src="food.js?v=0.59.0"></script>
+<script src="skills.js?v=0.59.0"></script>
+<script src="infection.js?v=0.59.0"></script>
+<script src="infected.js?v=0.59.0"></script>
+<script src="engine.js?v=0.59.0"></script>
+<script src="music.js?v=0.59.0"></script>
+<script src="weather.js?v=0.59.0"></script>
+<script src="gen.js?v=0.59.0"></script>
+<script src="raiders.js?v=0.59.0"></script>
+<script src="house.js?v=0.59.0"></script>
+<script src="horde.js?v=0.59.0"></script>
+<script src="base.js?v=0.59.0"></script>
+<script src="armor.js?v=0.59.0"></script>
+<script src="walks.js?v=0.59.0"></script>
+<script src="npcq.js?v=0.59.0"></script>
+<script src="crew.js?v=0.59.0"></script>
+<script src="boss.js?v=0.59.0"></script>
+<script src="daily.js?v=0.59.0"></script>
+<script src="gacha.js?v=0.59.0"></script>
+<script src="tour.js?v=0.59.0"></script>
+<script src="deep.js?v=0.59.0"></script>
+<script src="route.js?v=0.59.0"></script>
+<script src="advent.js?v=0.59.0"></script>
+<script src="install.js?v=0.59.0"></script>
+<script src="logo.js?v=0.59.0"></script>
+<script src="title.js?v=0.59.0"></script>
+<script src="game.js?v=0.59.0"></script>
+<script src="codex.js?v=0.59.0"></script>
+<script src="social.js?v=0.59.0"></script>
+<script src="gifts.js?v=0.59.0"></script>
+<script src="mvt.js?v=0.59.0"></script>
+<script src="mapfx.js?v=0.59.0"></script>
+<script src="mapquest.js?v=0.59.0"></script>
+<script src="mappoi.js?v=0.59.0"></script>
+<script src="camps.js?v=0.59.0"></script>
+<script src="walkfx.js?v=0.59.0"></script>
+<script src="journal.js?v=0.59.0"></script>
+<script src="collect.js?v=0.59.0"></script>
+<script src="charms.js?v=0.59.0"></script>
+<script src="weapons2.js?v=0.59.0"></script>
+<script src="named.js?v=0.59.0"></script>
+<script src="trades.js?v=0.59.0"></script>
+<script src="map.js?v=0.59.0"></script>
 </body>
 </html>
