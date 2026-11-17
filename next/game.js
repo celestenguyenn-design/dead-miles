@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.55.0';
+const NEXT_VERSION = '0.56.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1076,6 +1076,9 @@ const NEXT_VERSION = '0.55.0';
       <div class="lrow"><div class="kick">Hood${lk.cos && lk.cos.hat ? ' <span class="lnote">· your hat keeps it down</span>' : ''}</div><div class="chips"><button class="chip${lk.hood ? ' on' : ''}" data-k="hood" data-v="1">Up</button><button class="chip${!lk.hood ? ' on' : ''}" data-k="hood" data-v="0">Down</button></div></div>
       <div class="lrow"><div class="kick">Eyes</div>${lookChips('eyes', 'eyes', LK.eyes, lk)}</div>
       <div class="lrow"><div class="kick">Eye colour</div>${sw('eyeC', LK.eyeCols, v => v[0], v => v[1])}</div>
+      <div class="lrow"><div class="kick">Face</div><div class="chips">${LK.faces.map((n, i) => `<button class="chip${(lk.face || 0) === i ? ' on' : ''}" data-k="face" data-v="${i}">${n}</button>`).join('')}</div></div>
+      <div class="lrow"><div class="kick">Mouth</div><div class="chips">${LK.mouths.map((n, i) => `<button class="chip${(lk.mouth || 0) === i ? ' on' : ''}" data-k="mouth" data-v="${i}">${n}</button>`).join('')}</div></div>
+      <div class="lrow"><div class="kick">Head size</div><div class="chips">${LK.heads.map((n, i) => `<button class="chip${(lk.head || 0) === i ? ' on' : ''}" data-k="head" data-v="${i}">${n}</button>`).join('')}</div></div>
       <div class="lrow"><div class="kick">Jacket</div>${sw('coat', LK.coats, v => v[0], v => v[2])}</div>
       <div class="lrow"><div class="kick">Pants</div>${sw('pants', LK.pants, v => v[0], v => v[1])}</div>`;
   }

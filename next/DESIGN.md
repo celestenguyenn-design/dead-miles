@@ -1208,6 +1208,13 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - Implementation: extras go in as f.extra (prepRun, guarded by L._named), and L.namedZ adds to the extra zombies in house.js.
 - Measured in a test run: 17-54 extra items per named house.
 
+## Done in 0.56.0 (owner: "change how my character looks a bit, its not cute enough")
+- Edit look has 3 new rows. Defaults keep the old look; everything is free.
+  - Face: Roughed up / Clean (no bandage, no dirt) / Rosy (clean, pink blush on both cheeks, a little shine).
+  - Mouth: Smile / Grin / Cat :3 / Smirk / Tongue out / Oh!
+  - Head size: Normal 1.42 / Big 1.55 / Extra big 1.66.
+- In LOOK.patch, colour-half lines are found by content (after the outline/colour split), not by index.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
