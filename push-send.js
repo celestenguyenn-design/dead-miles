@@ -149,6 +149,54 @@ function decide(row, everyone) {
   return out;
 }
 
+// ---------------------------------------------------------------- the new game (/next/, 0.64, next/push.sql)
+// Each subscription carries a "plan" the game timed while it was open (horde 24 h / 3 h, food, garden,
+// been away). Items are sent once their time has come (up to 3 hours late, never older). Two live
+// nudges are worked out here: a quiet evening and a long-distance partner who walked today.
+function decideNext(row) {
+  const now = Date.now(), tz = Number(row.tz || 0);
+  const local = new Date(now + tz * 60000), hour = local.getUTCHours(), day = local.toISOString().slice(0, 10);
+  const sent = row.sent || {}, out = [];
+  for (const p of Array.isArray(row.plan) ? row.plan : []) {
+    if (!p || !p.tag || !p.at || sent[p.tag]) continue;
+    if (p.at <= now && p.at > now - 3 * 36e5) out.push({ tag: p.tag, title: String(p.title || 'Dead Miles').slice(0, 80), body: String(p.body || '').slice(0, 240) });
+  }
+  const steps = Number(row.steps_today || 0);
+  if (hour >= 18 && hour < 21 && steps < 2000 && !sent['quiet-' + day]) {
+    out.push({ tag: 'quiet-' + day, title: 'Quiet out there today', body: `Dot: "${steps ? fmt(steps) + ' steps. ' : ''}Too quiet. A short walk would do you good - and the houses won't scout themselves."` });
+  }
+  const th = Number(row.partner_today || 0);
+  if (row.partner && hour >= 12 && hour < 22 && th >= 3000 && steps < 3000 && !sent['pair-' + day]) {
+    out.push({ tag: 'pair-' + day, title: `${row.partner_name || row.partner} is on the radio`, body: `"I'm at ${fmt(th)} today. Your turn. Over." Both of you at 3,000+ = radio contact.` });
+  }
+  // at most 2 at once, the plan's order first; the rest go next run
+  return { day, msgs: out.slice(0, 2) };
+}
+async function sendNext(TEST) {
+  let rows;
+  try { rows = await rpc('next_push_targets', { p_secret: SECRET }); }
+  catch (e) { console.log('next: not set up yet (run next/push.sql in the Supabase SQL editor). ' + e.message.slice(0, 120)); return; }
+  if (!rows || !rows.length) { console.log('next: no subscribers.'); return; }
+  let sent = 0, dead = 0;
+  for (const row of rows) {
+    const { day, msgs } = TEST
+      ? { day: null, msgs: [{ tag: 'test', title: 'Notifications are on', body: 'Dot here. Horde warnings, food, the garden and your partner come through on this channel now.' }] }
+      : decideNext(row);
+    for (const msg of msgs) {
+      const sub = { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } };
+      try {
+        await webpush.sendNotification(sub, JSON.stringify({ title: msg.title, body: msg.body, tag: msg.tag }), { TTL: 3 * 3600 });
+        if (day) await rpc('next_push_mark', { p_secret: SECRET, p_endpoint: row.endpoint, p_tag: msg.tag, p_mark: day });
+        sent++; console.log(`next: sent ${msg.tag} to ${row.handle}`);
+      } catch (e) {
+        if (e.statusCode === 404 || e.statusCode === 410) { await rpc('next_push_gone', { p_secret: SECRET, p_endpoint: row.endpoint }); dead++; break; }
+        console.log(`next: failed ${msg.tag} for ${row.handle}: ${e.statusCode || ''} ${e.message}`);
+      }
+    }
+  }
+  console.log(`next: ${rows.length} subscription(s), ${sent} sent, ${dead} dead removed.`);
+}
+
 (async () => {
   await keepWarm();
   if (MISSING.length) {
@@ -164,6 +212,8 @@ function decide(row, everyone) {
     console.log('Missing SB_ANON. Nothing sent.');
     return;
   }
+  const TEST = process.env.TEST_PUSH === 'true' || process.env.TEST_PUSH === '1';
+  await sendNext(TEST);   // the new game (/next/) first; it never stops the old game's run below
   const rows = await rpc('push_targets', { p_secret: SECRET });
   if (!rows || !rows.length) { console.log('No subscribers.'); return; }
   console.log(`${rows.length} subscription(s).`);
@@ -173,7 +223,6 @@ function decide(row, everyone) {
   // say, which makes "it works" impossible to see from a log line. Running the
   // workflow with the test box ticked sends one push to every subscriber right
   // now. It is NOT recorded in push_mark, so it can never eat a real nudge.
-  const TEST = process.env.TEST_PUSH === 'true' || process.env.TEST_PUSH === '1';
   let sent = 0, dead = 0;
   for (const row of rows) {
     const msgs = TEST

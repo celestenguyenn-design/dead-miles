@@ -1294,15 +1294,32 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   - Ending the partnership deletes the shared days.
 - Radio lines: neighborhood 50% / 100%, partner nudges, radio contact, pair requests.
 
+## Done in 0.64.0 - push.js (DM.Push) + sw.js + push.sql (owner: "build push notifications")
+- Real push, the app CLOSED. Reuses the old game's sender: push-send.js (repo root, GitHub Actions push.yml, every 15 min),
+  the same VAPID key pair and PUSH_SECRET. The old game's push_subs / push_targets are untouched; the new game has its own
+  next_push_subs table + next_push_save / _drop / _targets / _mark / _gone (next/push.sql).
+- next/sw.js: push + notificationclick only. No fetch handler and no caching on purpose (version.txt does updates). Scope /next/.
+- Turn on: Radio sheet (tap the radio bar on home) -> "Turn on notifications". Needs Online sign-in. On iPhone only from the
+  Home Screen app (iOS 16.4+); the sheet says so. Falls back to the 0.62 in-page notifications where push can't work.
+- The plan: the game times nudges while it is open and re-sends them when they change (home tick, every 5 min, on going to
+  the background): horde 24 h and 3 h before Sunday 9 PM NY, not enough food for the crew (7 PM), garden thirsty (5 PM today,
+  noon tomorrow), "Dot hasn't seen you" 2 days after the app was last open (6 PM). Tags match life.js radio keys, so the phone
+  replaces rather than doubles.
+- Live nudges in the sender: quiet evening (6-9 PM local, under 2,000 steps today from step_posts or a same-day board row) and
+  partner (noon-10 PM, partner 3,000+ in next_pair_days and me under 3,000). Each at most once per local day.
+- Plan items go out once their time has come, up to 3 h late, max 2 per subscriber per run. TTL 3 h.
+- Test: run the "Send notifications" workflow with the test box ticked; it now also sends one to every next subscriber.
+
 ## NEXT UP (handoff, updated 2026-11-17 - read this first in a new chat)
 ### 0. Open decisions / requests from the owner (2026-11-17)
 - Isabel ('isa') is on NET.cfg.trustedTyped (net.js), so her TYPED steps are recorded as phone steps. That means they
   count everywhere as "real" steps, including the 0.63 city horde / neighborhood / co-op and the buddy and supply runs.
   The owner doubts some of her numbers (91k steps in a week); her phone sync does not work. ASK the owner whether to keep her trusted.
-- "Can we send notifications to play": real push (app closed) is NOT built. It needs a service worker push handler,
-  Web Push VAPID keys (private key as a Supabase Edge Function secret), a push_subscriptions table, and an Edge Function
-  on a schedule. On iPhone it only works when the game is added to the Home Screen (iOS 16.4+).
-  The radio notifications in life.js only fire while the page is alive.
+  Checked 2026-11-17: 'isa' has 0 rows in step_posts, ever. Her ledger: 16.1k / 21.1k / 21.6k / 16.6k / 15.7k (Nov 13-17), all typed.
+  For comparison (real phone posts): brooklyn 12-21k, tiff 23.5k once, bubba 4-6k, celeste 4-9k.
+- Push (app closed) is built in 0.64. If next_push_targets is missing, the owner has not pasted next/push.sql into the
+  Supabase SQL editor yet (the MCP approval timed out again); the sender logs "next: not set up yet" until then.
+  Not yet seen on a real phone: turn it on from the Radio sheet, then run the workflow with "test" ticked.
 - 0.63 city / co-op is untested with real players: the owner will test with Isabel.
 - Active players (next_saves, 2026-11-17): isa, celeste, bayside-queens (Anson) and bubba play regularly; brooklyn (David),
   tiff and bob drop in; sheepshead and tomsoo never started. The city horde minimum of 200k a week is reachable by this group.

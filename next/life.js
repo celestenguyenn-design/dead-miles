@@ -185,16 +185,28 @@ window.DM = window.DM || {};
     const f = s.radio.feed[0], ago = Math.round((Date.now() - f.at) / 60000);
     return `<button class="radiobar" id="lfRadio"><i>📻</i><span>${esc(f.t)}</span><em>${ago < 1 ? 'now' : ago < 60 ? ago + 'm' : Math.round(ago / 60) + 'h'}</em></button>`;
   };
+  function pushHTML() {   // 0.64
+    if (!('Notification' in window)) { const b = DM.Push && DM.Push.blocker(); return b ? `<p class="mp dim">${esc(b)}</p>` : ''; }
+    if (DM.Push && DM.Push.on()) return '<p class="mp dim">Notifications are on, even with the game closed: horde night, food running out, the garden, your partner, a quiet evening.</p><button class="mbtn sm ghost" id="rdOff">Turn notifications off</button>';
+    const b = DM.Push && DM.Push.blocker();
+    if (L.notifyOn()) return `<p class="mp dim">Notifications are on while the game is open or in the background.${b ? ' ' + esc(b) : ''}</p>${b ? '' : '<button class="mbtn sm" id="rdOn">Also when the game is closed</button>'}<button class="mbtn sm ghost" id="rdOff">Turn notifications off</button>`;
+    return `<p class="mp">Get phone notifications: horde night coming, your crew is out of food, the garden is thirsty, your partner walked.</p>${b ? `<p class="mp dim">${esc(b)}</p>` : ''}<button class="mbtn sm" id="rdOn">Turn on notifications</button>`;
+  }
   function openRadio() {
     const s = st();
     G().ui.sheetOpen(`<div class="kick">Radio</div><h3>What's going on</h3>
-      ${!('Notification' in window) ? '' : L.notifyOn() ? '<p class="mp dim">Phone notifications are on (while the game is open or in the background).</p><button class="mbtn sm ghost" id="rdOff">Turn notifications off</button>'
-        : '<p class="mp">Get these as phone notifications: horde night coming, caches open, your crew is hungry, your pet found something.</p><button class="mbtn sm" id="rdOn">Turn on notifications</button>'}
+      ${pushHTML()}
       <div class="rdfeed">${s.radio.feed.map(f => `<div class="rdrow"><span>${esc(f.t)}</span><em>${new Date(f.at).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</em></div>`).join('') || '<p class="mp dim">Static. Nothing yet.</p>'}</div>
       <button class="mbtn ghost" id="rdClose">Close</button>`);
     document.getElementById('rdClose').onclick = () => G().ui.sheetClose();
-    const on = document.getElementById('rdOn'); if (on) on.onclick = async () => { try { const p = await Notification.requestPermission(); s.radio.push = p === 'granted' ? 1 : 0; G().save(); toast(p === 'granted' ? 'Radio notifications on' : 'Notifications are blocked in your phone settings', 2.2); } catch (e) { toast('This browser cannot show notifications', 2); } openRadio(); };
-    const off = document.getElementById('rdOff'); if (off) off.onclick = () => { s.radio.push = 0; G().save(); openRadio(); };
+    const on = document.getElementById('rdOn'); if (on) on.onclick = async () => {
+      on.disabled = true; on.textContent = 'Turning on...';
+      const P = DM.Push, r = P && !P.blocker() ? await P.enable() : null;   // 0.64: real push, even with the game closed
+      if (r && r.ok) { s.radio.push = 1; G().save(); toast('Notifications on - even with the game closed', 2.4); openRadio(); return; }
+      try { const p = await Notification.requestPermission(); s.radio.push = p === 'granted' ? 1 : 0; G().save(); toast(r && r.why ? r.why : p === 'granted' ? 'Radio notifications on' : 'Notifications are blocked in your phone settings', 3); } catch (e) { toast('This browser cannot show notifications', 2); }
+      openRadio();
+    };
+    const off = document.getElementById('rdOff'); if (off) off.onclick = async () => { s.radio.push = 0; G().save(); if (DM.Push) await DM.Push.disable(); openRadio(); };
   }
 
   // ---------------------------------------------------------------- first steps reward (new characters only)
@@ -212,7 +224,7 @@ window.DM = window.DM || {};
   }
 
   // ---------------------------------------------------------------- hooks for game.js
-  L.tick = function () { buddyTick(); radioTick(); };
+  L.tick = function () { buddyTick(); radioTick(); if (DM.Push) DM.Push.sync(); };   // 0.64: keep the push plan current
   L.tiles = () => { const t = []; const b = buddyTile(); if (b) t.push(b); const r = runTile(); if (r) t.push(r); return t; };
   L.has = k => k === 'buddy' || k === 'commute';
   L.html = k => k === 'buddy' ? L.buddyHTML() : L.runHTML();
