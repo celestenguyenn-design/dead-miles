@@ -1238,6 +1238,12 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   - +3 scrap for a class tier-3 weapon. Mechanics pay half the scrap.
 - Gamestage: quality now counts x4 (was x3), and your best class weapon adds +4 (tier 2) or +9 (tier 3). Example: a Masterwork heavy crossbow on a level 1 = gamestage 22.
 
+## Done in 0.59.0 (owner: "the workbench and our stash ... should have their own separate tabs, like weapons, armor, ammo, food")
+- Pack and stash get category chips (from 4 or more pack items / 6 or more stash items): All / Weapons / Armor & gear / Ammo / Food / Meds / Materials / Other, with counts.
+  Groups come from Game.grpOf(k) over D.cat. The filter only hides slots; indices stay the real ones.
+- Workbench tabs: All / Kitchen / Weapons / Armor & gear / Ammo / Meds. Cooking only shows in the Kitchen tab.
+- Switching main tabs closes any open item popup.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.
