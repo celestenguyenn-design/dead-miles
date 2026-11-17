@@ -320,6 +320,9 @@
   #ipop::before { content: ''; position: absolute; left: calc(var(--ax, 50%) - 8px); top: -8px; border: 8px solid transparent; border-top: 0; border-bottom-color: var(--ora); }
   #ipop.up::before { top: auto; bottom: -8px; border-bottom: 0; border-top: 8px solid var(--ora); }
   #ipop .ipx { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: rgba(255,255,255,.08); color: var(--crm, #f6e3bb); font: 800 13px system-ui; cursor: pointer; }
+  /* 0.60 (owner screenshot: long button labels spilled over the next button): popup buttons grow to fit their text */
+  .sact .mbtn { height: auto; min-height: 40px; white-space: normal; line-height: 1.2; padding-top: 7px; padding-bottom: 7px; text-align: center; max-width: 100%; }
+  #ipop .sact { max-height: 70vh; overflow-y: auto; }
   .sact span { flex: 1 1 100%; font-size: 14px; font-weight: 800; } .sact span b { color: var(--ora); } .sact em { font-style: normal; font-size: 10px; color: var(--ora); }
   #mres, #msheet { position: absolute; inset: 0; z-index: 10; display: none; place-items: center; padding: 16px; background: rgba(7,8,26,.72); }   /* 0.28.4: above the sticky header (5) and tabs (4) */
   #mres.on, #msheet.on { display: grid; }
@@ -574,7 +577,7 @@
   .newtxt { font-style: normal; color: #f07aa8; font-weight: 900; }
   .slot em.up { background: var(--grn); top: -7px; right: -4px; }
   .sact .wst { font-style: normal; font-size: 11px; color: var(--mute); margin-left: 4px; }
-  .mbtn.eqbig { flex: 1 1 100%; height: 50px; font-size: 17px; }
+  .mbtn.eqbig { flex: 1 1 100%; height: auto; min-height: 50px; font-size: 17px; white-space: normal; line-height: 1.2; padding-top: 8px; padding-bottom: 8px; }
   /* creation / edit look tabs + wardrobe */
   #ltabs { display: flex; gap: 6px; margin: -4px 0 10px; }
   #ltabs button { position: relative; flex: 1; height: 42px; border-radius: 12px; background: rgba(17,20,47,.6); color: var(--mute); font-size: 15px; font-weight: 900; border: 2.5px solid var(--plum); }
@@ -927,55 +930,56 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.59.0"></script>
-<script src="art.js?v=0.59.0"></script>
-<script src="net.js?v=0.59.0"></script>
-<script src="netpanel.js?v=0.59.0"></script>
-<script src="syncguide.js?v=0.59.0"></script>
-<script src="events.js?v=0.59.0"></script>
-<script src="data.js?v=0.59.0"></script>
-<script src="food.js?v=0.59.0"></script>
-<script src="skills.js?v=0.59.0"></script>
-<script src="infection.js?v=0.59.0"></script>
-<script src="infected.js?v=0.59.0"></script>
-<script src="engine.js?v=0.59.0"></script>
-<script src="music.js?v=0.59.0"></script>
-<script src="weather.js?v=0.59.0"></script>
-<script src="gen.js?v=0.59.0"></script>
-<script src="raiders.js?v=0.59.0"></script>
-<script src="house.js?v=0.59.0"></script>
-<script src="horde.js?v=0.59.0"></script>
-<script src="base.js?v=0.59.0"></script>
-<script src="armor.js?v=0.59.0"></script>
-<script src="walks.js?v=0.59.0"></script>
-<script src="npcq.js?v=0.59.0"></script>
-<script src="crew.js?v=0.59.0"></script>
-<script src="boss.js?v=0.59.0"></script>
-<script src="daily.js?v=0.59.0"></script>
-<script src="gacha.js?v=0.59.0"></script>
-<script src="tour.js?v=0.59.0"></script>
-<script src="deep.js?v=0.59.0"></script>
-<script src="route.js?v=0.59.0"></script>
-<script src="advent.js?v=0.59.0"></script>
-<script src="install.js?v=0.59.0"></script>
-<script src="logo.js?v=0.59.0"></script>
-<script src="title.js?v=0.59.0"></script>
-<script src="game.js?v=0.59.0"></script>
-<script src="codex.js?v=0.59.0"></script>
-<script src="social.js?v=0.59.0"></script>
-<script src="gifts.js?v=0.59.0"></script>
-<script src="mvt.js?v=0.59.0"></script>
-<script src="mapfx.js?v=0.59.0"></script>
-<script src="mapquest.js?v=0.59.0"></script>
-<script src="mappoi.js?v=0.59.0"></script>
-<script src="camps.js?v=0.59.0"></script>
-<script src="walkfx.js?v=0.59.0"></script>
-<script src="journal.js?v=0.59.0"></script>
-<script src="collect.js?v=0.59.0"></script>
-<script src="charms.js?v=0.59.0"></script>
-<script src="weapons2.js?v=0.59.0"></script>
-<script src="named.js?v=0.59.0"></script>
-<script src="trades.js?v=0.59.0"></script>
-<script src="map.js?v=0.59.0"></script>
+<script src="s2art.js?v=0.60.0"></script>
+<script src="art.js?v=0.60.0"></script>
+<script src="net.js?v=0.60.0"></script>
+<script src="netpanel.js?v=0.60.0"></script>
+<script src="syncguide.js?v=0.60.0"></script>
+<script src="events.js?v=0.60.0"></script>
+<script src="data.js?v=0.60.0"></script>
+<script src="food.js?v=0.60.0"></script>
+<script src="skills.js?v=0.60.0"></script>
+<script src="infection.js?v=0.60.0"></script>
+<script src="infected.js?v=0.60.0"></script>
+<script src="engine.js?v=0.60.0"></script>
+<script src="music.js?v=0.60.0"></script>
+<script src="weather.js?v=0.60.0"></script>
+<script src="gen.js?v=0.60.0"></script>
+<script src="raiders.js?v=0.60.0"></script>
+<script src="house.js?v=0.60.0"></script>
+<script src="horde.js?v=0.60.0"></script>
+<script src="base.js?v=0.60.0"></script>
+<script src="armor.js?v=0.60.0"></script>
+<script src="walks.js?v=0.60.0"></script>
+<script src="npcq.js?v=0.60.0"></script>
+<script src="crew.js?v=0.60.0"></script>
+<script src="boss.js?v=0.60.0"></script>
+<script src="daily.js?v=0.60.0"></script>
+<script src="gacha.js?v=0.60.0"></script>
+<script src="tour.js?v=0.60.0"></script>
+<script src="deep.js?v=0.60.0"></script>
+<script src="route.js?v=0.60.0"></script>
+<script src="advent.js?v=0.60.0"></script>
+<script src="install.js?v=0.60.0"></script>
+<script src="logo.js?v=0.60.0"></script>
+<script src="title.js?v=0.60.0"></script>
+<script src="game.js?v=0.60.0"></script>
+<script src="codex.js?v=0.60.0"></script>
+<script src="social.js?v=0.60.0"></script>
+<script src="gifts.js?v=0.60.0"></script>
+<script src="mvt.js?v=0.60.0"></script>
+<script src="mapfx.js?v=0.60.0"></script>
+<script src="mapquest.js?v=0.60.0"></script>
+<script src="mappoi.js?v=0.60.0"></script>
+<script src="camps.js?v=0.60.0"></script>
+<script src="walkfx.js?v=0.60.0"></script>
+<script src="journal.js?v=0.60.0"></script>
+<script src="collect.js?v=0.60.0"></script>
+<script src="charms.js?v=0.60.0"></script>
+<script src="weapons2.js?v=0.60.0"></script>
+<script src="named.js?v=0.60.0"></script>
+<script src="trades.js?v=0.60.0"></script>
+<script src="progress.js?v=0.60.0"></script>
+<script src="map.js?v=0.60.0"></script>
 </body>
 </html>

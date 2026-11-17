@@ -1244,6 +1244,17 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - Workbench tabs: All / Kitchen / Weapons / Armor & gear / Ammo / Meds. Cooking only shows in the Kitchen tab.
 - Switching main tabs closes any open item popup.
 
+## Done in 0.60.0 (owner: "more skills ... and blueprints ... progressing pretty fast ... I have all the blueprints"; "add a invite to party option"; popup text overflow screenshot)
+- progress.js: skill ranks 6-8 for the 5 general trees. They cost 3/4/5 points and need survivor level 12/18/25; SK.block checks R.lv.
+  New Walker tree for everyone (6 ranks: cache speed, +finds/day, find step, lucky finds, gear upkeep; last rank level 15),
+  read by walkfx.js through SK.walkFindStep / walkFindMax / walkLucky / walkFix / walkCache.
+- 16 new blueprints: tier-2 weapons, crossbow, arrow bundle, reloaded 9mm, charms, plate carrier, herbal remedy,
+  antibiotics, hiking backpack, cheap silencer. Each has a Crafting level (cl, 2-10) needed to learn it. Older advanced
+  blueprints got cl too. Game.applyUse refuses below that level and the item stays.
+- Party invites (invites.sql, migration next_party_invites): next_party_invite / next_party_invites (claim on read, 20 a day).
+  The party sheet has an "Invite friends" list from the board plus a handle box. checkInvites() on the home screen shows a Join / No thanks card.
+- Item popup buttons wrap and grow to fit (.sact .mbtn, .mbtn.eqbig); the popup scrolls if it's tall.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

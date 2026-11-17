@@ -23,8 +23,9 @@ window.DM = window.DM || {};
     [['col_*', 1], 3], [['charm_*', 1], .3]];   // 0.53: collectibles (mostly roadside postcards) + walking charms
   const LUCKY = { cache2: 1, cache5: 1, 'bp_*': 1, 'col_*': 1, 'charm_*': 1 };   // the Rabbit's foot doubles these
   const on = k => DM.Charm && DM.Charm.on(k);
-  const findStep = () => on('pedo') ? 750 : FIND_STEP, findMax = () => on('mapcase') ? 16 : FIND_MAX;
-  const wOf = f => f[1] * (LUCKY[f[0][0]] && on('rabbit') ? 2 : 1);
+  const SKW = (k, d) => DM.Skills && DM.Skills[k] ? DM.Skills[k]() : d;   // 0.60: the Walker skill tree (progress.js)
+  const findStep = () => Math.round((on('pedo') ? 750 : FIND_STEP) * SKW('walkFindStep', 1)), findMax = () => (on('mapcase') ? 16 : FIND_MAX) + SKW('walkFindMax', 0);
+  const wOf = f => f[1] * (LUCKY[f[0][0]] ? (on('rabbit') ? 2 : 1) * SKW('walkLucky', 1) : 1);
   function st() {
     const v = SV(); v.wfx = v.wfx || { mark: v.walked || 0, day: '', finds: 0, left: [], fix: v.walked || 0, bag: [] };
     const w = v.wfx; if (w.day !== today()) { w.day = today(); w.finds = 0; }
@@ -56,7 +57,7 @@ window.DM = window.DM || {};
       if (lost && lost.length) toast('Your stash is full - some walk finds were left behind', 2.4);
     }
     // gear upkeep
-    const FX = on('walkman') ? FIX_STEP / 2 : FIX_STEP, fixes = Math.floor((walked - w.fix) / FX);
+    const FX = (on('walkman') ? FIX_STEP / 2 : FIX_STEP) / SKW('walkFix', 1), fixes = Math.floor((walked - w.fix) / FX);
     if (fixes > 0) {
       w.fix += fixes * FX;
       const s = v.survivor, h = s.hands;
@@ -64,7 +65,7 @@ window.DM = window.DM || {};
       if (s.armor && DM.Armor) { const A = D().ITEMS[s.armor.k] && D().ITEMS[s.armor.k].armor; if (A) s.armor.d = Math.min(A.dur, DM.Armor.dur(s.armor) + Math.ceil(A.dur * .04 * fixes)); }
     }
     // walking caches
-    for (const c of w.bag) if (c.got < c.need) { c.got = Math.min(c.need, c.got + Math.round(delta * (on('compass') ? 1.25 : 1))); if (c.got >= c.need) toast(`📦 Your ${D().ITEMS[c.k].n.toLowerCase()} is open! Collect it on the home screen`, 3); }
+    for (const c of w.bag) if (c.got < c.need) { c.got = Math.min(c.need, c.got + Math.round(delta * (on('compass') ? 1.25 : 1) * SKW('walkCache', 1))); if (c.got >= c.need) toast(`📦 Your ${D().ITEMS[c.k].n.toLowerCase()} is open! Collect it on the home screen`, 3); }
     G().save();
   };
   // ---------------------------------------------------------------- the walk report card (home screen)
