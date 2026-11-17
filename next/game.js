@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.59.0';
+const NEXT_VERSION = '0.60.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -638,7 +638,9 @@ const NEXT_VERSION = '0.59.0';
   Game.applyUse = function (k) {
     const s = SV.survivor, it = D.ITEMS[k];
     if (it.slots) { if ((s.packBonus || 0) + it.slots > 8) { toast('Your pack can\'t take more upgrades', 1.8); return null; } s.packBonus = (s.packBonus || 0) + it.slots; Game.save(); return `${it.n} fitted: pack is now ${packSlots()} slots`; }
-    if (it.bp) { if (s.known.includes(it.bp)) { toast('You already know that one', 1.6); return null; } s.known.push(it.bp); Game.save(); return 'Learned: ' + D.RECIPES[it.bp].n; }
+    if (it.bp) { if (s.known.includes(it.bp)) { toast('You already know that one', 1.6); return null; }
+      { const cl = (D.RECIPES[it.bp] || {}).cl; if (cl && DM.Trades && DM.Trades.lvl('craft') < cl) { toast(`Too advanced for now - needs Crafting level ${cl} (you're ${DM.Trades.lvl('craft')}). Keep it and craft more.`, 2.8); return null; } }   /* 0.60 */
+      s.known.push(it.bp); Game.save(); return 'Learned: ' + D.RECIPES[it.bp].n; }
     if (k === 'shoes') { if (s.shoes) { toast('Already wearing them', 1.4); return null; } s.shoes = true; Game.save(); return 'Quiet shoes on: footsteps 30% quieter'; }
     if (k === 'lockset') { if (s.lockset) { toast('You already carry a set', 1.4); return null; } s.lockset = true; Game.save(); return 'Lockpick set: locks feel easier'; }
     return null;
@@ -835,7 +837,7 @@ const NEXT_VERSION = '0.59.0';
     return keys.map(k => {
       const r = D.RECIPES[k], ok = known && canCraft(r), out = r.out[0];
       return `<div class="recipe tap${ok ? '' : ' no'}${known ? '' : ' locked'}" data-rec="${k}"><div class="rout">${icon(out)}${r.out[1] > 1 ? `<em>x${r.out[1]}</em>` : ''}</div>
-        <div class="rinfo"><b>${r.n}</b>${known ? '' : '<div class="bpneed">Blueprint needed - Dot trades them</div>'}<div class="rin">${Object.keys(r.in).map(m => { const have = countItem(m); return `<span class="${have >= r.in[m] ? 'ok' : 'miss'}">${icon(m)}<i>${D.ITEMS[m].n}</i> ${have}/${r.in[m]}</span>`; }).join('')}</div></div>
+        <div class="rinfo"><b>${r.n}</b>${known ? '' : `<div class="bpneed">Blueprint needed - Dot trades them${r.cl ? ` · learn at Crafting level ${r.cl}` : ''}</div>`}<div class="rin">${Object.keys(r.in).map(m => { const have = countItem(m); return `<span class="${have >= r.in[m] ? 'ok' : 'miss'}">${icon(m)}<i>${D.ITEMS[m].n}</i> ${have}/${r.in[m]}</span>`; }).join('')}</div></div>
         ${known ? `<button class="mbtn sm${ok ? '' : ' ghost'}" data-craft="${k}"${ok ? '' : ' disabled'}>Craft</button>` : '<span class="rlock">?</span>'}</div>`;
     }).join('');
   }
@@ -1527,6 +1529,7 @@ const NEXT_VERSION = '0.59.0';
     if (DM.Camps && SV.tutorialDone) { const cp = DM.Camps.tile(); if (cp) t.push(cp); }   // 0.46: camps
     if (DM.Social && SV.tutorialDone) { const so = DM.Social.tile(); if (so) t.push(so); }   // 0.40: party walk + friends race
     if (DM.Gifts) DM.Gifts.check();   // 0.41: gifts from friends land in the stash
+    checkInvites();   // 0.60: party invites
     if (window.NET && NET.ok && NET.name && SV.survivor.name === 'Survivor') publish();   // 0.42.1: pick up the account name
     if (DM.Journal) { const jt = DM.Journal.tile(); if (jt) t.push(jt); }   // 0.50
     if (DM.Collect && SV.tutorialDone) { const ct = DM.Collect.tile(); if (ct) t.push(ct); }   // 0.53
@@ -1603,6 +1606,19 @@ const NEXT_VERSION = '0.59.0';
     if ((SV.horde.weeks[n.week] || {}).n >= HD.MAX_SHIFTS) { toast('You did all your shifts this week', 1.8); return; }
     goBase({ shift: true, week: n.week });
   }
+  // 0.60: party invites arrive like gifts; one card at a time: Join / No thanks
+  let invAt = 0, invQ = [];
+  async function checkInvites() {
+    const N = window.NET; if (!N || !N.ok || !SV.tutorialDone) return;
+    if (Date.now() - invAt > 60e3) { invAt = Date.now(); try { invQ = invQ.concat(await N.partyInvites()); } catch (e) { /* offline */ } }
+    if (!invQ.length || DM.scene || $('#msheet').classList.contains('on')) return;
+    const iv = invQ.shift(), cur = N.party && N.party.code;
+    if (cur === iv.code) { checkInvites(); return; }
+    sheetOpen(`<div class="kick">Party invite</div><h3>${esc(iv.name || iv.from)} invited you</h3><p class="mp">Join the party <b>${esc(iv.code)}</b>? Everyone in a party shares horde night: one big horde, everyone's watch-shift kills count.${cur ? ` You'll leave <b>${esc(cur)}</b>.` : ''}</p>
+      <button class="mbtn big" id="ivYes">Join ${esc(iv.code)}</button><button class="mbtn big ghost" id="ivNo">No thanks</button><p class="mp dim" id="ivMsg"></p>`);
+    $('#ivNo').onclick = () => { sheetClose(); setTimeout(checkInvites, 400); };
+    $('#ivYes').onclick = async () => { $('#ivMsg').textContent = 'Joining...'; const r = await N.partyJoin(iv.code); if (r.ok) { sheetClose(); renderHome(); toast(`Joined ${r.code}!`, 1.8); } else $('#ivMsg').textContent = r.error || 'Could not join'; };
+  }
   function partySheet() {
     const N = window.NET, p = N && N.party;
     if (!N || !N.ok) { sheetOpen(`<div class="kick">Horde night</div><h3>Party</h3><p class="mp">Up to 6 friends share one horde. Sign in first (Account & friends), then everyone types the same party code.</p><button class="mbtn" id="pAcc">Account &amp; friends</button><button class="mbtn ghost" id="pClose">Close</button>`); $('#pAcc').onclick = () => { sheetClose(); openAccount(); }; $('#pClose').onclick = sheetClose; return; }
@@ -1611,12 +1627,25 @@ const NEXT_VERSION = '0.59.0';
     const mine = p && p.code;
     sheetOpen(`<div class="kick">Horde night</div><h3>Party</h3>${mine ? `<p class="mp">You are in <b>${esc(p.code)}</b> (${(p.members || []).length}/6): ${(p.members || []).map(m => '@' + esc(m)).join(', ')}.</p><p class="mp">Everyone's watch-shift kills thin the same horde. Each base is checked against what is left.</p><button class="mbtn ghost" id="pLeave">Leave party</button>`
       : `<p class="mp">Up to 6 friends share one horde, with one deadline: Sunday 9 PM New York time. Join a party below, or start your own.</p>`}
+      ${mine ? `<div class="kick sect" style="margin-top:12px">Invite friends</div><div id="pInv" class="plist"><div class="mp dim">Loading players...</div></div>
+        <div class="btnrow" style="margin-top:6px"><input id="pInvH" placeholder="or type their handle" maxlength="24" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1;min-width:0"><button class="mbtn sm" id="pInvGo">Invite</button></div><p class="mp dim" id="pInvMsg"></p>` : ''}
       <div class="kick sect" style="margin-top:12px">${mine ? 'Other parties' : 'Parties to join'}</div><div id="pList" class="plist"><div class="mp dim">Loading parties...</div></div>
       <div class="kick sect" style="margin-top:12px">Start your own</div><input id="pCode" placeholder="new party name, e.g. brooklyn" maxlength="20" autocapitalize="off" autocorrect="off" spellcheck="false" style="display:block;width:100%;box-sizing:border-box;height:50px;margin:6px 0 8px;padding:0 14px;border-radius:14px;border:2.5px solid #5a4a86;background:#11142f;color:#f6e3bb;font:800 16px Inter,system-ui,sans-serif;-webkit-user-select:text;user-select:text"><button class="mbtn${mine ? ' ghost' : ''}" id="pJoin">${mine ? 'Switch to this party' : 'Start / join by name'}</button><div class="mp" id="pMsg"></div>
       <button class="mbtn ghost" id="pClose">Close</button>`);
     $('#pClose').onclick = sheetClose;
     const join = async code => { $('#pMsg').textContent = 'Joining...'; const r = await N.partyJoin(code); if (r.ok) { sheetClose(); renderHome(); toast(mine ? `Switched to ${r.code}` : `Joined ${r.code}`, 1.8); } else $('#pMsg').textContent = r.error || 'Could not join'; };
     if ($('#pJoin')) $('#pJoin').onclick = () => join($('#pCode').value);
+    // 0.60: party invites
+    const invite = async (h, btn) => { const m = $('#pInvMsg'); if (btn) { btn.disabled = true; btn.textContent = '...'; } const r = await N.partyInvite(h); if (btn) btn.textContent = r.ok ? 'Invited ✓' : 'Invite'; if (btn && !r.ok) btn.disabled = false; if (m) m.textContent = r.ok ? `Invite sent to @${h.replace(/^@/, '')} - they'll see it next time they open the game.` : r.error; };
+    if (mine) {
+      if ($('#pInvGo')) $('#pInvGo').onclick = () => { const h = $('#pInvH').value.trim(); if (h) invite(h); };
+      Promise.resolve(N.boardRows && N.boardRows.length ? N.boardRows : N.board()).then(rows => {
+        const el = $('#pInv'); if (!el) return; const inP = (p.members || []).map(x => String(x).toLowerCase());
+        const fr = (rows || []).filter(r => r.handle && r.handle !== N.handle && !inP.includes(String(r.handle).toLowerCase())).slice(0, 12);
+        el.innerHTML = fr.length ? fr.map(r => `<div class="prow"><div><b>${esc(r.name || r.handle)}</b><span>@${esc(r.handle)}</span></div><button class="mbtn sm" data-inv="${esc(r.handle)}">Invite</button></div>`).join('') : '<div class="mp dim">No other players on the board yet - type a handle below.</div>';
+        el.querySelectorAll('[data-inv]').forEach(b => b.onclick = () => invite(b.dataset.inv, b));
+      });
+    }
     N.partyList().then(list => {
       const el = $('#pList'); if (!el) return;
       const rows = (list || []).filter(x => !x.mine);

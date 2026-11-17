@@ -563,6 +563,19 @@
       return { ok: false, error: r && r.error === 'full' ? 'That party is full (6 max).' : (r && r.error) || 'failed' };
     } catch (e) { setErr(e); return { ok: false, error: 'Could not reach the server.' }; }
   };
+  // 0.60 (owner: "add a invite to party option"): invite a player to the party you are in; your invites inbox (claim on read)
+  NET.partyInvite = async function (to) {
+    if (!NET.ok) return { ok: false, error: 'Sign in first.' };
+    try {
+      const r = await rpc('next_party_invite', { p_handle: NET.handle, p_token: NET.token, p_to: String(to || '').replace(/^@/, '') });
+      if (r && r.ok) return r;
+      return { ok: false, error: ({ noparty: 'Join or start a party first.', already: 'They are already in your party.', full: 'Your party is full (6 max).', nobody: 'No player with that handle.', to: 'Pick someone else.', limit: 'You sent 20 invites today - try tomorrow.' })[r && r.error] || 'Could not send it.' };
+    } catch (e) { setErr(e); return { ok: false, error: 'Could not reach the server.' }; }
+  };
+  NET.partyInvites = async function () {
+    if (!NET.ok) return [];
+    try { const r = await rpc('next_party_invites', { p_handle: NET.handle, p_token: NET.token }); return r && r.ok ? r.invites || [] : []; } catch (e) { return []; }
+  };
   NET.partyLeave = async function (code) {
     if (!NET.ok) return { ok: false };
     const c = slug(code || (NET.party && NET.party.code)); if (!c) return { ok: true };
