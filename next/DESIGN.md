@@ -1314,7 +1314,8 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 ### 0. Open decisions / requests from the owner (2026-11-17)
 - Isabel ('isa') is on NET.cfg.trustedTyped (net.js), so her TYPED steps are recorded as phone steps. That means they
   count everywhere as "real" steps, including the 0.63 city horde / neighborhood / co-op and the buddy and supply runs.
-  The owner doubts some of her numbers (91k steps in a week); her phone sync does not work. ASK the owner whether to keep her trusted.
+  The owner doubts some of her numbers (91k steps in a week); her phone sync does not work.
+  DECIDED 2026-11-17 by the owner: KEEP her trusted ("it's fine if she enjoys the game"). Do not ask again or change it.
   Checked 2026-11-17: 'isa' has 0 rows in step_posts, ever. Her ledger: 16.1k / 21.1k / 21.6k / 16.6k / 15.7k (Nov 13-17), all typed.
   For comparison (real phone posts): brooklyn 12-21k, tiff 23.5k once, bubba 4-6k, celeste 4-9k.
 - Push (app closed) is built in 0.64. If next_push_targets is missing, the owner has not pasted next/push.sql into the
