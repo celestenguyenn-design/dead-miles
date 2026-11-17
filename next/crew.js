@@ -128,6 +128,7 @@
     const v = SV(), m = Object.assign({ id: 'c' + (++v.crew.seq), joined: Date.now() }, spec);
     v.crew.list.push(m); v.crew.met++; G().save(); return m;
   }
+  C.adopt = (kind, coat) => adopt(kind, coat);   // 0.62: walking buddy (life.js)
   function adopt(kind, coat) {
     const v = SV(), have = pets().map(p => p.name), nm = PET_NAMES[kind].filter(n => !have.includes(n));
     const p = { id: 'p' + (++v.pets.seq), kind, coat, name: pick(nm.length ? nm : PET_NAMES[kind]), xp: 0, active: !pets().some(p => p.active), away: 0, joined: Date.now() };
@@ -389,6 +390,7 @@
       e.gone = 1; const m = e.m, v = SV(); v.crew.list = v.crew.list.filter(x => x !== m);
       if (m.wpn || m.arm) { const back = [m.wpn, m.arm].filter(Boolean).map(x => Object.assign({ n: 1 }, x)); if (DM.House && DM.House.G) for (const x of back) DM.House.G.drops.push({ k: x.k, n: 1, d: x.d, q: x.q, x: e.x, y: e.y, t: .5 }); }
       if (DM.Journal) DM.Journal.note(`${m.name} died in there. I couldn't save them.`);
+      if (DM.Life) { const HL = DM.House && DM.House.L; DM.Life.died(m, { kind: z.raider ? 'raider' : z.kind, where: HL ? (HL.address || HL.name) : '' }); }   // 0.62 memorial
       G().save(); SFX.play('kill');
       toast(`${m.name} is dead. ${m.wpn || m.arm ? 'Their gear lies where they fell.' : ''}`, 3.4);
       if (R.mate === e) R.mate = null; if (R.fighters) R.fighters = R.fighters.filter(x => x !== e);
@@ -657,10 +659,12 @@
           ${away ? '<div class="cpast"><b class="bad">Ran off after a zombie scare - back tomorrow.</b></div>' : ''}
           ${p.active ? '<span class="pactive">Comes along on runs</span>' : `<button class="mbtn sm ghost" data-act="${p.id}">Take along</button>`}</div></div>`; }).join('')
         : '<div class="empty">No strays yet. Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Walk up to one and stand close for a moment, or offer food.</div>'}
+      ${DM.Life ? DM.Life.memorialWallHTML() : ''}
       <button class="mbtn ghost" id="csClose">Close</button></div>`;
     el.classList.add('on'); el.onclick = e => { if (e.target === el) closeSheet(); };
     for (const n of notes) n.seen = true; if (v.crew.morning) v.crew.morning.seen = true; G().save();
     drawCardPorts();
+    if (DM.Life) DM.Life.bindWall(el);
     $('#csClose').onclick = closeSheet;
     el.querySelectorAll('[data-dis]').forEach(b => b.onclick = () => {
       if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Tap again: send them away?'; return; }

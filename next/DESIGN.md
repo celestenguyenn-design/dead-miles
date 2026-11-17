@@ -1262,6 +1262,21 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   A full day of 12 finds gives about 1.2 wood and 0.9 tape (was 0.9 and 0.7).
 - Idea, not done: typed steps count the same as phone steps. The owner thinks one player types a lot (75k steps in 4 days).
 
+## Done in 0.62.0 - life.js (DM.Life) (owner picked from the "viral" ideas: funny crew memorials, a pet that walks with you, story notifications, commute mode, an instant first reward for new players only - "keep Isabel out of it")
+- Memorials: crew.js calls Life.died(m, { kind, where }) on a permanent death.
+  - A random funny "how they went" (14 templates), last words (12), days survived, where.
+  - The card shows when you're home; "Copy to share" puts it on the clipboard. The Crew sheet has an "In memory" wall.
+- Walking buddy: the active pet finds something every 2,500 real steps (phone + walk, never typed), up to 3 a day.
+  - Dogs dig up supplies; cats bring gifts. Small chances of a collectible, a 2 km cache, or (cats) a charm, growing with pet level.
+  - No pets yet: the tile offers a free adoption (dog or cat, any coat). Crew.adopt is exported.
+- Supply run (commute mode): Start before a walk, End on arrival. Real steps only.
+  - 1 haul per 1,000 steps (max 5), 2 runs a day. Hauls roll from store / storage / register / car loot.
+- Radio: Life.radio(text, key) feeds a ticker at the top of the home screen; tap it for the log and the notification switch.
+  - Calls: horde in 24 h / 3 h, cache open, crew hungry, garden ready / wilting, quiet evening, 10k steps, pet finds, memorials.
+  - Phone notifications use the Notification API, only while the page is alive (open or backgrounded). A closed app needs a push server (not built).
+- First-steps crate: life.first = 'new' is set only when a character is made from 0.62 on. At 300 walked steps: a 2 km cache, supplies and 30 caps.
+  Existing saves never get it. Step setup stays mandatory, as before.
+
 ## NEXT UP (handoff, updated 2026-11-14)
 ### 1. Map: watch it on the owner's phone (0.25 switched to OpenFreeMap tiles). If it is solid for a while, the Overpass
   fallback (MIRRORS, ask(), the staged queries) can be deleted.

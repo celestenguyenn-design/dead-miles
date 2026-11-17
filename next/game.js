@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.61.0';
+const NEXT_VERSION = '0.62.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1140,6 +1140,7 @@ const NEXT_VERSION = '0.61.0';
     } else { if ($('#cSignIn')) $('#cSignIn').onclick = () => { SFX.play('ui'); if (window.NET && NET.openPanel) NET.openPanel('old'); else openAccount(); };   // 0.28.3: an existing account loads its save instead
     $('#cGo').onclick = async () => {
       SV.survivor = createSurvivor(cre.name.trim(), LK.norm(cre.look), cre.job);
+      if (DM.Life) DM.Life.markNew();   // 0.62: the first-steps crate is for brand-new characters only
       if (!SV.stats.runs) SV.unlocks = [];   // 0.45: a brand-new player opens the extra features one by one
       DM.S = SV.survivor; Game.save(); publish();
       if (DM.Tour) DM.Tour.queue();   // 0.26.2: setup (steps) first, before the tutorial house and any tip
@@ -1235,6 +1236,7 @@ const NEXT_VERSION = '0.61.0';
     if (!SV || !SV.survivor || DM.scene) return;
     if (DM.WalkFX) DM.WalkFX.tick();   // 0.47: walk finds, gear upkeep, walking caches
     if (DM.Collect) DM.Collect.file();   // 0.53: new collectibles file themselves
+    if (DM.Life) DM.Life.tick();   // 0.62: walking buddy, radio
     if (DM.Journal) DM.Journal.tick();   // 0.50: the survival log
     if (DM.Title && DM.Title.up) return;   // 0.22: the title screen is still up; its tap boots the home (no tips under it)
     rollDay();
@@ -1269,6 +1271,7 @@ const NEXT_VERSION = '0.61.0';
           ${IS_IOS && window.NET && NET.ok ? '<button class="mbtn sm" id="mSyncNow" style="width:100%;margin:8px 0 0">Sync my steps now</button>' : ''}
         </div>
       </div>
+      ${SV.tutorialDone && DM.Life ? DM.Life.feedHTML() : ''}
       ${SV.tutorialDone && DM.WalkFX ? DM.WalkFX.reportHTML() : ''}
       ${SV.tutorialDone ? guideCard() : ''}
       ${gated ? homeTiles() : eventBanner()}
@@ -1284,6 +1287,7 @@ const NEXT_VERSION = '0.61.0';
     };
     $('#mnet').onclick = openAccount;
     bindHomeTop();   // 0.23 ui: base icon + horde pill in the top bar, feature tiles open their own sheets
+    if (DM.Life) setTimeout(() => DM.Life.afterHome(), 0);   // 0.62: radio bar, memorials, first-steps crate
     DM.Boss.bind($('#mbody'));   // (shows the boss reward sheet when one is waiting)
     if ($('#evBan')) $('#evBan').onclick = () => { SFX.play('ui'); openEvent(); };
     if (DM.Weather) DM.Weather.bind($('#mbody'), sheetOpen, sheetClose);   // 0.22: the weather chip + its sheet (weather.js)
@@ -1533,6 +1537,7 @@ const NEXT_VERSION = '0.61.0';
     if (window.NET && NET.ok && NET.name && SV.survivor.name === 'Survivor') publish();   // 0.42.1: pick up the account name
     if (DM.Journal) { const jt = DM.Journal.tile(); if (jt) t.push(jt); }   // 0.50
     if (DM.Collect && SV.tutorialDone) { const ct = DM.Collect.tile(); if (ct) t.push(ct); }   // 0.53
+    if (DM.Life && SV.tutorialDone) t.push(...DM.Life.tiles());   // 0.62: walking buddy, supply run
     if (DM.Codex && SV.tutorialDone) { DM.Codex.check(); const ct = DM.Codex.tile(); if (ct) t.push(ct); }   // 0.35: bestiary + feats
     const gn = BS.gardenNote(); if (gn) t.push({ k: 'garden', c: '#93a86c', n: 'Garden', sub: gn, hot: '' });
     const ev = eventBanner();
@@ -1542,7 +1547,7 @@ const NEXT_VERSION = '0.61.0';
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
     cardSheet = k;
-    const html = k === 'collect' ? `<div class="clwrap">${DM.Collect.html()}</div>` : k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
+    const html = DM.Life && DM.Life.has(k) ? `<div class="lfwrap">${DM.Life.html(k)}</div>` : k === 'collect' ? `<div class="clwrap">${DM.Collect.html()}</div>` : k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
     sheetOpen(`<div class="cardsheet" data-cs="${k}">${html}</div><button class="mbtn ghost" id="csDone">Close</button>`);
     const el = $('#msheet'), root = el.querySelector('.cardsheet');
     el.onclick = e => { if (e.target === el) closeCardSheet(); };
@@ -1555,6 +1560,7 @@ const NEXT_VERSION = '0.61.0';
     else if (k === 'social') { publish(); const w = root.querySelector('.sowrap'), re = () => { w.innerHTML = DM.Social.html(); DM.Social.bind(w, re); }; DM.Social.bind(w, re); }
     else if (k === 'codex') DM.Codex.bind(root.querySelector('.cxwrap'));
     else if (k === 'collect') DM.Collect.bind();
+    else if (DM.Life && DM.Life.has(k)) { const w = root.querySelector('.lfwrap'), re = () => { w.innerHTML = DM.Life.html(k); DM.Life.bind(k, w, re); }; DM.Life.bind(k, w, re); }
     else if (k === 'raid') { const g = root.querySelector('#raidGo'); if (g) g.onclick = () => { SFX.play('ui'); cardSheet = null; sheetClose(); BS.raidDefend(); }; else { BS.raidSeen(); } }
     else if (k === 'advent') DM.Advent.bind(root.querySelector('.advwrap'));
     else if (k === 'boss') DM.Boss.bind(root);
