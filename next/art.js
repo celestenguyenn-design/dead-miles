@@ -200,7 +200,12 @@ const ART = (() => {
       ['#efe6d2', '#cfc3a6', 'Cream'], ['#2f6a4a', '#225038', 'Forest'], ['#7a2a3a', '#5a1e2a', 'Wine'], ['#b39ae0', '#8a72bd', 'Lavender']],   // 0.26.6: +4
     pants: [['#2f3a72', 'Denim'], ['#2a2838', 'Black'], ['#a08a5a', 'Khaki'], ['#5c6a3a', 'Olive'], ['#8a3a3a', 'Red'], ['#b9bdcc', 'Grey'], ['#6a4a3a', 'Brown'], ['#4a3a6a', 'Plum'], ['#d9cfb8', 'Cream']],   // 0.26.6: +3
   };
-  LOOK.def = { body: 'f', skin: 0, hair: 0, hairC: 0, hood: true, coat: 0, pants: 0, eyes: 0, eyeC: 0 };
+  LOOK.def = { body: 'f', skin: 0, hair: 0, hairC: 0, hood: true, coat: 0, pants: 0, eyes: 0, eyeC: 0, face: 0, mouth: 0, head: 0 };
+  // 0.56 (owner: "change how my character looks a bit, it's not cute enough"): face, mouth and head size options
+  LOOK.faces = ['Roughed up', 'Clean', 'Rosy'];
+  LOOK.mouths = ['Smile', 'Grin', 'Cat :3', 'Smirk', 'Tongue out', 'Oh!'];
+  LOOK.heads = ['Normal', 'Big', 'Extra big'];
+  const HEAD_SC = [1.42, 1.55, 1.66];
   LOOK.FREE_HAIR = 6; LOOK.FREE_EYES = [0, 6];   // 0.26.6: everything else is a capsule unlock (D.LOOKUN, wardrobe.looks)
   // cos: worn cosmetics by slot ({hat, face, neck, back, outfit} -> key in COS or null); always a fresh copy
   LOOK.norm = l => { const o = typeof l === 'number' ? Object.assign({}, LOOK.def, { coat: l }) : Object.assign({}, LOOK.def, l || {}); const c = {}; for (const k in (o.cos || {})) if (o.cos[k] && COS[o.cos[k]]) c[k] = o.cos[k]; o.cos = c; return o; };
@@ -298,6 +303,28 @@ const ART = (() => {
         L[101] = L[101] + SL('M8.8,-143.6 l2.8,-2.4 M24.2,-143.6 l2.6,-2.4', P.INK, 1.8);   // lashes
         L[103] = `<ellipse cx="25.5" cy="-130" rx="3.4" ry="2.2" fill="${sk[1]}" opacity=".5"/>`;
       }
+      // 0.56 cute options
+      const mid0 = L.findIndex(l => l.includes('</g></g><g><g class=')), at = sub => L.findIndex((l, i) => i > mid0 && l.includes(sub));
+      if (lk.face >= 1) {   // clean: no bandage, no dirt
+        for (const sub of ['rotate(28 -1 -131)', 'M21,-127 Q24,-131 28,-128', 'M3,-155 Q7,-157 9,-154']) { const i = at(sub); if (i > 0) L[i] = ''; }
+      }
+      if (lk.face === 2) {   // rosy cheeks on both sides + a little shine
+        const bi = at('cx="25.5" cy="-130"'); const blush = `<ellipse cx="2.4" cy="-130.6" rx="4.2" ry="2.5" fill="#ff8aa8" opacity=".55"/><ellipse cx="23.6" cy="-130.6" rx="4.2" ry="2.5" fill="#ff8aa8" opacity=".55"/>`
+          + SL('M.6,-131.4 l1.4,-1.4 M3,-131.4 l1.4,-1.4 M21.8,-131.4 l1.4,-1.4 M24.2,-131.4 l1.4,-1.4', '#ffffff', .9);
+        if (bi > 0) L[bi] = blush;
+      }
+      if (lk.mouth) {
+        const mi = at('M11.2,-127 Q13.6,-127.9 16,-126.8');
+        const M = {
+          1: SP('M10,-128.6 Q13.6,-129.4 17.4,-128.6 Q16.8,-123.2 13.6,-123 Q10.6,-123.2 10,-128.6 Z', '#7a2a3a', 1.5) + SD('M11.6,-124.6 Q13.6,-126.4 15.8,-124.6 Q13.6,-123.2 11.6,-124.6 Z', '#f07aa8'),
+          2: SL('M10,-128.2 Q11.8,-125.4 13.6,-127.6 Q15.4,-125.4 17.2,-128.2', P.INK, 1.5),
+          3: SL('M11,-126.4 Q14.6,-126.6 17.6,-129.6', P.INK, 1.6),
+          4: SL('M10.4,-127.8 Q13.6,-125.4 16.8,-127.8', P.INK, 1.5) + SP('M12.4,-126.4 Q12.6,-122.6 14.2,-122.6 Q15.8,-122.6 15.6,-126.2 Z', '#f07aa8', 1.1),
+          5: `<ellipse cx="13.6" cy="-126.4" rx="2" ry="2.6" fill="#7a2a3a" stroke="${P.INK}" stroke-width="1.3"/>`,
+        }[lk.mouth];
+        if (mi > 0 && M) L[mi] = L[mi].replace(/<path d="M11\.2,-127[^>]*\/>/, M);
+      }
+      if (lk.head) { const sc = HEAD_SC[lk.head] || HEAD_SC[0]; for (let i = 0; i < L.length; i++) if (L[i].includes('scale(1.42)')) L[i] = L[i].replace('scale(1.42)', `scale(${sc})`); }
       COSPATCH(L, lk);
     };
   };
