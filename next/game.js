@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.57.0';
+const NEXT_VERSION = '0.58.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -717,14 +717,16 @@ const NEXT_VERSION = '0.57.0';
   // 0.19: crafted weapon quality - survivor level and the Combat / Scavenging trees push it up; mostly Worn-Solid, never Rusty
   function craftQuality(rnd = Math.random) {
     const s = SV.survivor, SK = DM.Skills, b = 2 + Math.min(.5, (SK.level(s) - 1) * .02) + .06 * (SK.rank('combat', s) + SK.rank('scav', s)) / 2;
-    return Math.min(5, Math.max(2, D.rollQuality(Math.min(3.2, b), 0, rnd)) + SK.craftTier(s));   // 0.34: Tinkerer Master crafter
+    return Math.min(5, Math.max(2, D.rollQuality(Math.min(3.2, b), 0, rnd)) + SK.craftTier(s) + (DM.Trades ? DM.Trades.craftTier() : 0));   // 0.34: Tinkerer Master crafter; 0.58 crafting level
   }
   Game.craftQuality = craftQuality;
   // ---------------------------------------------------------------- 0.19: gamestage (data.js D.gamestage / D.gsFx)
+  // 0.58 (owner: "the higher we craft our weapons ... much harder zombies"): a class tier-2 weapon +4, tier-3 +9
+  function bestTier() { const s = SV && SV.survivor; if (!s || !DM.W2) return 0; let b = 0; for (const e of [s.hands].concat(s.pack || [], s.stash || [])) { if (!e) continue; for (const j in DM.W2.LINES) { const i = DM.W2.LINES[j].indexOf(e.k); if (i > 0) b = Math.max(b, i === 2 ? 9 : 4); } } return b; }
   function bestQ() { const s = SV && SV.survivor; if (!s) return 2; let b = s.hands ? D.qOf(s.hands) : 1; for (const e of (s.pack || []).concat(s.stash || [])) if (D.isWeapon(e.k)) b = Math.max(b, D.qOf(e)); return b; }
   function gamestage() {
     const s = SV && SV.survivor; if (!s) return { gs: 1, lvl: 1, days: 0, bq: 2, fx: D.gsFx(1), line: '' };
-    const lvl = DM.Skills.level(s), days = +s.gsDays || 0, bq = bestQ(), gs = D.gamestage(lvl, days, bq), fx = D.gsFx(gs);
+    const lvl = DM.Skills.level(s), days = +s.gsDays || 0, bq = bestQ(), wt = bestTier(), gs = Math.min(D.GS_MAX, D.gamestage(lvl, days, bq) + wt), fx = D.gsFx(gs);   // 0.58: class weapon tiers push it up
     const line = fx.t <= 0 ? 'how tough the world is for you, from your level, days played and best weapon. Low for now: zombies as they always were.'
       : `zombies +${Math.round((fx.hp - 1) * 100)}% health and bite, more special infected, slightly better weapon finds. From level ${lvl}, ${days} day${days === 1 ? '' : 's'} played and your best weapon (max ${D.GS_MAX}).`;
     return { gs, lvl, days, bq, fx, line };
@@ -792,7 +794,8 @@ const NEXT_VERSION = '0.57.0';
     let usedQ = 0; for (const k in r.in) for (const x of takeItems(k, r.in[k])) if (D.isWeapon(x.k)) usedQ = Math.max(usedQ, D.qOf(x));
     const [k, n] = r.out, q = D.isWeapon(k) ? Math.max(usedQ, craftQuality()) : undefined;   // 0.19: crafted quality (never below the weapon it was made from)
     const lost = give(k, n, undefined, q);
-    DM.Skills.addXP(2); Game.save(); SFX.play('open');
+    let saved = ''; if (DM.Trades) { DM.Trades.gain('craft', 6 + 2 * Object.keys(r.in).length + (D.isWeapon(k) ? 6 : 0)); if (Math.random() < DM.Trades.refund()) { const m = Object.keys(r.in)[Math.floor(Math.random() * Object.keys(r.in).length)]; give(m, 1); saved = ` · saved 1 ${D.ITEMS[m].n.toLowerCase()}`; } }   // 0.58 crafting level
+    DM.Skills.addXP(2); Game.save(); SFX.play('open'); if (saved) setTimeout(() => toast('🔨 Careful work' + saved, 1.6), 1900);
     toast(lost ? `Crafted ${D.ITEMS[k].n} - no room for ${lost}` : `Crafted ${q ? D.QUAL[q].n.toLowerCase() + ' ' : ''}${D.ITEMS[k].n}${n > 1 ? ' x' + n : ''}`, 1.8);
     if (!benchHost) benchSel = null;
     reHost();
@@ -841,10 +844,11 @@ const NEXT_VERSION = '0.57.0';
     const s = SV.survivor, el = benchHost || $('#mpane');
     if (benchHost && benchSel) { el.innerHTML = benchDetailHTML(benchSel); bindDetail(el); return; }
     const unknown = Object.keys(D.RECIPES).filter(k => !s.known.includes(k));
-    el.innerHTML = `<div class="kick sect">Workbench · ${s.known.length} recipe${s.known.length === 1 ? '' : 's'} known</div><div class="benchhint">Tap a recipe to see what it does and where to find each material.</div>` + benchRows(s.known, true)
+    el.innerHTML = (DM.Trades ? `<div class="ktwrap">${DM.Trades.kitchenHTML(icon)}</div>` : '') + `<div class="kick sect">Workbench · ${s.known.length} recipe${s.known.length === 1 ? '' : 's'} known · 🔨 Crafting level ${DM.Trades ? DM.Trades.lvl('craft') : 1}</div><div class="benchhint">Tap a recipe to see what it does and where to find each material.</div>` + benchRows(s.known, true)
       + (unknown.length ? `<div class="kick sect">Not learned yet · ${unknown.length}</div>` + benchRows(unknown, false) : '')
       + `<div class="empty">${unknown.length ? 'Blueprints: Dot trades them, and some turn up in hidden stashes and safes.' : 'You know every blueprint so far.'}<br>Materials come from the stash and the pack.</div>`;
     el.querySelectorAll('[data-craft]').forEach(b => b.onclick = e => { e.stopPropagation(); craft(b.dataset.craft); });
+    if (DM.Trades) DM.Trades.bindKitchen(el, () => reHost());
     el.querySelectorAll('[data-rec]').forEach(b => b.onclick = () => { SFX.play('ui'); openRecipe(b.dataset.rec); });
   }
   function benchDetailHTML(k) {
@@ -1696,6 +1700,7 @@ const NEXT_VERSION = '0.57.0';
       <div class="kick sect">You</div>
       <button class="gline tap${pts ? ' hot' : ''}" id="gSkills"><span class="gi">★</span><div><b>Level ${xl.L} · skills</b><span>${pts ? `${pts} skill point${pts > 1 ? 's' : ''} to spend` : 'Five skill trees · 1 point a level'}</span></div><em>›</em></button>
       ${(g => `<div class="gline gsline"><span class="gi">☣</span><div><b>Gamestage ${g.gs}</b><span>${esc(g.fx.t > 0 ? `Zombies +${Math.round((g.fx.hp - 1) * 100)}% tougher, specials more common, better weapon finds` : 'Low: zombies as tough as ever. Grows with level, days played and your best weapon')}</span></div></div>`)(gamestage())}
+      ${DM.Trades ? DM.Trades.gearHTML() : ''}
       <button class="gline tap" id="gFood"><span class="gi">🍗</span><div><b>Eat &amp; drink</b><span>Hunger ${Math.round(f.h)} · Thirst ${Math.round(f.t)}</span></div><em>›</em></button>`;
     } else if (gTab === 'pack') {
       body = `<div class="ghead"><span class="kick">Backpack · ${s.pack.length}/${packSlots()} slots</span>${s.pack.length > 1 ? '<button class="mini" id="sSortP">Sort</button>' : ''}</div>
@@ -1854,10 +1859,17 @@ const NEXT_VERSION = '0.57.0';
     }, 'big']);
     if (sel.from === 'hands') btns.push(['Unequip', () => { D.unloadGun(s); if (!addTo(s.pack, packSlots(), e.k, 1, e.d, e.q) && !addTo(s.stash, stashSlots(), e.k, 1, e.d, e.q)) return toast('No room', 1.4); s.hands = null; done(); }]);
     if (it.w) {
-      const cost = s.job === 'mechanic' ? 1 : 2, max = D.wMax(e);   // 0.19: max durability by quality
-      if (e.d < max) btns.push([`Repair (${cost} scrap)`, () => {
+      // 0.58 (owner: "things will start to cost a lot more to repair, especially the higher the tier"): scrap by quality
+      // (Rusty/Worn 2, Solid 3, Fine 5 + tape, Masterwork 8 + 2 tape + 25 caps), +3 scrap for a class tier-3 weapon;
+      // mechanics pay half the scrap, crafting level 5+ takes 1 off
+      const q0 = D.qOf(e), ct = DM.W2 && DM.W2.lineOf(e.k) && Object.values(DM.W2.LINES).some(L => L[2] === e.k) ? 3 : 0;
+      const cost = Math.max(1, Math.ceil(([0, 2, 2, 3, 5, 8][q0] + ct) * (s.job === 'mechanic' ? .5 : 1)) - (DM.Trades ? DM.Trades.repairCut() : 0)), tapeC = q0 >= 5 ? 2 : q0 >= 4 ? 1 : 0, capsC = q0 >= 5 ? 25 : 0, max = D.wMax(e);   // 0.19: max durability by quality
+      if (e.d < max) btns.push([`Repair (${cost} scrap${tapeC ? `, ${tapeC} tape` : ''}${capsC ? `, ${capsC} caps` : ''})`, () => {
         const have = s.pack.concat(s.stash).filter(x => x.k === 'scrap').reduce((a, x) => a + x.n, 0);
         if (have < cost) return toast(`Needs ${cost} scrap metal`, 1.6);
+        if (tapeC && countItem('tape') < tapeC) return toast(`Needs ${tapeC} duct tape`, 1.6);
+        if (capsC && SV.trader.caps < capsC) return toast(`Needs ${capsC} caps`, 1.6);
+        if (tapeC) takeItems('tape', tapeC); SV.trader.caps -= capsC;
         let need = cost; for (const list of [s.stash, s.pack]) for (let j = list.length - 1; j >= 0 && need; j--) if (list[j].k === 'scrap') { const t = Math.min(need, list[j].n); list[j].n -= t; need -= t; if (!list[j].n) list.splice(j, 1); }
         const nd = Math.min(max, e.d + Math.round(max * .4));
         if (sel.from === 'hands') s.hands.d = nd; else e.d = nd;

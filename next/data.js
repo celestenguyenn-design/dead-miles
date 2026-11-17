@@ -407,7 +407,7 @@ window.DM = window.DM || {};
   //   zombie HP and hits +0..25%, special-infected share +0..12 points at danger 3-4, from gamestage 25 some specials
   //   at danger 2 (up to 15% of zombies at 60), weapon quality roll +0..0.4, rare-find chance +0..6%.
   D.GS_MAX = 60;
-  D.gamestage = (lvl, days, bestQ) => Math.max(1, Math.min(D.GS_MAX, Math.round((lvl || 1) + Math.min(20, (days || 0) / 3) + 3 * Math.max(0, (bestQ || 2) - 2))));
+  D.gamestage = (lvl, days, bestQ) => Math.max(1, Math.min(D.GS_MAX, Math.round((lvl || 1) + Math.min(20, (days || 0) / 3) + 4 * Math.max(0, (bestQ || 2) - 2))));
   D.gsFx = function (gs) {
     // 0.30 (owner: "zombies should be more difficult as we progress ... they're quite easy rn"): the ramp starts at
     // gamestage 4 (was 10) and goes further: HP +60% and bites +40% at 50+ (was +25/+25 at 60), specials sooner, and

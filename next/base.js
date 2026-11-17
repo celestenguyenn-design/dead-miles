@@ -166,10 +166,11 @@
   function harvest(i) {
     const b = base(), p = b.beds[i], s = B.plantState(p); if (!s || !s.ready) return;
     const rnd = D.mulberry32(D.hashStr(SV().seedBase + ':crop:' + i + ':' + p.d0)), C = D.CROPS[p.k];
-    const n = C.yield[0] + Math.floor(rnd() * (C.yield[1] - C.yield[0] + 1)), seed = rnd() < .5;
+    const TR = DM.Trades, n = C.yield[0] + Math.floor(rnd() * (C.yield[1] - C.yield[0] + 1)) + (TR ? TR.cropBonus() : 0), seed = rnd() < (TR ? TR.seedChance() : .5);   // 0.58 farming level
     const items = [[p.k, n]].concat(seed ? [['seed_' + p.k, 1]] : []);
     if (!G().canGive(items)) { toast('No room in your pack or stash for the harvest', 2); return; }
     for (const [k, c] of items) G().give(k, c);
+    if (DM.Trades) DM.Trades.gain('farm', 6 * n);
     b.beds[i] = null; SFX.play('pick'); G().save(); syncPieces();
     toast(`Harvested ${n} ${D.ITEMS[p.k].n.toLowerCase()}${seed ? ' + seeds' : ''}`, 2);
   }
