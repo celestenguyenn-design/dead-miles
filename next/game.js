@@ -57,6 +57,14 @@ const NEXT_VERSION = '0.66.0';
     if (v.survivor) { D.mergeStacks(v.survivor.pack); D.mergeStacks(v.survivor.stash); }   // 0.26.3: bigger stacks - fold old ones together
     v.trader.event = v.trader.event || null;   // phase 5a: Dot's seasonal job chain { key, step, kills, base }
     v.tips = v.tips || {};                  // phase 5: first-time tips already shown
+    // 0.66 (owner: "I got it for free the dog lol. Please remove it"): take back pets from the 0.62-0.65 free adoption.
+    // Strays coaxed in houses are marked src 'house' from 0.66 on; an unmarked pet that joined after 0.62 shipped was free.
+    v.fixes = v.fixes || {};
+    if (!v.fixes.freepet && v.pets && Array.isArray(v.pets.list)) {
+      v.fixes.freepet = 1;
+      const keep = v.pets.list.filter(p => p.src || !(+p.joined >= 1794953729000));
+      if (keep.length < v.pets.list.length) { v.pets.list = keep; if (keep.length && !keep.some(p => p.active)) keep[0].active = true; }
+    }
     if (v.survivor) migrateCos(v.survivor);
     if (v.survivor) { migrateQuiver(v.survivor); migratePouch(v.survivor); }
     if (v.survivor) migrateKeys(v.survivor);
@@ -595,7 +603,7 @@ const NEXT_VERSION = '0.66.0';
       { n: 'Garden seeds', items: [[s1, 2 + t], [s2, 2 + t]] },
       { n: 'Scavenger kit', items: [['lockpick', 1 + t], ['battery', 2], ['cloth', 2]] },
       { n: 'Walking cache', items: [[t >= 3 ? 'cache5' : 'cache2', 1]] },
-      { n: t >= 3 ? 'Capsule tokens' : 'Capsule token', tok: t >= 3 ? 2 : 1, items: [] },
+      { n: 'Capsule token', tok: 1, items: [] },   // 0.66: one at any tier (capsules were too cheap)
       { n: 'Coffee & snacks', items: [['coffee', 1 + Math.ceil(t / 2)], ['snack', 2 + t]] },
     ].filter(o => (!o.tok || DM.Gacha) && o.items.every(([k]) => D.ITEMS[k]));
     for (let i = 0; i < 2 && EXTRA.length; i++) opts.push(EXTRA.splice(Math.floor(rnd() * EXTRA.length), 1)[0]);
@@ -766,7 +774,7 @@ const NEXT_VERSION = '0.66.0';
     infect: DM.Infect ? DM.Infect.NOTE : ['Infected', ''],   // 0.18 (infection.js)
     // 0.26.2 (owner: "pls add instructions to the game"): first-time tips for the newer parts
     trader: ['Auntie Dot', 'Quests: take up to 2 jobs and turn them in for caps and a reward. Shop: supplies, blueprints, cosmetics (and holiday decor during events). Sell: trade junk for caps. After this visit she heads off for about 3,000 steps, up to 3 visits a day.'],
-    gacha: ['Capsule machine', 'Pull for a random cosmetic. Tokens: 1 for every 4,000 steps (up to 3 a day) or 50 caps. At least one epic or better every 10 pulls, and Dot buys any duplicate.'],
+    gacha: ['Capsule machine', 'Pull for a random cosmetic. Tokens: 1 for every 5,000 steps (up to 2 a day) or 120 caps. At least one epic or better every 10 pulls, and Dot buys any duplicate.'],
     deck: ['Deck the base', 'Get this holiday\'s decor from Dot\'s holiday shelf, holiday houses or capsules, then place it at your base (Base > Decorate). 2, 5 and 8 pieces placed win prizes - claim them here.'],
     decor: ['Decorating', 'Decor box: pick a piece, then tap where it goes. Tap a placed piece to move it, Rotate it a quarter turn (front, side, back) or Turn it to mirror it. Store puts it back in the box.'],
     walks: ['Walks', 'Three ways to get paid for walking: hit 5,000 steps a day to grow your streak, pick an expedition and let your steps carry you there (finds on the way, a crate at the end), and collect lifetime step milestones with titles.'],
@@ -1461,7 +1469,7 @@ const NEXT_VERSION = '0.66.0';
     crew: [2, 'Crew & strays', 'Survivors hiding in houses can join you. They live at your base, eat from your stash, and help - one can even come on runs.'],
     daily: [2, 'Daily challenge', 'One special house a day, the same for everyone. Loot it and see how you score against your friends.'],
     event: [2, 'Holiday events', 'Seasonal events add special zombies, food, decor and Dot jobs. Check the event tab while one is on.'],
-    gacha: [3, 'Capsule machine', 'Spend tokens (from walking, or 50 caps) on random cosmetics: outfits, hats, hair and more.'],
+    gacha: [3, 'Capsule machine', 'Spend tokens (from walking, or 120 caps) on random cosmetics: outfits, hats, hair and more.'],
     codex: [3, 'Codex', 'Your bestiary (kill more of a kind to hit it harder) and feats that pay caps and unlock titles.'],
     social: [3, 'Walk together', 'Walk with friends: a shared party step goal and a weekly step race with prizes.'],
     camps: [4, 'Camps', 'Bandit camps all over the map. Raid them - a real fight - and hold them for daily tribute you spend in the War chest.'],
@@ -2078,7 +2086,7 @@ const NEXT_VERSION = '0.66.0';
     ['Walks: streak, expeditions, milestones', 'The Walks tab. Daily streak: walk 5,000 steps (typed at half) and claim it - rewards grow every day in a row, with bonuses on day 3, 7, 14 and 30; one freeze a week covers a missed day. Expeditions: pick a Brooklyn destination (8,000 to 40,000 steps); your steps from then on carry you there, with a find at 25/50/75% and a crate at the end. Milestones: lifetime steps from 25k to 2.5M, each with caps, capsule tokens, sometimes a cosmetic, and a title to show under your name.'],
     ['Armor', 'Wear one piece of armor (Gear > Equipped > Armor). It cuts the damage of every hit (padded jacket 10%, sports pads 15%, riot vest 25%, plate carrier 35%) and wears down as it does, until it falls apart. Repair it with cloth or scrap. The riot vest and plate carrier make your steps louder, and the plate carrier slows you a little. Find it in coat closets, wardrobes, gym lockers, garages and police stations, in horde crates, at Dot\'s, or craft a padded jacket.'],
     ['Map jobs: crates, radio calls, deliveries, fog', 'With the map open (or in Pocket mode) there is more to do while you walk. Supply crates: up to 3 a day land at real places near you - walk over one to grab it; an air drop (one a day, after you have walked a bit) has better loot but only 20 minutes. Radio calls: a survivor names a place and a deadline - get there in time for a reward. Dot\'s delivery (one a day, button on the map): pick up a package at one place and carry it to another. Fog of war: the map is fogged except where you have walked; clearing new streets gives XP, sometimes a find, and rewards at 250 / 1,000 / 3,000 / 10,000 squares. Turn the fog off with its button. All of this is kept only on your phone.'],
-    ['Capsule machine', 'The capsule machine (Capsules tab) gives a random cosmetic, hairstyle or eye style for a token (new hairstyles and eyes show up in Edit look, marked with a lock until you pull them). You get a token for every 4,000 steps (up to 3 a day), or buy one for 50 caps. Odds: common 55%, rare 30%, epic 12%, legendary 3%, and at least one epic or better every 10 pulls. Cosmetics you do not have yet come first; Dot buys any duplicate. During a holiday its capsules join the machine, and 1 pull in 4 is a piece of holiday decor.'],
+    ['Capsule machine', 'The capsule machine (Capsules tab) gives a random cosmetic, hairstyle or eye style for a token (new hairstyles and eyes show up in Edit look, marked with a lock until you pull them). You get a token for every 5,000 steps (up to 2 a day), or buy one for 120 caps. Odds: common 55%, rare 30%, epic 12%, legendary 3%, and at least one epic or better every 10 pulls. Cosmetics you do not have yet come first; Dot buys any duplicate. During a holiday its capsules join the machine, and 1 pull in 4 is a piece of holiday decor.'],
     ['Deck the base', 'During Thanksgiving and Christmas, place that holiday\'s decor at your base (Base > Decor) for prizes: 2 pieces = 2 capsule tokens + 40 caps, 5 = 3 tokens + 80 caps, 8 = a legendary holiday hat + 100 caps. Holiday decor comes from Dot\'s holiday shelf, holiday houses (storage, pantries, closets) and the capsule machine.'],
     ['Workbench & crafting', 'Workbench (home tab, or at the base) lists every recipe you know with each material, what you have and what you need. Tap a recipe to see what it does, every material in full with where to find it, and a big Craft button. Materials come from the stash and the pack. New recipes come from blueprints: Dot trades them, and some turn up in hidden stashes and safes.'],
     ['Crew', 'About 1 house in 25 has a survivor hiding in a closet or a secret room (more in mansions and police stations). Talk to them: with a free bunk they move into your base (2 bunks, build up to 4). Each has a role - Scavenger (crew searches bring back more), Guard (horde-night defence), Medic (heals you each morning), Gardener (waters a plant a day), Tinkerer (cheaper repairs) - and levels up slowly. Each eats 1 food a day from your STASH; three hungry days and they leave a note (they never take anything). The more crew you have, the more a Crew search brings back.'],

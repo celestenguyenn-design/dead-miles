@@ -63,7 +63,7 @@ window.DM = window.DM || {};
     { s: '.hcard.trader', t: 'Auntie Dot, the trader', d: 'Take jobs, buy supplies and sell junk for caps. After a visit she heads off for 3,000 steps (up to 3 visits a day).' },
     { s: '#dlyCard', t: 'Daily challenge', d: 'One house a day, the same for everyone. Your first try is scored on the leaderboard.' },
     { s: '#mtabs [data-t="walks"]', t: 'Walks', d: 'Get paid for walking: a daily streak (5,000 steps a day), expeditions to Brooklyn landmarks your steps carry you to, and lifetime milestones with titles.' },
-    { s: '#mtabs [data-t="gacha"]', t: 'Capsules', d: 'The capsule machine: spend a token on a random cosmetic. You get a token every 4,000 steps (up to 3 a day), or buy one with caps.' },
+    { s: '#mtabs [data-t="gacha"]', t: 'Capsules', d: 'The capsule machine: spend a token on a random cosmetic. You get a token every 5,000 steps (up to 2 a day), or buy one with caps.' },
     { s: '#mtabs [data-t="event"]', t: 'The event tab', d: 'While a holiday runs it gets its own tab: what is on, Dot\'s event jobs, the limited cosmetics and Deck the base (place holiday decor at your base for prizes).' },
     { f: loot, t: 'Loot a house', d: 'Loot to go in yourself: search furniture, pick locks, avoid or fight zombies, and leave with what you found. Crew sends a crew member instead.' },
     { s: '#mtabs [data-t="stash"]', t: 'Gear', d: 'Your backpack and stash: eat, equip weapons, move things to the stash so a bad run cannot cost them, sell or discard junk.' },

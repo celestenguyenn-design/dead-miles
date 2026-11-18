@@ -504,7 +504,7 @@
     if (s.pet.kind === 'cat') meow(); else bark();
     s.st = 'out'; s.y += 10;
     if (pets().length >= C.MAX_PETS) { s.st = 'leave'; toast(`You already look after ${C.MAX_PETS} strays. This one licks your hand and trots off.`, 2.8); return; }
-    const pt = adopt(s.pet.kind, s.pet.coat); s.st = 'leave';
+    const pt = adopt(s.pet.kind, s.pet.coat); pt.src = 'house'; s.st = 'leave';   // 0.66: earned (see the free-pet fix in game.js migrate)
     namePet(pt, true);
   }
   const hasFood = () => DM.House.G && DM.House.G.pack.some(e => D.ITEMS[e.k] && D.ITEMS[e.k].use === 'Eat');

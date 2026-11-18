@@ -1335,6 +1335,15 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - Break warnings (owner: "everything should get a warning when it's about to break"): a ⚠ toast once when your weapon
   (house.js wearWeapon) or armor (armor.js A.hit) drops to 15%, and when a crew member's weapon or armor does (crew.js).
   Starting a run with a weapon or armor at 15% or less warns too (game.js loot). Lockpicks: "⚠ Last pick left".
+- Free pet taken back (owner adopted one on 0.65: "I got it for free the dog lol. Please remove it"): game.js migrate runs
+  a one-time fix (SV.fixes.freepet) that removes pets without src that joined after 0.62 shipped (1794953729000 ms).
+  Strays coaxed in houses get p.src = 'house' from 0.66 on. Owner's save had Waffles (dog, joined 1794964386238).
+  A stray coaxed between 0.62 and 0.66 would also be removed (none seen in the cloud saves).
+- Capsules (owner: "capsules are too cheap, we need more things as well, I almost maxed it out"): a token is 120 caps
+  (was 50); steps give 1 per 5,000 (was 4,000), up to 2 a day (was 3). Dot's job token choice is always 1; the camps
+  store's 3 tokens cost 12 marks (was 6). 14 new capsule cosmetics (art.js + data.js), the machine's line went from 12 to
+  26: c propeller, chef, mustache, glasses3d, hawaiian; r cowboy, frogcap, monocle, chain, pajamas; e wizard, medal,
+  guitar; l jetpack.
 
 ## NEXT UP (handoff, updated 2026-11-17 - read this first in a new chat)
 ### 0. Open decisions / requests from the owner (2026-11-17)
