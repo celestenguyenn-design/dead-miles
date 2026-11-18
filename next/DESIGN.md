@@ -1324,6 +1324,14 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   free adoption and nothing needed taking back.
 - house.js landArrow (owner: "kind of op that the arrows never break anymore"): the Hunter skill Retriever now means arrows
   snap 15% of the time instead of never. Without it, still 35%. skills.js description updated.
+- Tool belt (owner: "a slot for a crowbar too because sometimes we never bring it" / "it should still be able to break tho but
+  it should give us a warning"): Gear > Equipped has a Tool belt slot (SV.survivor.tool = { k, d, q }, crowbar or pry bar).
+  It counts as carried in every house (house.js hasItem, game.js lockCheck), takes no pack slot and is never dropped. It is
+  not a weapon in houses - equip one in your hand for that. Tap the empty slot to hang one from the pack/stash, or use
+  "Tool belt" on a crowbar/pry bar; the slot's sheet has Put in stash / To pack.
+- Prying now wears the tool used (house.js wearPry: 10 durability per pry; belt first, then hand, then pack; Tinkerer
+  wearSkip applies). A Worn crowbar lasts about 9 pries. At 2 or fewer pries left: a ⚠ toast after each pry, a red
+  "N pries left" on the slot, and a toast before entering a house with locks. It snaps at 0. Repair: stash, then Repair.
 
 ## NEXT UP (handoff, updated 2026-11-17 - read this first in a new chat)
 ### 0. Open decisions / requests from the owner (2026-11-17)
