@@ -3,7 +3,7 @@
    - Memorials: a crew member who dies gets a gravestone card with a (silly) story of how they went, days survived, last
      words. Shown when you get home; the Crew sheet keeps the wall. "Copy" puts it on the clipboard to share.
    - Walking buddy: the active pet walks with you. Every 2,500 steps it brings something (dogs dig up supplies, cats bring
-     "gifts"), up to 3 a day, better as it levels. No pet yet? Adopt a dog or a cat here (once, free).
+     "gifts"), up to 3 a day, better as it levels. No pet yet? Find a stray in a house (0.66: the free adoption is gone).
    - Supply run (commute mode): tap Start before a walk you take anyway (to the train, the shops). Phone / watch steps
      only - typed steps don't count. End it after 1,000+: one haul per 1,000 steps (max 5), 2 runs a day.
    - Radio: little story messages about what is going on (horde night coming, caches open, crew hungry, the garden, your
@@ -104,7 +104,7 @@ window.DM = window.DM || {};
   }
   const buddyTile = () => {
     const v = SV(), s = st(); if (!v || !DM.Crew) return null; const p = DM.Crew.activePet();
-    if (!p) return (v.pets && v.pets.list.length) ? null : { k: 'buddy', c: '#f0b25a', n: 'Walking buddy', sub: 'Adopt a dog or a cat to walk with you', hot: 'New' };
+    if (!p) return (v.pets && v.pets.list.length) ? null : { k: 'buddy', c: '#f0b25a', n: 'Walking buddy', sub: 'Find a stray hiding in a house to walk with you', hot: '' };   // 0.66: no free adoption
     const left = BUDDY_STEP - (realSteps(v) - (s.buddy.mark || 0));
     return { k: 'buddy', c: '#f0b25a', n: `${p.name} the ${p.kind}`, sub: s.buddy.n >= BUDDY_MAX ? `Found ${BUDDY_MAX} things today - tired, happy` : `Walking with you · next find in ${fmt(Math.max(0, left))} steps`, hot: '' };
   };
@@ -113,13 +113,12 @@ window.DM = window.DM || {};
     if (p) return `<div class="kick">Walking buddy</div><h3>${esc(p.name)}</h3><canvas id="lfPet" width="160" height="120" style="display:block;margin:0 auto"></canvas>
       <p class="mp">${esc(p.name)} walks with you everywhere (phone and watch steps). Every ${fmt(BUDDY_STEP)} steps ${p.kind === 'cat' ? 'you get a "gift"' : 'they dig something up'} - up to ${BUDDY_MAX} a day, and luckier as they level up (level ${DM.Crew.plv(p)}).</p>
       <p class="mp dim">Today: ${s.buddy.n}/${BUDDY_MAX} finds. Switch buddies in the Crew &amp; strays sheet.</p>`;
-    const coat = k => DM.Crew.COATS[k];
-    return `<div class="kick">Walking buddy</div><h3>Adopt a buddy</h3><p class="mp">Pick a stray to walk with you. They dig up (or "gift" you) things as you walk, and come along on runs. You can find more strays hiding in houses.</p>
-      ${['dog', 'cat'].map(k => `<div class="kick sect">${k === 'dog' ? 'Dogs' : 'Cats'}</div><div class="chips">${coat(k).map((c, i) => `<button class="chip" data-adopt="${k}:${i}" style="border-color:${c.a}">${esc(c.n)}</button>`).join('')}</div>`).join('')}`;
+    // 0.66 (owner: "adopting a dog or buddy should not be free"): no free adoption - pets come from strays in houses
+    return `<div class="kick">Walking buddy</div><h3>No buddy yet</h3><p class="mp">Strays hide in some houses - under beds, in closets, behind shelves. Stand next to one (food helps) and it may trust you.</p>
+      <p class="mp">A pet then walks with you: every ${fmt(BUDDY_STEP)} steps a dog digs something up and a cat brings you a "gift", up to ${BUDDY_MAX} a day.</p>`;
   };
   L.bindBuddy = function (root, re) {
     const p = DM.Crew.activePet(), cv = root.querySelector('#lfPet'); if (p && cv && DM.Crew.petPortrait) DM.Crew.petPortrait(cv, p, { happy: true, heart: 1 });
-    root.querySelectorAll('[data-adopt]').forEach(b => b.onclick = () => { const [k, i] = b.dataset.adopt.split(':'); const np = DM.Crew.adopt(k, +i); if (np) { np.active = true; G().save(); sfx('pick'); toast(`${np.name} the ${k} is walking with you now!`, 2.4); } re(); });
   };
 
   // ---------------------------------------------------------------- supply run (commute mode)

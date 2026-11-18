@@ -128,7 +128,6 @@
     const v = SV(), m = Object.assign({ id: 'c' + (++v.crew.seq), joined: Date.now() }, spec);
     v.crew.list.push(m); v.crew.met++; G().save(); return m;
   }
-  C.adopt = (kind, coat) => adopt(kind, coat);   // 0.62: walking buddy (life.js)
   function adopt(kind, coat) {
     const v = SV(), have = pets().map(p => p.name), nm = PET_NAMES[kind].filter(n => !have.includes(n));
     const p = { id: 'p' + (++v.pets.seq), kind, coat, name: pick(nm.length ? nm : PET_NAMES[kind]), xp: 0, active: !pets().some(p => p.active), away: 0, joined: Date.now() };

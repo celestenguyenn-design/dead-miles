@@ -1317,6 +1317,12 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   Garden seeds (2 kinds x 2+t), Scavenger kit (lockpicks 1+t, 2 batteries, 2 cloth), Walking cache (2 km; 5 km at tier 3+),
   Capsule token(s) (1; 2 at tier 3+, opt.tok, added in turnIn), Coffee & snacks. Cosmetic chance unchanged.
 
+## Done in 0.66.0 (owner: "adopting a dog or buddy should not be free please remove it if people already adopted")
+- life.js: the Walking buddy tile/sheet no longer offers a free dog or cat. With no pet it explains that strays hide in
+  houses (coax them, food helps). Crew.adopt export removed (Crew coax and the dev addPet still use adopt()).
+- Checked every cloud save (next_saves, 2026-11-18): pets.seq = 0 and no pets for all 9 players, so nobody had used the
+  free adoption and nothing needed taking back.
+
 ## NEXT UP (handoff, updated 2026-11-17 - read this first in a new chat)
 ### 0. Open decisions / requests from the owner (2026-11-17)
 - Isabel ('isa') is on NET.cfg.trustedTyped (net.js), so her TYPED steps are recorded as phone steps. That means they
