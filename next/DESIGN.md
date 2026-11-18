@@ -1310,6 +1310,13 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - Plan items go out once their time has come, up to 3 h late, max 2 per subscriber per run. TTL 3 h.
 - Test: run the "Send notifications" workflow with the test box ticked; it now also sends one to every next subscriber.
 
+## Done in 0.65.0 - Dot's job rewards (owner: "Dot shouldn't give a blueprint for every quest, it should be rare" / "add other things that they can give")
+- game.js rewardOptions: the Blueprint choice now shows on ~12% / 15% / 18% of tier 1 / 2 / 3 jobs (was every job while
+  unknown blueprints remained). 1,000 simulated jobs: 15%. Still seeded per job, so reopening the sheet doesn't reroll.
+- Always: Food, Meds, Ammo (Arrows for hunters). Plus 2 of these per job: Building materials (wood t, nails 2t, tape 1),
+  Garden seeds (2 kinds x 2+t), Scavenger kit (lockpicks 1+t, 2 batteries, 2 cloth), Walking cache (2 km; 5 km at tier 3+),
+  Capsule token(s) (1; 2 at tier 3+, opt.tok, added in turnIn), Coffee & snacks. Cosmetic chance unchanged.
+
 ## NEXT UP (handoff, updated 2026-11-17 - read this first in a new chat)
 ### 0. Open decisions / requests from the owner (2026-11-17)
 - Isabel ('isa') is on NET.cfg.trustedTyped (net.js), so her TYPED steps are recorded as phone steps. That means they

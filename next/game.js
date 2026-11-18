@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.64.0';
+const NEXT_VERSION = '0.65.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -579,8 +579,21 @@ const NEXT_VERSION = '0.64.0';
     const t = q.tier, opts = [];
     const unknown = Object.keys(D.ITEMS).filter(k => k.startsWith('bp_') && !SV.survivor.known.includes(D.ITEMS[k].bp) && !countItem(k));   // 0.24.3
     const rnd = D.mulberry32(D.hashStr(q.id + ':rw'));
-    if (unknown.length) { const k = unknown[Math.floor(rnd() * unknown.length)]; opts.push({ n: 'Blueprint', items: [[k, 1]] }); }
+    // 0.65 (owner: "Dot shouldn't give a blueprint for every quest, it should be rare"): ~1 job in 8 (a bit more at higher tiers)
+    if (unknown.length && rnd() < Math.min(.2, .09 + .03 * t)) { const k = unknown[Math.floor(rnd() * unknown.length)]; opts.push({ n: 'Blueprint', items: [[k, 1]] }); }
     opts.push({ n: 'Food bundle', items: [['beans', t + 1], ['water', t], ...(D.EVENT ? [['pie', 1]] : [])] });
+    // 0.65 ("add other things that they can give"): two extra choices per job, picked from this list
+    const seeds = Object.keys(D.ITEMS).filter(k => D.ITEMS[k].seed), sd = () => seeds[Math.floor(rnd() * seeds.length)];
+    const s1 = sd(); let s2 = sd(); if (s2 === s1) s2 = seeds[(seeds.indexOf(s1) + 1) % seeds.length];
+    const EXTRA = [
+      { n: 'Building materials', items: [['wood', t], ['nails', 2 * t], ['tape', 1]] },
+      { n: 'Garden seeds', items: [[s1, 2 + t], [s2, 2 + t]] },
+      { n: 'Scavenger kit', items: [['lockpick', 1 + t], ['battery', 2], ['cloth', 2]] },
+      { n: 'Walking cache', items: [[t >= 3 ? 'cache5' : 'cache2', 1]] },
+      { n: t >= 3 ? 'Capsule tokens' : 'Capsule token', tok: t >= 3 ? 2 : 1, items: [] },
+      { n: 'Coffee & snacks', items: [['coffee', 1 + Math.ceil(t / 2)], ['snack', 2 + t]] },
+    ].filter(o => (!o.tok || DM.Gacha) && o.items.every(([k]) => D.ITEMS[k]));
+    for (let i = 0; i < 2 && EXTRA.length; i++) opts.push(EXTRA.splice(Math.floor(rnd() * EXTRA.length), 1)[0]);
     opts.push({ n: 'Meds bundle', items: [['bandage', t + 1], ['meds', Math.ceil(t / 2)]] });
     opts.push(SV.survivor.job === 'hunter' ? { n: 'Arrows bundle', items: [['arrow', 6 * t], ['lockpick', 1]] } : { n: 'Ammo bundle', items: [['ammo', 10 * t], ['lockpick', 1]] });
     // now and then Dot throws in a cosmetic option (her quest line; the harvest scarf during Thanksgiving)
@@ -595,6 +608,7 @@ const NEXT_VERSION = '0.64.0';
     if (q.type === 'fetch') takeItems('parcel', 1);
     for (const [k, n] of opt.items) give(k, n);   // 0.19: give() makes weapons Worn at full durability
     if (opt.cos) Game.unlockCos('cos_' + opt.cos);
+    if (opt.tok && DM.Gacha) DM.Gacha.state().tok += opt.tok;   // 0.65
     T.caps += q.reward.caps; DM.Skills.addXP(q.reward.xp);
     T.active = T.active.filter(x => x !== q);
     SV.houses = SV.houses.filter(h => h.quest !== q.id);
@@ -951,7 +965,7 @@ const NEXT_VERSION = '0.64.0';
     el.querySelectorAll('[data-turn]').forEach(b => b.onclick = () => {
       const q = T.active.find(x => x.id === b.dataset.turn), opts = rewardOptions(q);
       sheetOpen(`<div class="kick">${D.QUESTS[q.type].n} · tier ${q.tier}</div><h3>Pick your reward</h3><p class="mp">Plus ${q.reward.caps} caps and ${q.reward.xp} xp.</p>
-        ${opts.map((o, i) => `<button class="pick${o.cos ? ' cospick' : ''}" data-opt="${i}"><b>${o.n}</b><span class="picons">${o.cos ? `${icon('cos_' + o.cos)}${D.COS[o.cos].n} · ${D.RARITY[D.COS[o.cos].r].n.toLowerCase()}, for your wardrobe` : o.items.map(([k, n]) => `${icon(k)}${D.ITEMS[k].n}${n > 1 ? ' x' + n : ''}`).join(' ')}</span></button>`).join('')}`);
+        ${opts.map((o, i) => `<button class="pick${o.cos ? ' cospick' : ''}" data-opt="${i}"><b>${o.n}</b><span class="picons">${o.cos ? `${icon('cos_' + o.cos)}${D.COS[o.cos].n} · ${D.RARITY[D.COS[o.cos].r].n.toLowerCase()}, for your wardrobe` : o.tok ? `🎟 ${o.tok} for the capsule machine` : o.items.map(([k, n]) => `${icon(k)}${D.ITEMS[k].n}${n > 1 ? ' x' + n : ''}`).join(' ')}</span></button>`).join('')}`);
       $('#msheet').querySelectorAll('[data-opt]').forEach(o => o.onclick = () => {
         const opt = opts[+o.dataset.opt];
         // supply/fetch items leave first, so check room as if they were gone
