@@ -849,6 +849,10 @@
   .hsect + .evban .evg { width: 32px; height: 32px; border-radius: 10px; border-width: 2px; } .hsect + .evban .evg svg { width: 20px; height: 20px; }
   .hsect + .evban .evt b { font-size: 14px; } .hsect + .evban .evt em { font-size: 10.5px; } .hsect + .evban .evgo { font-size: 22px; }
   .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  /* 0.66: the rest of the tiles fold into one button */
+  .tilemore { display: flex; align-items: center; justify-content: space-between; width: 100%; margin: 8px 0; padding: 10px 14px; border-radius: 14px; background: rgba(17,20,47,.55); border: 2px solid #3d2d61; color: var(--crm); font-weight: 900; font-size: 14px; }
+  .tilemore i { font-style: normal; margin-left: 6px; padding: 1px 7px; border-radius: 8px; background: #3d2d61; color: var(--mute); font-size: 11px; } .tilemore span { color: var(--mute); }
+  .tquiet { margin: 2px 2px 4px; color: var(--mute); font-size: 12px; font-weight: 700; }
   .tile { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; min-height: 64px; padding: 10px 12px 12px 14px; border-radius: 14px; text-align: left;
     background: #1c1538; border: 2px solid var(--ink); box-shadow: inset 4px 0 0 var(--tc); overflow: hidden; }
   .tile:active { transform: translateY(1px); }

@@ -1283,7 +1283,7 @@ const NEXT_VERSION = '0.66.0';
           <div class="portwrap"><canvas id="mPort" width="150" height="190"></canvas><div class="lookbtns"><button class="editlook" id="mLook">Edit look</button><button class="editlook ward" id="mWard">Wardrobe${newCos() ? `<i class="nbadge">${newCos()}</i>` : ''}</button></div></div>
           <div class="sinfo">
             <div class="sname">${esc(s.name)}${DM.Walks && DM.Walks.title() ? ` <em class="stitle">${esc(DM.Walks.title())}</em>` : ''}</div>
-            <div class="sjob">${J.n} · <span>${J.stats.join(' · ')}</span></div>
+            <div class="sjob">${J.n}</div>
             <div class="mbar hp"><i style="width:${s.hp / maxHp(s) * 100}%"></i><span>HP ${Math.ceil(s.hp)}/${maxHp(s)}</span></div>
             ${DM.Food.barsHTML(s)}${needStat(s)}
             <button class="sline skbtn${pts ? ' pts' : ''}" id="mSkills"><span>Level ${xl.L}${pts ? ` · <b>${pts} skill point${pts > 1 ? 's' : ''}</b>` : ''}</span><em>Skills ›</em><div class="mbar xp"><i style="width:${xl.pct}%"></i></div></button>
@@ -1520,7 +1520,7 @@ const NEXT_VERSION = '0.66.0';
   }
   function guideCard() {
     if (SV.guideOff) return `<button class="gdshow" id="gdShow">What should I do next? ›</button>`;
-    const st = guideSteps();
+    const st = guideSteps().slice(0, 1);   // 0.66 (owner: "too jumbled"): just the top suggestion
     return `<div class="gdcard"><div class="gdhead"><span class="kick">What to do next</span><button class="gdx" id="gdHide" aria-label="Hide">Hide</button></div>${st.map((x, i) => `<button class="gdrow" data-gd="${x.k}"><i>${i + 1}</i><span><b>${esc(x.t)}</b><em>${esc(x.sub)}</em></span><u>›</u></button>`).join('')}</div>`;
   }
   function bindGuide() {
@@ -1571,7 +1571,12 @@ const NEXT_VERSION = '0.66.0';
     const gn = BS.gardenNote(); if (gn) t.push({ k: 'garden', c: '#93a86c', n: 'Garden', sub: gn, hot: '' });
     const ev = eventBanner();
     t = t.filter(x => unl(x.k));   // 0.45: new players get these one by one
-    return `<div class="hsect"><span class="kick">This week</span></div>${ev}<div class="tiles">${t.map(x => `<button class="tile" data-tile="${x.k}" style="--tc:${x.c}"><span class="tn">${esc(x.n)}</span><span class="ts">${esc(x.sub)}</span>${x.bar != null ? `<i class="tbar"><i style="width:${Math.max(0, Math.min(100, x.bar))}%"></i></i>` : ''}${x.hot ? `<b class="thot">${esc(x.hot)}</b>` : ''}</button>`).join('')}</div>`;
+    // 0.66 (owner: "there's soooo many things on the UI ... it's too jumbled"): only tiles that need you stay on the
+    // home screen (a badge: Go, New, Fight, On...); the rest fold into one "All activities" button (remembered per phone).
+    const tileH = x => `<button class="tile" data-tile="${x.k}" style="--tc:${x.c}"><span class="tn">${esc(x.n)}</span><span class="ts">${esc(x.sub)}</span>${x.bar != null ? `<i class="tbar"><i style="width:${Math.max(0, Math.min(100, x.bar))}%"></i></i>` : ''}${x.hot ? `<b class="thot">${esc(x.hot)}</b>` : ''}</button>`, pinned = t.filter(x => x.hot).slice(0, 6), rest = t.filter(x => !pinned.includes(x));
+    let more = false; try { more = localStorage.getItem('dm-next-tiles') === '1'; } catch (e) { /* ignore */ }
+    return `<div class="hsect"><span class="kick">This week</span></div>${ev}${pinned.length ? `<div class="tiles">${pinned.map(tileH).join('')}</div>` : '<p class="tquiet">Nothing needs you right now.</p>'}`
+      + (rest.length ? `<button class="tilemore" id="tileMore">${more ? 'Show less' : `All activities <i>${rest.length}</i>`}<span>${more ? '▴' : '▾'}</span></button>${more ? `<div class="tiles">${rest.map(tileH).join('')}</div>` : ''}` : '');
   }
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
@@ -1612,6 +1617,7 @@ const NEXT_VERSION = '0.66.0';
   function bindHomeTop() {
     const b = $('#hBase'); if (b) b.onclick = () => { SFX.play('ui'); goBase(); };
     const p = $('#hPill'); if (p) p.onclick = () => { SFX.play('ui'); openCardSheet('horde'); };
+    const tm = $('#tileMore'); if (tm) tm.onclick = () => { SFX.play('ui'); try { localStorage.setItem('dm-next-tiles', localStorage.getItem('dm-next-tiles') === '1' ? '0' : '1'); } catch (e) { /* ignore */ } renderHome(); };   // 0.66
     document.querySelectorAll('[data-tile]').forEach(x => x.onclick = () => {
       SFX.play('ui'); const k = x.dataset.tile;
       if (k === 'garden') goBase();

@@ -123,23 +123,37 @@ window.DM = window.DM || {};
 
   // ---------------------------------------------------------------- supply run (commute mode)
   const RUN_MIN = 1000, RUN_MAX_ROLLS = 5, RUN_DAY = 2;
+  // 0.66 (owner: "supply run i think is bugged"): steps since the start, also across midnight (the day's count resets then;
+  // r.d0 = the game day it started). A run left open for 2+ days is dropped, and so is a run from before 0.66 (no d0).
+  function runGot(v, r) {
+    const P = v.prevDay;
+    if (!r.d0) return null;   // a run from before 0.66 (no start day): cancelled
+    if (r.d0 === v.day.key) return realSteps(v) - r.p0;
+    if (P && P.key === r.d0) return Math.max(0, (P.phone || 0) + (P.walk || 0) - r.p0) + realSteps(v);
+    return null;
+  }
+  // pull the latest phone steps first (4 s at most), so the start and the end are both up to date
+  const syncNow = () => new Promise(res => { const N = window.NET; if (!N || !N.ok || !N.pullSteps) return res(); const t = setTimeout(res, 4000); N.pullSteps().catch(() => { }).then(() => { clearTimeout(t); res(); }); });
   const runTile = () => { const v = SV(), r = st().run; if (!v) return null; if (r.day !== today()) { r.day = today(); r.n = 0; }
-    if (r.on) return { k: 'commute', c: '#9fe0e6', n: 'Supply run', sub: `${fmt(Math.max(0, realSteps(v) - r.p0))} steps so far - end it when you arrive`, hot: 'On' };
+    if (r.on && runGot(v, r) == null) r.on = 0;   // 0.66: started 2+ days ago
+    if (r.on) return { k: 'commute', c: '#9fe0e6', n: 'Supply run', sub: `${fmt(Math.max(0, runGot(v, r)))} steps so far - end it when you arrive`, hot: 'On' };
     return { k: 'commute', c: '#9fe0e6', n: 'Supply run', sub: r.n >= RUN_DAY ? 'Done for today' : 'Walking somewhere anyway? Make it a run', hot: '' }; };
   L.runHTML = function () {
-    const v = SV(), r = st().run, got = realSteps(v) - r.p0;
+    const v = SV(), r = st().run, got = Math.max(0, runGot(v, r) || 0);
     return `<div class="kick">Commute mode</div><h3>Supply run</h3><p class="mp">Walking to the train, the shops, work? Start a supply run before you go and end it when you get there. Every ${fmt(RUN_MIN)} steps on the way = one haul of supplies (max ${RUN_MAX_ROLLS}). Phone / watch steps only - typed steps don't count. ${RUN_DAY} runs a day.</p>
+      <p class="mp dim">On iPhone, run your step Shortcut (or open the step app) right before you start and again when you arrive.</p>
       ${r.on ? `<div class="kick sect">On the move</div><p class="mp"><b>${fmt(Math.max(0, got))}</b> steps so far · ${Math.min(RUN_MAX_ROLLS, Math.floor(Math.max(0, got) / RUN_MIN))} haul${Math.floor(got / RUN_MIN) === 1 ? '' : 's'}</p><button class="mbtn big" id="runEnd">I'm here - end the run</button><button class="mbtn big ghost" id="runQuit">Cancel it</button>`
         : r.n >= RUN_DAY ? '<p class="mp dim">You did both runs today. Back tomorrow.</p>' : '<button class="mbtn big" id="runGo">Start a supply run</button>'}
-      <p class="mp dim">Sync your steps when you arrive so they're counted.</p>`;
+`;
   };
   L.bindRun = function (root, re) {
     const v = SV(), r = st().run;
-    const go = root.querySelector('#runGo'); if (go) go.onclick = () => { r.on = 1; r.p0 = realSteps(v); G().save(); sfx('ui'); L.radio('🎒 Supply run started. Keep your eyes open on the way.', 'runs' + Date.now()); re(); };
+    const go = root.querySelector('#runGo'); if (go) go.onclick = async () => { go.disabled = true; go.textContent = 'Syncing your steps...'; await syncNow(); r.on = 1; r.d0 = v.day.key; r.p0 = realSteps(v); G().save(); sfx('ui'); L.radio('🎒 Supply run started. Keep your eyes open on the way.', 'runs' + Date.now()); re(); };
     const q = root.querySelector('#runQuit'); if (q) q.onclick = () => { r.on = 0; G().save(); re(); };
-    const end = root.querySelector('#runEnd'); if (end) end.onclick = () => {
-      const got = realSteps(v) - r.p0, n = Math.min(RUN_MAX_ROLLS, Math.floor(got / RUN_MIN));
-      if (n < 1) { toast(`Only ${fmt(Math.max(0, got))} steps so far - a run needs ${fmt(RUN_MIN)} (sync your steps first)`, 2.6); return; }
+    const end = root.querySelector('#runEnd'); if (end) end.onclick = async () => {
+      end.disabled = true; end.textContent = 'Syncing your steps...'; await syncNow(); end.disabled = false; end.textContent = "I'm here - end the run";
+      const got = Math.max(0, runGot(v, r) || 0), n = Math.min(RUN_MAX_ROLLS, Math.floor(got / RUN_MIN));
+      if (n < 1) { toast(`Only ${fmt(got)} steps since you started - a run needs ${fmt(RUN_MIN)}. On iPhone, run your step Shortcut and try again.`, 3.2); re(); return; }
       r.on = 0; r.n++;
       const keys = []; for (let i = 0; i < n; i++) keys.push(...D.rollLoot(pick(['store', 'storage', 'register', 'car']), Math.random));
       const stacks = D.toStacks(keys, Math.random); const lost = G().routeApi.toStash(stacks.map(e => Object.assign({}, e)));

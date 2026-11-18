@@ -1344,6 +1344,15 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   store's 3 tokens cost 12 marks (was 6). 14 new capsule cosmetics (art.js + data.js), the machine's line went from 12 to
   26: c propeller, chef, mustache, glasses3d, hawaiian; r cowboy, frogcap, monocle, chain, pajamas; e wizard, medal,
   guitar; l jetpack.
+- Supply run fixes (owner: "supply run i think is bugged"; her save had a run started 11-17 stuck at 0 steps): it counted
+  v.day phone+walk, which resets at midnight (a run over midnight went negative), and it never pulled fresh steps, so a
+  late Shortcut post counted from before the start or not at all. Now: Start and End first pull steps (NET.pullSteps,
+  4 s max); r.d0 = start day and runGot() adds yesterday's part via SV.prevDay; a run open 2+ days, or from before 0.66,
+  is cancelled. Tested: 800 steps refused, 2,500 -> 2 hauls, old run cancelled.
+- Home screen declutter (owner: "soooo many things on the UI ... too jumbled"): homeTiles shows only tiles with a badge
+  (hot: Go / New / Fight / On ..., max 6); the rest fold into "All activities N" (localStorage dm-next-tiles). The hero
+  card drops the job stats line; "What to do next" shows 1 step instead of 3. Owner's save: 14 tiles -> 5 + the button,
+  home 2,200 px -> 1,770 px.
 
 ## NEXT UP (handoff, updated 2026-11-17 - read this first in a new chat)
 ### 0. Open decisions / requests from the owner (2026-11-17)
