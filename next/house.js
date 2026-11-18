@@ -523,7 +523,7 @@
   // secrets stay invisible until most of the house has been searched; no announcement when that happens
   const gateSet = () => G.furn.filter(f => f.lootable && !f.secretLoot && !f.lock && !f.car && !f.keyRoom);   // 0.8: brass-key spots never count
   function gateOpen() { const C = gateSet(); return C.filter(f => f.searched).length >= Math.ceil(C.length * gatePct()); }
-  const hasItem = k => G.pack.some(e => e.k === k) || (S().hands && S().hands.k === k);
+  const hasItem = k => G.pack.some(e => e.k === k) || (S().hands && S().hands.k === k) || (S().tool && S().tool.k === k);   // 0.66: tool belt
   const hasPry = () => hasItem('crowbar') || hasItem('prybar');
   const packCount = k => G.pack.reduce((a, e) => a + (e.k === k ? e.n : 0), 0);
   function usePack(k) { const i = G.pack.findIndex(e => e.k === k); if (i < 0) return; if (!--G.pack[i].n) G.pack.splice(i, 1); }
@@ -2270,7 +2270,7 @@
   function startPry(it) {
     const p = G.p, o = it.obj;
     p.st = 'search'; p.stT = 0;
-    p.search = { it: { obj: o, act: 'Pry', name: o.name, rect: it.rect, noise: 7.5 * (hasItem('prybar') && !hasItem('crowbar') ? .6 : 1), pry: true, done: () => { o.locked = null; o.pried = true; o._key = null; SFX.play('kill'); G.shake = 8; emitNoise(o.x + o.w / 2, o.y + o.h, 9 * (hasItem('prybar') && !hasItem('crowbar') ? .6 : 1) * (job() === 'mechanic' ? .5 : 1) * SK.pryNoise()); finishPry(it); } }, t: 0, dur: 2.6 + (o.time > 2.5 ? 1 : .4), nextNoise: .2, nextFx: 0 };
+    p.search = { it: { obj: o, act: 'Pry', name: o.name, rect: it.rect, noise: 7.5 * (hasItem('prybar') && !hasItem('crowbar') ? .6 : 1), pry: true, done: () => { o.locked = null; o.pried = true; o._key = null; wearPry(); SFX.play('kill'); G.shake = 8; emitNoise(o.x + o.w / 2, o.y + o.h, 9 * (hasItem('prybar') && !hasItem('crowbar') ? .6 : 1) * (job() === 'mechanic' ? .5 : 1) * SK.pryNoise()); finishPry(it); } }, t: 0, dur: 2.6 + (o.time > 2.5 ? 1 : .4), nextNoise: .2, nextFx: 0 };
     SFX.play('scrape');
   }
   function finishPry(it) { // pried open: the normal search happens straight away (with a chance to smash something)
@@ -2318,7 +2318,7 @@
     buzz(60);
     const n = packCount('lockpick');
     if (!n) closeLock('Last pick snapped');
-    else LP.msg = `Snap! ${n} pick${n > 1 ? 's' : ''} left`;
+    else LP.msg = n === 1 ? 'Snap! ⚠ Last pick left' : `Snap! ${n} picks left`;   // 0.66: warn on the last one
   }
   function drawLock() {
     if (!LP.on) return;
@@ -2432,8 +2432,27 @@
   function wearWeapon(n = 1) {
     const h = S().hands; if (!h || h.d == null) return;
     if (Math.random() < SK.wearSkip()) return;   // 0.34: Tinkerer Patch job
-    h.d -= n;
+    const was = h.d; h.d -= n;
+    // 0.66 (owner: "everything should get a warning when it's about to break"): once, when it drops to 15%
+    if (h.d > 0 && was > D.wMax(h) * .15 && h.d <= D.wMax(h) * .15) toast(`⚠ Your ${ITEMS[h.k].n.toLowerCase()} is about to break - repair it in Gear`, 2.8);
     if (h.d <= 0) { toast(`Your ${ITEMS[h.k].n.toLowerCase()} broke!`, 2); SFX.play('break'); D.unloadGun(S()); G.reload = null; S().hands = null; lastHud = ''; }
+  }
+  // 0.66 (owner: the tool-belt crowbar "should still be able to break tho but it should give us a warning"): every pry
+  // wears the tool used - the tool belt first, then the one in your hand, then one in the pack. Warns when 2 pries are left.
+  const PRY_WEAR = 10, PRYK = ['crowbar', 'prybar'];
+  function wearPry() {
+    const s = S(); if (Math.random() < SK.wearSkip()) return;
+    const where = s.tool && PRYK.includes(s.tool.k) ? 'tool' : s.hands && PRYK.includes(s.hands.k) ? 'hands' : 'pack';
+    const e = where === 'pack' ? G.pack.find(x => PRYK.includes(x.k)) : s[where]; if (!e) return;
+    if (where === 'hands') { const k = e.k; wearWeapon(PRY_WEAR); if (!S().hands) return; if (S().hands.k !== k) return; }
+    else { if (e.d == null) e.d = D.wMax(e); e.d -= PRY_WEAR; }
+    const nm = ITEMS[e.k].n.toLowerCase(), place = where === 'tool' ? ' on your tool belt' : '';
+    if (e.d <= 0) {
+      if (where === 'tool') s.tool = null; else if (where === 'pack') G.pack.splice(G.pack.indexOf(e), 1);
+      toast(`Your ${nm}${place} snapped!`, 2.4); SFX.play('break'); lastHud = ''; return;
+    }
+    const left = Math.ceil(e.d / PRY_WEAR);
+    if (left <= 2) toast(`⚠ Your ${nm}${place} is nearly worn out - ${left} more pr${left === 1 ? 'y' : 'ies'}. Repair it in Gear.`, 3);
   }
   function swapWeapon() {
     const ws = G.pack.map((e, i) => [e, i]).filter(([e]) => D.isWeapon(e.k));
@@ -2542,7 +2561,7 @@
     return true;
   }
   function landArrow(x, y) {
-    if (!SK.noSnapArrow() && Math.random() > .65) return; // some snap (0.34: Tracker Retriever - none)
+    if (Math.random() < (SK.noSnapArrow() ? .15 : .35)) return; // some snap (0.34: Tracker Retriever - none; 0.66 owner: "kind of op" - Retriever 15% instead of 35%)
     const near = G.drops.find(d => d.k === 'arrow' && Math.hypot(d.x - x, d.y - y) < 26);
     if (near) near.n++; else G.drops.push({ k: 'arrow', n: 1, x, y, t: .7 });
   }

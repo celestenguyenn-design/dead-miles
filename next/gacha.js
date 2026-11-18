@@ -3,8 +3,8 @@
    the running holiday's capsules (src 'gacha' with ev = the event). While a holiday runs, 1 pull in 4 is a piece of
    holiday decor instead. Odds: common 55, rare 30, epic 12, legendary 3; 10 pulls in a row without an epic or better
    -> the next one is (pity). Cosmetics you do not own come first; a duplicate is sold to Dot (Game.unlockCos).
-   Tokens: 1 per 4,000 steps walked (SV.walked, the same total Dot and quests use), at most 3 a day - the same for
-   everyone - or 50 caps each. New saves start with 1.
+   Tokens: 1 per 5,000 steps walked (SV.walked, the same total Dot and quests use), at most 2 a day - the same for
+   everyone - or 120 caps each (0.66; was 4,000 / 3 / 50). New saves start with 1.
    Deck the base (home card while a holiday with decor runs): place that holiday's decor at the base. 2 / 5 / 8 pieces
    placed -> 2 tokens + 40 caps / 3 tokens + 80 caps / the holiday's legendary cosmetic (ev.deckCos) + 100 caps.
    Claimed per event and year. Decor comes from Dot's holiday shelf, holiday houses and capsules.
@@ -14,7 +14,7 @@ window.DM = window.DM || {};
 (() => {
   const D = DM.D, E = DM.E, $ = E.$, SFX = E.SFX, toast = E.toast;
   const GA = DM.Gacha = {};
-  const STEP = 4000, DAY_MAX = 3, PRICE = 50, PITY = 10;
+  const STEP = 5000, DAY_MAX = 2, PRICE = 120, PITY = 10;   // 0.66 (owner: "capsules are too cheap"): was 4,000 steps, 3 a day, 50 caps
   const ODDS = { c: 55, r: 30, e: 12, l: 3 };
   const RCOL = { c: '#cfc4ec', r: '#7ec0ee', e: '#b98cf0', l: '#ffd27a' };
   const G = () => DM.Game, SV = () => G() && G().data(), U = () => G().ui;

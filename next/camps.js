@@ -126,7 +126,7 @@ window.DM = window.DM || {};
     { k: 'stash', n: '+10 stash slots', d: 'Permanent. Up to +40.', cost: s => STASH_COST[s.buys.stash], left: s => s.buys.stash < STASH_COST.length, buy: (s, v) => { s.buys.stash++; v.survivor.warStash = (v.survivor.warStash || 0) + 10; } },
     { k: 'plate', n: 'Plated armor', d: 'The heaviest armor in the game.', cost: () => 14, left: () => true, buy: () => G().routeApi.toStash([{ k: 'armor_plate', n: 1 }]) },
     { k: 'master', n: 'Masterwork weapon', d: 'A random weapon at the top quality tier.', cost: () => 22, left: () => true, buy: () => { const k = ['machete', 'axe', 'spikedbat', 'pistol', 'shotgun', 'baton', 'bow'][Math.floor(Math.random() * 7)], e = { k, n: 1, q: 5 }; e.d = D().wMax(e); G().routeApi.toStash([e]); toast(`A Masterwork ${D().ITEMS[k].n.toLowerCase()} is in your stash`, 2.4); } },
-    { k: 'tok', n: '3 capsule tokens', d: 'For the capsule machine.', cost: () => 6, left: () => !!DM.Gacha, buy: () => { DM.Gacha.state().tok += 3; } },
+    { k: 'tok', n: '3 capsule tokens', d: 'For the capsule machine.', cost: () => 12,   /* 0.66: was 6 */ left: () => !!DM.Gacha, buy: () => { DM.Gacha.state().tok += 3; } },
   ];
   CP.tile = function () {
     const n = N(); if (!n || !n.ok) return null; CP.refresh();

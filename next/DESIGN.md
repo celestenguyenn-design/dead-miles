@@ -1317,6 +1317,43 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   Garden seeds (2 kinds x 2+t), Scavenger kit (lockpicks 1+t, 2 batteries, 2 cloth), Walking cache (2 km; 5 km at tier 3+),
   Capsule token(s) (1; 2 at tier 3+, opt.tok, added in turnIn), Coffee & snacks. Cosmetic chance unchanged.
 
+## Done in 0.66.0 (owner: "adopting a dog or buddy should not be free please remove it if people already adopted")
+- life.js: the Walking buddy tile/sheet no longer offers a free dog or cat. With no pet it explains that strays hide in
+  houses (coax them, food helps). Crew.adopt export removed (Crew coax and the dev addPet still use adopt()).
+- Checked every cloud save (next_saves, 2026-11-18): pets.seq = 0 and no pets for all 9 players, so nobody had used the
+  free adoption and nothing needed taking back.
+- house.js landArrow (owner: "kind of op that the arrows never break anymore"): the Hunter skill Retriever now means arrows
+  snap 15% of the time instead of never. Without it, still 35%. skills.js description updated.
+- Tool belt (owner: "a slot for a crowbar too because sometimes we never bring it" / "it should still be able to break tho but
+  it should give us a warning"): Gear > Equipped has a Tool belt slot (SV.survivor.tool = { k, d, q }, crowbar or pry bar).
+  It counts as carried in every house (house.js hasItem, game.js lockCheck), takes no pack slot and is never dropped. It is
+  not a weapon in houses - equip one in your hand for that. Tap the empty slot to hang one from the pack/stash, or use
+  "Tool belt" on a crowbar/pry bar; the slot's sheet has Put in stash / To pack.
+- Prying now wears the tool used (house.js wearPry: 10 durability per pry; belt first, then hand, then pack; Tinkerer
+  wearSkip applies). A Worn crowbar lasts about 9 pries. At 2 or fewer pries left: a ⚠ toast after each pry, a red
+  "N pries left" on the slot, and a toast before entering a house with locks. It snaps at 0. Repair: stash, then Repair.
+- Break warnings (owner: "everything should get a warning when it's about to break"): a ⚠ toast once when your weapon
+  (house.js wearWeapon) or armor (armor.js A.hit) drops to 15%, and when a crew member's weapon or armor does (crew.js).
+  Starting a run with a weapon or armor at 15% or less warns too (game.js loot). Lockpicks: "⚠ Last pick left".
+- Free pet taken back (owner adopted one on 0.65: "I got it for free the dog lol. Please remove it"): game.js migrate runs
+  a one-time fix (SV.fixes.freepet) that removes pets without src that joined after 0.62 shipped (1794953729000 ms).
+  Strays coaxed in houses get p.src = 'house' from 0.66 on. Owner's save had Waffles (dog, joined 1794964386238).
+  A stray coaxed between 0.62 and 0.66 would also be removed (none seen in the cloud saves).
+- Capsules (owner: "capsules are too cheap, we need more things as well, I almost maxed it out"): a token is 120 caps
+  (was 50); steps give 1 per 5,000 (was 4,000), up to 2 a day (was 3). Dot's job token choice is always 1; the camps
+  store's 3 tokens cost 12 marks (was 6). 14 new capsule cosmetics (art.js + data.js), the machine's line went from 12 to
+  26: c propeller, chef, mustache, glasses3d, hawaiian; r cowboy, frogcap, monocle, chain, pajamas; e wizard, medal,
+  guitar; l jetpack.
+- Supply run fixes (owner: "supply run i think is bugged"; her save had a run started 11-17 stuck at 0 steps): it counted
+  v.day phone+walk, which resets at midnight (a run over midnight went negative), and it never pulled fresh steps, so a
+  late Shortcut post counted from before the start or not at all. Now: Start and End first pull steps (NET.pullSteps,
+  4 s max); r.d0 = start day and runGot() adds yesterday's part via SV.prevDay; a run open 2+ days, or from before 0.66,
+  is cancelled. Tested: 800 steps refused, 2,500 -> 2 hauls, old run cancelled.
+- Home screen declutter (owner: "soooo many things on the UI ... too jumbled"): homeTiles shows only tiles with a badge
+  (hot: Go / New / Fight / On ..., max 6); the rest fold into "All activities N" (localStorage dm-next-tiles). The hero
+  card drops the job stats line; "What to do next" shows 1 step instead of 3. Owner's save: 14 tiles -> 5 + the button,
+  home 2,200 px -> 1,770 px.
+
 ## NEXT UP (handoff, updated 2026-11-17 - read this first in a new chat)
 ### 0. Open decisions / requests from the owner (2026-11-17)
 - Isabel ('isa') is on NET.cfg.trustedTyped (net.js), so her TYPED steps are recorded as phone steps. That means they

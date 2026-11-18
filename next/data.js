@@ -258,6 +258,14 @@ window.DM = window.DM || {};
     starshades: { n: 'Star shades', slot: 'face', r: 'r', src: 'gacha' }, cape: { n: 'Hero cape', slot: 'back', r: 'r', src: 'gacha' },
     halo: { n: 'Glow halo', slot: 'hat', r: 'e', src: 'gacha' }, batwings: { n: 'Bat wings', slot: 'back', r: 'l', src: 'gacha' },
     // 0.26.6 (owner: "more clothes"): capsule outfits
+    // 0.67: capsule line 2
+    propeller: { n: 'Propeller beanie', slot: 'hat', r: 'c', src: 'gacha' }, chef: { n: 'Chef hat', slot: 'hat', r: 'c', src: 'gacha' },
+    mustache: { n: 'Big mustache', slot: 'face', r: 'c', src: 'gacha' }, glasses3d: { n: '3D glasses', slot: 'face', r: 'c', src: 'gacha' },
+    hawaiian: { n: 'Hawaiian shirt', slot: 'outfit', r: 'c', src: 'gacha' }, cowboy: { n: 'Cowboy hat', slot: 'hat', r: 'r', src: 'gacha' },
+    frogcap: { n: 'Frog beanie', slot: 'hat', r: 'r', src: 'gacha' }, monocle: { n: 'Monocle', slot: 'face', r: 'r', src: 'gacha' },
+    chain: { n: 'Gold chain', slot: 'neck', r: 'r', src: 'gacha' }, pajamas: { n: 'Pajamas', slot: 'outfit', r: 'r', src: 'gacha' },
+    wizard: { n: 'Wizard hat', slot: 'hat', r: 'e', src: 'gacha' }, medal: { n: 'Gold medal', slot: 'neck', r: 'e', src: 'gacha' },
+    guitar: { n: 'Electric guitar', slot: 'back', r: 'e', src: 'gacha' }, jetpack: { n: 'Jetpack', slot: 'back', r: 'l', src: 'gacha' },
     overalls: { n: 'Overalls', slot: 'outfit', r: 'c', src: 'gacha' }, trench: { n: 'Trench coat', slot: 'outfit', r: 'r', src: 'gacha' },
     labcoat: { n: 'Lab coat', slot: 'outfit', r: 'e', src: 'gacha' }, tux: { n: 'Tuxedo', slot: 'outfit', r: 'l', src: 'gacha' },
     // 0.26 holiday capsules (only in the machine while their event runs) + the Deck the base top prizes

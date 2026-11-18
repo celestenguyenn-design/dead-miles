@@ -3,7 +3,7 @@
    - Memorials: a crew member who dies gets a gravestone card with a (silly) story of how they went, days survived, last
      words. Shown when you get home; the Crew sheet keeps the wall. "Copy" puts it on the clipboard to share.
    - Walking buddy: the active pet walks with you. Every 2,500 steps it brings something (dogs dig up supplies, cats bring
-     "gifts"), up to 3 a day, better as it levels. No pet yet? Adopt a dog or a cat here (once, free).
+     "gifts"), up to 3 a day, better as it levels. No pet yet? Find a stray in a house (0.66: the free adoption is gone).
    - Supply run (commute mode): tap Start before a walk you take anyway (to the train, the shops). Phone / watch steps
      only - typed steps don't count. End it after 1,000+: one haul per 1,000 steps (max 5), 2 runs a day.
    - Radio: little story messages about what is going on (horde night coming, caches open, crew hungry, the garden, your
@@ -104,7 +104,7 @@ window.DM = window.DM || {};
   }
   const buddyTile = () => {
     const v = SV(), s = st(); if (!v || !DM.Crew) return null; const p = DM.Crew.activePet();
-    if (!p) return (v.pets && v.pets.list.length) ? null : { k: 'buddy', c: '#f0b25a', n: 'Walking buddy', sub: 'Adopt a dog or a cat to walk with you', hot: 'New' };
+    if (!p) return (v.pets && v.pets.list.length) ? null : { k: 'buddy', c: '#f0b25a', n: 'Walking buddy', sub: 'Find a stray hiding in a house to walk with you', hot: '' };   // 0.66: no free adoption
     const left = BUDDY_STEP - (realSteps(v) - (s.buddy.mark || 0));
     return { k: 'buddy', c: '#f0b25a', n: `${p.name} the ${p.kind}`, sub: s.buddy.n >= BUDDY_MAX ? `Found ${BUDDY_MAX} things today - tired, happy` : `Walking with you · next find in ${fmt(Math.max(0, left))} steps`, hot: '' };
   };
@@ -113,34 +113,47 @@ window.DM = window.DM || {};
     if (p) return `<div class="kick">Walking buddy</div><h3>${esc(p.name)}</h3><canvas id="lfPet" width="160" height="120" style="display:block;margin:0 auto"></canvas>
       <p class="mp">${esc(p.name)} walks with you everywhere (phone and watch steps). Every ${fmt(BUDDY_STEP)} steps ${p.kind === 'cat' ? 'you get a "gift"' : 'they dig something up'} - up to ${BUDDY_MAX} a day, and luckier as they level up (level ${DM.Crew.plv(p)}).</p>
       <p class="mp dim">Today: ${s.buddy.n}/${BUDDY_MAX} finds. Switch buddies in the Crew &amp; strays sheet.</p>`;
-    const coat = k => DM.Crew.COATS[k];
-    return `<div class="kick">Walking buddy</div><h3>Adopt a buddy</h3><p class="mp">Pick a stray to walk with you. They dig up (or "gift" you) things as you walk, and come along on runs. You can find more strays hiding in houses.</p>
-      ${['dog', 'cat'].map(k => `<div class="kick sect">${k === 'dog' ? 'Dogs' : 'Cats'}</div><div class="chips">${coat(k).map((c, i) => `<button class="chip" data-adopt="${k}:${i}" style="border-color:${c.a}">${esc(c.n)}</button>`).join('')}</div>`).join('')}`;
+    // 0.66 (owner: "adopting a dog or buddy should not be free"): no free adoption - pets come from strays in houses
+    return `<div class="kick">Walking buddy</div><h3>No buddy yet</h3><p class="mp">Strays hide in some houses - under beds, in closets, behind shelves. Stand next to one (food helps) and it may trust you.</p>
+      <p class="mp">A pet then walks with you: every ${fmt(BUDDY_STEP)} steps a dog digs something up and a cat brings you a "gift", up to ${BUDDY_MAX} a day.</p>`;
   };
   L.bindBuddy = function (root, re) {
     const p = DM.Crew.activePet(), cv = root.querySelector('#lfPet'); if (p && cv && DM.Crew.petPortrait) DM.Crew.petPortrait(cv, p, { happy: true, heart: 1 });
-    root.querySelectorAll('[data-adopt]').forEach(b => b.onclick = () => { const [k, i] = b.dataset.adopt.split(':'); const np = DM.Crew.adopt(k, +i); if (np) { np.active = true; G().save(); sfx('pick'); toast(`${np.name} the ${k} is walking with you now!`, 2.4); } re(); });
   };
 
   // ---------------------------------------------------------------- supply run (commute mode)
   const RUN_MIN = 1000, RUN_MAX_ROLLS = 5, RUN_DAY = 2;
+  // 0.66 (owner: "supply run i think is bugged"): steps since the start, also across midnight (the day's count resets then;
+  // r.d0 = the game day it started). A run left open for 2+ days is dropped, and so is a run from before 0.66 (no d0).
+  function runGot(v, r) {
+    const P = v.prevDay;
+    if (!r.d0) return null;   // a run from before 0.66 (no start day): cancelled
+    if (r.d0 === v.day.key) return realSteps(v) - r.p0;
+    if (P && P.key === r.d0) return Math.max(0, (P.phone || 0) + (P.walk || 0) - r.p0) + realSteps(v);
+    return null;
+  }
+  // pull the latest phone steps first (4 s at most), so the start and the end are both up to date
+  const syncNow = () => new Promise(res => { const N = window.NET; if (!N || !N.ok || !N.pullSteps) return res(); const t = setTimeout(res, 4000); N.pullSteps().catch(() => { }).then(() => { clearTimeout(t); res(); }); });
   const runTile = () => { const v = SV(), r = st().run; if (!v) return null; if (r.day !== today()) { r.day = today(); r.n = 0; }
-    if (r.on) return { k: 'commute', c: '#9fe0e6', n: 'Supply run', sub: `${fmt(Math.max(0, realSteps(v) - r.p0))} steps so far - end it when you arrive`, hot: 'On' };
+    if (r.on && runGot(v, r) == null) r.on = 0;   // 0.66: started 2+ days ago
+    if (r.on) return { k: 'commute', c: '#9fe0e6', n: 'Supply run', sub: `${fmt(Math.max(0, runGot(v, r)))} steps so far - end it when you arrive`, hot: 'On' };
     return { k: 'commute', c: '#9fe0e6', n: 'Supply run', sub: r.n >= RUN_DAY ? 'Done for today' : 'Walking somewhere anyway? Make it a run', hot: '' }; };
   L.runHTML = function () {
-    const v = SV(), r = st().run, got = realSteps(v) - r.p0;
+    const v = SV(), r = st().run, got = Math.max(0, runGot(v, r) || 0);
     return `<div class="kick">Commute mode</div><h3>Supply run</h3><p class="mp">Walking to the train, the shops, work? Start a supply run before you go and end it when you get there. Every ${fmt(RUN_MIN)} steps on the way = one haul of supplies (max ${RUN_MAX_ROLLS}). Phone / watch steps only - typed steps don't count. ${RUN_DAY} runs a day.</p>
+      <p class="mp dim">On iPhone, run your step Shortcut (or open the step app) right before you start and again when you arrive.</p>
       ${r.on ? `<div class="kick sect">On the move</div><p class="mp"><b>${fmt(Math.max(0, got))}</b> steps so far · ${Math.min(RUN_MAX_ROLLS, Math.floor(Math.max(0, got) / RUN_MIN))} haul${Math.floor(got / RUN_MIN) === 1 ? '' : 's'}</p><button class="mbtn big" id="runEnd">I'm here - end the run</button><button class="mbtn big ghost" id="runQuit">Cancel it</button>`
         : r.n >= RUN_DAY ? '<p class="mp dim">You did both runs today. Back tomorrow.</p>' : '<button class="mbtn big" id="runGo">Start a supply run</button>'}
-      <p class="mp dim">Sync your steps when you arrive so they're counted.</p>`;
+`;
   };
   L.bindRun = function (root, re) {
     const v = SV(), r = st().run;
-    const go = root.querySelector('#runGo'); if (go) go.onclick = () => { r.on = 1; r.p0 = realSteps(v); G().save(); sfx('ui'); L.radio('🎒 Supply run started. Keep your eyes open on the way.', 'runs' + Date.now()); re(); };
+    const go = root.querySelector('#runGo'); if (go) go.onclick = async () => { go.disabled = true; go.textContent = 'Syncing your steps...'; await syncNow(); r.on = 1; r.d0 = v.day.key; r.p0 = realSteps(v); G().save(); sfx('ui'); L.radio('🎒 Supply run started. Keep your eyes open on the way.', 'runs' + Date.now()); re(); };
     const q = root.querySelector('#runQuit'); if (q) q.onclick = () => { r.on = 0; G().save(); re(); };
-    const end = root.querySelector('#runEnd'); if (end) end.onclick = () => {
-      const got = realSteps(v) - r.p0, n = Math.min(RUN_MAX_ROLLS, Math.floor(got / RUN_MIN));
-      if (n < 1) { toast(`Only ${fmt(Math.max(0, got))} steps so far - a run needs ${fmt(RUN_MIN)} (sync your steps first)`, 2.6); return; }
+    const end = root.querySelector('#runEnd'); if (end) end.onclick = async () => {
+      end.disabled = true; end.textContent = 'Syncing your steps...'; await syncNow(); end.disabled = false; end.textContent = "I'm here - end the run";
+      const got = Math.max(0, runGot(v, r) || 0), n = Math.min(RUN_MAX_ROLLS, Math.floor(got / RUN_MIN));
+      if (n < 1) { toast(`Only ${fmt(got)} steps since you started - a run needs ${fmt(RUN_MIN)}. On iPhone, run your step Shortcut and try again.`, 3.2); re(); return; }
       r.on = 0; r.n++;
       const keys = []; for (let i = 0; i < n; i++) keys.push(...D.rollLoot(pick(['store', 'storage', 'register', 'car']), Math.random));
       const stacks = D.toStacks(keys, Math.random); const lost = G().routeApi.toStash(stacks.map(e => Object.assign({}, e)));

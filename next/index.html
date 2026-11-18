@@ -849,6 +849,10 @@
   .hsect + .evban .evg { width: 32px; height: 32px; border-radius: 10px; border-width: 2px; } .hsect + .evban .evg svg { width: 20px; height: 20px; }
   .hsect + .evban .evt b { font-size: 14px; } .hsect + .evban .evt em { font-size: 10.5px; } .hsect + .evban .evgo { font-size: 22px; }
   .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  /* 0.66: the rest of the tiles fold into one button */
+  .tilemore { display: flex; align-items: center; justify-content: space-between; width: 100%; margin: 8px 0; padding: 10px 14px; border-radius: 14px; background: rgba(17,20,47,.55); border: 2px solid #3d2d61; color: var(--crm); font-weight: 900; font-size: 14px; }
+  .tilemore i { font-style: normal; margin-left: 6px; padding: 1px 7px; border-radius: 8px; background: #3d2d61; color: var(--mute); font-size: 11px; } .tilemore span { color: var(--mute); }
+  .tquiet { margin: 2px 2px 4px; color: var(--mute); font-size: 12px; font-weight: 700; }
   .tile { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; min-height: 64px; padding: 10px 12px 12px 14px; border-radius: 14px; text-align: left;
     background: #1c1538; border: 2px solid var(--ink); box-shadow: inset 4px 0 0 var(--tc); overflow: hidden; }
   .tile:active { transform: translateY(1px); }
@@ -930,59 +934,59 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.65.0"></script>
-<script src="art.js?v=0.65.0"></script>
-<script src="net.js?v=0.65.0"></script>
-<script src="netpanel.js?v=0.65.0"></script>
-<script src="syncguide.js?v=0.65.0"></script>
-<script src="events.js?v=0.65.0"></script>
-<script src="data.js?v=0.65.0"></script>
-<script src="food.js?v=0.65.0"></script>
-<script src="skills.js?v=0.65.0"></script>
-<script src="infection.js?v=0.65.0"></script>
-<script src="infected.js?v=0.65.0"></script>
-<script src="engine.js?v=0.65.0"></script>
-<script src="music.js?v=0.65.0"></script>
-<script src="weather.js?v=0.65.0"></script>
-<script src="gen.js?v=0.65.0"></script>
-<script src="raiders.js?v=0.65.0"></script>
-<script src="house.js?v=0.65.0"></script>
-<script src="horde.js?v=0.65.0"></script>
-<script src="base.js?v=0.65.0"></script>
-<script src="armor.js?v=0.65.0"></script>
-<script src="walks.js?v=0.65.0"></script>
-<script src="npcq.js?v=0.65.0"></script>
-<script src="crew.js?v=0.65.0"></script>
-<script src="boss.js?v=0.65.0"></script>
-<script src="daily.js?v=0.65.0"></script>
-<script src="gacha.js?v=0.65.0"></script>
-<script src="tour.js?v=0.65.0"></script>
-<script src="deep.js?v=0.65.0"></script>
-<script src="route.js?v=0.65.0"></script>
-<script src="advent.js?v=0.65.0"></script>
-<script src="install.js?v=0.65.0"></script>
-<script src="logo.js?v=0.65.0"></script>
-<script src="title.js?v=0.65.0"></script>
-<script src="game.js?v=0.65.0"></script>
-<script src="codex.js?v=0.65.0"></script>
-<script src="social.js?v=0.65.0"></script>
-<script src="gifts.js?v=0.65.0"></script>
-<script src="mvt.js?v=0.65.0"></script>
-<script src="mapfx.js?v=0.65.0"></script>
-<script src="mapquest.js?v=0.65.0"></script>
-<script src="mappoi.js?v=0.65.0"></script>
-<script src="camps.js?v=0.65.0"></script>
-<script src="walkfx.js?v=0.65.0"></script>
-<script src="journal.js?v=0.65.0"></script>
-<script src="collect.js?v=0.65.0"></script>
-<script src="charms.js?v=0.65.0"></script>
-<script src="weapons2.js?v=0.65.0"></script>
-<script src="named.js?v=0.65.0"></script>
-<script src="trades.js?v=0.65.0"></script>
-<script src="progress.js?v=0.65.0"></script>
-<script src="life.js?v=0.65.0"></script>
-<script src="push.js?v=0.65.0"></script>
-<script src="city.js?v=0.65.0"></script>
-<script src="map.js?v=0.65.0"></script>
+<script src="s2art.js?v=0.66.0"></script>
+<script src="art.js?v=0.66.0"></script>
+<script src="net.js?v=0.66.0"></script>
+<script src="netpanel.js?v=0.66.0"></script>
+<script src="syncguide.js?v=0.66.0"></script>
+<script src="events.js?v=0.66.0"></script>
+<script src="data.js?v=0.66.0"></script>
+<script src="food.js?v=0.66.0"></script>
+<script src="skills.js?v=0.66.0"></script>
+<script src="infection.js?v=0.66.0"></script>
+<script src="infected.js?v=0.66.0"></script>
+<script src="engine.js?v=0.66.0"></script>
+<script src="music.js?v=0.66.0"></script>
+<script src="weather.js?v=0.66.0"></script>
+<script src="gen.js?v=0.66.0"></script>
+<script src="raiders.js?v=0.66.0"></script>
+<script src="house.js?v=0.66.0"></script>
+<script src="horde.js?v=0.66.0"></script>
+<script src="base.js?v=0.66.0"></script>
+<script src="armor.js?v=0.66.0"></script>
+<script src="walks.js?v=0.66.0"></script>
+<script src="npcq.js?v=0.66.0"></script>
+<script src="crew.js?v=0.66.0"></script>
+<script src="boss.js?v=0.66.0"></script>
+<script src="daily.js?v=0.66.0"></script>
+<script src="gacha.js?v=0.66.0"></script>
+<script src="tour.js?v=0.66.0"></script>
+<script src="deep.js?v=0.66.0"></script>
+<script src="route.js?v=0.66.0"></script>
+<script src="advent.js?v=0.66.0"></script>
+<script src="install.js?v=0.66.0"></script>
+<script src="logo.js?v=0.66.0"></script>
+<script src="title.js?v=0.66.0"></script>
+<script src="game.js?v=0.66.0"></script>
+<script src="codex.js?v=0.66.0"></script>
+<script src="social.js?v=0.66.0"></script>
+<script src="gifts.js?v=0.66.0"></script>
+<script src="mvt.js?v=0.66.0"></script>
+<script src="mapfx.js?v=0.66.0"></script>
+<script src="mapquest.js?v=0.66.0"></script>
+<script src="mappoi.js?v=0.66.0"></script>
+<script src="camps.js?v=0.66.0"></script>
+<script src="walkfx.js?v=0.66.0"></script>
+<script src="journal.js?v=0.66.0"></script>
+<script src="collect.js?v=0.66.0"></script>
+<script src="charms.js?v=0.66.0"></script>
+<script src="weapons2.js?v=0.66.0"></script>
+<script src="named.js?v=0.66.0"></script>
+<script src="trades.js?v=0.66.0"></script>
+<script src="progress.js?v=0.66.0"></script>
+<script src="life.js?v=0.66.0"></script>
+<script src="push.js?v=0.66.0"></script>
+<script src="city.js?v=0.66.0"></script>
+<script src="map.js?v=0.66.0"></script>
 </body>
 </html>
