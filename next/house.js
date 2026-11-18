@@ -2542,7 +2542,7 @@
     return true;
   }
   function landArrow(x, y) {
-    if (!SK.noSnapArrow() && Math.random() > .65) return; // some snap (0.34: Tracker Retriever - none)
+    if (Math.random() < (SK.noSnapArrow() ? .15 : .35)) return; // some snap (0.34: Tracker Retriever - none; 0.66 owner: "kind of op" - Retriever 15% instead of 35%)
     const near = G.drops.find(d => d.k === 'arrow' && Math.hypot(d.x - x, d.y - y) < 26);
     if (near) near.n++; else G.drops.push({ k: 'arrow', n: 1, x, y, t: .7 });
   }

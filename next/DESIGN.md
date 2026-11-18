@@ -1322,6 +1322,8 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   houses (coax them, food helps). Crew.adopt export removed (Crew coax and the dev addPet still use adopt()).
 - Checked every cloud save (next_saves, 2026-11-18): pets.seq = 0 and no pets for all 9 players, so nobody had used the
   free adoption and nothing needed taking back.
+- house.js landArrow (owner: "kind of op that the arrows never break anymore"): the Hunter skill Retriever now means arrows
+  snap 15% of the time instead of never. Without it, still 35%. skills.js description updated.
 
 ## NEXT UP (handoff, updated 2026-11-17 - read this first in a new chat)
 ### 0. Open decisions / requests from the owner (2026-11-17)

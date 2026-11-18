@@ -51,7 +51,7 @@ window.DM = window.DM || {};
     ] },
     // 0.34 (owner: "job-only skill trees"): one extra tree per job, only that job sees it (only: job id)
     { id: 'jhunt', n: 'Tracker', col: '#c9a86a', only: 'hunter', blurb: 'Hunter only. The bow, mastered.', ranks: [
-      { n: 'Retriever', d: 'Arrows never snap - every one you shoot can be picked back up.', c: 1 },
+      { n: 'Retriever', d: 'Arrows snap far less often (15% instead of 35%) - most can be picked back up.', c: 1 },
       { n: 'Eagle eye', d: 'The bow auto-aims from 40% further away and hits 10% harder.', c: 2 },
       { n: 'Silent kill', d: 'Sneak hits x2 (instead of x1.6).', c: 2 },
       { n: 'Volley', d: 'Every shot looses a second arrow for free.', c: 3 },
