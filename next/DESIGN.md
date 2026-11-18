@@ -1332,6 +1332,9 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - Prying now wears the tool used (house.js wearPry: 10 durability per pry; belt first, then hand, then pack; Tinkerer
   wearSkip applies). A Worn crowbar lasts about 9 pries. At 2 or fewer pries left: a ⚠ toast after each pry, a red
   "N pries left" on the slot, and a toast before entering a house with locks. It snaps at 0. Repair: stash, then Repair.
+- Break warnings (owner: "everything should get a warning when it's about to break"): a ⚠ toast once when your weapon
+  (house.js wearWeapon) or armor (armor.js A.hit) drops to 15%, and when a crew member's weapon or armor does (crew.js).
+  Starting a run with a weapon or armor at 15% or less warns too (game.js loot). Lockpicks: "⚠ Last pick left".
 
 ## NEXT UP (handoff, updated 2026-11-17 - read this first in a new chat)
 ### 0. Open decisions / requests from the owner (2026-11-17)

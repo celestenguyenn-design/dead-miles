@@ -20,7 +20,8 @@ window.DM = window.DM || {};
   A.hit = function (s, dmg) {
     const w = A.worn(s); if (!w || dmg <= 0) return dmg;
     const a = A.def(w.k), out = Math.max(1, Math.round(dmg * (1 - a.red)));
-    w.d = A.dur(w) - Math.max(1, Math.round(dmg * .6));
+    const was = A.dur(w); w.d = was - Math.max(1, Math.round(dmg * .6));
+    if (w.d > 0 && was > a.dur * .15 && w.d <= a.dur * .15 && DM.E && DM.E.toast) DM.E.toast(`⚠ Your ${D().ITEMS[w.k].n.toLowerCase()} is about to fall apart - repair it in Gear`, 2.8);   // 0.66
     if (w.d <= 0) { const n = D().ITEMS[w.k].n; s.armor = null; if (DM.E && DM.E.toast) DM.E.toast(`Your ${n.toLowerCase()} fell apart`, 2.2); }
     return out;
   };

@@ -2318,7 +2318,7 @@
     buzz(60);
     const n = packCount('lockpick');
     if (!n) closeLock('Last pick snapped');
-    else LP.msg = `Snap! ${n} pick${n > 1 ? 's' : ''} left`;
+    else LP.msg = n === 1 ? 'Snap! ⚠ Last pick left' : `Snap! ${n} picks left`;   // 0.66: warn on the last one
   }
   function drawLock() {
     if (!LP.on) return;
@@ -2432,7 +2432,9 @@
   function wearWeapon(n = 1) {
     const h = S().hands; if (!h || h.d == null) return;
     if (Math.random() < SK.wearSkip()) return;   // 0.34: Tinkerer Patch job
-    h.d -= n;
+    const was = h.d; h.d -= n;
+    // 0.66 (owner: "everything should get a warning when it's about to break"): once, when it drops to 15%
+    if (h.d > 0 && was > D.wMax(h) * .15 && h.d <= D.wMax(h) * .15) toast(`⚠ Your ${ITEMS[h.k].n.toLowerCase()} is about to break - repair it in Gear`, 2.8);
     if (h.d <= 0) { toast(`Your ${ITEMS[h.k].n.toLowerCase()} broke!`, 2); SFX.play('break'); D.unloadGun(S()); G.reload = null; S().hands = null; lastHud = ''; }
   }
   // 0.66 (owner: the tool-belt crowbar "should still be able to break tho but it should give us a warning"): every pry

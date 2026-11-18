@@ -373,6 +373,10 @@ const NEXT_VERSION = '0.66.0';
   function loot(h, checked) {
     if (SV.survivor.hp < 15) { toast('Too hurt to go in. Eat or patch up first.', 2.2); return; }
     if (!checked) { lockCheck(h, () => loot(h, true)); return; }
+    { const s = SV.survivor, low = [];   // 0.66: "everything should get a warning when it's about to break"
+      if (s.hands && s.hands.d != null && s.hands.d <= D.wMax(s.hands) * .15) low.push(D.ITEMS[s.hands.k].n.toLowerCase());
+      if (s.armor && D.ITEMS[s.armor.k] && D.ITEMS[s.armor.k].armor && DM.Armor.dur(s.armor) <= D.ITEMS[s.armor.k].armor.dur * .15) low.push(D.ITEMS[s.armor.k].n.toLowerCase());
+      if (low.length) toast(`⚠ Your ${low.join(' and ')} ${low.length > 1 ? 'are' : 'is'} about to break - repair in Gear`, 2.8); }
     const L = Object.assign({}, layoutOf(h), { id: h.id });
     const q = h.quest && questById(h.quest);
     if (q && q.type === 'fetch' && !q.done) { // plant Dot's lockbox in one container of this house

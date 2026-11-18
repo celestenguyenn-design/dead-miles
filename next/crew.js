@@ -382,7 +382,7 @@
     const z = g.zs.find(z => !z.dead && (!z.raider || (z.camp && z.aggro)) && z.st !== 'sleep' && z.st !== 'idle' && z.st !== 'rise' && z.st !== 'guard' && dist(z, e) < .85 * T);
     if (!z) { e.hitT = .3; return; }
     const arm = e.m.arm && D.ITEMS[e.m.arm.k] && D.ITEMS[e.m.arm.k].armor;
-    let dmg = Math.round(9 * (z.dmgMul || 1)); if (arm) { dmg = Math.max(1, Math.round(dmg * (1 - arm.red))); e.m.arm.d = Math.max(0, (e.m.arm.d != null ? e.m.arm.d : arm.dur) - 1); if (!e.m.arm.d) { toast(`${e.m.name}'s ${D.ITEMS[e.m.arm.k].n.toLowerCase()} fell apart`, 1.8); e.m.arm = null; } }
+    let dmg = Math.round(9 * (z.dmgMul || 1)); if (arm) { dmg = Math.max(1, Math.round(dmg * (1 - arm.red))); e.m.arm.d = Math.max(0, (e.m.arm.d != null ? e.m.arm.d : arm.dur) - 1); if (e.m.arm.d === Math.floor(arm.dur * .15) && e.m.arm.d > 0) toast(`⚠ ${e.m.name}'s ${D.ITEMS[e.m.arm.k].n.toLowerCase()} is about to fall apart`, 1.8); if (!e.m.arm.d) { toast(`${e.m.name}'s ${D.ITEMS[e.m.arm.k].n.toLowerCase()} fell apart`, 1.8); e.m.arm = null; } }
     e.hitT = 1.2; e.hp -= dmg; e.flash = 1; SFX.play('hurt'); syncHp(e);
     // in a house (looting, deep runs, camps) a crew member who drops is gone for good
     if (e.hp <= 0 && R.kind === 'house' && !e.m.ally) {
@@ -418,7 +418,7 @@
       e.cd = 1.1; e.swing = .25; e.flip = tgt.x < e.x;
       const w = e.m.wpn && D.WEAPONS[(D.ITEMS[e.m.wpn.k] || {}).w], wm = w && !w.ranged ? D.wDmg(e.m.wpn) * .8 : 16;   // 0.51: their own weapon
       const dmg = (wm + 3 * lv) * (role === 'guard' ? 1.5 : 1);
-      if (w && !w.ranged && e.m.wpn.d != null) { e.m.wpn.d--; if (e.m.wpn.d <= 0) { toast(`${e.m.name}'s ${D.ITEMS[e.m.wpn.k].n.toLowerCase()} broke`, 1.8); e.m.wpn = null; } }
+      if (w && !w.ranged && e.m.wpn.d != null) { e.m.wpn.d--; if (e.m.wpn.d === Math.floor(D.wMax(e.m.wpn) * .15) && e.m.wpn.d > 0) toast(`⚠ ${e.m.name}'s ${D.ITEMS[e.m.wpn.k].n.toLowerCase()} is about to break`, 1.8); if (e.m.wpn.d <= 0) { toast(`${e.m.name}'s ${D.ITEMS[e.m.wpn.k].n.toLowerCase()} broke`, 1.8); e.m.wpn = null; } }
       DM.House.hurtZombie(tgt, dmg, Math.atan2(tgt.y - e.y, tgt.x - e.x), true); SFX.play('swing');
     }
     if (role === 'medic') { e.mt = (e.mt || 20) - dt; if (e.mt <= 0) { e.mt = 20; const all = (R.fighters || []).concat(R.mate ? [R.mate] : []).filter(x => !x.gone && x !== e && x.hp < x.maxHp * .7); const w = all.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0]; if (w && dist(w, e) < 6 * T) { w.hp = Math.min(w.maxHp, w.hp + 15 + 3 * lv); syncHp(w); toast(`${e.m.name} patches up ${w.m.name}`, 1.4); } } }   // 0.46.2: medics heal the crew too
