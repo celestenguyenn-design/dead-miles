@@ -1,7 +1,8 @@
 /* Dead Miles (next) - phase 5b: the crew (survivors you find hiding in houses, living at your base) and strays (pets).
    Save data: SV.crew = { list, seq, notes, morning } and SV.pets = { list, seq } (C.norm adds every default; nothing is
    ever renamed or dropped). Crew eat 1 food a day from the STASH; 3 hungry days in a row and they leave a note (they
-   never take anything). Pets never die: a zombie hit sends them running home, back the next day.
+   never take anything). Pets never die. 0.67: they have health on runs; hits hurt them, and only at 0 HP do they limp
+   home (back the next day, or right away with a bandage from the Crew & pets sheet).
    Runs plug in through C.wrap(opts, kind, extra) which chains house.js hooks (acts, tick, sprites, onAlert, quiet).
    Plain script, global DM.Crew. Offline-safe: nothing here touches the network. */
 'use strict';
@@ -34,6 +35,10 @@
   const PLV = [0, 25, 70, 150, 300];                       // pet level from thousands of your steps
   const plvOf = xp => { let l = 1; while (l < 5 && xp >= PLV[l]) l++; return l; };
   C.plv = p => plvOf(p.xp || 0);
+  // 0.67 (owner: Isabel's cat "ran off" the moment a boss fight started - "what do you think is a good idea?"): pets have
+  // health on runs. A lunge or a boss charge hurts them and they hop back, but they stay. Only at 0 HP do they limp home,
+  // and a bandage at home (Crew & pets) gets them back on their feet the same day. Pets still never die.
+  C.petMaxHp = p => 40 + 15 * (plvOf(p.xp || 0) - 1);
   const PET_NAMES = { dog: ['Biscuit', 'Scout', 'Waffles', 'Pepper', 'Moose', 'Bodega', 'Lady', 'Tank', 'Peanut', 'Rocky'], cat: ['Mochi', 'Salem', 'Noodle', 'Miso', 'Pumpkin', 'Bagel', 'Smokey', 'Olive', 'Ziti', 'Boots'] };
   const COATS = C.COATS = {
     dog: [{ n: 'Brown', a: '#a0704f', b: '#7a5040', e: '#5e3a2a', m: '#d9b48a' }, { n: 'Black & white', a: '#3a3848', b: '#26242f', e: '#26242f', m: '#efe6d6', patch: '#efe6d6' },
@@ -104,7 +109,7 @@
     // gardener
     if (roleLv('gardener').length && DM.Base.crewWater) { const w = DM.Base.crewWater(); if (w) { lines.push(`Your gardener watered the ${esc(w)}.`); C.onTask('gardener'); } }
     // pets come home; cats bring things
-    for (const p of pets()) if (p.away && p.away < t) { p.away = 0; lines.push(`${esc(p.name)} came home in the night.`); }
+    for (const p of pets()) if (p.away && p.away < t) { p.away = 0; p.hurt = 0; lines.push(`${esc(p.name)} came home in the night.`); }
     for (const p of pets()) {
       if (p.kind !== 'cat' || p.away) continue;
       const r = D.mulberry32(D.hashStr(v.seedBase + ':cat:' + p.id + ':' + t));
@@ -297,7 +302,7 @@
   function init(g) {
     if (R.init) return; R.init = true;
     const p = g.p;
-    if (R.petRec) R.pet = { rec: R.petRec, x: p.x - 30, y: p.y + 8, vx: 0, vy: 0, hw: 7, hh: 5, ph: 0, flip: false, st: 'follow', heart: 0, barkT: 0 };
+    if (R.petRec) R.pet = Object.assign({ rec: R.petRec, x: p.x - 30, y: p.y + 8, vx: 0, vy: 0, hw: 7, hh: 5, ph: 0, flip: false, st: 'follow', heart: 0, barkT: 0, inv: 0, hurtT: 0 }, (() => { const mx = C.petMaxHp(R.petRec); return { hp: mx, maxHp: mx }; })());
     if (R.kind === 'house' && !R.extra.noMate) { const m = crew().find(x => x.mate && !x.hungry && x.hurt !== dayNo()); if (m) { C.ensureRig(m.id, m.look); R.mate = Object.assign({ m, x: p.x + 30, y: p.y + 8, vx: 0, vy: 0, hw: 10, hh: 7, ph: 0, flip: false, cd: 1, swing: 0, healed: 0 }, fhp(m)); } }
     // 0.42.1 (owner: "my crew members were useless during horde night, they weren't there"): on watch shifts and base raids
     // every fed crew member is out in the yard fighting
@@ -353,7 +358,8 @@
           walkTo(pe, st.x, st.y, Math.min(5 * T, 1.5 * T + d * 1.8), dt);
         } else { pe.vx *= Math.exp(-8 * dt); pe.vy *= Math.exp(-8 * dt); pe.ph = E.lerp(pe.ph, 0, .1); if (Math.abs(p.x - pe.x) > 8) pe.flip = p.x < pe.x; }
         // a zombie lunging at her catches the pet instead? It yelps and runs home.
-        for (const z of g.zs) if (!z.dead && (z.st === 'lunge' || z.bst === 'charge') && dist(z, pe) < .7 * T) { petRunsOff(pe, z); break; }
+        pe.inv = Math.max(0, pe.inv - dt); if (pe.hurtT > 0) DM.House.move(pe, pe.vx * dt, pe.vy * dt); pe.hurtT = Math.max(0, pe.hurtT - dt);
+        if (!pe.inv) for (const z of g.zs) if (!z.dead && (z.st === 'lunge' || z.bst === 'charge') && dist(z, pe) < .7 * T) { petHurt(pe, z, z.bst === 'charge' ? 18 : 10); break; }
         if (R.pet && pe.rec.kind === 'dog' && R.kind === 'house') sniff(dt, g, pe);
       }
     }
@@ -425,10 +431,16 @@
     if (role === 'medic' && !e.healed && p.hp > 0 && p.hp < DM.D.maxHp(DM.S) * .4) { e.healed = 1; p.hp = Math.min(DM.D.maxHp(DM.S), p.hp + 12 + 3 * lv); toast(`${e.m.name} patches you up (+${12 + 3 * lv} HP)`, 2); SFX.play('pick'); }
   }
   C.mateFind = () => R && R.mate && R.mate.m.role === 'scavenger' ? .1 + .02 * C.lv(R.mate.m) : 0;   // house.js: extra-find chance
+  function petHurt(pe, z, dmg) {
+    pe.hp = Math.max(0, pe.hp - dmg); pe.inv = 1.4; pe.hurtT = .5; yelp();
+    const a = Math.atan2(pe.y - z.y, pe.x - z.x); pe.vx = Math.cos(a) * 5 * T; pe.vy = Math.sin(a) * 5 * T;   // hops clear of it
+    if (pe.hp <= 0) { petRunsOff(pe, z); return; }
+    if (!pe.warned && pe.hp <= pe.maxHp * .4) { pe.warned = 1; toast(`⚠ ${pe.rec.name} is badly hurt - one or two more hits and ${pe.rec.kind === 'dog' ? 'he' : 'she'} limps home`, 2.6); }
+  }
   function petRunsOff(pe, z) {
-    const r = pe.rec; r.away = dayNo(); G().save(); yelp();
+    const r = pe.rec; r.away = dayNo(); r.hurt = 1; G().save(); yelp();
     pe.st = 'flee'; pe.t = 0; const a = Math.atan2(pe.y - z.y, pe.x - z.x); pe.fx = pe.x + Math.cos(a) * 6 * T; pe.fy = pe.y + Math.sin(a) * 6 * T;
-    toast(`${r.name} yelped and bolted. ${r.kind === 'dog' ? 'He' : 'She'}'ll find the way home by tomorrow.`, 2.8);
+    toast(`${r.name} got hurt and limped home. Patch ${r.kind === 'dog' ? 'him' : 'her'} up with a bandage at the base, or ${r.kind === 'dog' ? 'he' : 'she'}'s back tomorrow.`, 3.2);
   }
   function onAlert(z) {
     const pe = R && R.pet; if (!pe || pe.st === 'flee' || pe.rec.kind !== 'dog') return;
@@ -565,7 +577,8 @@
     if (!R) return []; init(g);
     const out = [], t = g.t;
     const pe = R.pet;
-    if (pe) out.push({ k: pe.y, draw: c => drawPet(c, pe.rec, pe.x, pe.y, { t, ph: pe.ph, move: Math.min(1, Math.hypot(pe.vx, pe.vy) / (2 * T)), flip: pe.flip, sit: Math.hypot(pe.vx, pe.vy) < 4, bark: pe.barkT > 0, heart: pe.heart, alpha: pe.a, sc: 1.1 }) });
+    if (pe) out.push({ k: pe.y, draw: c => { drawPet(c, pe.rec, pe.x, pe.y, { t, ph: pe.ph, move: Math.min(1, Math.hypot(pe.vx, pe.vy) / (2 * T)), flip: pe.flip, sit: Math.hypot(pe.vx, pe.vy) < 4, bark: pe.barkT > 0, heart: pe.heart, alpha: pe.inv > 0 && Math.floor(pe.inv * 10) % 2 ? .45 : pe.a, sc: 1.1 });
+      if (pe.hp != null && pe.hp < pe.maxHp && pe.st !== 'flee') { const w = 22, x = pe.x - w / 2, y = pe.y - 30, f = pe.hp / pe.maxHp; c.fillStyle = 'rgba(17,20,47,.8)'; c.fillRect(x - 1, y - 1, w + 2, 5); c.fillStyle = f > .5 ? '#7fd49a' : f > .25 ? '#e0b94a' : '#ff6b5a'; c.fillRect(x, y, w * f, 3); } } });
     if (R.nq) { const n = R.nq; n.t = (n.t || 0) + .016; const asked = DM.NPCQ && DM.NPCQ.forHouseQ(R.nqSpec.h.id);
       out.push({ k: n.y, draw: c => { if (!ART.rigs[C.rigName('nq')]) return; c.save(); c.fillStyle = 'rgba(8,6,22,.4)'; c.beginPath(); c.ellipse(n.x, n.y + 1, 16, 5.5, 0, 0, 6.28); c.fill();
         ART.drawRig(c, C.rigName('nq'), n.x, n.y, E.PSCALE, n.flip, { weapon: 'fists', sy: 1 + Math.sin(n.t * 2.2) * .012 });
@@ -655,7 +668,7 @@
         <div class="cinfo"><div class="cname"><b>${esc(p.name)}</b><button class="linkbtn inl" data-ren="${p.id}">rename</button></div><div class="crole">${COATS[p.kind][p.coat].n} ${p.kind} · Lv ${lv}</div>
           <div class="cperk">${p.kind === 'dog' ? `Barks when a zombie spots you · sniffs out good containers${lv > 1 ? ' (more often)' : ''}` : `Footsteps ${Math.round((.15 + .03 * lv) * 100)}% quieter · ${30 + 5 * lv}% chance of a morning present`}</div>
           <div class="cbars"><span>${nx ? `Lv ${lv + 1}: ${Math.floor(p.xp).toLocaleString('en-US')}k/${nx}k of your steps` : 'Max level'}</span><i class="cbar"><i style="width:${nx ? Math.min(100, (p.xp - PLV[lv - 1]) / (nx - PLV[lv - 1]) * 100) : 100}%"></i></i></div>
-          ${away ? '<div class="cpast"><b class="bad">Ran off after a zombie scare - back tomorrow.</b></div>' : ''}
+          ${away ? `<div class="cpast"><b class="bad">${p.hurt ? 'Hurt - resting at home, back tomorrow.' : 'Ran off after a zombie scare - back tomorrow.'}</b></div><div class="cgear"><button class="mbtn sm ghost" data-pheal="${p.id}">🩹 Patch up now · 1 bandage</button></div>` : ''}
           ${p.active ? '<span class="pactive">Comes along on runs</span>' : `<button class="mbtn sm ghost" data-act="${p.id}">Take along</button>`}</div></div>`; }).join('')
         : '<div class="empty">No strays yet. Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Walk up to one and stand close for a moment, or offer food.</div>'}
       ${DM.Life ? DM.Life.memorialWallHTML() : ''}
@@ -665,6 +678,9 @@
     drawCardPorts();
     if (DM.Life) DM.Life.bindWall(el);
     $('#csClose').onclick = closeSheet;
+    el.querySelectorAll('[data-pheal]').forEach(b => b.onclick = () => { const p = pets().find(x => x.id === b.dataset.pheal); if (!p) return;
+      if (G().countItem('bandage') < 1) { toast('No bandages in your pack or stash', 1.8); return; }
+      G().takeItems('bandage', 1); p.away = 0; p.hurt = 0; G().save(); SFX.play('pick'); toast(`${p.name} is patched up and ready to go`, 2); C.openSheet(); });
     el.querySelectorAll('[data-dis]').forEach(b => b.onclick = () => {
       if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Tap again: send them away?'; return; }
       const m = crew().find(x => x.id === b.dataset.dis); if (m) { back(m.wpn); back(m.arm); } v.crew.list = v.crew.list.filter(x => x !== m); G().save(); toast(`${m.name} packs a bag and heads off. "Good luck."`, 2.2); C.openSheet();

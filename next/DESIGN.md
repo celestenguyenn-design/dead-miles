@@ -1396,3 +1396,7 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - Decor art redrawn (hay bale, garland, wreaths, cornucopia, scarecrow, gnome, flamingo, lantern, flower box, cactus,
   posters, presents, string lights) and new pieces: pumpkin pile (Thanksgiving), flag bunting, neon HOME sign, burn barrel,
   jukebox, fish tank.
+- 0.67.1 pets (Isabel's cat "ran off" as a boss fight started; owner asked what's best): pets still never die, but have
+  HP on runs (40 + 15 per pet level). A lunge hurts 10, a boss charge 18, then 1.4 s of grace; they hop clear and keep
+  following, with a small HP bar and a warning at 40%. Only at 0 HP do they limp home (away until tomorrow, rec.hurt);
+  Crew & pets has "Patch up now · 1 bandage" to bring an away pet back the same day.
