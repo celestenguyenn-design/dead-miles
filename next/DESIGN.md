@@ -1400,3 +1400,19 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   HP on runs (40 + 15 per pet level). A lunge hurts 10, a boss charge 18, then 1.4 s of grace; they hop clear and keep
   following, with a small HP bar and a warning at 40%. Only at 0 HP do they limp home (away until tomorrow, rec.hurt);
   Crew & pets has "Patch up now · 1 bandage" to bring an away pet back the same day.
+
+## Done in 0.68 - Field cards (owner: "some type of collection thing like cards, artifacts ... never ending, a grind";
+## picked field cards over a relic museum or a bounty ladder)
+- cards.js: 59 cards in 7 sets (The Dead, Survivors, Old Brooklyn, Arsenal, Strays; Thanksgiving + Christmas sets only
+  drop while that holiday runs). Rarity c/r/e/l at 60/28/10/2, foil 1 in 30. Art is painted on canvas from the game's own
+  zombie / survivor rigs, pet portraits, item icons and a few small painters (token, MetroCard, ticket, slice...).
+- Packs (3 cards, last one rare+, epic+ guaranteed by the 10th pack): every 2,500 steps walked (3 a day), 'cardpack' in
+  loot tables (desk, register, safe, attic, locked room, horde crates, deep runs...), Dot's shop, one per boss kill.
+  Kills also drop a single card now and then (1.5%, special 4%, raider 3%).
+- Never ends: copies star a card up at 1/3/6/11/19; past ★5 a copy becomes dust (5/15/40/100, foil x3). Dust crafts a
+  missing card (60/180/480/1200) or buys a pack (120). Full set: 150 caps + 2 tokens. Codex titles for 10/40 cards, a
+  foil, a ★5, a full set.
+- Deck: 3 slots (4 at 20 different cards, 5 at 40). Perks scale x1 -> x3 from ★1 to ★5 and wrap the skill helpers
+  (meleeMul, hpBonus, staBonus, searchMul, extraFind, rareBonus, stepNoise, drainMul, walkFindMax), Codex.dmgVs (per
+  zombie kind), Crew.petMaxHp and Trades.gain('craft'). Card luck = chance of a 4th card per pack.
+- Save: SV.cards. Ideas not built yet: gifting duplicates to friends, comparing binders, new monthly sets.

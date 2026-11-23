@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.67.1';
+const NEXT_VERSION = '0.68.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1272,6 +1272,7 @@ const NEXT_VERSION = '0.67.1';
     if (!SV || !SV.survivor || DM.scene) return;
     if (DM.WalkFX) DM.WalkFX.tick();   // 0.47: walk finds, gear upkeep, walking caches
     if (DM.Collect) DM.Collect.file();   // 0.53: new collectibles file themselves
+    if (DM.Cards) DM.Cards.tick();   // 0.68: field card packs from walking and looting
     if (DM.Life) DM.Life.tick();   // 0.62: walking buddy, radio
     if (DM.City) DM.City.tick();   // 0.63: neighborhood, city horde, co-op (reports real steps)
     if (DM.Journal) DM.Journal.tick();   // 0.50: the survival log
@@ -1574,6 +1575,7 @@ const NEXT_VERSION = '0.67.1';
     if (window.NET && NET.ok && NET.name && SV.survivor.name === 'Survivor') publish();   // 0.42.1: pick up the account name
     if (DM.Journal) { const jt = DM.Journal.tile(); if (jt) t.push(jt); }   // 0.50
     if (DM.Collect && SV.tutorialDone) { const ct = DM.Collect.tile(); if (ct) t.push(ct); }   // 0.53
+    if (DM.Cards && SV.tutorialDone) { const ft = DM.Cards.tile(); if (ft) t.push(ft); }   // 0.68 field cards
     if (DM.Life && SV.tutorialDone) t.push(...DM.Life.tiles());   // 0.62: walking buddy, supply run
     if (DM.City && SV.tutorialDone) t.push(...DM.City.tiles());   // 0.63: reclaim the neighborhood, long-distance survivors
     if (DM.Codex && SV.tutorialDone) { DM.Codex.check(); const ct = DM.Codex.tile(); if (ct) t.push(ct); }   // 0.35: bestiary + feats
@@ -1590,7 +1592,7 @@ const NEXT_VERSION = '0.67.1';
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
     cardSheet = k;
-    const html = DM.City && DM.City.has(k) ? `<div class="cywrap">${DM.City.html(k)}</div>` : DM.Life && DM.Life.has(k) ? `<div class="lfwrap">${DM.Life.html(k)}</div>` : k === 'collect' ? `<div class="clwrap">${DM.Collect.html()}</div>` : k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
+    const html = DM.Cards && DM.Cards.has(k) ? `<div class="fcwrap">${DM.Cards.html()}</div>` : DM.City && DM.City.has(k) ? `<div class="cywrap">${DM.City.html(k)}</div>` : DM.Life && DM.Life.has(k) ? `<div class="lfwrap">${DM.Life.html(k)}</div>` : k === 'collect' ? `<div class="clwrap">${DM.Collect.html()}</div>` : k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
     sheetOpen(`<div class="cardsheet" data-cs="${k}">${html}</div><button class="mbtn ghost" id="csDone">Close</button>`);
     const el = $('#msheet'), root = el.querySelector('.cardsheet');
     el.onclick = e => { if (e.target === el) closeCardSheet(); };
@@ -1603,6 +1605,7 @@ const NEXT_VERSION = '0.67.1';
     else if (k === 'social') { publish(); const w = root.querySelector('.sowrap'), re = () => { w.innerHTML = DM.Social.html(); DM.Social.bind(w, re); }; DM.Social.bind(w, re); }
     else if (k === 'codex') DM.Codex.bind(root.querySelector('.cxwrap'));
     else if (k === 'collect') DM.Collect.bind();
+    else if (DM.Cards && DM.Cards.has(k)) { const w = root.querySelector('.fcwrap'), re = () => { if (!document.body.contains(w)) return; w.innerHTML = DM.Cards.html(); DM.Cards.bind(w, re); }; DM.Cards.bind(w, re); }
     else if (DM.City && DM.City.has(k)) { const w = root.querySelector('.cywrap'), re = () => { if (!document.body.contains(w)) return; w.innerHTML = DM.City.html(k); DM.City.bind(k, w, re); }; DM.City.bind(k, w, re); }
     else if (DM.Life && DM.Life.has(k)) { const w = root.querySelector('.lfwrap'), re = () => { w.innerHTML = DM.Life.html(k); DM.Life.bind(k, w, re); }; DM.Life.bind(k, w, re); }
     else if (k === 'raid') { const g = root.querySelector('#raidGo'); if (g) g.onclick = () => { SFX.play('ui'); cardSheet = null; sheetClose(); BS.raidDefend(); }; else { BS.raidSeen(); } }
@@ -1616,7 +1619,7 @@ const NEXT_VERSION = '0.67.1';
       root.querySelectorAll('[data-seen]').forEach(x => x.onclick = () => { SV.horde.resolved[x.dataset.seen].seen = true; Game.save(); renderHome(); });
     }
   }
-  function closeCardSheet() { cardSheet = null; sheetClose(); }
+  function closeCardSheet() { cardSheet = null; sheetClose(); if (DM.Cards) DM.Cards.reset(); }
   function refreshCardSheet() {
     if (!cardSheet) return;
     const el = $('#msheet'), cs = el.querySelector('.cardsheet');
@@ -2104,6 +2107,7 @@ const NEXT_VERSION = '0.67.1';
     ['Map jobs: crates, radio calls, deliveries, fog', 'With the map open (or in Pocket mode) there is more to do while you walk. Supply crates: up to 3 a day land at real places near you - walk over one to grab it; an air drop (one a day, after you have walked a bit) has better loot but only 20 minutes. Radio calls: a survivor names a place and a deadline - get there in time for a reward. Dot\'s delivery (one a day, button on the map): pick up a package at one place and carry it to another. Fog of war: the map is fogged except where you have walked; clearing new streets gives XP, sometimes a find, and rewards at 250 / 1,000 / 3,000 / 10,000 squares. Turn the fog off with its button. All of this is kept only on your phone.'],
     ['Capsule machine', 'The capsule machine (Capsules tab) gives a random cosmetic, hairstyle or eye style for a token (new hairstyles and eyes show up in Edit look, marked with a lock until you pull them). You get a token for every 5,000 steps (up to 2 a day), or buy one for 120 caps. Odds: common 55%, rare 30%, epic 12%, legendary 3%, and at least one epic or better every 10 pulls. Cosmetics you do not have yet come first; Dot buys any duplicate. During a holiday its capsules join the machine, and 1 pull in 4 is a piece of holiday decor.'],
     ['Deck the base', 'During Thanksgiving and Christmas, place that holiday\'s decor at your base (Base > Decor) for prizes: 2 pieces = 2 capsule tokens + 40 caps, 5 = 3 tokens + 80 caps, 8 = a legendary holiday hat + 100 caps. Holiday decor comes from Dot\'s holiday shelf, holiday houses (storage, pantries, closets) and the capsule machine.'],
+    ['Field cards', 'Trading cards you collect (home screen: Field cards). Every 2,500 steps you walk earns a card pack (3 a day); packs also turn up in desks, registers, safes, attics, locked rooms and horde crates, every boss drops one, and Dot sells them. A pack is 3 cards, at least one rare. Duplicates raise a card\'s stars (★1 to ★5); copies past ★5 become dust, which crafts a missing card or buys a pack. 1 card in 30 is a shiny foil. Put cards in your deck (3 slots, 4 at 20 cards, 5 at 40): their perks work everywhere. Holiday sets only drop while the holiday runs. A full set pays 150 caps and 2 capsule tokens.'],
     ['Workbench & crafting', 'Workbench (home tab, or at the base) lists every recipe you know with each material, what you have and what you need. Tap a recipe to see what it does, every material in full with where to find it, and a big Craft button. Materials come from the stash and the pack. New recipes come from blueprints: Dot trades them, and some turn up in hidden stashes and safes. Others unlock as your Crafting level rises: base decor (the Decor tab) and supply crates that pack spare food, water and bandages into something Dot will buy. Crafting XP comes from crafting, repairing and upgrading weapons, class upgrades, and building or repairing your base.'],
     ['Crew', 'About 1 house in 25 has a survivor hiding in a closet or a secret room (more in mansions and police stations). Talk to them: with a free bunk they move into your base (2 bunks, build up to 4). Each has a role - Scavenger (crew searches bring back more), Guard (horde-night defence), Medic (heals you each morning), Gardener (waters a plant a day), Tinkerer (cheaper repairs) - and levels up slowly. Each eats 1 food a day from your STASH; three hungry days and they leave a note (they never take anything). The more crew you have, the more a Crew search brings back.'],
     ['Strays', 'Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Move slowly near them (a small push on the joystick) until they trust you, then tap to coax them out - or offer food from your pack. One pet comes along on runs and at the base; up to 4 live with you. Dogs bark when a zombie spots you and sometimes sniff out a container with something good; cats make you quieter and bring little presents some mornings. Pets level from your steps. They never die: a zombie scare sends them running home, back the next day.'],
