@@ -15,7 +15,7 @@ window.DM = window.DM || {};
   const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const RATE = 1 / 12;
   const pickOf = (a, r) => a[Math.floor(r() * a.length)];
-  const decor = r => pickOf(Object.keys(D.DECOR), r);
+  const decor = r => pickOf(Object.keys(D.DECOR).filter(d => !D.DECOR[d].dot), r);
   const KINDS = {
     collector: { n: "The Collector's house", g: '🗃️', c: '#7fd9c8', on: ['rowL', 'mansion', 'apt', 'rowS'], z: 2, d: 'Someone kept everything. Shelves of it. Cards, records, globes - and something rare.',
       each: (f, r) => r() < .55 && DM.Collect ? [DM.Collect.pick(f.loot, r)] : r() < .2 ? [decor(r)] : [],

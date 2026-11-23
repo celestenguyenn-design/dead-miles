@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.66.0';
+const NEXT_VERSION = '0.67.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -396,7 +396,7 @@ const NEXT_VERSION = '0.66.0';
       const rnd = D.mulberry32(h.seed ^ 0x2c1b3c6d), cs = L.furn.filter(f => f.loot && !f.secretLoot && f.room !== 'o');
       if (cs.length && rnd() < (h.type === 'mansion' ? .75 : .45)) {
         L.furn = L.furn.map(f => Object.assign({}, f));
-        const ks = Object.keys(D.DECOR), f = L.furn.filter(f => f.loot && !f.secretLoot && f.room !== 'o')[Math.floor(rnd() * cs.length)];
+        const ks = Object.keys(D.DECOR).filter(d => !D.DECOR[d].dot), f = L.furn.filter(f => f.loot && !f.secretLoot && f.room !== 'o')[Math.floor(rnd() * cs.length)];
         f.extra = (f.extra || []).concat(ks[Math.floor(rnd() * ks.length)]); f.noEmpty = 1;
       }
     }
@@ -483,7 +483,7 @@ const NEXT_VERSION = '0.66.0';
   Object.assign(Game, { countItem: k => countItem(k), takeItems: (k, n) => takeItems(k, n), give: (k, n, d, q) => give(k, n, d, q) });
   function refreshTrader(force) {
     const T = SV.trader, day = SV.day.key;
-    if (T.day === day && !force) return;
+    if (T.day === day && !force && T.sv === 67) return;   // 0.67: restock once for the new shelves
     const rnd = D.mulberry32(D.hashStr(SV.seedBase + ':dot:' + day + ':' + traderLevel()));
     if (T.day !== day) { // new quest offers at local midnight
       T.offers = [];
@@ -507,7 +507,13 @@ const NEXT_VERSION = '0.66.0';
     if (L >= 2 && rnd() < .35) { const c = cosOf(D.pickCos([], rnd)); if (!own[c] && !T.stock.some(e => e.k === 'cos_' + c)) T.stock.push({ k: 'cos_' + c, n: 1, price: D.RARITY[D.COS[c].r].price, left: 1 }); }
     // 0.26: Dot's holiday shelf - two pieces of the running holiday's decor (Deck the base), new each day
     if (EVA && EVA.ev.decor) { const dk = EVA.ev.decor.slice().sort(() => rnd() - .5).slice(0, 2); for (const k of dk) T.stock.push({ k, n: 1, price: D.DECOR[k].v * 6, left: 2 }); }
-    T.day = day;
+    // 0.67 (owner: "Dot doesn't really have anything that we need"): a decor shelf every day - one piece only Dot has
+    // (jukebox, fish tank) and two others - and from trader level 2 a Dot's special: a Fine weapon (Masterwork at level 4+)
+    { const exc = Object.keys(D.DECOR).filter(k => D.DECOR[k].dot), rest = Object.keys(D.DECOR).filter(k => !D.DECOR[k].dot && !D.DECOR[k].ev && !T.stock.some(e => e.k === k)).sort(() => rnd() - .5).slice(0, 2);
+      for (const k of [exc[Math.floor(rnd() * exc.length)]].concat(rest)) if (k) T.stock.push({ k, n: 1, price: D.DECOR[k].v * 6, left: 1 }); }
+    if (L >= 2) { const ws = D.SHOP.filter(r => D.isWeapon(r[0]) && r[3] <= L + 1 && r[2] >= 40 && r[2] <= 130); if (ws.length) { const r = ws[Math.floor(rnd() * ws.length)], q = L >= 4 && rnd() < .35 ? 5 : 4;
+      T.stock.push({ k: r[0], n: 1, price: Math.round(r[2] * (q === 5 ? 2.6 : 1.7)), left: 1, q, special: 1 }); } }
+    T.day = day; T.sv = 67;
   }
   function makeQuest(type, tier, rnd) {
     const T = SV.trader, Q = D.QUESTS[type];
@@ -864,7 +870,7 @@ const NEXT_VERSION = '0.66.0';
     return keys.map(k => {
       const r = D.RECIPES[k], ok = known && canCraft(r), out = r.out[0];
       return `<div class="recipe tap${ok ? '' : ' no'}${known ? '' : ' locked'}" data-rec="${k}"><div class="rout">${icon(out)}${r.out[1] > 1 ? `<em>x${r.out[1]}</em>` : ''}</div>
-        <div class="rinfo"><b>${r.n}</b>${known ? '' : `<div class="bpneed">Blueprint needed - Dot trades them${r.cl ? ` · learn at Crafting level ${r.cl}` : ''}</div>`}<div class="rin">${Object.keys(r.in).map(m => { const have = countItem(m); return `<span class="${have >= r.in[m] ? 'ok' : 'miss'}">${icon(m)}<i>${D.ITEMS[m].n}</i> ${have}/${r.in[m]}</span>`; }).join('')}</div></div>
+        <div class="rinfo"><b>${r.n}</b>${known ? '' : `<div class="bpneed">${r.auto ? `Unlocks at Crafting level ${r.auto}` : `Blueprint needed - Dot trades them${r.cl ? ` · learn at Crafting level ${r.cl}` : ''}`}</div>`}<div class="rin">${Object.keys(r.in).map(m => { const have = countItem(m); return `<span class="${have >= r.in[m] ? 'ok' : 'miss'}">${icon(m)}<i>${D.ITEMS[m].n}</i> ${have}/${r.in[m]}</span>`; }).join('')}</div></div>
         ${known ? `<button class="mbtn sm${ok ? '' : ' ghost'}" data-craft="${k}"${ok ? '' : ' disabled'}>Craft</button>` : '<span class="rlock">?</span>'}</div>`;
     }).join('');
   }
@@ -872,9 +878,10 @@ const NEXT_VERSION = '0.66.0';
     if (benchHost && !document.body.contains(benchHost)) benchHost = null;
     const s = SV.survivor, el = benchHost || $('#mpane');
     if (benchHost && benchSel) { el.innerHTML = benchDetailHTML(benchSel); bindDetail(el); return; }
-    const inCat = k => benchCat === 'all' || grpOf(D.RECIPES[k].out[0]) === benchCat;
-    const unknown = Object.keys(D.RECIPES).filter(k => !s.known.includes(k) && inCat(k)), known = s.known.filter(k => D.RECIPES[k] && inCat(k));
-    const bar = `<div class="catf">${[['all', 'All']].concat(DM.Trades ? [['kitchen', '🍳 Kitchen']] : [], CATF.slice(1).filter(([g]) => Object.keys(D.RECIPES).some(k => grpOf(D.RECIPES[k].out[0]) === g))).map(([g, lab]) => `<button class="chip${benchCat === g ? ' on' : ''}" data-bc="${g}">${lab}</button>`).join('')}</div>`;   // 0.59: bench tabs
+    if (DM.Craft) DM.Craft.sync();   // 0.67: recipes that come with Crafting level
+    const inCat = k => benchCat === 'all' || (benchCat === 'decor' ? D.cat(D.RECIPES[k].out[0]) === 'decor' : grpOf(D.RECIPES[k].out[0]) === benchCat);
+    const unknown = Object.keys(D.RECIPES).filter(k => !s.known.includes(k) && inCat(k)).sort((a, b) => (D.RECIPES[a].auto || 99) - (D.RECIPES[b].auto || 99)), known = s.known.filter(k => D.RECIPES[k] && inCat(k));
+    const bar = `<div class="catf">${[['all', 'All']].concat(DM.Trades ? [['kitchen', '🍳 Kitchen']] : [], DM.Craft ? [['decor', '🪑 Decor']] : [], CATF.slice(1).filter(([g]) => Object.keys(D.RECIPES).some(k => grpOf(D.RECIPES[k].out[0]) === g))).map(([g, lab]) => `<button class="chip${benchCat === g ? ' on' : ''}" data-bc="${g}">${lab}</button>`).join('')}</div>`;   // 0.59: bench tabs
     el.innerHTML = bar + (benchCat === 'kitchen' && DM.Trades ? `<div class="ktwrap">${DM.Trades.kitchenHTML(icon)}</div>` : `<div class="kick sect">Workbench · ${s.known.length} recipe${s.known.length === 1 ? '' : 's'} known · 🔨 Crafting level ${DM.Trades ? DM.Trades.lvl('craft') : 1}</div><div class="benchhint">Tap a recipe to see what it does and where to find each material.${benchCat === 'all' && DM.Trades ? ' Cooking is in the 🍳 Kitchen tab.' : ''}</div>` + benchRows(known, true)
       + (unknown.length ? `<div class="kick sect">Not learned yet · ${unknown.length}</div>` + benchRows(unknown, false) : ''))
       + (benchCat === 'kitchen' ? '' : `<div class="empty">${unknown.length ? 'Blueprints: Dot trades them, and some turn up in hidden stashes and safes.' : 'You know every blueprint so far.'}<br>Materials come from the stash and the pack.</div>`);
@@ -890,7 +897,7 @@ const NEXT_VERSION = '0.66.0';
       <div class="kick sect">Materials</div>
       ${Object.keys(r.in).map(m => { const have = countItem(m), ok = have >= r.in[m]; return `<div class="rdmat ${ok ? 'ok' : 'miss'}">${icon(m)}<div><b>${D.ITEMS[m].n}</b><span>${esc(whereFrom(m))}</span></div><em>${have}/${r.in[m]}</em></div>`; }).join('')}
       ${known ? (miss.length ? `<button class="mbtn big" disabled>Missing: ${miss.map(m => D.ITEMS[m].n.toLowerCase()).join(', ')}</button>` : `<button class="mbtn big" id="rdCraft">Craft ${esc(it.n)}${r.out[1] > 1 ? ' x' + r.out[1] : ''}</button>`)
-        : '<button class="mbtn big" disabled>Blueprint needed - Dot trades them</button>'}
+        : `<button class="mbtn big" disabled>${r.auto ? `Unlocks at Crafting level ${r.auto}` : 'Blueprint needed - Dot trades them'}</button>`}
       <button class="mbtn big ghost" id="rdBack">${benchHost ? 'Back to the bench' : 'Close'}</button></div>`;
   }
   function bindDetail(el) {
@@ -1005,8 +1012,10 @@ const NEXT_VERSION = '0.66.0';
     const row = (e, i) => { const cos = D.ITEMS[e.k].cos, left = e.left && !(cos && Game.hasCos(cos)); return `<div class="shoprow${left ? '' : ' gone'}${cos ? ' cosrow' : ''}">${icon(e.k)}<div><b>${D.ITEMS[e.k].n}${e.n > 1 ? ' x' + e.n : ''}${D.isWeapon(e.k) ? qTag(e) : ''}</b>${cos ? cosRow(e) : `<span>${e.left ? e.left + ' left' : 'sold out'}</span>`}</div>
       <button class="mbtn sm${T.caps >= e.price && left ? '' : ' ghost'}" data-buy="${i}"${left ? '' : ' disabled'}>${icon('caps')}${e.price}</button></div>`; };
     const cosI = T.stock.map((e, i) => i).filter(i => D.ITEMS[T.stock[i].k].cos), goodI = T.stock.map((e, i) => i).filter(i => !D.ITEMS[T.stock[i].k].cos);
-    el.innerHTML = (cosI.length ? `<div class="kick sect">Back shelf · cosmetics</div>` + cosI.map(i => row(T.stock[i], i)).join('') : '') +
-      `<div class="kick sect">Today's stock · level ${traderLevel()}</div>` + (goodI.length ? goodI.map(i => row(T.stock[i], i)).join('') : '<div class="empty">Shelves are bare today.</div>') + '<div class="empty">Bought goods go in your pack, or the stash if it is full. Cosmetics go to your wardrobe.</div>';
+    const spI = goodI.filter(i => T.stock[i].special), decI = goodI.filter(i => D.ITEMS[T.stock[i].k].decor), restI = goodI.filter(i => !spI.includes(i) && !decI.includes(i));   // 0.67
+    const sect = (t, ix) => ix.length ? `<div class="kick sect">${t}</div>` + ix.map(i => row(T.stock[i], i)).join('') : '';
+    el.innerHTML = sect("⭐ Dot's special · today only", spI) + (cosI.length ? `<div class="kick sect">Back shelf · cosmetics</div>` + cosI.map(i => row(T.stock[i], i)).join('') : '') + sect('🪑 Decor shelf · for your base', decI) +
+      `<div class="kick sect">Today's stock · level ${traderLevel()}</div>` + (restI.length ? restI.map(i => row(T.stock[i], i)).join('') : '<div class="empty">Shelves are bare today.</div>') + '<div class="empty">Bought goods go in your pack, or the stash if it is full. Cosmetics go to your wardrobe.</div>';
     el.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
       const e = T.stock[+b.dataset.buy];
       if (T.caps < e.price) { toast('Not enough caps, sugar', 1.4); return; }
@@ -1975,6 +1984,7 @@ const NEXT_VERSION = '0.66.0';
         let need = cost; for (const list of [s.stash, s.pack]) for (let j = list.length - 1; j >= 0 && need; j--) if (list[j].k === 'scrap') { const t = Math.min(need, list[j].n); list[j].n -= t; need -= t; if (!list[j].n) list.splice(j, 1); }
         const nd = Math.min(max, e.d + Math.round(max * .4));
         if (sel.from === 'hands') s.hands.d = nd; else e.d = nd;
+        if (DM.Trades) DM.Trades.gain('craft', 5 + 2 * q0);   // 0.67: bench work counts
         done('Repaired');
       }]);
       // 0.29.2 (owner: "my bow broke ... or even upgrading it"): raise a weapon one quality tier (more damage and
@@ -1986,7 +1996,7 @@ const NEXT_VERSION = '0.66.0';
           if (cp && SV.trader.caps < cp) return toast(`Needs ${cp} caps`, 1.6);
           for (const [k, n] of mats) { let need = n; for (const list of [s.stash, s.pack]) for (let j = list.length - 1; j >= 0 && need; j--) if (list[j].k === k) { const t = Math.min(need, list[j].n); list[j].n -= t; need -= t; if (!list[j].n) list.splice(j, 1); } }
           SV.trader.caps -= cp;
-          const tgt = sel.from === 'hands' ? s.hands : e; tgt.q = q + 1; tgt.d = D.wMax({ k: e.k, q: q + 1 }); SFX.play('pick');
+          const tgt = sel.from === 'hands' ? s.hands : e; tgt.q = q + 1; tgt.d = D.wMax({ k: e.k, q: q + 1 }); SFX.play('pick'); if (DM.Trades) DM.Trades.gain('craft', 12 + 10 * q);
           done(`${it.n} is now ${D.QUAL[q + 1].n} · ${D.wDmg({ k: e.k, q: q + 1 })} dmg`);
         }]); }
       // 0.54 class weapon upgrades (weapons2.js): bow -> crossbow -> heavy crossbow, etc. Keeps the quality, fully repaired
@@ -1998,7 +2008,7 @@ const NEXT_VERSION = '0.66.0';
           if (SV.trader.caps < C.caps) return toast(`Needs ${C.caps} caps`, 1.6);
           for (const [k, n] of C.m) { let need = n; for (const list of [s.stash, s.pack]) for (let j = list.length - 1; j >= 0 && need; j--) if (list[j].k === k) { const t = Math.min(need, list[j].n); list[j].n -= t; need -= t; if (!list[j].n) list.splice(j, 1); } }
           SV.trader.caps -= C.caps;
-          const tgt = sel.from === 'hands' ? s.hands : e; if (sel.from === 'hands') D.unloadGun(s); tgt.k = CX.to; tgt.d = D.wMax({ k: CX.to, q: D.qOf(tgt) }); SFX.play('pick');
+          const tgt = sel.from === 'hands' ? s.hands : e; if (sel.from === 'hands') D.unloadGun(s); tgt.k = CX.to; tgt.d = D.wMax({ k: CX.to, q: D.qOf(tgt) }); SFX.play('pick'); if (DM.Trades) DM.Trades.gain('craft', 60);
           if (DM.Journal) DM.Journal.note(`Turned my ${it.n.toLowerCase()} into a ${to.n.toLowerCase()}.`);
           if (sel.from === 'hands' && Game.onEquip) Game.onEquip();
           done(`${it.n} → ${to.n}! ${D.wDmg(tgt)} dmg`);
@@ -2094,7 +2104,7 @@ const NEXT_VERSION = '0.66.0';
     ['Map jobs: crates, radio calls, deliveries, fog', 'With the map open (or in Pocket mode) there is more to do while you walk. Supply crates: up to 3 a day land at real places near you - walk over one to grab it; an air drop (one a day, after you have walked a bit) has better loot but only 20 minutes. Radio calls: a survivor names a place and a deadline - get there in time for a reward. Dot\'s delivery (one a day, button on the map): pick up a package at one place and carry it to another. Fog of war: the map is fogged except where you have walked; clearing new streets gives XP, sometimes a find, and rewards at 250 / 1,000 / 3,000 / 10,000 squares. Turn the fog off with its button. All of this is kept only on your phone.'],
     ['Capsule machine', 'The capsule machine (Capsules tab) gives a random cosmetic, hairstyle or eye style for a token (new hairstyles and eyes show up in Edit look, marked with a lock until you pull them). You get a token for every 5,000 steps (up to 2 a day), or buy one for 120 caps. Odds: common 55%, rare 30%, epic 12%, legendary 3%, and at least one epic or better every 10 pulls. Cosmetics you do not have yet come first; Dot buys any duplicate. During a holiday its capsules join the machine, and 1 pull in 4 is a piece of holiday decor.'],
     ['Deck the base', 'During Thanksgiving and Christmas, place that holiday\'s decor at your base (Base > Decor) for prizes: 2 pieces = 2 capsule tokens + 40 caps, 5 = 3 tokens + 80 caps, 8 = a legendary holiday hat + 100 caps. Holiday decor comes from Dot\'s holiday shelf, holiday houses (storage, pantries, closets) and the capsule machine.'],
-    ['Workbench & crafting', 'Workbench (home tab, or at the base) lists every recipe you know with each material, what you have and what you need. Tap a recipe to see what it does, every material in full with where to find it, and a big Craft button. Materials come from the stash and the pack. New recipes come from blueprints: Dot trades them, and some turn up in hidden stashes and safes.'],
+    ['Workbench & crafting', 'Workbench (home tab, or at the base) lists every recipe you know with each material, what you have and what you need. Tap a recipe to see what it does, every material in full with where to find it, and a big Craft button. Materials come from the stash and the pack. New recipes come from blueprints: Dot trades them, and some turn up in hidden stashes and safes. Others unlock as your Crafting level rises: base decor (the Decor tab) and supply crates that pack spare food, water and bandages into something Dot will buy. Crafting XP comes from crafting, repairing and upgrading weapons, class upgrades, and building or repairing your base.'],
     ['Crew', 'About 1 house in 25 has a survivor hiding in a closet or a secret room (more in mansions and police stations). Talk to them: with a free bunk they move into your base (2 bunks, build up to 4). Each has a role - Scavenger (crew searches bring back more), Guard (horde-night defence), Medic (heals you each morning), Gardener (waters a plant a day), Tinkerer (cheaper repairs) - and levels up slowly. Each eats 1 food a day from your STASH; three hungry days and they leave a note (they never take anything). The more crew you have, the more a Crew search brings back.'],
     ['Strays', 'Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Move slowly near them (a small push on the joystick) until they trust you, then tap to coax them out - or offer food from your pack. One pet comes along on runs and at the base; up to 4 live with you. Dogs bark when a zombie spots you and sometimes sniff out a container with something good; cats make you quieter and bring little presents some mornings. Pets level from your steps. They never die: a zombie scare sends them running home, back the next day.'],
     ['Weekly boss', 'Every week (Monday to Sunday, New York time) a named boss holes up in a special house on everyone\'s list. Walk 5,000 steps that week to reach it, then fight it up to 2 times a day (90 seconds each). Red markers on the floor show where the next attack lands: a charge line, a slam ring, walkers being called. Its health is shared by your whole party for the whole week; when it falls, everyone who hit it gets a good item, caps and a chance at a boss cosmetic. Going down in a boss fight costs you nothing but the fight.'],

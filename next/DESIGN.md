@@ -1383,3 +1383,16 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - Balance to watch: deep-run Nest floors (~14 zombies, many specials), special-infected share as gamestage climbs.
 - Oura API integration was postponed by the owner ("I'll do it next time"); steps from the ring already sync via Apple Health
   with the Shortcut's "Source is Oura" filter.
+
+## Done in 0.67 (owner: "nothing for me to craft", "Dot doesn't really have anything that we need", "our house decorations are pretty bad")
+- Crafting XP from all bench work: weapon repair (5 + 2/quality), quality upgrade (12 + 10/tier), class upgrade (60),
+  building a base piece (15 + 10/tier), base repairs (8), on top of workbench crafts.
+- crafting.js: recipes with `auto` = the Crafting level that teaches them (no blueprint, never a bp_ item): supply crates
+  (ration, snack, first-aid) that pack surplus food/water/bandages into Sell items for Dot, and 19 decor recipes (wood,
+  nails, cloth, batteries, paperbacks). Workbench has a Decor tab; locked ones say "Unlocks at Crafting level N".
+- Dot: far less food/water/snack and starter weapons (crowbar, bat, knife, pan), more tape and batteries, more
+  blueprints; a daily decor shelf (one Dot-only piece, `dot: 1`: jukebox, fish tank - never in loot), and from trader
+  level 2 "Dot's special": a Fine weapon (Masterwork 35% at level 4+). Stock re-rolls once for 0.67 (trader.sv).
+- Decor art redrawn (hay bale, garland, wreaths, cornucopia, scarecrow, gnome, flamingo, lantern, flower box, cactus,
+  posters, presents, string lights) and new pieces: pumpkin pile (Thanksgiving), flag bunting, neon HOME sign, burn barrel,
+  jukebox, fish tank.

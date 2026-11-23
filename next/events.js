@@ -26,7 +26,7 @@ window.DM = window.DM || {};
       loot: { fridge: { cranberry: 2, pie: 2 }, pantry: { stuffing: 3, cranberry: 2, d_cornu: .25 }, cabinet: { stuffing: 2, cranberry: 1 }, store: { cranberry: 2, stuffing: 2 }, storage: { stuffing: 1, pie: 1, d_hay: .3, d_fallwreath: .3 } },
       boss: { kind: 'turkey', name: 'Zombie turkey', chance: 1 / 3, hp: 170, props: { hw: 10, hh: 7 }, tutorial: true },
       cos: ['pilgrim', 'feathers', 'pietin', 'harvest', 'turkeyhat', 'leafcrown', 'flannel', 'cornback', 'strawhat'],
-      decor: ['d_scarecrow', 'd_hay', 'd_cornu', 'd_fallwreath', 'd_garland'],   // 0.26: holiday decor (Deck the base, Dot's shelf, capsules)
+      decor: ['d_scarecrow', 'd_hay', 'd_cornu', 'd_fallwreath', 'd_garland', 'd_pumpkins'],   // 0.26: holiday decor (Deck the base, Dot's shelf, capsules)
       deckCos: 'strawhat',                                                     // 0.26: the Deck the base top prize
       // Dot's event job chain (one at a time, on top of the normal 2 jobs)
       quests: [
