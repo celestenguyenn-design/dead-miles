@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.71';
+const VERSION='7.72';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2359,8 +2359,8 @@ const ACHV=[
   {id:'day20k',  n:'Twenty Thousand',  d:'20,000 steps in one day',     f:S=>(S.steps.today||0)>=20000||((S.steps.hist||[]).some(h=>h.n>=20000))},
   {id:'k1000',   n:'Unstoppable',      d:'Put down 1,000 walkers',      f:S=>S.kills>=1000},
   {id:'lvl40',   n:'Old Hand',         d:'Reach level 40',              f:S=>S.lvl>=40},
-  {id:'craft10', n:'Tinkerer',         d:'Make 10 things in the workshop', f:S=>(S.crafted||0)>=10},
-  {id:'craft50', n:'Mad Scientist',    d:'Make 50 things in the workshop', f:S=>(S.crafted||0)>=50},
+  {id:'craft10', n:'Tinkerer',         d:'Craft, cook, upgrade or temper 10 things', f:S=>(S.crafted||0)>=10},
+  {id:'craft50', n:'Mad Scientist',    d:'Craft, cook, upgrade or temper 50 things', f:S=>(S.crafted||0)>=50},
   {id:'town10',  n:'Local',            d:'Walk 10% of your town',       f:S=>townPctNow()>=10},
   {id:'town50',  n:'Knows the Shortcuts',d:'Walk 50% of your town',     f:S=>townPctNow()>=50},
   {id:'town90',  n:'Every Last Street',d:'Walk 90% of your town',       f:S=>townPctNow()>=90},
@@ -3176,6 +3176,25 @@ function act(kind){
     for(const o of alive())dealTo(o,rint(10,16)+(S.lvl-1),'The fire catches '+o.n,'heavy');
     if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+30);
   }
+  else if(kind==='pipe'){
+    if(C.pipes){toast('One pipe bomb a fight','d');return;}
+    if(!toolUse('pipe')){toast('No pipe bomb','d');return;}
+    C.pipes=1;SFX.play('shatter');const d=rint(26,38)+(S.lvl-1);dealTo(t,d,'The pipe bomb goes off under '+t.n,'heavy');
+    if(S.loc)S.loc.noise=Math.min(100,S.loc.noise+20);
+  }
+  else if(kind==='smoke'){
+    if(C.where==='raid'||C.where==='horde'){toast('Nowhere to run. This is your base.');return;}
+    if(!toolUse('smoke')){toast('No smoke bomb','d');return;}
+    C.fled=true;C.dropped=[];clog('You crack the smoke bomb. By the time it clears, you are two streets away with everything you came in with.','good');
+    SFX.play('ui');endCombat(false);return;
+  }
+  else if(kind==='kit'){
+    const w=eqItem('melee')&&repairMissing(eqItem('melee'))?eqItem('melee'):(eqItem('ranged')&&repairMissing(eqItem('ranged'))?eqItem('ranged'):null);
+    if(!w){toast('Nothing equipped needs fixing','d');return;}
+    if(!toolUse('kit')){toast('No repair kit','d');return;}
+    const add=Math.min(12,repairMissing(w));w.dur=Math.max(0,w.dur||0)+add;delete w.broken;
+    clog('You crouch and work the '+w.n+' over with the kit: +'+add+' durability.','good');SFX.play('chest');
+  }
   else if(kind==='brace'){C.brace=true;clog('You set your feet and wait for it.','you');fxPush({k:'brace'});}
   else if(kind==='med'){
     // Unlimited patch-ups meant ten meds were 400 extra HP and no boss could
@@ -3580,6 +3599,9 @@ function renderCombat(){
     <button class="btn" onclick="swapSheet()">🔄 Switch weapon<small>${swapOptions().length} in your gear${w?' · costs your turn':' · free, hands empty'}</small></button>
     <button class="btn" onclick="shootGuard()" ${g&&(ammoN||g.id==='mercy')?'':'disabled'}>${g?g.e+' '+esc(g.n)+(temperOf(g)?' <span class="chip s">'+esc(temperOf(g).n)+'</span>':''):'🔫 No gun'}<small>${g?(wDmg(g)[0]+sk('steadyaim')*3)+'-'+(wDmg(g)[1]+sk('steadyaim')*3)+' · '+ammoN+' rounds'+(g.dur!==undefined?' · '+g.dur+' left':''):'find one'}</small></button>
     ${toolN('molotov')>0?`<button class="btn" onclick="act('molotov')" ${(C.molos||0)>=2?'disabled':''}>🍾 Molotov<small>hits all ${alive().length} · ${toolN('molotov')} on your belt · loud</small></button>`:''}
+    ${toolN('pipe')>0?`<button class="btn" onclick="act('pipe')" ${C.pipes?'disabled':''}>🧨 Pipe bomb<small>${26+S.lvl-1}-${38+S.lvl-1} to ${esc(t?t.n:'them')} · ${toolN('pipe')} on your belt</small></button>`:''}
+    ${toolN('kit')>0?`<button class="btn" onclick="act('kit')">🧰 Field repair<small>+12 durability · ${toolN('kit')} on your belt</small></button>`:''}
+    ${toolN('smoke')>0&&C.where!=='raid'&&C.where!=='horde'?`<button class="btn ghost" onclick="act('smoke')">💨 Smoke bomb<small>always escape · drop nothing · ${toolN('smoke')} left</small></button>`:''}
     <button class="btn" onclick="act('brace')">⚔️ Counter<small>take ${sk('steady')?60+sk('steady')*10:50}% less · hit back everyone who lands one</small></button>
     <button class="btn" onclick="act('med')" ${meds?'':'disabled'}>${meds?MEDS[bestMed()].e:'🩹'} Patch up<small>${meds?esc(MEDS[bestMed()].n)+' · +'+Math.min(medHeal(bestMed()),maxHp()-S.hp):'no meds'}</small></button>
     <button class="btn ghost" onclick="act('flee')" ${C.where==='raid'?'disabled':''}>🏃 Run<small>70% · drop 25% pack</small></button>
@@ -3922,7 +3944,7 @@ function claimBase(confirmed){
   // separable: the perk follows the BUILDING, the stash spot follows the PIN.
   if(S.base.geo&&typeof STREET!=='undefined'&&STREET.on)setTimeout(basePinOffer,500);
 }
-function defense(){if(!S.base)return 0;let d=0;for(const [k,l] of Object.entries(S.base.rooms)){if(!l)continue;d+=BUILD[k].def[l-1]||0;}d+=(S.base.rooms.walls||0)*(sk('framing')*3+sk('fortify')*2)+(S.base.rooms.traps||0)*sk('trapmaker')*2;d+=crewDefense();return d;}
+function defense(){if(!S.base)return 0;let d=0;for(const [k,l] of Object.entries(S.base.rooms)){if(!l)continue;d+=BUILD[k].def[l-1]||0;}d+=(S.base.rooms.walls||0)*(sk('framing')*3+sk('fortify')*2)+(S.base.rooms.traps||0)*sk('trapmaker')*2;d+=(S.base.plate||0)*3;d+=crewDefense();return d;}
 // v7.54: a Trapper rigs the fence before you leave, so they count home or away; a
 // Light sleeper only counts while they are actually home. Nobody who is down counts.
 function crewDefense(){let d=0,tl=0;for(const c of (S.crew||[])){if(c.hp!==undefined&&c.hp<=0)continue;if(c.out)continue;if(c.role==='trapper')tl=Math.max(tl,c.lvl+sk('leader'));if(c.trait==='sentry'&&!(S.active||[]).includes(c.id))d+=3;if(c.role==='trapper'&&c.lvl>=CREW_CAP)d+=6;}return d+(tl?2+tl*2:0);}
@@ -3985,7 +4007,7 @@ function canCook(r){if(r.needs&&!(S.base&&S.base.rooms[r.needs]))return 'Needs a
 function cook(id){const r=RECIPES.find(x=>x.id===id);if(!r||!S.base)return;const ok=canCook(r);if(ok!==true){toast(ok,'d');return;}
   if(r.give.indexOf('meds:')===0){for(const [k,v] of Object.entries(r.cost))S.stock[k]-=v;medsGive(r.give.slice(5),1);log('Made '+r.n.toLowerCase()+'.');toast('+1 '+r.n.toLowerCase(),'a');}
   else{if(S.pack.length>=capacity()){toast('Pack is full - nowhere to put it','d');return;}for(const [k,v] of Object.entries(r.cost))S.stock[k]-=v;const it={id:r.give,...ITEMS[r.give],uid:uid()};S.pack.push(it);log('Made a '+it.n.toLowerCase()+'. It is in your pack.');toast(it.e+' '+it.n+' - in your pack','a');}
-  SFX.play('loot');save();render();}
+  craftGain(5,true);SFX.play('loot');save();render();}
 function renderKitchen(){const el=$('#kitchen');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first.</p>';return;}
   el.innerHTML='<p class="help">Stash water: <b>'+(S.stock.water||0)+'</b> · food: <b>'+(S.stock.food||0)+'</b> · scrap: <b>'+(S.stock.scrap||0)+'</b>. What you make goes in your pack.</p><div class="stack" style="margin-top:8px">'
     +RECIPES.map(r=>{const ok=canCook(r);const cost=Object.entries(r.cost).map(([k,v])=>v+' '+{water:'💧',food:'🥫',scrap:'🔩'}[k]).join(' + ');
@@ -3999,38 +4021,82 @@ function renderKitchen(){const el=$('#kitchen');if(!el)return;if(!S.base){el.inn
    (S.tools), not in the pack: stashing turns the whole pack into points, and a
    molotov you made on purpose must not get melted into league score by accident.
    Five of each at most, so a big scrap pile cannot make fights free. */
-const TOOL_CAP=5;
+const TOOL_CAP_BASE=5;
+/* v7.72 - CRAFTING LEVEL. "My crafting level is still at 0 because I don't have
+   anything I need to craft... even upgrading my stuff doesn't give me craft
+   points, which it should." Four recipes and nothing that counted except the
+   workshop buttons. Now every piece of bench work earns craft XP - making a
+   tool, cooking, repairing, working gear up, tempering - and the level opens
+   new recipes and real perks, so the surplus scrap has somewhere to go. */
+const CRAFT_MAX=10;
+function craftNeed(l){return 40*l*(l+1)/2;}                 // total XP to REACH level l
+function craftXpHave(){if(S.craftXp===undefined)S.craftXp=(S.crafted||0)*10;return S.craftXp;}
+function craftLvl(){const x=craftXpHave();let l=0;while(l<CRAFT_MAX&&x>=craftNeed(l+1))l++;return l;}
+function craftGain(n,count){const before=craftLvl();S.craftXp=craftXpHave()+n;if(count)S.crafted=(S.crafted||0)+1;
+  const now=craftLvl();if(now>before){const p=CRAFT_PERKS.filter(x=>x.l>before&&x.l<=now).map(x=>x.t).join(' · ');
+    log('Crafting level '+now+'. '+p);toast('🛠️ Crafting level '+now+(p?' · '+p:''),'l');SFX.play('legend');}}
+const CRAFT_PERKS=[
+  {l:1,t:'Hand-loaded rounds'},
+  {l:2,t:'Pipe bombs'},
+  {l:3,t:'Smoke bombs and hand-loaded shells'},
+  {l:4,t:'Press scrap into parts · workshop recipes cost 1 less scrap'},
+  {l:5,t:'Field repair kits'},
+  {l:6,t:'Repairs cost 10% less'},
+  {l:7,t:'15% chance to make a spare'},
+  {l:8,t:'Reinforced plating for your base'},
+  {l:10,t:'Toolbelt holds 8 of each'},
+];
+function toolCap(){return craftLvl()>=10?8:TOOL_CAP_BASE;}
+const TOOL_CAP=TOOL_CAP_BASE;   // older code reads this name; toolCap() is the live one
 const TOOLS={
   molotov:{n:'Molotov',e:'🍾',d:'In a fight: hits EVERY enemy for 10-16 (+ your level). Loud: noise +30 indoors. Two a fight.'},
   picks:  {n:'Lockpicks',e:'🪛',d:'Opens a locked room with no noise at all, like a key but without the extra loot.'},
   lure:   {n:'Noisemaker',e:'⏰',d:'Wind it up and throw it down the street: noise -30 where you are looting.'},
+  pipe:   {n:'Pipe bomb',e:'🧨',d:'In a fight: 26-38 (+ your level) to the one you are aiming at. Very loud: noise +20. One a fight.'},
+  smoke:  {n:'Smoke bomb',e:'💨',d:'In a fight: you are gone, every time, and nothing falls out of your pack. Not at your own base.'},
+  kit:    {n:'Field repair kit',e:'🧰',d:'In a fight: your weapon gets 12 durability back. Uses your turn.'},
 };
 const WORKSHOP=[
   {id:'molotov',cost:{scrap:6,water:1},tool:'molotov',d:TOOLS.molotov.d},
   {id:'picks',  cost:{scrap:4,parts:1},tool:'picks',  d:TOOLS.picks.d},
   {id:'lure',   cost:{scrap:5},        tool:'lure',   d:TOOLS.lure.d},
-  {id:'bolts',  cost:{scrap:3},        n:'Whittle bolts',e:'🎯',d:'+8 bolts to the stash, for a bow or crossbow.'},
+  {id:'bolts',  cost:{scrap:3},        n:'Whittle bolts',e:'🎯',d:'+8 bolts to the stash, for a bow or crossbow.',go:()=>{addAmmoStock('bolts',8);return '🎯 +8 bolts';}},
+  {id:'rounds', cost:{scrap:5},        lv:1,n:'Hand-load rounds',e:'📦',d:'+6 rounds to the stash.',go:()=>{addAmmoStock('ammo',6);return '📦 +6 rounds';}},
+  {id:'pipe',   cost:{scrap:10,parts:1},lv:2,tool:'pipe',d:TOOLS.pipe.d},
+  {id:'smoke',  cost:{scrap:6,water:1},lv:3,tool:'smoke',d:TOOLS.smoke.d},
+  {id:'shells', cost:{scrap:7},        lv:3,n:'Hand-load shells',e:'🟥',d:'+4 shotgun shells to the stash.',go:()=>{addAmmoStock('shells',4);return '🟥 +4 shells';}},
+  {id:'press',  cost:{scrap:15},       lv:4,n:'Press scrap into parts',e:'⚙️',d:'+1 weapon part, for upgrades and tempers.',go:()=>{S.parts=(S.parts||0)+1;return '⚙️ +1 part';}},
+  {id:'kit',    cost:{scrap:8,parts:1},lv:5,tool:'kit',d:TOOLS.kit.d},
+  {id:'plate',  cost:{scrap:30,parts:2},lv:8,n:'Reinforced plating',e:'🛡️',d:'Bolt it to the walls: +3 base defense for good. Up to +30.',
+    max:()=>(S.base.plate||0)>=10?'Walls are fully plated':null,go:()=>{S.base.plate=(S.base.plate||0)+1;return '🛡️ Base defense +3 ('+S.base.plate*3+'/30)';}},
 ];
 function tools(){return S.tools||(S.tools={});}
 function toolN(k){return tools()[k]||0;}
 function toolUse(k){if(toolN(k)<1)return false;S.tools[k]--;return true;}
 function haveOf(k){return k==='parts'?(S.parts||0):(S.stock[k]||0);}
-function canCraft(r){if(!S.base)return 'Claim a base first';if(r.tool&&toolN(r.tool)>=TOOL_CAP)return 'Toolbelt holds '+TOOL_CAP;
-  for(const [k,v] of Object.entries(r.cost))if(haveOf(k)<v)return 'Needs '+v+' '+k;return true;}
+function craftCost(r){const c=Object.assign({},r.cost);if(craftLvl()>=4&&c.scrap)c.scrap=Math.max(1,c.scrap-1);return c;}
+function canCraft(r){if(!S.base)return 'Claim a base first';if(r.lv&&craftLvl()<r.lv)return 'Crafting level '+r.lv;if(r.tool&&toolN(r.tool)>=toolCap())return 'Toolbelt holds '+toolCap();
+  if(r.max){const m=r.max();if(m)return m;}
+  for(const [k,v] of Object.entries(craftCost(r)))if(haveOf(k)<v)return 'Needs '+v+' '+k;return true;}
 function craft(id){const r=WORKSHOP.find(x=>x.id===id);if(!r)return;const ok=canCraft(r);if(ok!==true){toast(ok,'d');return;}
-  for(const [k,v] of Object.entries(r.cost)){if(k==='parts')S.parts-=v;else S.stock[k]-=v;}
-  if(r.tool){const t=TOOLS[r.tool];tools()[r.tool]=toolN(r.tool)+1;log('Made a '+t.n.toLowerCase()+'. It is on your toolbelt.');toast(t.e+' '+t.n+' · '+toolN(r.tool)+' on your belt','a');}
-  else{addAmmoStock('bolts',8);log('Whittled 8 bolts.');toast('🎯 +8 bolts','a');}
-  S.crafted=(S.crafted||0)+1;SFX.play('salvage');save();render();}
+  for(const [k,v] of Object.entries(craftCost(r))){if(k==='parts')S.parts-=v;else S.stock[k]-=v;}
+  const spare=craftLvl()>=7&&Math.random()<0.15;
+  if(r.tool){const t=TOOLS[r.tool];const n=spare&&toolN(r.tool)+2<=toolCap()?2:1;tools()[r.tool]=toolN(r.tool)+n;log('Made '+(n>1?'two '+t.n.toLowerCase()+'s - one spare':'a '+t.n.toLowerCase())+'. On your toolbelt.');toast(t.e+' '+t.n+(n>1?' x2 (spare!)':'')+' · '+toolN(r.tool)+' on your belt','a');}
+  else{let msg=r.go();if(spare&&!r.max){msg+=' · spare! '+r.go();}log(r.n+': '+msg+'.');toast(msg,'a');}
+  craftGain(10,true);SFX.play('salvage');save();render();}
 function toolbeltLine(){const on=Object.keys(TOOLS).filter(k=>toolN(k)>0);
   return on.length?on.map(k=>TOOLS[k].e+' '+TOOLS[k].n+' x'+toolN(k)).join(' · '):'Nothing on your toolbelt yet.';}
+function craftBar(){const l=craftLvl(),x=craftXpHave();if(l>=CRAFT_MAX)return '<p class="help"><b style="color:var(--bone)">🛠️ Crafting level '+l+'</b> · maxed out</p>';
+  const a=craftNeed(l),b=craftNeed(l+1),pct=Math.round((x-a)/(b-a)*100);const nx=CRAFT_PERKS.find(p=>p.l>l);
+  return '<p class="help"><b style="color:var(--bone)">🛠️ Crafting level '+l+'</b> · '+(x-a)+'/'+(b-a)+' XP'+(nx?' · level '+nx.l+': '+esc(nx.t):'')+'</p><div class="hpbar" style="margin-top:4px"><i style="width:'+pct+'%;background:var(--amber)"></i></div>'
+    +'<p class="help" style="margin-top:4px">Craft XP comes from everything at the bench: making things here (+10), working gear up (+12 or more), tempering (+10), repairs (+4 a piece) and cooking (+5).</p>';}
 function renderWorkshop(){const el=$('#workshop');if(!el)return;if(!S.base){el.innerHTML='<p class="help">Claim a base first.</p>';return;}
   const icon={scrap:'🔩',water:'💧',parts:'⚙️'};
-  el.innerHTML='<p class="help">Scrap: <b>'+(S.stock.scrap||0)+'</b> · water: <b>'+(S.stock.water||0)+'</b> · parts: <b>'+(S.parts||0)+'</b></p>'
+  el.innerHTML=craftBar()+'<p class="help" style="margin-top:6px">Scrap: <b>'+(S.stock.scrap||0)+'</b> · water: <b>'+(S.stock.water||0)+'</b> · parts: <b>'+(S.parts||0)+'</b></p>'
     +'<p class="help" style="margin-top:4px"><b style="color:var(--bone)">Toolbelt:</b> '+toolbeltLine()+'</p><div class="stack" style="margin-top:8px">'
-    +WORKSHOP.map(r=>{const ok=canCraft(r);const t=r.tool?TOOLS[r.tool]:r;const cost=Object.entries(r.cost).map(([k,v])=>v+' '+icon[k]).join(' + ');
-      return '<button class="btn'+(ok===true?'':' ghost')+'" '+(ok===true?'':'disabled')+' onclick="craft(\''+r.id+'\')">'+t.e+' '+esc(t.n)+(r.tool?' <span class="sub">'+toolN(r.tool)+'/'+TOOL_CAP+'</span>':'')+'<small>'+cost+' · '+esc(ok===true?r.d:ok)+'</small></button>';}).join('')+'</div>';
-  const f=$('#workshopFold');if(f)f.textContent=toolbeltLine().indexOf('Nothing')===0?'':Object.keys(TOOLS).reduce((a,k)=>a+toolN(k),0)+' on your belt';}
+    +WORKSHOP.map(r=>{const ok=canCraft(r);const t=r.tool?TOOLS[r.tool]:r;const cost=Object.entries(craftCost(r)).map(([k,v])=>v+' '+icon[k]).join(' + ');const locked=r.lv&&craftLvl()<r.lv;
+      return '<button class="btn'+(ok===true?'':' ghost')+'" '+(ok===true?'':'disabled')+' onclick="craft(\''+r.id+'\')">'+(locked?'🔒 ':'')+t.e+' '+esc(t.n)+(r.tool?' <span class="sub">'+toolN(r.tool)+'/'+toolCap()+'</span>':'')+'<small>'+cost+' · '+esc(ok===true?r.d:(locked?ok+' - '+r.d:ok))+'</small></button>';}).join('')+'</div>';
+  const f=$('#workshopFold');if(f){const n=Object.keys(TOOLS).reduce((a,k)=>a+toolN(k),0);f.textContent='lvl '+craftLvl()+(n?' · '+n+' on your belt':'');}}
 function useLure(){const loc=S.loc;if(!loc)return;if(!toolUse('lure')){toast('No noisemaker','d');return;}
   loc.noise=Math.max(0,loc.noise-30);log('You wind the noisemaker and throw it down the street. Whatever was listening goes after it.');toast('⏰ Noise -30','a');SFX.play('ui');save();render();}
 function lureBtn(loc){return toolN('lure')>0&&loc.noise>0?'<button class="btn sm" style="margin-top:6px" onclick="useLure()">⏰ Throw a noisemaker<small>noise -30 · '+toolN('lure')+' left</small></button>':'';}
@@ -4221,7 +4287,7 @@ function repairCost(g){
   const miss=repairMissing(g);if(!miss)return 0;
   let c=miss*repairPer(g);
   if(atBench())c=c/2;
-  c-=sk('tinkerer');if(bg('mechanic'))c-=Math.ceil(c*0.4);
+  c-=sk('tinkerer');if(bg('mechanic'))c-=Math.ceil(c*0.4);if(craftLvl()>=6)c*=0.9;
   return Math.max(1,Math.ceil(c));
 }
 function repair(uidv){
@@ -4243,12 +4309,12 @@ function repair(uidv){
     S.stock.scrap-=Math.min(S.stock.scrap,spend);
     g.dur=Math.max(0,g.dur||0)+can;if(g.dur>0)delete g.broken;
     log('Patched the '+g.n+' as far as the scrap went: +'+can+' of '+miss+' for '+spend+' scrap.');
-    toast(g.n+' patched · +'+can+'/'+miss,'a');SFX.play('chest');
+    toast(g.n+' patched · +'+can+'/'+miss,'a');craftGain(4);SFX.play('chest');
     save();render();return;
   }
   S.stock.scrap-=c;delete g.broken;g.dur=repairMax(g);
   log('Repaired the '+g.n+' for '+c+' scrap. Back to '+g.dur+' swings.');
-  toast(g.n+' repaired · -'+c+' scrap','z');SFX.play('chest');
+  toast(g.n+' repaired · -'+c+' scrap','z');craftGain(4);SFX.play('chest');
   save();render();
 }
 // Fix everything that needs it, cheapest first, until the scrap runs out.
@@ -4259,7 +4325,7 @@ function repairAll(){
   for(const g of list){const c=repairCost(g);if(S.stock.scrap<c)break;S.stock.scrap-=c;delete g.broken;g.dur=repairMax(g);spent+=c;n++;}
   if(!n){toast('Not enough scrap for even the cheapest repair','d');return;}
   log('Repaired '+n+' piece'+(n===1?'':'s')+' for '+spent+' scrap.');
-  toast('Repaired '+n+' · -'+spent+' scrap','z');SFX.play('chest');save();render();
+  toast('Repaired '+n+' · -'+spent+' scrap','z');craftGain(4*n);SFX.play('chest');save();render();
 }
 let GEAR_TAB='all';function gearTab(k){GEAR_TAB=k;SFX.play('ui');render();}
 const SALV={common:3,uncommon:6,rare:12,epic:20,legendary:35};
@@ -4404,7 +4470,7 @@ function upgrade(uidv,useScroll,usePin){
       +(odds.br>0?'\n'+Math.round(odds.br*100)+'% it is destroyed':'')
       +'\n\nCosts '+c+' scrap and '+pc+' parts either way.'))return;
   // pay first: an attempt costs the same whatever it does
-  S.stock.scrap-=c;S.parts=partsHave()-pc;
+  S.stock.scrap-=c;S.parts=partsHave()-pc;craftGain(12+3*up,true);
   /* v7.12 - insurance is spent only when it ACTUALLY fires. Burning a scroll on
      an attempt that succeeded, or on a legendary that could never shatter, is
      the kind of quiet tax that makes a player stop using the system at all. */
@@ -4456,7 +4522,7 @@ function reroll(uidv){
   if(partsHave()<pc){toast('Need '+pc+' parts. Salvage gear to get them - you have '+partsHave()+'.','d');return;}
   const old=g.temper;
   if(old&&!confirm('Reroll the '+g.n+'? Its '+TEMPERS[old].n+' temper is gone whichever way this lands, and Crude is the most likely result.'))return;
-  S.stock.scrap-=sc;S.parts=partsHave()-pc;
+  S.stock.scrap-=sc;S.parts=partsHave()-pc;craftGain(10,true);
   g.temper=rollTemper();
   const t=TEMPERS[g.temper];
   if(g.dur!==undefined)g.dur=Math.max(1,Math.min(g.dur,durMax(g)));  // a worse temper can shrink the ceiling - it must never zero the weapon
@@ -5925,6 +5991,10 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.72',d:'Nov 23',t:'Crafting level, and a lot more to make',
+  i:['CRAFTING LEVEL (Base tab, Workshop). Every bit of bench work now earns craft XP: making things in the workshop, working gear up (whether it takes or not), tempering, repairing and cooking. What you already made counts toward it.',
+     'NEW RECIPES as you level: hand-loaded rounds (1), PIPE BOMBS - a big hit on one enemy (2), SMOKE BOMBS - a sure escape that drops nothing (3), hand-loaded shells (3), pressing 15 scrap into a weapon part (4), FIELD REPAIR KITS - +12 durability mid-fight (5), and REINFORCED PLATING - +3 base defense each, up to +30 (8).',
+     'PERKS: workshop recipes cost 1 less scrap at level 4, repairs 10% less at 6, a 15% chance to make a spare at 7, and the toolbelt holds 8 of each at 10. The Tinkerer and Mad Scientist milestones now count upgrades, tempers and cooking too.']},
  {v:'7.71',d:'Sep 29',t:'Stronghold rooms say why they are locked',
   i:['In a raider stronghold the Loot pile and the Boss trailer are locked until you have pushed through the stage before them - but they just sat there grey and did nothing when tapped, which looked broken. Now they show a lock, say which stage opens them, and tapping one tells you what to push to first.']},
  {v:'7.70',d:'Sep 28',t:'No more difficulty setting',
