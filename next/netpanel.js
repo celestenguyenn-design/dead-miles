@@ -52,7 +52,7 @@
 #np .msg.bad{color:${C.bad}} #np .msg.ok{color:${C.ok}}
 #np .fr{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid rgba(246,227,187,.1)}
 #np .fr:first-of-type{border-top:0}
-#np .av{width:42px;height:42px;border-radius:13px;background:${C.lil};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex:0 0 auto}
+#np .av{width:42px;height:42px;border-radius:13px;background:${C.lil};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex:0 0 auto;overflow:hidden}#np .av.face{background:radial-gradient(circle at 50% 35%,#7a68b0,#3d2d61)}#np .av canvas{width:100%;height:100%;display:block}
 #np .fr .nm{flex:1;min-width:0}
 #np .fr .nm b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #np .fr .st{text-align:right;font-size:13px;flex:0 0 auto}
@@ -143,11 +143,31 @@
       + msg('copy') + '</div>';
   }
 
+  // 0.72.2 (owner: friends "should show their character's look instead of D for David or B for Bel"): the look each game
+  // publishes (extra.look; the board returns it in pub) drawn as a head-and-shoulders portrait, one rig per friend
+  const lookOf = r => { const p = r && (r.pub || r.extra || r); const l = p && (p.look || (p.extra && p.extra.look)); return l && typeof l === 'object' ? l : null; };
+  const faceRig = {};
+  function drawFaces(root) {
+    if (typeof ART === 'undefined' || !ART.buildRig) return;   // ART is a top-level const, not on window
+    root.querySelectorAll('canvas[data-face]').forEach(cv => {
+      const r = (NET.boardRows || []).find(x => x.handle === cv.dataset.face), lk0 = lookOf(r); if (!lk0) return;
+      let lk; try { lk = ART.LOOK.norm(lk0); } catch (e) { return; }
+      const key = 'face_' + String(r.handle).replace(/[^a-z0-9_]/gi, ''), sig = JSON.stringify(lk);
+      const draw = () => { const x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height);
+        const im = ART.pinkGirl && ART.pinkGirl(lk) && ART.img && ART.img('you');
+        if (im) { const w = cv.width * 1.12, h = im.height * w / im.width; x.drawImage(im, (cv.width - w) / 2, cv.height * .04, w, h); return; }
+        ART.drawRig(x, key, cv.width / 2 - 12, cv.height * 2.1, cv.height / 92, false, { weapon: 'fists' }); };
+      const f = faceRig[key];
+      if (f && f.sig === sig && f.ok) return draw();
+      if (!f || f.sig !== sig) { faceRig[key] = { sig, ok: false }; ART.buildRig('survivor', 1.4, ART.LOOK.recolor(lk), key, ART.LOOK.patch(lk)).then(() => { faceRig[key].ok = true; const c = document.querySelector('canvas[data-face="' + r.handle + '"]'); if (c) drawFaces(c.closest('#np') || document); }).catch(() => { }); }
+    });
+  }
   function boardCard() {
     const rows = NET.boardRows || [];
     const list = rows.length ? rows.map(r => {
       const me = r.handle === NET.handle;
-      return '<div class="fr"><div class="av" style="' + (me ? 'background:' + C.ora + ';color:#2a1308' : '') + '">' + esc((r.name || r.handle || '?').charAt(0).toUpperCase()) + '</div>'
+      const lk = lookOf(r), fl = lk && typeof ART !== 'undefined' && ART.drawRig;   // 0.72.2: their own character instead of a letter
+      return '<div class="fr"><div class="av' + (fl ? ' face' : '') + '" style="' + (me ? 'background:' + C.ora + ';color:#2a1308' : '') + '">' + (fl ? '<canvas data-face="' + esc(r.handle) + '" width="96" height="96"></canvas>' : esc((r.name || r.handle || '?').charAt(0).toUpperCase())) + '</div>'
         + '<div class="nm"><b>' + esc(r.name || r.handle) + (me ? ' (you)' : '') + '</b><span class="mut">Lv ' + (r.level || 1) + (r.job ? ' ' + esc(r.job) : '') + ' &middot; ' + fmt(r.looted) + ' houses &middot; ' + fmt(r.kills) + ' kills</span></div>'
         + '<div class="st"><b>' + fmt(r.steps_today) + '</b><span class="mut">' + fmt(r.steps_week) + ' this week</span>' + (r.typed_share > 0.25 ? '<span class="mut">' + Math.round(r.typed_share * 100) + '% typed</span>' : '') + '</div></div>';
     }).join('') : '<p class="mut">No one has played the new game in the last two weeks yet.</p>';
@@ -174,6 +194,7 @@
       + '</div>';
     for (const k in keep) { const i = document.getElementById(k); if (i && keep[k]) i.value = keep[k]; }
     root.querySelector('.sh').scrollTop = y;
+    drawFaces(root);
   }
 
   const val = id => { const i = document.getElementById(id); return i ? i.value.trim() : ''; };

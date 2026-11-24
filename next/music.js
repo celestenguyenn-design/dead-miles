@@ -308,7 +308,7 @@ window.DM = window.DM || {};
   M.start = function () {
     const c = SFX.ac; if (!c || !cfg.music || document.visibilityState === 'hidden') return;
     graph();
-    if (c.state === 'suspended') { try { c.resume(); } catch (e) { /* needs a gesture */ } }
+    if (c.state !== 'running' && c.state !== 'closed') { try { c.resume(); } catch (e) { /* needs a gesture */ } }   // 0.72.1: also 'interrupted' (iOS)
     if (!running) { running = true; next = c.currentTime + .15; M.T = M.tension(); lastTick = 0; }
     if (!timer) timer = setInterval(tick, 100);
     M.on = true; applyVolumes();
@@ -328,7 +328,8 @@ window.DM = window.DM || {};
   });
   M.nowName = () => cur ? TRACKS[cur].n : '';
   // first user gesture: unlock audio (iOS) and start the music
-  const kick = () => { SFX.init(); applyVolumes(); if (cfg.music && !running) M.start(); };
+  const kick = () => { SFX.init(); applyVolumes(); if (cfg.music && (!running || (SFX.ac && SFX.ac.state !== 'running'))) M.start(); };   // 0.72.1: a tap also wakes audio the phone interrupted
+  window.addEventListener('pageshow', () => { const c = SFX.ac; if (c && c.state !== 'running' && c.state !== 'closed') { try { c.resume(); } catch (e) { /* ignore */ } } });
   for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(ev, kick, { capture: true, passive: true });
   // pause while the app is hidden; pick up again when it comes back
   document.addEventListener('visibilitychange', () => {

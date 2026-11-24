@@ -22,7 +22,8 @@ window.DM = window.DM || {};
   const SFX = E.SFX = {
     ac: null, master: null, nb: null,
     init() {
-      if (this.ac) { if (this.ac.state === 'suspended') this.ac.resume(); return; }
+      // 0.72.1: iOS leaves the context 'interrupted' (not 'suspended') after a call, CarPlay / Bluetooth or another app took the audio - resume from any not-running state
+      if (this.ac) { if (this.ac.state !== 'running' && this.ac.state !== 'closed') { try { this.ac.resume(); } catch (e) { /* needs a gesture */ } } return; }
       try {
         const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
         this.ac = new AC(); this.master = this.ac.createGain(); this.master.gain.value = .5; this.master.connect(this.ac.destination);
