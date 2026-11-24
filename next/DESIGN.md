@@ -1440,3 +1440,4 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - theme.css (loaded after the inline styles): glowing outlined cards, amber buttons, the Outfit font (fonts/, OFL).
 - tour.js steps carry the view they live in (v) and open it before pointing; Houses/Gear/Map steps point at the bottom bar.
 - A new player's Home shows "Your first house · Go" (opens Loot).
+- 0.69.1 (owner: "make auntie dot cuter"): DOT_SVG redrawn chibi: silver hair puff, beaded headwrap, cat-eye glasses on a chain, gold hoops, waving, coffee mug, DOT'S apron.
