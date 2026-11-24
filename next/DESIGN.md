@@ -1452,3 +1452,4 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   Field cards dot / walker / lena / pets use the pictures. Restyle of the drawn rigs: thinner sticker edge, a soft pastel
   filter, rosy cheeks, the walker recoloured mint + lavender with a small one-fang mouth (no open jaw / drool).
   Licence of the SpriteCook art not yet confirmed by the owner (free plan); all 40 credits spent.
+- 0.72.1 (owner: "the sounds are gone the music"): audio resumes from any not-running AudioContext state (iOS 'interrupted' after calls / CarPlay / Bluetooth), on every tap and on pageshow - before, only 'suspended' was handled, so an interrupted context stayed silent until the app was killed.
