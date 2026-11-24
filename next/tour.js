@@ -44,31 +44,31 @@ window.DM = window.DM || {};
     // 0.26.4 (owner: "the tutorial didnt make the steps mandatory ... SHOW them and wait for them to set it up before
     // moving on ... thats the hardest part"): the guide opens by itself in setup mode (syncguide.js SYNC.setup) and stays
     // open until a real sync arrives from the phone. Old phone data does not count - everyone does one fresh sync.
-    { s: '#mSyncG', t: 'Step 2 of 2 · Set up step sync', auto: 1,
+    { s: '#mSyncG', v: 'home', log: 1, t: 'Step 2 of 2 · Set up step sync', auto: 1,
       d: () => synced() ? 'Step sync works - your phone sent its steps. You are all set.' : cant() ? 'You chose to type your steps for now. You can set up sync any time: How to sync steps on the home screen.' : 'This is the most important part. The setup guide opens next and shows you every step for your phone (iPhone: a Shortcut; Android: the Dead Miles Steps app). It stays open until your phone actually sends its first steps.',
       act: () => window.SYNC && !synced() && !cant() ? ['Show me how to set it up', () => SYNC.setup(ok => { const v = SV(); if (ok) v.syncSetup = 1; else v.tourNoSync = 1; DM.Game.save(); })] : null,
       done: () => synced() || cant(), need: 'Set up step sync to continue' },
-    { f: () => $('#mLog') && $('#mLog').parentElement, interact: 1, t: 'No sync yet? Type your steps', d: 'Until sync is on (or if it cannot work on your phone), type today\'s step TOTAL from your phone or watch here and tap Log. Typed steps count at half, up to 4,000 a day. Every ~1,000 steps scouts another house to loot.', done: () => synced() || logged(), need: 'Type your step total and tap Log to continue', skipIf: synced },
-    { s: '#mNeeds', t: 'Hunger and thirst', d: 'These drain slowly, even with the app closed. Tap them to eat or drink. Below 30 you tire faster and search slower.' },
-    { s: '#mSkills', t: 'Level and skills', d: 'Everything you do earns XP. Each level gives a skill point to spend in the skill trees here.' },
-    { s: '#mWard', t: 'Wardrobe', d: 'Cosmetics you earn go straight here: hats, glasses, scarves, packs and jackets. Edit look changes your face and hair.' },
+    { f: () => $('#mLog') && $('#mLog').parentElement, v: 'home', log: 1, interact: 1, t: 'No sync yet? Type your steps', d: 'Until sync is on (or if it cannot work on your phone), type today\'s step TOTAL from your phone or watch here and tap Log. Typed steps count at half, up to 4,000 a day. Every ~1,000 steps scouts another house to loot.', done: () => synced() || logged(), need: 'Type your step total and tap Log to continue', skipIf: synced },
+    { s: '#mNeeds', v: 'me', t: 'Hunger and thirst', d: 'Me (bottom right) is you: your bars, level, skills and wardrobe, plus every activity. These drain slowly, even with the app closed. Tap them to eat or drink. Below 30 you tire faster and search slower.' },
+    { s: '#mSkills', v: 'me', t: 'Level and skills', d: 'Everything you do earns XP. Each level gives a skill point to spend in the skill trees here.' },
+    { s: '#mWard', v: 'me', t: 'Wardrobe', d: 'Cosmetics you earn go straight here: hats, glasses, scarves, packs and jackets. Edit look changes your face and hair.' },
     { s: '#hPill', t: 'Horde night', d: 'Every Sunday a horde attacks your base. The countdown is here. Build walls and traps, and take watch shifts to defend it.' },
     { s: '#hBase', t: 'Your base', d: 'Walk around your base: build defences and garden beds with build steps (half of every step), and Decorate with furniture you find. Your stash chest is there too.' },
-    { s: '#evBan', t: 'Holiday events', d: 'Holidays bring their own loot, a mini-boss, jobs from Dot, holiday capsules and decor. Tap the banner to see what is on.' },
-    { s: '[data-tile="boss"]', t: 'Weekly boss', d: 'A named boss each week, the same for everyone. Walk 5,000 steps that week to reach it, then fight it.' },
-    { s: '[data-tile="deep"]', t: 'Deep runs', d: 'Go down floor after floor for better loot. Every floor gets harder - leave before it goes wrong.' },
-    { s: '[data-tile="crew"]', t: 'Crew and strays', d: 'Survivors and pets you rescue live at your base. Crew can loot houses for you, and they need feeding.' },
-    { s: '#mtabs [data-t="houses"]', t: 'Houses', d: 'Your list of scouted houses, Dot, the daily challenge and the capsule machine. Unlooted houses last 3 days.' },
-    { s: '.rtseg', t: 'Daily route', d: 'Route shows today\'s branching map: every 1,500 steps opens the next row, and you pick one stop - a house, a safehouse, Dot, a supply drop or an event.' },
-    { s: '.hcard.trader', t: 'Auntie Dot, the trader', d: 'Take jobs, buy supplies and sell junk for caps. After a visit she heads off for 3,000 steps (up to 3 visits a day).' },
-    { s: '#dlyCard', t: 'Daily challenge', d: 'One house a day, the same for everyone. Your first try is scored on the leaderboard.' },
-    { s: '#mtabs [data-t="walks"]', t: 'Walks', d: 'Get paid for walking: a daily streak (5,000 steps a day), expeditions to Brooklyn landmarks your steps carry you to, and lifetime milestones with titles.' },
-    { s: '#mtabs [data-t="gacha"]', t: 'Capsules', d: 'The capsule machine: spend a token on a random cosmetic. You get a token every 5,000 steps (up to 2 a day), or buy one with caps.' },
-    { s: '#mtabs [data-t="event"]', t: 'The event tab', d: 'While a holiday runs it gets its own tab: what is on, Dot\'s event jobs, the limited cosmetics and Deck the base (place holiday decor at your base for prizes).' },
-    { f: loot, t: 'Loot a house', d: 'Loot to go in yourself: search furniture, pick locks, avoid or fight zombies, and leave with what you found. Crew sends a crew member instead.' },
-    { s: '#mtabs [data-t="stash"]', t: 'Gear', d: 'Your backpack and stash: eat, equip weapons, move things to the stash so a bad run cannot cost them, sell or discard junk.' },
-    { s: '#mtabs [data-t="bench"]', t: 'Workbench', d: 'Craft bandages, lockpicks, arrows, weapons and gear from materials. Blueprints unlock new recipes.' },
-    { s: '#mtabs [data-t="map"]', t: 'Real-world map', d: 'Your real streets. Walk up to a marked place with the map open and it becomes a bonus house (3 a day, on foot). Crates, radio calls and Dot\'s deliveries pop up while you walk. The ? on the map explains it all.' },
+    { s: '#evBan', v: 'home', t: 'Holiday events', d: 'Holidays bring their own loot, a mini-boss, jobs from Dot, holiday capsules and decor. Tap the banner to see what is on.' },
+    { s: '[data-tile="boss"]', v: 'me', t: 'Weekly boss', d: 'A named boss each week, the same for everyone. Walk 5,000 steps that week to reach it, then fight it.' },
+    { s: '[data-tile="deep"]', v: 'me', t: 'Deep runs', d: 'Go down floor after floor for better loot. Every floor gets harder - leave before it goes wrong.' },
+    { s: '[data-tile="crew"]', v: 'me', t: 'Crew and strays', d: 'Survivors and pets you rescue live at your base. Crew can loot houses for you, and they need feeding.' },
+    { s: '#bnav [data-nav="loot"]', t: 'Loot', d: 'The tabs along the bottom are always there. Loot is your list of scouted houses, Auntie Dot, the daily route and the daily challenge. Unlooted houses last 3 days.' },
+    { s: '.rtseg', v: 'loot', t: 'Daily route', d: 'Route shows today\'s branching map: every 1,500 steps opens the next row, and you pick one stop - a house, a safehouse, Dot, a supply drop or an event.' },
+    { s: '.hcard.trader', v: 'loot', t: 'Auntie Dot, the trader', d: 'Take jobs, buy supplies and sell junk for caps. After a visit she heads off for 3,000 steps (up to 3 visits a day).' },
+    { s: '#dlyCard', v: 'loot', t: 'Daily challenge', d: 'One house a day, the same for everyone. Your first try is scored on the leaderboard.' },
+    { s: '#mtabs [data-t="walks"]', v: 'me', t: 'Walks', d: 'Get paid for walking: a daily streak (5,000 steps a day), expeditions to Brooklyn landmarks your steps carry you to, and lifetime milestones with titles.' },
+    { s: '#mtabs [data-t="gacha"]', v: 'me', t: 'Capsules', d: 'The capsule machine: spend a token on a random cosmetic. You get a token every 5,000 steps (up to 2 a day), or buy one with caps.' },
+    { s: '#mtabs [data-t="event"]', v: 'me', t: 'The event tab', d: 'While a holiday runs it gets its own tab: what is on, Dot\'s event jobs, the limited cosmetics and Deck the base (place holiday decor at your base for prizes).' },
+    { f: loot, v: 'loot', t: 'Loot a house', d: 'Loot to go in yourself: search furniture, pick locks, avoid or fight zombies, and leave with what you found. Crew sends a crew member instead.' },
+    { s: '#bnav [data-nav="bag"]', t: 'Bag', d: 'Your backpack, stash and workbench: eat, equip weapons, move things to the stash so a bad run cannot cost them, sell or discard junk.' },
+    { s: '#mtabs [data-t="bench"]', v: 'bag', t: 'Workbench', d: 'Craft bandages, lockpicks, arrows, weapons and gear from materials. Blueprints unlock new recipes.' },
+    { s: '#bnav [data-nav="map"]', t: 'Real-world map', d: 'Your real streets. Walk up to a marked place with the map open and it becomes a bonus house (3 a day, on foot). Crates, radio calls and Dot\'s deliveries pop up while you walk. The ? on the map explains it all.' },
     { s: '#mset', t: 'Settings and help', d: 'Sound, music, your save, How to play (every rule in detail) and this tour again. That\'s it - go walk!' },
   ];
   let on = false, pending = false, i = 0, list = [], el = null, pollT = null, autoed = false, setupN = 0;
@@ -76,6 +76,8 @@ window.DM = window.DM || {};
   const SETUP = 5;   // the first 5 steps are the setup (the home-screen one is dropped when it is not needed)
   function visible(n) { if (!n) return false; const r = n.getBoundingClientRect(); return r.width > 0 && r.height > 0 && n.offsetParent !== null; }
   const txt = v => typeof v === 'function' ? v() : v;
+  const G0 = () => DM.Game;
+  function goTo(st) { const g = G0(); if (!g || !g.goView) return; if (st.v && g.view && g.view() !== st.v) g.goView(st.v); if (st.log && g.openStepLog) g.openStepLog(); }
   function target(st) { return st.f ? st.f() : st.s ? $(st.s) : null; }
   function build() {
     if (el) return;
@@ -116,6 +118,7 @@ window.DM = window.DM || {};
     } else { spot.classList.add('none'); card.style.top = 'auto'; card.style.bottom = '24%'; }
   }
   function show() {
+    goTo(list[i]);   // 0.69: steps live in different tabs
     const st = list[i], n = target(st);
     if (n && n.scrollIntoView) try { n.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); } catch (e) { n.scrollIntoView(); }
     const card = el.querySelector('.tourcard'), last = i === list.length - 1;
@@ -154,13 +157,14 @@ window.DM = window.DM || {};
     const v = SV(); if (!v || !v.survivor || DM.scene) return false;
     if (!replay && (trusted() || (signedIn() && syncedBefore())) && v.tourDone) { v.setupDone = 1; if (!trusted()) v.syncSetup = 1; DM.Game.save(); return false; }   // nothing to set up
     if ($('#msheet')) $('#msheet').classList.remove('on');
-    const tab = $('#mtabs [data-t="houses"]'); if (tab && !tab.classList.contains('on')) tab.click();
+    if (DM.Game.goView) DM.Game.goView('home');
     build(); el.style.display = ''; on = true; pending = false; i = 0; autoed = false;
     // setup steps always show and can never be skipped; the rest of the tour can be. A save that finished the tour
     // before setup was required gets the setup alone.
     const setupOnly = !replay && v.tourDone && !v.setupDone;
     const keep = st => (!st.home || (DM.Install && DM.Install.needed())) && !(trusted() && STEPS.indexOf(st) > -1 && STEPS.indexOf(st) < SETUP);   // trusted: no setup steps
-    list = (setupOnly ? STEPS.slice(0, SETUP).concat([FIN]) : STEPS.filter((st, k) => k < SETUP || !st.s && !st.f || visible(target(st)))).filter(keep);
+    list = (setupOnly ? STEPS.slice(0, SETUP).concat([FIN]) : STEPS.filter((st, k) => { if (k < SETUP || !st.s && !st.f) return true; goTo(st); return visible(target(st)); })).filter(keep);
+    if (DM.Game.goView) DM.Game.goView('home');
     setupN = list.filter((st, k) => STEPS.indexOf(st) > -1 && STEPS.indexOf(st) < SETUP).length;
     show(); return true;
   };
@@ -173,7 +177,7 @@ window.DM = window.DM || {};
     const v = SV();
     if (on || pending || !v || !v.survivor || (v.tourDone && v.setupDone) || DM.scene || document.hidden) return;
     if ((trusted() || (signedIn() && syncedBefore())) && v.tourDone) { v.setupDone = 1; DM.Game.save(); return; }
-    if (($('#msheet') && $('#msheet').classList.contains('on')) || ($('#tipbox') && $('#tipbox').classList.contains('on')) || !visible($('#mtabs')) || ($('#menu') && $('#menu').className)) return;
+    if (($('#msheet') && $('#msheet').classList.contains('on')) || ($('#tipbox') && $('#tipbox').classList.contains('on')) || !$('#bnav') || ($('#menu') && $('#menu').className)) return;
     TO.start();
   }, 2500);
 })();

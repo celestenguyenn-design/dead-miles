@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.68.1';
+const NEXT_VERSION = '0.69.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1100,7 +1100,127 @@ const NEXT_VERSION = '0.68.1';
   function hideMenu() { $('#menu').classList.add('off'); }
   function showMenu() { $('#menu').classList.remove('off'); }
   let curTab = 'houses';
-  function tab(t) { curTab = t; sel = null; { const ip = $('#ipop'); if (ip) ip.classList.remove('on'); }   /* 0.59: an item popup never follows you to another tab */ if (t === 'stash' && SV.survivor.better) { SV.survivor.better = null; Game.save(); } document.querySelectorAll('#mtabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); renderHome(); }
+  // ---------------------------------------------------------------- 0.69 the five tabs (owner: "the UI is insane and just very
+  // difficult to navigate ... can't find things, too much at once"; picked the Grape & amber glow style, "make my character
+  // animated, same thing if we have a pet")
+  //   Home = the walking scene + at most 3 things that need you · Loot = today's houses, Dot, route · Map · Bag = gear and
+  //   workbench · Me = your character, skills, wardrobe and every activity. Every old piece of the home screen still exists;
+  //   it lives in one of these views (HV), so nothing lost its button.
+  let HV = 'home', stepLogOpen = false;
+  const ME_TABS = ['walks', 'gacha', 'event'];
+  const viewOf = t => t === 'houses' ? 'loot' : (t === 'stash' || t === 'bench') ? 'bag' : ME_TABS.includes(t) ? 'me' : HV;
+  const meTabOk = t => (t === 'walks' && SV.tutorialDone && DM.Walks && unl('walks')) || (t === 'gacha' && SV.tutorialDone && DM.Gacha && unl('gacha')) || (t === 'event' && SV.tutorialDone && EVA && unl('event'));
+  const paneOn = () => HV === 'loot' || HV === 'bag' || (HV === 'me' && ME_TABS.includes(curTab) && meTabOk(curTab));
+  function goView(v) {
+    if (v === 'map') { if (DM.Map) DM.Map.open(); return; }
+    HV = v;
+    if (v === 'loot') curTab = 'houses';
+    else if (v === 'bag' && curTab !== 'stash' && curTab !== 'bench') curTab = 'stash';
+    else if (v === 'me' && !(ME_TABS.includes(curTab) && meTabOk(curTab))) curTab = ME_TABS.find(meTabOk) || curTab;
+    if (curTab === 'stash' && SV.survivor.better) { SV.survivor.better = null; Game.save(); }
+    renderHome0(); const m = $('#menu'); if (m) m.scrollTop = 0;
+  }
+  Game.goView = goView;
+  Game.view = () => HV;
+  Game.openStepLog = () => { if (stepLogOpen) return; stepLogOpen = true; const el = $('#stepLog'), b = $('#h2Log'); if (el) el.hidden = false; if (b) b.classList.add('on'); };
+  const NAV_ICON = {
+    home: '<path d="M3.5 11 12 4l8.5 7v9h-6v-5.5h-5V20h-6z"/>',
+    loot: '<path d="M4 20V9l5-4 5 4v11zM14 20V12h6v8z"/><path d="M8 20v-4h2v4"/>',
+    map: '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/>',
+    bag: '<path d="M6 8h12l1 12H5zM9 8V6a3 3 0 0 1 6 0v2"/>',
+    me: '<path d="M12 3l2.6 5.5 6 .8-4.4 4.1 1.1 6L12 16.5 6.7 19.4l1.1-6L3.4 9.3l6-.8z"/>',
+  };
+  function navHTML(gated) {
+    const s = SV.survivor, newH = (SV.houses || []).filter(h => h.status === 'new' && !h.quest).length || (!SV.tutorialDone ? 1 : 0);
+    const meDot = DM.Skills.points(s) > 0 || newCos() > 0 || (DM.Walks && SV.tutorialDone && DM.Walks.claimable());
+    const items = [['home', 'Home', 0], ['loot', 'Loot', newH], ['map', 'Map', 0], ['bag', 'Bag', betterBadge() ? '!' : 0], ['me', 'Me', meDot ? '•' : 0]].filter(([k]) => k !== 'map' || DM.Map);
+    return `<nav id="bnav" class="bnav">${items.map(([k, n, b]) => `<button data-nav="${k}" class="${HV === k ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">${NAV_ICON[k]}</svg><span>${n}</span>${b ? `<i class="nbad${b === '•' ? ' dot' : ''}">${b === '•' ? '' : b}</i>` : ''}</button>`).join('')}</nav>`;
+  }
+  function bindNav() {
+    document.querySelectorAll('#bnav [data-nav]').forEach(b => b.onclick = () => { const v = b.dataset.nav; if (v === HV && v !== 'map') { const m = $('#menu'); if (m) m.scrollTo({ top: 0, behavior: 'smooth' }); return; } SFX.play('ui'); goView(v); });
+    const lg = $('#h2Log'); if (lg) lg.onclick = () => { SFX.play('ui'); stepLogOpen = !stepLogOpen; const el = $('#stepLog'); if (el) el.hidden = !stepLogOpen; lg.classList.toggle('on', stepLogOpen); };
+    const hm = $('#hMore'); if (hm) hm.onclick = () => { SFX.play('ui'); goView('me'); };
+    const hc = $('#heroCv'); if (hc) hc.onclick = () => { heroWave(); };
+  }
+
+  // ---------------------------------------------------------------- 0.69 the walking scene on Home
+  // She walks down the block with her pet while the street scrolls past. Three touches (owner: "I'd like all 3"):
+  //   1. the more steps today, the faster she walks (standing still before the first 100);
+  //   2. she waves when you open the app (and when you tap her);
+  //   3. the pet sits beside her until she has walked today, then trots along.
+  const SCN = { raf: 0, wave: -9, t0: 0, waved: false, pet: null, tmp: null, town: null };
+  function heroHTML(d, nxt) {
+    const steps = Math.round(d.phone + d.walk + d.typed), eff = effective(d), pct = nxt ? Math.max(3, Math.min(100, eff / nxt * 100)) : 100;
+    return `<div class="hero2"><canvas id="heroCv" aria-label="You, out walking"></canvas>
+      <div class="h2steps"><b>${steps.toLocaleString('en-US')}</b><span>steps today</span></div>
+      <div class="h2next">${nxt ? `next house at ${nxt.toLocaleString('en-US')}` : 'all houses found today'}</div><div class="h2bar"><i style="width:${pct}%"></i></div>
+      <button class="h2log${stepLogOpen ? ' on' : ''}" id="h2Log">${d.phone ? 'Steps & sync' : '＋ Log steps'}</button></div>`;
+  }
+  function heroWave() { SCN.wave = performance.now() / 1000; }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') SCN.waved = false; });
+  function heroStart() {
+    const cv = $('#heroCv'); if (!cv) return;
+    if (!SCN.waved) { SCN.waved = true; SCN.wave = performance.now() / 1000 + .35; }
+    if (!SCN.tmp) SCN.tmp = document.createElement('canvas');
+    if (!SCN.t0) SCN.t0 = performance.now() / 1000;
+    if (SCN.raf) return;
+    const loop = () => { SCN.raf = 0; const c = $('#heroCv'); if (!c || DM.scene || HV !== 'home' || document.hidden) return; heroDraw(c); SCN.raf = requestAnimationFrame(loop); };
+    SCN.raf = requestAnimationFrame(loop);
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && SV && !DM.scene) heroStart(); });
+  function town(W) {   // a strip of rowhouses, made once per width
+    if (SCN.town && SCN.town.W === W) return SCN.town;
+    const B = []; let x = 0, i = 0; while (x < W * 2.2) { const w = 34 + (i * 37) % 30, h = 58 + (i * 53) % 52; B.push({ x, w, h, win: (i * 7) % 3, roof: i % 3 }); x += w + 3; i++; }
+    return (SCN.town = { W, B, len: x });
+  }
+  function heroDraw(cv) {
+    const dpr = Math.min(3, window.devicePixelRatio || 2), W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+    const d = SV.day, steps = d.phone + d.walk + d.typed, now = performance.now() / 1000, t = now - SCN.t0;
+    const walking = steps >= 100, k = walking ? .6 + Math.min(1.4, steps / 7000) : 0;   // 1. faster with more steps
+    SCN.dist = (SCN.dist || 0) + (SCN.last ? Math.min(.1, now - SCN.last) : 0) * 34 * k; SCN.last = now;
+    SCN.ph = (SCN.ph || 0) + (SCN.lastPh ? Math.min(.1, now - SCN.lastPh) : 0) * 7 * k; SCN.lastPh = now;
+    // sky, moon, the block
+    const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#3a2868'); g.addColorStop(1, '#5a3a7a'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    x.fillStyle = 'rgba(255,214,140,.14)'; x.beginPath(); x.arc(W * .46, 30, 25, 0, 6.28); x.fill(); x.fillStyle = 'rgba(255,214,140,.92)'; x.beginPath(); x.arc(W * .46, 30, 14, 0, 6.28); x.fill();
+    const gy = H - 22, T = town(W), o1 = (SCN.dist * .35) % T.len;
+    x.lineWidth = 2; x.strokeStyle = '#11142f';
+    for (const rep of [0, 1]) for (const b of T.B) { const bx = b.x - o1 + rep * T.len; if (bx > W || bx + b.w < 0) continue;
+      x.fillStyle = '#2a1d4c'; x.fillRect(bx, gy - b.h, b.w, b.h); x.strokeRect(bx, gy - b.h, b.w, b.h);
+      if (b.roof === 0) { x.fillStyle = '#231a40'; x.fillRect(bx - 2, gy - b.h - 4, b.w + 4, 5); }
+      for (let r = 0; r < 3; r++) for (let c2 = 0; c2 < 2; c2++) { const lit = (b.win + r + c2) % 3 === 0; x.fillStyle = lit ? '#ffb347' : '#3d2d61'; x.fillRect(bx + 6 + c2 * (b.w / 2 - 2), gy - b.h + 8 + r * 13, 7, 8); } }
+    x.fillStyle = '#4a3c70'; x.fillRect(0, gy, W, 12); x.fillStyle = '#11142f'; x.fillRect(0, gy, W, 2); x.fillStyle = '#231a40'; x.fillRect(0, gy + 12, W, H - gy - 12);
+    const o2 = SCN.dist % 40; x.fillStyle = '#ffb347'; for (let dx = -o2; dx < W; dx += 40) x.fillRect(dx, gy + 16, 20, 3);
+    // her
+    const cx = W * .2, fy = gy + 5, ph = SCN.ph, s = walking ? Math.sin(ph) : 0;
+    const wt = now - SCN.wave, waving = wt >= 0 && wt < 1.9;   // 2. a wave on opening the app (or a tap)
+    const yo = walking ? -Math.abs(Math.cos(ph)) * 3.5 : 0, breathe = 1 + Math.sin(now * 2.4) * .012;
+    x.fillStyle = 'rgba(8,6,22,.4)'; x.beginPath(); x.ellipse(cx, fy, 24, 5, 0, 0, 6.28); x.fill();
+    if (ART.rigs.survivor) {
+      const sh = SV.survivor.hands, wk = sh && D.ITEMS[sh.k] ? D.ITEMS[sh.k].w : 'fists';
+      const parts = { legB: { r: s * .42 }, legF: { r: -s * .42 }, arm: { r: -s * .3 }, bat: { r: -s * .3 }, head: { r: Math.sin(now * 1.3) * .05 } };
+      if (waving) { const a = -1.55 + Math.sin(wt * 13) * .45; parts.arm = { r: a }; parts.bat = { r: a }; parts.head = { r: .1 + Math.sin(wt * 6.5) * .05 }; }
+      ART.drawRig(x, 'survivor', cx, fy + yo, H / 300, false, { sy: walking ? 1 : breathe, rot: walking ? Math.sin(ph * .5) * .02 : 0, parts, weapon: waving ? 'fists' : wk });
+      if (waving) bubble(x, cx + H * .16, fy - H * .74, 'Hi!', Math.min(1, wt * 5, (1.9 - wt) * 5));
+    }
+    // 3. the pet: sits until she has walked today, then trots beside her
+    const p = DM.Crew && DM.Crew.activePet ? DM.Crew.activePet() : null;
+    if (p) { const tc = SCN.tmp, pw = Math.round(H * .5 * dpr), phh = Math.round(H * .34 * dpr); if (tc.width !== pw) { tc.width = pw; tc.height = phh; }
+      DM.Crew.petPortrait(tc, p, walking ? { sit: false, move: 1, ph: ph * 1.2, t: now, happy: true } : { sit: true, t: now, heart: waving ? 1 : 0 });
+      const pw2 = H * .5, ph2 = H * .34, px = cx + H * .17;
+      x.drawImage(tc, px, fy - ph2, pw2, ph2);
+      if (!walking && !waving) bubble(x, px + pw2 * .5, fy - ph2 * .92, '…?', .5 + .5 * Math.max(0, Math.sin(now * 1.6)));   // waiting for a walk
+    }
+  }
+  function bubble(x, bx, by, txt, a) {   // a little speech bubble on the scene
+    if (a <= 0) return; x.save(); x.globalAlpha = a; x.font = '800 13px Outfit, Inter, sans-serif';
+    const w = x.measureText(txt).width + 16, h = 22; x.fillStyle = '#fff6e6'; x.strokeStyle = '#11142f'; x.lineWidth = 2;
+    x.beginPath(); x.roundRect ? x.roundRect(bx - w / 2, by - h, w, h, 10) : x.rect(bx - w / 2, by - h, w, h); x.fill(); x.stroke();
+    x.beginPath(); x.moveTo(bx - 6, by - 1); x.lineTo(bx - 10, by + 7); x.lineTo(bx + 1, by - 1); x.closePath(); x.fill(); x.stroke();
+    x.fillStyle = '#1a1232'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, bx, by - h / 2 + 1); x.restore();
+  }
+  function tab(t) { curTab = t; HV = viewOf(t); sel = null; { const ip = $('#ipop'); if (ip) ip.classList.remove('on'); }   /* 0.59: an item popup never follows you to another tab */ if (t === 'stash' && SV.survivor.better) { SV.survivor.better = null; Game.save(); } document.querySelectorAll('#mtabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); renderHome(); }
 
   // ---- character creation / edit look
   let cre = { name: '', look: ART.LOOK.norm(null), job: 'scavenger' }, creEdit = false, idleRAF = 0;
@@ -1287,7 +1407,22 @@ const NEXT_VERSION = '0.68.1';
     $('#mbody').innerHTML = `
       <div class="mtop hometop"><div class="mbrand"><div class="logo">${DM.Logo ? DM.Logo.mini() : 'DEAD MILES'}</div><button id="mver" class="ver">${VERSION}</button></div>${gated ? hordePill() : ''}<span class="mtsp"></span>
         ${gated ? `<button id="hBase" class="gear tbase${BS.gardenNote() ? ' dot' : ''}" aria-label="Go to base"><svg viewBox="0 0 24 24"><path d="M3.5 11.2 12 4l8.5 7.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.8 9.6V20h4.4v-5.4h3.6V20h4.4V9.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>` : ''}<button id="mnet" class="gear" aria-label="Account and friends"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.8 19.5c.6-3.6 3.2-5.6 6.2-5.6s5.6 2 6.2 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16.5 13.6c2.6.1 4.4 1.8 4.9 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><button id="mset" class="gear" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 4.6.1-1.1-.1-1.1 2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.9-1.1L15.8 3h-4l-.4 2.6a8 8 0 0 0-1.9 1.1l-2.4-1-2 3.4 2 1.6-.1 1.1.1 1.1-2 1.6 2 3.4 2.4-1c.6.5 1.2.8 1.9 1.1l.4 2.6h4l.4-2.6a8 8 0 0 0 1.9-1.1l2.4 1 2-3.4z" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></button></div>
+      <div class="hv" data-hv="home"${HV === 'home' ? '' : ' hidden'}>
       ${DM.Weather ? DM.Weather.chipHTML() : ''}   <!-- 0.22: weather chip -->
+      ${heroHTML(d, nxt)}
+      <div class="steplog" id="stepLog"${stepLogOpen ? '' : ' hidden'}>
+        <div class="stepcard"><div class="steptop"><div class="steps"><b>${Math.round(d.phone + d.walk + d.typed).toLocaleString('en-US')}</b><span>steps today</span></div>
+            <div class="scout"><b>${d.scouted}</b><span>house${d.scouted === 1 ? '' : 's'} found</span></div></div>
+          <div class="stepinfo">${d.typed ? `${d.typed.toLocaleString('en-US')} typed (half value) · ` : ''}${Math.round(w).toLocaleString('en-US')} worth${nxt ? ` · next house at <b>${nxt.toLocaleString('en-US')}</b>` : ' · that\'s the max today'}</div>
+          <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="Type today's total" maxlength="8"><button id="mLog" class="mbtn sm">Log</button></div>
+          <div class="syncrow"><div id="msync" class="msync"></div>${window.SYNC ? (window.NET && NET.ok && !d.phone && new Date().getHours() >= 14 ? '<button class="synclink nudge" id="mSyncG" data-m="fix">No phone steps? Fix sync</button>' : '<button class="synclink" id="mSyncG">How to sync steps</button>') : ''}</div>
+          ${IS_IOS && window.NET && NET.ok ? '<button class="mbtn sm" id="mSyncNow" style="width:100%;margin:8px 0 0">Sync my steps now</button>' : ''}</div>
+      </div>
+      ${SV.tutorialDone && DM.WalkFX ? DM.WalkFX.reportHTML() : ''}
+      ${gated ? homeTiles('today') : `<div class="hsect"><span class="kick">Today</span></div><div class="tiles today"><button class="tile" data-tile="firsthouse" style="--tc:#ffb347"><span class="tn">Your first house</span><span class="ts">14 Halsey St is waiting</span><b class="thot">Go</b></button></div><div class="hevent">${eventBanner()}</div>`}
+      ${SV.tutorialDone ? guideCard() : ''}
+      </div>
+      <div class="hv" data-hv="me"${HV === 'me' ? '' : ' hidden'}>
       <div class="hero">
         <div class="scard">
           <div class="portwrap"><canvas id="mPort" width="150" height="190"></canvas><div class="lookbtns"><button class="editlook" id="mLook">Edit look</button><button class="editlook ward" id="mWard">Wardrobe${newCos() ? `<i class="nbadge">${newCos()}</i>` : ''}</button></div></div>
@@ -1300,21 +1435,14 @@ const NEXT_VERSION = '0.68.1';
             <div class="shands">${hands}</div>
           </div>
         </div>
-        <div class="stepcard">
-          <div class="steptop"><div class="steps"><b>${Math.round(d.phone + d.walk + d.typed).toLocaleString('en-US')}</b><span>steps today</span></div>
-            <div class="scout"><b>${d.scouted}</b><span>house${d.scouted === 1 ? '' : 's'} found</span></div></div>
-          <div class="stepinfo">${d.typed ? `${d.typed.toLocaleString('en-US')} typed (half value) · ` : ''}${Math.round(w).toLocaleString('en-US')} worth${nxt ? ` · next house at <b>${nxt.toLocaleString('en-US')}</b>` : ' · that\'s the max today'}</div>
-          <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="Type today's total" maxlength="8"><button id="mLog" class="mbtn sm">Log</button></div>
-          <div class="syncrow"><div id="msync" class="msync"></div>${window.SYNC ? (window.NET && NET.ok && !d.phone && new Date().getHours() >= 14 ? '<button class="synclink nudge" id="mSyncG" data-m="fix">No phone steps? Fix sync</button>' : '<button class="synclink" id="mSyncG">How to sync steps</button>') : ''}</div>
-          ${IS_IOS && window.NET && NET.ok ? '<button class="mbtn sm" id="mSyncNow" style="width:100%;margin:8px 0 0">Sync my steps now</button>' : ''}
-        </div>
       </div>
       ${SV.tutorialDone && DM.Life ? DM.Life.feedHTML() : ''}
-      ${SV.tutorialDone && DM.WalkFX ? DM.WalkFX.reportHTML() : ''}
-      ${SV.tutorialDone ? guideCard() : ''}
-      ${gated ? homeTiles() : eventBanner()}
-      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Walks && unl('walks') ? `<button data-t="walks">Walks${DM.Walks.claimable() && curTab !== 'walks' ? '<i class="tbadge">!</i>' : ''}</button>` : ''}${SV.tutorialDone && DM.Gacha && unl('gacha') ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA && unl('event') ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}<button data-t="help" class="helptab" aria-label="Help for this tab">?</button></div>
-      <div id="mpane"></div>`;
+      ${gated ? homeTiles('all') : ''}
+      </div>
+      <div id="mtabs" data-hv="${HV}"${['bag', 'me'].includes(HV) && paneOn() ? '' : ' hidden'}><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Walks && unl('walks') ? `<button data-t="walks">Walks${DM.Walks.claimable() && curTab !== 'walks' ? '<i class="tbadge">!</i>' : ''}</button>` : ''}${SV.tutorialDone && DM.Gacha && unl('gacha') ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA && unl('event') ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}<button data-t="help" class="helptab" aria-label="Help for this tab">?</button></div>
+      <div id="mpane"${paneOn() ? '' : ' hidden'}></div>
+      ${navHTML(gated)}`;
+    bindNav(); heroStart();
     bindGuide(); setTimeout(unlockPops, 600); setTimeout(partyAsk, 1500);   // 0.45; 0.46.1 party nudge
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { if (b.dataset.t === 'help') { helpTab(); return; } SFX.play('ui'); if (b.dataset.t === 'map') { DM.Map.open(); return; } tab(b.dataset.t); }; });
     $('#mLog').onclick = () => {
@@ -1345,7 +1473,7 @@ const NEXT_VERSION = '0.68.1';
     $('#mset').onclick = openSettings;
     drawPortrait($('#mPort'), s.hands && s.hands.k, .78);
     if ((curTab === 'walks' && !(SV.tutorialDone && DM.Walks)) || (curTab === 'gacha' && !(SV.tutorialDone && DM.Gacha)) || (curTab === 'event' && !(SV.tutorialDone && EVA))) curTab = 'houses';
-    if (curTab === 'houses') renderHouses(); else if (curTab === 'bench') renderBench(); else if (curTab === 'gacha') DM.Gacha.renderPane($('#mpane')); else if (curTab === 'walks') DM.Walks.renderPane($('#mpane')); else if (curTab === 'event') renderEventTab(); else renderStash();
+    if (!paneOn()) { /* Home: no pane */ } else if (curTab === 'houses') renderHouses(); else if (curTab === 'bench') renderBench(); else if (curTab === 'gacha') DM.Gacha.renderPane($('#mpane')); else if (curTab === 'walks') DM.Walks.renderPane($('#mpane')); else if (curTab === 'event') renderEventTab(); else renderStash();
     updateSync();
     if (cosQueue.length) setTimeout(showCosPop, 400); else { tip('home'); if (s.food.h < DM.Food.LOW || s.food.t < DM.Food.LOW) tip('food'); if (DM.Infect && DM.Infect.is(s)) tip('infect'); }
     const ic = document.querySelector('.nstat .inf'); if (ic) ic.onclick = () => { SFX.play('ui'); toast(DM.Infect.effects(s)[0], 5); };   // 0.18
@@ -1545,7 +1673,7 @@ const NEXT_VERSION = '0.68.1';
     });
   }
   // the home tiles: one compact tile per feature; each opens its own sheet
-  function homeTiles() {
+  function homeTiles(mode) {
     let t = [], s = SV.survivor, hr = hordeRes();
     if (hr) t.push({ k: 'horde', c: hr[1].hold ? '#93a86c' : '#ff6b5a', n: 'Horde night', sub: hr[1].hold ? 'Your base held!' : 'The horde got in', hot: 'See' });
     if (DM.Boss) {
@@ -1584,10 +1712,10 @@ const NEXT_VERSION = '0.68.1';
     t = t.filter(x => unl(x.k));   // 0.45: new players get these one by one
     // 0.66 (owner: "there's soooo many things on the UI ... it's too jumbled"): only tiles that need you stay on the
     // home screen (a badge: Go, New, Fight, On...); the rest fold into one "All activities" button (remembered per phone).
-    const tileH = x => `<button class="tile" data-tile="${x.k}" style="--tc:${x.c}"><span class="tn">${esc(x.n)}</span><span class="ts">${esc(x.sub)}</span>${x.bar != null ? `<i class="tbar"><i style="width:${Math.max(0, Math.min(100, x.bar))}%"></i></i>` : ''}${x.hot ? `<b class="thot">${esc(x.hot)}</b>` : ''}</button>`, pinned = t.filter(x => x.hot).slice(0, 6), rest = t.filter(x => !pinned.includes(x));
-    let more = false; try { more = localStorage.getItem('dm-next-tiles') === '1'; } catch (e) { /* ignore */ }
-    return `<div class="hsect"><span class="kick">This week</span></div>${ev}${pinned.length ? `<div class="tiles">${pinned.map(tileH).join('')}</div>` : '<p class="tquiet">Nothing needs you right now.</p>'}`
-      + (rest.length ? `<button class="tilemore" id="tileMore">${more ? 'Show less' : `All activities <i>${rest.length}</i>`}<span>${more ? '▴' : '▾'}</span></button>${more ? `<div class="tiles">${rest.map(tileH).join('')}</div>` : ''}` : '');
+    const tileH = x => `<button class="tile" data-tile="${x.k}" style="--tc:${x.c}"><span class="tn">${esc(x.n)}</span><span class="ts">${esc(x.sub)}</span>${x.bar != null ? `<i class="tbar"><i style="width:${Math.max(0, Math.min(100, x.bar))}%"></i></i>` : ''}${x.hot ? `<b class="thot">${esc(x.hot)}</b>` : ''}</button>`, pinned = t.filter(x => x.hot);
+    // 0.69 (owner: "can't find things", "too much at once"): Home shows the 3 things that need you most; Me holds every activity
+    if (mode === 'today') return `<div class="hsect"><span class="kick">Today</span>${pinned.length > 3 ? `<small class="hmore" id="hMore">+${pinned.length - 3} more in Me ›</small>` : ''}</div>${pinned.length ? `<div class="tiles today">${pinned.slice(0, 3).map(tileH).join('')}</div>` : '<p class="tquiet">Nothing needs you right now. Go for a walk!</p>'}${ev ? `<div class="hevent">${ev}</div>` : ''}`;
+    return `<div class="hsect"><span class="kick">Everything to do</span></div><div class="tiles all">${t.map(tileH).join('')}</div>`;
   }
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
@@ -1632,7 +1760,8 @@ const NEXT_VERSION = '0.68.1';
     const tm = $('#tileMore'); if (tm) tm.onclick = () => { SFX.play('ui'); try { localStorage.setItem('dm-next-tiles', localStorage.getItem('dm-next-tiles') === '1' ? '0' : '1'); } catch (e) { /* ignore */ } renderHome(); };   // 0.66
     document.querySelectorAll('[data-tile]').forEach(x => x.onclick = () => {
       SFX.play('ui'); const k = x.dataset.tile;
-      if (k === 'garden') goBase();
+      if (k === 'firsthouse') goView('loot');   // 0.69
+      else if (k === 'garden') goBase();
       else if (k === 'horde') openCardSheet('horde');
       else if (k === 'journal') DM.Journal.open();   // 0.50
       else if (k === 'daily') { tab('houses'); const c = $('#dlyCard'); if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 1400); } }

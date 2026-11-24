@@ -1423,3 +1423,20 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   can't go through the instant friend gift (item.nogift). Walk a spare copy instead (never your last; one at a time):
   it leaves the binder at once and is sent through next_gift_send as 'fcard_<id>' after 5,000 / 10,000 / 20,000 /
   40,000 steps (c/r/e/l); "Turn back" returns it. The recipient's tick files fcard_ items into their binder.
+
+## Done in 0.69 - the UI revamp (owner: "the UI is insane and just very difficult to navigate"; can't find things, too
+## much at once; picked "Grape & amber" from the glow samples in mockups/ui/glow.html, "make my character animated, same
+## thing if we have a pet", then all three touches)
+- Five tabs in a bottom bar that is always there (game.js navHTML / goView, HV): Home (walking scene + at most 3 "Today"
+  tiles + the guide + event), Loot (the Houses pane: Dot, route, daily, houses), Map (opens map.js), Bag (Gear +
+  Workbench sub-tabs) and Me (character card, bars, skills, wardrobe, radio feed, every activity tile, and the Walks /
+  Capsules / Event sub-tabs). Nothing was removed: every old element still renders in one of the views (data-hv), so all
+  the old bindings and the tour still find their buttons. tab(t) also switches the view (viewOf). Badges: Loot = new
+  houses, Bag = a better weapon, Me = skill points / new cosmetics / walk rewards.
+- Home's step card (typed steps, sync) folds behind "Log steps" on the scene (Game.openStepLog).
+- The walking scene (heroDraw): her real rig walks down a scrolling block with the active pet. Faster the more steps
+  today (standing still under 100), waves with a "Hi!" when the app opens / comes back / is tapped, and the pet sits
+  with a "…?" until she has walked. Stops drawing when Home is not showing or the app is hidden.
+- theme.css (loaded after the inline styles): glowing outlined cards, amber buttons, the Outfit font (fonts/, OFL).
+- tour.js steps carry the view they live in (v) and open it before pointing; Houses/Gear/Map steps point at the bottom bar.
+- A new player's Home shows "Your first house · Go" (opens Loot).
