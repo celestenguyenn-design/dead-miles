@@ -1416,3 +1416,10 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   (meleeMul, hpBonus, staBonus, searchMul, extraFind, rareBonus, stepNoise, drainMul, walkFindMax), Codex.dmgVs (per
   zombie kind), Crew.petMaxHp and Trades.gain('craft'). Card luck = chance of a 4th card per pack.
 - Save: SV.cards. Ideas not built yet: gifting duplicates to friends, comparing binders, new monthly sets.
+- 0.68.1 (owner: "the card drops should be very low"; "I don't want to be able to gift, make it difficult ... we have to
+  walk to gift it"): one walking pack a day at 10,000 steps; loot pack weights cut ~5x and only in safes, attics, locked
+  rooms, horde crates, caches, deep runs, desks/registers (tiny); kills drop a card 0.3% (special 0.8%, raider 0.6%);
+  bosses drop a pack 30%; Dot sells one (120 caps, trader level 2+, 30% of days); dust pack 300. Card packs and cards
+  can't go through the instant friend gift (item.nogift). Walk a spare copy instead (never your last; one at a time):
+  it leaves the binder at once and is sent through next_gift_send as 'fcard_<id>' after 5,000 / 10,000 / 20,000 /
+  40,000 steps (c/r/e/l); "Turn back" returns it. The recipient's tick files fcard_ items into their binder.

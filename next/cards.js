@@ -25,8 +25,15 @@ window.DM = window.DM || {};
   const RAR = ['c', 'r', 'e', 'l'], RN = { c: 'Common', r: 'Rare', e: 'Epic', l: 'Legendary' }, RCOL = { c: '#9d90bf', r: '#5fa8e8', e: '#b98cf0', l: '#e0b94a' };
   const RW = { c: 60, r: 28, e: 10, l: 2 };              // pull odds
   const STAR_AT = [1, 3, 6, 11, 19];                     // copies for ★1..★5
-  const DUST = { c: 5, r: 15, e: 40, l: 100 }, CRAFT = { c: 60, r: 180, e: 480, l: 1200 }, PACK_DUST = 120;
-  const FOIL = 1 / 30, WALK_STEP = 2500, WALK_MAX = 3, SET_CAPS = 150, SET_TOK = 2;
+  const DUST = { c: 5, r: 15, e: 40, l: 100 }, CRAFT = { c: 60, r: 180, e: 480, l: 1200 }, PACK_DUST = 300;
+  const FOIL = 1 / 30, WALK_STEP = 10000, WALK_MAX = 1, SET_CAPS = 150, SET_TOK = 2;
+  // 0.68.1 (owner: "the card drops should be very low"): one walking pack a day at 10,000 steps, loot packs rare, single
+  // cards off zombies very rare, bosses drop a pack 30% of the time
+  const KILL_CH = { base: .003, special: .008, raider: .006 }, BOSS_CH = .3;
+  // 0.68.1 (owner: "I don't want to be able to gift, make it difficult ... we have to walk to gift it"): no instant gifts.
+  // A spare copy (never your last) can be WALKED to one friend: it leaves your binder, and only arrives once you have
+  // walked this many steps. One card on the road at a time.
+  const GIFT_STEPS = { c: 5000, r: 10000, e: 20000, l: 40000 };
   // perk: [label, base value by rarity c/r/e/l, format]
   const PERK = {
     melee: ['damage', [.03, .05, .08, .12], v => `+${pc(v)} damage`],
@@ -209,16 +216,18 @@ window.DM = window.DM || {};
   // ---------------------------------------------------------------- sources
   // items: a sealed pack found while looting files itself into your packs at home
   D.ITEMS.cardpack = { n: 'Card pack', i: 'cardpack', rare: 1, tag: '3 field cards · opens at home' };
-  D.VALUE.cardpack = 10; D.STACK.cardpack = 10;
+  D.VALUE.cardpack = 10; D.STACK.cardpack = 10; D.ITEMS.cardpack.nogift = 1;   // 0.68.1: never an instant gift
+  // a card a friend walked over: arrives as an item through the gift inbox and files itself into the binder
+  for (const k of CARDS) { D.ITEMS['fcard_' + k.id] = { n: 'Field card: ' + k.n, i: 'cardpack', rare: 1, nogift: 1, tag: 'a field card from a friend · files itself at home' }; D.VALUE['fcard_' + k.id] = 0; }
   const S0 = '#11142f';
   if (typeof ART !== 'undefined' && ART.addIcons) ART.addIcons({
     cardpack: `<g transform="rotate(-8)"><rect x="-19" y="-27" width="38" height="54" rx="4" fill="#3d2d61" stroke="${S0}" stroke-width="2.8"/><path d="M-19,-19 h38 M-19,19 h38" stroke="${S0}" stroke-width="2"/>
       <path d="M-19,-27 l4,-3 4,3 4,-3 4,3 4,-3 4,3 4,-3 4,3 4,-3 3,3" fill="none" stroke="${S0}" stroke-width="2"/><circle cx="0" cy="0" r="11" fill="#f07aa8" stroke="${S0}" stroke-width="2.2"/>
       <path d="M-5,-5 h7 a5,5 0 0 1 0,10 h-7 z" fill="#f6e3bb" stroke="${S0}" stroke-width="1.6"/><path d="M-14,-23 l28,0" stroke="#e0b94a" stroke-width="2.4"/></g>`,
   });
-  for (const [t, w] of [['desk', .12], ['books', .12], ['night', .08], ['register', .2], ['store', .12], ['safe', .5], ['attic', .4], ['lockedroom', .5], ['hordecrate', .8], ['hordecrate_bf', 1.2], ['giftbox', .6], ['cache', .4], ['deep1', .3], ['deep2', .5], ['deep3', .7], ['filing', .1]])
+  for (const [t, w] of [['desk', .02], ['books', .02], ['register', .03], ['safe', .1], ['attic', .08], ['lockedroom', .1], ['hordecrate', .15], ['hordecrate_bf', .25], ['giftbox', .1], ['cache', .08], ['deep2', .1], ['deep3', .15]])
     if (D.LOOT[t]) D.LOOT[t][1].cardpack = (D.LOOT[t][1].cardpack || 0) + w;
-  if (D.SHOP) D.SHOP.push(['cardpack', 1, 45, 1, .95], ['cardpack', 1, 45, 3, .6]);
+  if (D.SHOP) D.SHOP.push(['cardpack', 1, 120, 2, .3]);
   // walking: a pack every 2,500 steps (3 a day); loot packs file themselves (called when the home screen draws)
   CD.tick = function () {
     const v = SV(), c = st(); if (!v || !c || !v.survivor || DM.scene) return;
@@ -227,8 +236,37 @@ window.DM = window.DM || {};
     while (w - c.mark >= WALK_STEP) { c.mark += WALK_STEP; if (c.dayPacks < WALK_MAX) { c.dayPacks++; got++; } }
     const s = v.survivor; let filed = 0;
     for (const list of [s.pack, s.stash]) for (let j = list.length - 1; j >= 0; j--) if (list[j].k === 'cardpack') { filed += list[j].n; list.splice(j, 1); }
+    for (const list of [s.pack, s.stash]) for (let j = list.length - 1; j >= 0; j--) { const e = list[j]; if (!e.k.startsWith('fcard_') || !BY[e.k.slice(6)]) continue;
+      for (let i = 0; i < e.n; i++) { const k = BY[e.k.slice(6)], r = add(k.id, false); setTimeout(() => toast(`🎁 A friend walked a card all the way to you: ${k.n}${r && r.isNew ? ' (new!)' : r && r.up ? ` (★${r.up}!)` : ''}`, 3.4), 600); }
+      list.splice(j, 1); G().save(); }
+    sendTick(v, c);
     if (got || filed) { c.packs += got + filed; G().save(); toast(`🃏 ${got ? `Your walk turned up ${got} card pack${got > 1 ? 's' : ''}` : ''}${got && filed ? ' · ' : ''}${filed ? `${filed} pack${filed > 1 ? 's' : ''} from looting` : ''} - open them in Field cards`, 3); }
   };
+  // ---------------------------------------------------------------- walking a card to a friend
+  const NET0 = () => window.NET;
+  CD.canGift = () => !!(DM.Gifts && DM.Gifts.can());
+  CD.giftSteps = id => GIFT_STEPS[BY[id].r];
+  CD.startGift = function (id, to, toName) {
+    const c = st(), o = c && c.own[id], v = SV(); if (!o || o.n < 2 || c.send || !to) return false;
+    o.n--; c.send = { id, to, name: toName || to, need: GIFT_STEPS[BY[id].r], start: v.walked || 0, at: Date.now() };
+    if (DM.Journal) DM.Journal.note(`Set out to walk a ${BY[id].n} card to ${toName || to}.`);
+    G().save(); return true;
+  };
+  CD.cancelGift = function () { const c = st(); if (!c || !c.send) return; const o = c.own[c.send.id]; if (o) o.n = Math.min(STAR_AT[4], o.n + 1); c.send = null; G().save(); };
+  CD.sendLeft = () => { const c = st(), v = SV(); return c && c.send ? Math.max(0, c.send.need - ((v.walked || 0) - c.send.start)) : 0; };
+  let sending = false;
+  async function sendTick(v, c) {
+    const g = c.send; if (!g || sending || CD.sendLeft() > 0) return;
+    if (g.try && Date.now() - g.try < 60e3) return;
+    const n = NET0(); if (!n || !n.ok || !n.handle) return;
+    sending = true; g.try = Date.now();
+    try {
+      const r = await n.rpc('next_gift_send', { p_handle: n.handle, p_token: n.token, p_to: g.to, p_items: [{ k: 'fcard_' + g.id, n: 1 }], p_note: 'Walked this card all the way over.' });
+      if (r && r.ok) { c.send = null; G().save(); toast(`🚶🎁 You walked ${BY[g.id].n} all the way to ${g.name}. Delivered!`, 3.4); if (DM.Journal) DM.Journal.note(`Walked a ${BY[g.id].n} card to ${g.name}.`); sfx('pick'); }
+      else if (r && (r.error === 'nobody' || r.error === 'to')) { CD.cancelGift(); toast(`Couldn't find ${g.name} - the card came back to your binder`, 3); }
+    } catch (e) { /* offline: try again later */ }
+    sending = false;
+  }
   // kills: now and then a card falls out of a pocket; bosses always drop a pack
   if (DM.Game && DM.Game.onKill) {
     const k0 = DM.Game.onKill;
@@ -237,8 +275,8 @@ window.DM = window.DM || {};
       try {
         if (!st() || !z) return;
         const boss = z.boss || z.kind === 'wboss' || (DM.Events && DM.Events.isBoss && DM.Events.isBoss(z));
-        if (boss) { givePacks(1, 'The boss dropped a card pack!'); return; }
-        const ch = z.raider ? .03 : z.special ? .04 : .015;
+        if (boss) { if (Math.random() < BOSS_CH) givePacks(1, 'The boss dropped a card pack!'); return; }
+        const ch = z.raider ? KILL_CH.raider : z.special ? KILL_CH.special : KILL_CH.base;
         if (Math.random() < ch) { const k = pickCard(); const r = add(k.id, Math.random() < FOIL); G().save(); toast(`🃏 A card fell out of its pocket: ${r.foil ? '✨ foil ' : ''}${k.n}${r.isNew ? ' (new!)' : r.up ? ` (★${r.up}!)` : ''}`, 2.8); sfx('pick'); }
       } catch (e) { /* never break a fight */ }
     };
@@ -341,7 +379,7 @@ window.DM = window.DM || {};
   CD.reset = () => { view = { set: view.set, sel: null }; };
   CD.tile = function () {
     const c = st(); if (!c) return null; const u = uniq();
-    return { k: 'cards', c: '#f07aa8', n: 'Field cards', sub: `${u}/${CARDS.length} cards${c.packs ? ` · ${c.packs} pack${c.packs > 1 ? 's' : ''} to open` : ' · a pack every 2,500 steps'}`, hot: c.packs ? 'Open' : c.fresh.length ? 'New' : '' };
+    return { k: 'cards', c: '#f07aa8', n: 'Field cards', sub: `${u}/${CARDS.length} cards${c.packs ? ` · ${c.packs} pack${c.packs > 1 ? 's' : ''} to open` : c.send ? ' · a card on the road' : ` · a pack at ${WALK_STEP.toLocaleString('en-US')} steps`}`, hot: c.packs ? 'Open' : c.fresh.length ? 'New' : '' };
   };
   const stars = (s, big) => `<span class="fcst${big ? ' big' : ''}">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= s ? 'on' : ''}">★</i>`).join('')}</span>`;
   function cardHTML(k, o, opt = {}) {
@@ -358,7 +396,8 @@ window.DM = window.DM || {};
     const deck = Array.from({ length: sl }, (_, i) => { const id = c.deck[i], k = BY[id]; return k ? `<div class="fcslot">${cardHTML(k, c.own[id], { inDeck: 1 })}<small>${esc(perkText(k, CD.star(id)))}</small></div>` : '<div class="fcslot empty"><span>+</span><small>Empty slot</small></div>'; }).join('');
     const sets = Object.keys(SETS), list = CARDS.filter(k => view.set === 'all' || k.set === view.set);
     return `<div class="kick">Field cards · ${u}/${CARDS.length}${c.dust ? ` · ✨ ${c.dust} dust` : ''}</div><h3>Your binder</h3>
-      ${c.packs ? `<button class="mbtn big fcopen" id="fcOpen">🃏 Open a card pack <i>${c.packs}</i></button>` : `<p class="mp dim">Next pack in ${Math.max(0, WALK_STEP - ((SV().walked || 0) - c.mark)).toLocaleString('en-US')} steps${c.dayPacks >= WALK_MAX ? ' (tomorrow - 3 walking packs a day)' : ''}. Packs also turn up in desks, registers, safes, attics and horde crates, every boss drops one, and Dot sells them.</p>`}
+      ${c.packs ? `<button class="mbtn big fcopen" id="fcOpen">🃏 Open a card pack <i>${c.packs}</i></button>` : `<p class="mp dim">${c.dayPacks >= WALK_MAX ? 'You walked today\'s pack out of the city - the next one comes tomorrow' : `Next pack in ${Math.max(0, WALK_STEP - ((SV().walked || 0) - c.mark)).toLocaleString('en-US')} steps (one a day)`}. Packs are rare: once in a while in a safe, attic, locked room or horde crate, sometimes from a boss, and Dot has one now and then.</p>`}
+      ${c.send ? (() => { const g = c.send, left = CD.sendLeft(), pct = Math.round((1 - left / g.need) * 100); return `<div class="fcroad"><b>🚶 Walking ${esc(BY[g.id].n)} to ${esc(g.name)}</b><i class="cbar"><i style="width:${pct}%"></i></i><span>${left ? `${left.toLocaleString('en-US')} steps to go` : 'Arrived - handing it over when you are online'}</span><button class="linkbtn" id="fcCancel">Turn back (the card comes home)</button></div>`; })() : ''}
       <div class="kick sect">Your deck · ${c.deck.length}/${sl} ${sl < 5 ? `<span class="dim">(${u >= 20 ? 'slot 5 at 40 cards' : 'slot 4 at 20 cards'})</span>` : ''}</div>
       <div class="fcdeck">${deck}</div><p class="mp dim fchint">Deck perks work everywhere: in houses, on walks and at the base. Tap a card to equip or swap it. Duplicates raise its ★.</p>
       <div class="catf fcsets"><button class="chip${view.set === 'all' ? ' on' : ''}" data-fs="all">All</button>${sets.map(s => { const all = CARDS.filter(k => k.set === s), n = all.filter(k => c.own[k.id]).length; return `<button class="chip${view.set === s ? ' on' : ''}${c.done[s] ? ' done' : ''}" data-fs="${s}">${SETS[s].g} ${esc(SETS[s].n)} ${n}/${all.length}</button>`; }).join('')}</div>
@@ -379,6 +418,8 @@ window.DM = window.DM || {};
       ${got ? (inDeck ? '<button class="mbtn big ghost" id="fcOut">Take out of the deck</button>' : `<button class="mbtn big" id="fcIn">${c.deck.length < CD.slots() ? 'Put in the deck' : 'Swap into the deck'}</button>`)
         : `<button class="mbtn big${c.dust >= cost ? '' : ' ghost'}" id="fcCraft"${c.dust >= cost ? '' : ' disabled'}>Craft with dust · ✨ ${cost}${c.dust < cost ? ` (you have ${c.dust})` : ''}</button>`}
       <div id="fcSwap"></div>
+      ${got ? (c.send ? `<p class="mp dim">🚶 You are already walking a card to someone. One at a time.</p>` : o.n < 2 ? `<p class="mp dim">🚶 Get a spare copy to walk one to a friend - your last copy never leaves.</p>`
+        : CD.canGift() ? `<button class="mbtn ghost" id="fcGift">🚶 Walk a spare copy to a friend · ${GIFT_STEPS[k.r].toLocaleString('en-US')} steps</button><div id="fcGiftPick"></div>` : '<p class="mp dim">🚶 Sign in (Settings > Account & friends) to walk spare cards to friends.</p>') : ''}
       <button class="mbtn ghost" id="fcBack">Back to the binder</button>`;
   }
   function paintAll(root) { root.querySelectorAll('canvas[data-art]').forEach(cv => paintArt(cv, BY[cv.dataset.art])); }
@@ -397,6 +438,24 @@ window.DM = window.DM || {};
       if (c.deck.length < CD.slots()) { c.deck.push(view.sel); G().save(); sfx('pick'); toast(`${BY[view.sel].n} is in your deck`, 1.6); go(); return; }
       $('#fcSwap').innerHTML = `<div class="kick sect">Swap it for</div><div class="fcswap">${c.deck.map(id => `<button class="mbtn sm ghost" data-sw="${id}">${esc(BY[id].n)} · ${esc(perkText(BY[id], CD.star(id)))}</button>`).join('')}</div>`;
       w.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => { const i = c.deck.indexOf(b.dataset.sw); if (i >= 0) c.deck[i] = view.sel; G().save(); sfx('pick'); toast(`${BY[view.sel].n} is in your deck`, 1.6); go(); });
+    };
+    if ($('#fcCancel')) $('#fcCancel').onclick = () => { const g = c.send; CD.cancelGift(); sfx('ui'); toast(`You turned back. ${BY[g.id].n} is in your binder again.`, 2.4); go(); };
+    if ($('#fcGift')) $('#fcGift').onclick = () => {
+      const n = NET0(), k = BY[view.sel], o = c.own[view.sel], s0 = starOf(o.n), s1 = starOf(o.n - 1);
+      const friends = ((n && n.boardRows) || []).filter(r => r.handle !== n.handle).slice(0, 20);
+      let to = '', name = '';
+      $('#fcGiftPick').innerHTML = `<div class="kick sect">Who gets it?</div><div class="chips" id="fgTo">${friends.map(r => `<button class="chip" data-h="${esc(r.handle)}" data-nm="${esc(r.name || r.handle)}">${esc(r.name || r.handle)}</button>`).join('') || '<span class="mp dim">No friends on the board yet - type a handle.</span>'}</div>
+        <input id="fgHandle" placeholder="or type their handle" maxlength="24" autocapitalize="off" autocorrect="off" spellcheck="false" style="display:block;width:100%;box-sizing:border-box;margin:6px 0 8px;height:42px;border-radius:12px;border:2.5px solid #3d2d61;background:#11142f;color:#f6e3bb;padding:0 12px;font:700 15px Inter,system-ui,sans-serif">
+        <p class="mp dim">The copy leaves your binder now${s1 < s0 ? ` (this card drops to ★${s1})` : ''} and is delivered after you walk <b>${GIFT_STEPS[k.r].toLocaleString('en-US')} steps</b>. Turn back any time and it comes home.</p>
+        <button class="mbtn" id="fgGo">Start walking</button>`;
+      w.querySelectorAll('#fgTo [data-h]').forEach(b => b.onclick = () => { to = b.dataset.h; name = b.dataset.nm; w.querySelectorAll('#fgTo .chip').forEach(x => x.classList.toggle('on', x === b)); });
+      $('#fgGo').onclick = () => {
+        const typed = ($('#fgHandle').value || '').trim().toLowerCase().replace(/^@/, ''), h = typed || to;
+        if (!h) return toast('Pick a friend or type a handle', 1.6);
+        if (n && h === n.handle) return toast('Pick someone else', 1.6);
+        if (!CD.startGift(view.sel, h, typed ? typed : name)) return toast('Could not start - try again', 1.6);
+        sfx('pick'); toast(`🚶 You set off with ${k.n} for ${typed || name}. ${GIFT_STEPS[k.r].toLocaleString('en-US')} steps to go.`, 3); view.sel = null; go();
+      };
     };
     if ($('#fcCraft')) $('#fcCraft').onclick = () => { const k = BY[view.sel], cost = CRAFT[k.r]; if (c.dust < cost) return; c.dust -= cost; add(k.id, false); G().save(); sfx('pick'); toast(`Crafted ${k.n}!`, 1.8); go(); };
   };
@@ -447,6 +506,7 @@ window.DM = window.DM || {};
     .fcrows { display: grid; gap: 4px; margin: 8px 0; } .fcrow { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 9px; background: rgba(17,20,47,.6); font-size: 12px; font-weight: 800; }
     .fcrow b { color: #ffd27a; } .fcrow em { font-style: normal; font-size: 10px; color: #9d90bf; } .fcrow.on { outline: 2px solid #ffd27a; } .fcrow.dim span { opacity: .6; }
     .fcswap { display: grid; gap: 6px; margin-bottom: 8px; }
+    .fcroad { display: grid; gap: 4px; margin: 8px 0; padding: 10px; border-radius: 12px; background: rgba(17,20,47,.65); border: 2px solid #7fd9c8; } .fcroad b { font-size: 13px; } .fcroad span { font-size: 11px; font-weight: 800; color: #9d90bf; } .fcroad .cbar i { background: #7fd9c8; }
     #fcPack { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: rgba(8,6,22,.95); backdrop-filter: blur(4px); opacity: 0; transition: opacity .25s; padding: 16px; }
     #fcPack.on { opacity: 1; } .fcpk { width: 100%; max-width: 440px; text-align: center; } .fcpk h3 { margin: 2px 0 12px; }
     .fcflip { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 14px; }
