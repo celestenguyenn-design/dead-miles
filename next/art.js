@@ -11,8 +11,8 @@ const ART = (() => {
   };
   // The wob filter region is relative to each element's bbox by default; give it a fixed
   // user-space region so separately rendered parts keep identical wobble and are not clipped.
-  const DEFS = S.defs.replace(/<filter id="wob"[^>]*>/, '<filter id="wob" filterUnits="userSpaceOnUse" x="-140" y="-290" width="320" height="340">');
-  const VB = { x: -82, y: -266, w: 172, h: 274 };   // tall enough for bunny ears and the pilgrim hat
+  const DEFS = S.defs.replace(/<filter id="wob"[^>]*>/, '<filter id="wob" filterUnits="userSpaceOnUse" x="-140" y="-330" width="320" height="380">');
+  const VB = { x: -82, y: -300, w: 172, h: 308 };   // 0.71: taller for the bigger chibi heads (was y -266, h 274)   // tall enough for bunny ears and the pilgrim hat
 
   // ---------- character rigs ----------
   // Line ranges refer to the colour half of the generated SVG; the cream outline half has the
@@ -42,6 +42,10 @@ const ART = (() => {
       skip: [],
     },
   };
+  // 0.71 (owner: soft kawaii chibi style - "restyle the in-house characters to match, for free"): bigger heads and eyes,
+  // warm brown lines instead of the ink blue-black. Applied when a rig is built, on top of whatever look was chosen
+  // (head size and eye style stay the player's own choice; this multiplies them).
+  const CHIBI = { head: 1.15, eyes: 1.25, line: '#4a2e2a', dark: '#221a1e', zHead: 1.15, lineW: .68 };
   function rng(a, b) { const r = []; for (let i = a; i <= b; i++) r.push(i); return r; }
 
   function svgURL(body, vb, w, h) {
@@ -61,6 +65,11 @@ const ART = (() => {
     const R = RIGS[key];
     const L = R.src.split('\n');
     if (patch) patch(L);
+    if (key === 'survivor') {
+      const hi = L.findIndex(l => /translate\(2 -122\) scale\([\d.]+\)/.test(l));
+      if (hi > 0) L[hi] = L[hi].replace(/scale\(([\d.]+)\)/, (m, v) => `scale(${(+v * CHIBI.head).toFixed(3)})`);
+      if (L[97] != null && L[100] != null) { L[97] = `<g transform="translate(12.7 -139) scale(${CHIBI.eyes}) translate(-12.7 139)">` + L[97]; L[100] = L[100] + '</g>'; }
+    }
     const mid = L.findIndex(l => l.includes('</g></g><g><g class='));
     const colourLines = rng(mid + 1, L.length - 1).filter(i => !/^\s*<\/g><\/g><\/g>\s*$/.test(L[i]));
     const used = new Set(R.skip);
@@ -73,6 +82,8 @@ const ART = (() => {
       let colour = lines.map(i => L[i]).join('\n');
       colour = colour.replace(/<\/g><\/g><\/g>\s*$/, '');
       if (recolor) for (const a in recolor) colour = colour.split(a).join(recolor[a]);
+      colour = colour.split('stroke="#11142f"').join(`stroke="${CHIBI.line}"`).split('fill="#11142f"').join(`fill="${CHIBI.dark}"`);   // 0.71 warm lines
+      colour = colour.replace(/stroke-width="([\d.]+)"/g, (m, w) => `stroke-width="${(+w * CHIBI.lineW).toFixed(2)}"`);   // 0.71 thinner lines
       // cream sticker copy: same shapes, every non-none fill/stroke turned cream
       let outline = colour.replace(/(fill|stroke)="(?!none)[^"]*"/g, '$1="#f6e3bb"');
       // the last colour line may carry the closing tags of the whole group
@@ -86,6 +97,7 @@ const ART = (() => {
       out.parts[idx] = { name: p.name, pivot: p.pivot, o, c: toCanvas(ic, W, H), r: red };
     }));
     out.byName = {}; out.parts.forEach(p => out.byName[p.name] = p);
+    if (key === 'zombie') out.headScale = CHIBI.zHead;
     rigs[as || key] = out;
     return out;
   }
@@ -109,6 +121,7 @@ const ART = (() => {
           if (t.dx || t.dy) ctx.translate(t.dx || 0, t.dy || 0);
           if (t.r) { ctx.translate(p.pivot[0], p.pivot[1]); ctx.rotate(t.r); ctx.translate(-p.pivot[0], -p.pivot[1]); }
         }
+        if (p.name === 'head' && rig.headScale) { ctx.translate(p.pivot[0], p.pivot[1]); ctx.scale(rig.headScale, rig.headScale); ctx.translate(-p.pivot[0], -p.pivot[1]); }
         if (alphaMul != null) ctx.globalAlpha *= alphaMul;
         if (p.name === 'bat' && pose.weapon && pose.weapon !== 'bat') { if (layer === 'c' && WEAPON_ART[pose.weapon]) WEAPON_ART[pose.weapon](ctx); ctx.restore(); continue; }
         ctx.drawImage(p[layer], VB.x, VB.y, VB.w, VB.h);
@@ -120,6 +133,7 @@ const ART = (() => {
     if (pose.over) { // something worn on the head (the Krampus walker's Santa hat): drawn in rig coordinates, follows the head
       const hp = rig.parts.find(p => p.name === 'head'), t = pp.head; ctx.save();
       if (hp && t && t.r) { ctx.translate(hp.pivot[0], hp.pivot[1]); ctx.rotate(t.r); ctx.translate(-hp.pivot[0], -hp.pivot[1]); }
+      if (hp && rig.headScale) { ctx.translate(hp.pivot[0], hp.pivot[1]); ctx.scale(rig.headScale, rig.headScale); ctx.translate(-hp.pivot[0], -hp.pivot[1]); }
       pose.over(ctx); ctx.restore();
     }
     if (pose.flash > 0) pass(pose.flashRed ? 'r' : 'o', pose.flash);

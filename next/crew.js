@@ -182,7 +182,7 @@
   // ---------------------------------------------------------------- pet art (Style B: ink outline, flat fills, a bit roughed up)
   function drawPet(c, pet, x, y, o = {}) {
     const K = COATS[pet.kind][pet.coat] || COATS[pet.kind][0], dog = pet.kind === 'dog', t = o.t || 0, mv = o.move || 0;
-    const sw = Math.sin((o.ph || 0) * 2) * mv, INK = P.INK;
+    const sw = Math.sin((o.ph || 0) * 2) * mv, INK = '#4a2e2a';   // 0.71: warm chibi lines, like the people
     c.save(); c.translate(x, y); c.scale((o.flip ? -1 : 1) * (o.sc || 1), o.sc || 1); c.lineJoin = 'round'; c.lineCap = 'round';
     if (o.alpha != null) c.globalAlpha *= o.alpha;
     if (!o.peek) { c.fillStyle = 'rgba(8,6,22,.38)'; c.beginPath(); c.ellipse(0, 0, dog ? 20 : 16, 5, 0, 0, 6.28); c.fill(); }
