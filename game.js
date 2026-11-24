@@ -1,6 +1,6 @@
 /* Dead Miles. One file of game logic; art lives in art.js. */
 /* ================= utils ================= */
-const VERSION='7.71';
+const VERSION='7.72';
 const $=(s)=>document.querySelector(s);
 const rnd=(a,b)=>a+Math.random()*(b-a);const rint=(a,b)=>Math.floor(rnd(a,b+1));
 const pick=(a)=>a[Math.floor(Math.random()*a.length)];const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -2545,7 +2545,8 @@ function checkMilestones(){
 const AWAY_MIN_MS=3600000, AWAY_WINDOW_MS=5*60000, AWAY_LOOT=0.7, AWAY_FLOOR=0.2;
 let AWAY_UNTIL=0;
 function awayArm(awayMs){if(awayMs>=AWAY_MIN_MS)AWAY_UNTIL=Date.now()+AWAY_WINDOW_MS;}
-function awayMode(){return Date.now()<AWAY_UNTIL&&!C&&!S.combat;}
+// v7.72: no crew able to go (all down, out on a job or resting) = nobody to search for her; steps bank at the door as before
+function awayMode(){return Date.now()<AWAY_UNTIL&&!C&&!S.combat&&activeCrew().length>0;}
 function awayCanResolve(loc){if(loc&&loc.quest)return false;return !!loc&&!loc.geo&&!loc.stronghold&&!loc.rival&&!loc.landmark&&!loc.boss;}
 function awayRep(){if(!S.awayRep)S.awayRep={at:Date.now(),steps:0,places:0,skipped:0,kills:0,dmg:0,heal:0,items:[],lines:[],waiting:''};return S.awayRep;}
 // A fight as an estimate: average damage each side, hit rates, crew roles, your armour.
@@ -5925,6 +5926,8 @@ function renderParty(){
 // Newest first. Every player sees the entries they have not read yet, once,
 // the next time they open the game. Nobody has to be told anything by hand.
 const NEWS=[
+ {v:'7.72',d:'Nov 24',t:'A dead crew cannot loot for you',
+  i:['When you came back after an hour away, your crew cleared and searched houses on the road for you - even when every one of them was down. Now the crew only goes in if someone with you can stand. If they are all down, out on a job or on a day off, your steps wait at the door like before until you search it yourself.']},
  {v:'7.71',d:'Sep 29',t:'Stronghold rooms say why they are locked',
   i:['In a raider stronghold the Loot pile and the Boss trailer are locked until you have pushed through the stage before them - but they just sat there grey and did nothing when tapped, which looked broken. Now they show a lock, say which stage opens them, and tapping one tells you what to push to first.']},
  {v:'7.70',d:'Sep 28',t:'No more difficulty setting',
