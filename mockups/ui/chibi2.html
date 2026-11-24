@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Dead Miles - chibi samples v2</title>
+<style>
+  @font-face { font-family: Out; src: url(fonts/Outfit-Regular.ttf); font-weight: 400; }
+  @font-face { font-family: Out; src: url(fonts/Outfit-Bold.ttf); font-weight: 800; }
+  body { margin: 0; background: #fffaf4; font-family: Out, sans-serif; color: #5a3a2e; }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 24px 30px 40px; }
+  h2 { margin: 18px 0 4px; font: 800 22px Out; color: #8a5a44; } p.s { margin: 0 0 10px; color: #a07a66; font-size: 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+  .fig { text-align: center; } .fig svg { width: 220px; height: 308px; display: block; } .fig b { font: 800 15px Out; }
+  .arrow { font: 800 26px Out; color: #d9a07a; align-self: center; margin: 0 4px; }
+</style></head><body><div class="wrap">
+<h2>Dead Miles cast · soft chibi</h2><p class="s">Thin brown lines, big soft faces with the eyes low, big glossy eyes, long flowing hair in locks, muted pastels, tiny bodies.</p>
+<div class="row" id="cast"></div>
+<h2>Getting hurt: the wince</h2><p class="s">Squash, eyes squeezed shut, sweat drop, "ow!", then bounce back.</p>
+<div class="row" id="wince"></div>
+</div>
+<script>
+const L = '#4a3026', LW = 1.9;
+let uid = 0;
+const p = (d, f, w = LW, x = '') => `<path d="${d}" fill="${f}" stroke="${L}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${x}/>`;
+const ln = (d, c = L, w = LW, x = '') => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round" ${x}/>`;
+const el = (cx, cy, rx, ry, f, w = LW, x = '') => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${f}" stroke="${w ? L : 'none'}" stroke-width="${w}" ${x}/>`;
+
+// hair shapes (front bangs made of pointed locks; long side locks; the back mass)
+const HAIR_BACK_LONG = 'M100 30 C152 30 172 68 170 112 C168 150 164 182 174 212 C164 222 150 218 142 206 C140 214 130 222 120 218 C130 196 136 168 132 146 L68 146 C64 168 70 196 80 218 C70 222 60 214 58 206 C50 218 36 222 26 212 C36 182 32 150 30 112 C28 68 48 30 100 30 Z';
+const HAIR_BACK_BOB = 'M100 30 C152 30 172 66 170 108 C170 136 166 150 160 160 C150 166 140 160 136 152 L64 152 C60 160 50 166 40 160 C34 150 30 136 30 108 C28 66 48 30 100 30 Z';
+const BANGS = 'M42 106 C38 62 66 36 100 36 C134 36 162 62 158 106 C152 96 146 90 140 88 C142 96 140 102 136 108 C130 96 122 88 114 86 C114 94 110 100 104 104 C100 94 94 88 86 86 C86 94 82 102 76 106 C72 98 66 92 60 90 C58 98 50 104 42 106 Z';
+const SIDE_L = 'M46 98 C40 124 44 156 34 184 C46 180 54 168 56 156 C58 136 58 116 56 102 Z';
+const SIDE_R = 'M154 98 C160 124 156 156 166 184 C154 180 146 168 144 156 C142 136 142 116 144 102 Z';
+
+function eyes(mood, y = 122, irisTop = '#2a1914', irisBot = '#7a4c36') {
+  const id = 'eg' + (++uid);
+  const g = `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${irisTop}"/><stop offset=".55" stop-color="${irisTop}"/><stop offset="1" stop-color="${irisBot}"/></linearGradient></defs>`;
+  const one = (x, f = 1) => `<ellipse cx="${x}" cy="${y}" rx="${10.5}" ry="${12.5}" fill="url(#${id})"/>` +
+    ln(`M${x - 10.5} ${y - 4} Q${x - 9} ${y - 13} ${x} ${y - 12.6} Q${x + 9} ${y - 13} ${x + 10.5} ${y - 4}`, '#2a1914', 2.4) +
+    `<ellipse cx="${x + 3.6 * f}" cy="${y - 4.5}" rx="4.2" ry="4.8" fill="#fff"/><circle cx="${x - 3.8 * f}" cy="${y + 5.5}" r="1.9" fill="#fff"/><circle cx="${x + 5 * f}" cy="${y + 4}" r="1" fill="#fff" opacity=".8"/>`;
+  if (mood === 'wince') return ln(`M${72} ${y - 7} L${84} ${y} L${72} ${y + 7}`, '#2a1914', 3.2) + ln(`M${128} ${y - 7} L${116} ${y} L${128} ${y + 7}`, '#2a1914', 3.2);
+  if (mood === 'closed') return ln(`M70 ${y + 1} Q78 ${y + 7} 86 ${y + 1}`, '#2a1914', 2.8) + ln(`M114 ${y + 1} Q122 ${y + 7} 130 ${y + 1}`, '#2a1914', 2.8);
+  if (mood === 'zombie') return g + one(78) + `<ellipse cx="122" cy="${y}" rx="10" ry="12" fill="#f6f2ea" stroke="#5a4a4a" stroke-width="1.6"/><circle cx="123" cy="${y + 2}" r="3" fill="#5a4a4a"/>` +
+    `<path d="M66 ${y - 9} Q78 ${y - 4} 90 ${y - 9} L90 ${y - 14} L66 ${y - 14} Z" fill="var(--sk)"/>` + ln(`M66 ${y - 9} Q78 ${y - 4} 90 ${y - 9}`, '#2a1914', 2.4) +
+    ln(`M68 ${y + 14} q10 4 20 0 M112 ${y + 14} q10 4 20 0`, '#8a9a80', 1.6);
+  return g + one(78) + one(122);
+}
+function face(mood, skin) {
+  const blur = 'bl' + (++uid);
+  let s = `<defs><filter id="${blur}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.4"/></filter></defs>`;
+  s += `<ellipse cx="74" cy="140" rx="9" ry="5" fill="#f2a4a0" opacity="${mood === 'zombie' ? .25 : .75}" filter="url(#${blur})"/><ellipse cx="126" cy="140" rx="9" ry="5" fill="#f2a4a0" opacity="${mood === 'zombie' ? .25 : .75}" filter="url(#${blur})"/>`;
+  s += eyes(mood);
+  if (mood === 'wince') s += ln('M94 145 q3 -3 6 0 q3 3 6 0', '#8a4436', 2);
+  else if (mood === 'closed') s += `<path d="M95 142 Q100 149 105 142 Z" fill="#d9707a" stroke="#8a4436" stroke-width="1.6" stroke-linejoin="round"/>`;
+  else if (mood === 'zombie') s += ln('M93 146 q7 -4 14 1', '#5a4a4a', 1.9) + p('M101 143.6 l1.6 4 l1.8 -3.4', '#fffaf0', 1.2);
+  else s += ln('M96 143 Q100 147 104 143', '#8a4436', 1.9);
+  return s;
+}
+// a figure. o: skin, hair, hairShade, hairStyle, top, collar, skirt, sock, shoe, hood, extras...
+function chibi(o) {
+  const skin = o.skin || '#fde6d6', hair = o.hair || '#8c5e40', hairHi = o.hairHi || '#b48a66', top = o.top || '#f3d9d0', skirt = o.skirt || '#c9b8a8';
+  const m = o.mood || 'smile', sq = o.squash || 0, tilt = o.tilt || 0;
+  const sid = 'hs' + (++uid);
+  let s = `<defs><linearGradient id="${sid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${hairHi}"/><stop offset=".35" stop-color="${hair}"/><stop offset="1" stop-color="${o.hairDeep || hair}"/></linearGradient></defs>`;
+  s += `<ellipse cx="100" cy="270" rx="${44 + sq * 6}" ry="6" fill="#4a3026" opacity=".1"/>`;
+  s += `<g transform="translate(100 270) scale(${1 + sq * .07} ${1 - sq * .09}) translate(-100 -270)">`;
+  // legs, socks, shoes
+  for (const x of [88, 112]) { s += p(`M${x - 5} 224 L${x - 5} 256 Q${x} 258 ${x + 5} 256 L${x + 5} 224 Z`, o.legs || skin, 1.6); if (o.sock) s += p(`M${x - 5.4} 240 L${x - 5.4} 256 Q${x} 258 ${x + 5.4} 256 L${x + 5.4} 240 Z`, o.sock, 1.4); }
+  s += p('M80 256 Q80 266 90 266 Q96 266 95 257 Z', o.shoe || '#6a4232', 1.6) + p('M120 256 Q120 266 110 266 Q104 266 105 257 Z', o.shoe || '#6a4232', 1.6);
+  // long hair behind the body
+  if (o.hairStyle !== 'bob' && !o.puff) s += p(HAIR_BACK_LONG, `url(#${sid})`, LW);
+  if (o.hood) s += p('M36 120 C30 60 64 30 100 30 C136 30 170 60 164 120 C166 150 156 168 140 172 L60 172 C44 168 34 150 36 120 Z', o.hood, LW);
+  if (o.puff) s += o.puff;
+  if (o.hairStyle === 'bob') s += p(HAIR_BACK_BOB, `url(#${sid})`, LW);
+  // body
+  if (o.skirt !== false) s += p(o.dress ? 'M76 182 L124 182 L138 226 Q100 234 62 226 Z' : 'M72 200 L128 200 L136 228 Q100 236 64 228 Z', skirt, LW) + (o.pleats ? ln('M84 202 L80 230 M100 202 V233 M116 202 L120 230', L, 1.2, 'opacity=".55"') : '');
+  s += p(o.dress ? 'M78 158 Q76 174 76 184 L124 184 Q124 174 122 158 Q100 152 78 158 Z' : 'M76 158 Q72 182 72 204 L128 204 Q128 182 124 158 Q100 152 76 158 Z', top, LW);
+  if (o.stripes) s += ln('M74 172 H126 M73 182 H127 M72 192 H128', o.stripes, 3, 'opacity=".9"');
+  if (o.collar) s += p('M84 156 L100 172 L116 156 L110 154 L100 162 L90 154 Z', o.collar, 1.6);
+  if (o.ribbon) s += p('M100 166 l-7 -4 l0 8 Z M100 166 l7 -4 l0 8 Z', o.ribbon, 1.3) + `<circle cx="100" cy="166" r="2.2" fill="${o.ribbon}" stroke="${L}" stroke-width="1.2"/>`;
+  if (o.pocket) s += p('M106 182 h12 v9 q-6 3 -12 0 Z', o.pocket, 1.3);
+  if (o.apron) s += p('M84 166 L116 166 L120 226 L80 226 Z', o.apron, 1.6) + `<text x="100" y="196" font-family="Out" font-weight="800" font-size="8.5" text-anchor="middle" fill="${L}">DOT'S</text>`;
+  if (o.straps) s += ln('M82 160 L86 196 M118 160 L114 196', o.straps, 3.4);
+  if (o.tear) s += p('M74 218 l6 -7 l4 7 l5 -6 l3 6 Z', o.skirt || skirt, 1.2) + ln('M112 176 l6 4 M114 186 l5 -3', L, 1.2);
+  // arms
+  const arm = (d, f) => ln(d, L, 11.6) + ln(d, f, 8.4);
+  const aL = o.armL || 'M79 164 Q70 180 70 198', aR = o.armR || 'M121 164 Q130 180 130 198';
+  s += arm(aL, o.sleeve || top) + arm(aR, o.sleeve || top);
+  const end = d => d.trim().split(/[\sQMC]+/).filter(Boolean).map(Number).slice(-2);
+  const [lx, ly] = end(aL), [rx, ry] = end(aR); s += el(lx, ly + 2, 5.4, 5.4, skin, 1.5) + el(rx, ry + 2, 5.4, 5.4, skin, 1.5);
+  if (o.mug) s += p(`M${rx + 2} ${ry - 8} h14 v14 q0 4 -4 4 h-6 q-4 0 -4 -4 Z`, '#fffaf0', 1.5) + ln(`M${rx + 16} ${ry - 5} q5 0 5 4 q0 4 -5 4`, L, 1.4);
+  if (o.bag) s += p(`M${lx - 18} ${ly + 2} h16 l2 16 h-20 Z`, o.bag, 1.5) + ln(`M${lx - 14} ${ly + 2} q4 -9 8 0`, L, 1.4);
+  // head
+  s += `<g transform="rotate(${tilt} 100 150)" style="--sk:${skin}">`;
+  s += el(100, 112, 54, 50, skin, LW);
+  s += `<path d="M50 100 Q100 116 150 100 L150 90 Q100 104 50 90 Z" fill="#000" opacity=".05"/>`;   // soft shade under the bangs
+  if (o.zombie) s += ln('M134 120 l10 4 M136 116 l2 6 M140 117 l2 6', '#7a8a6a', 1.3) + p('M58 96 l16 7 l-3 6 l-16 -7 Z', '#fffaf0', 1.3);
+  s += face(m, skin);
+  if (o.glasses) s += `<g fill="rgba(255,255,255,.2)" stroke="${o.glasses}" stroke-width="2.2"><ellipse cx="78" cy="122" rx="15" ry="13"/><ellipse cx="122" cy="122" rx="15" ry="13"/></g>` + ln('M93 120 q7 -3 14 0', o.glasses, 2) + ln('M63 116 l-6 -4 M137 116 l6 -4', o.glasses, 2);
+  // front hair
+  if (o.hood) s += p(o.hoodRim, o.hood, LW);
+  if (!o.puff) s += p(SIDE_L, `url(#${sid})`, LW) + p(SIDE_R, `url(#${sid})`, LW);
+  s += p(o.bangs || BANGS, `url(#${sid})`, LW);
+  s += ln('M66 62 C82 52 118 52 134 62', '#fff', 2.6, 'opacity=".35"') + ln('M72 70 l4 6 M96 60 l2 7 M124 66 l-3 6', '#fff', 1.6, 'opacity=".35"');
+  if (o.hat === 'bucket') s += p('M40 74 Q100 56 160 74 Q166 82 156 84 Q100 70 44 84 Q34 82 40 74 Z', o.hatC, LW) + p('M58 74 Q60 36 100 34 Q140 36 142 74 Q100 64 58 74 Z', o.hatC, LW) + ln('M58 70 Q100 60 142 70', o.band || '#6a4232', 4);
+  if (o.hat === 'beret') s += p('M46 66 Q56 32 104 30 Q150 32 156 62 Q126 52 100 54 Q72 54 46 66 Z', o.hatC, LW) + el(104, 29, 3.6, 3.6, o.hatC, 1.4);
+  if (o.bow) s += p('M126 52 l-18 -12 l0 22 Z', o.bow, 1.6) + p('M126 52 l18 -12 l0 22 Z', o.bow, 1.6) + el(126, 51, 4.6, 4.6, o.bow, 1.5);
+  if (o.wrap) s += p('M48 80 Q100 48 152 80 L150 68 Q100 36 50 68 Z', o.wrap, LW) + [64, 84, 116, 136].map((x, i) => el(x, i % 3 ? 54 : 62, 2.6, 2.6, '#f2c46a', 1.1)).join('');
+  if (o.hoops) s += `<circle cx="48" cy="132" r="5" fill="none" stroke="#d9a440" stroke-width="2"/><circle cx="152" cy="132" r="5" fill="none" stroke="#d9a440" stroke-width="2"/>`;
+  if (m === 'wince') s += p('M148 88 q7 9 2 14 q-7 -1 -2 -14 Z', '#cfe8f6', 1.4) + `<text x="26" y="58" font-family="Out" font-weight="800" font-size="19" fill="#e07a6a" stroke="#fffaf4" stroke-width="4" paint-order="stroke" transform="rotate(-12 26 58)">ow!</text>`;
+  s += `</g></g>`;
+
+  if (o.heart) s += p('M162 40 c-3 -6 -11 -3 -8 3 l8 8 l8 -8 c3 -6 -5 -9 -8 -3 Z', '#f4a0a8', 1.4);
+  return `<svg viewBox="0 0 200 280">${s}</svg>`;
+}
+function kitty() {   // a small chibi cat, sitting
+  const c = '#f0b070', d = '#d48a4a';
+  return `<svg viewBox="0 0 200 280"><ellipse cx="100" cy="266" rx="40" ry="6" fill="#4a3026" opacity=".1"/>
+    ${p('M132 250 Q172 246 168 210 Q166 196 156 202 Q160 230 132 236 Z', c)}${p('M64 264 Q58 196 100 190 Q142 196 136 264 Z', c)}
+    ${el(100, 226, 20, 22, '#fff6ea', 1.6)}${ln('M88 264 v-14 M112 264 v-14', L, 1.6)}
+    ${p('M50 140 L46 84 L86 108 Z', c)}${p('M150 140 L154 84 L114 108 Z', c)}${p('M54 126 L52 98 L74 112 Z', '#f6c0b8', 1.3)}${p('M146 126 L148 98 L126 112 Z', '#f6c0b8', 1.3)}
+    ${el(100, 148, 56, 48, c)}${ln('M88 106 q3 8 0 14 M100 103 v14 M112 106 q-3 8 0 14', d, 2.2)}
+    ${eyes('smile', 150)}<ellipse cx="72" cy="166" rx="9" ry="5" fill="#f2a4a0" opacity=".6"/><ellipse cx="128" cy="166" rx="9" ry="5" fill="#f2a4a0" opacity=".6"/>
+    ${ln('M96 162 l4 3 l4 -3', L, 1.8)}${ln('M100 165 q-4 5 -8 2 M100 165 q4 5 8 2', L, 1.6)}
+    ${ln('M46 156 l-14 -2 M46 164 l-13 4 M154 156 l14 -2 M154 164 l13 4', L, 1.3)}</svg>`.replace(/<path d="M96 143 Q100 147 104 143"[^>]*\/>/, '');
+}
+const YOU = { hair: '#e98ab0', hairHi: '#f6b4cc', hairDeep: '#c96a94', skin: '#fde6d6', top: '#f2a6c0', sleeve: '#f2a6c0', skirt: '#7a8ab8', pleats: 1, sock: '#fffaf0', shoe: '#6a4232',
+  straps: '#9a7ac0', bag: '#b89ad8', collar: '#fffaf0' };
+const DOT = { skin: '#b07850', hair: '#e8e2ee', hairHi: '#ffffff', hairDeep: '#c8c0d6', top: '#c9b0e0', sleeve: '#c9b0e0', skirt: '#8a6a9a', apron: '#f6c87a', sock: '#fffaf0', shoe: '#5a3a2a', glasses: '#d0584a', hoops: 1, mug: 1, wrap: '#5ab0a8',
+  puff: [[52, 96, 20], [148, 96, 20], [58, 66, 22], [142, 66, 22], [80, 44, 24], [120, 44, 24], [100, 38, 22], [46, 124, 15], [154, 124, 15]].map(([x, y, r]) => el(x, y, r, r, '#e8e2ee', LW)).join(''), bangs: 'M50 96 Q100 70 150 96 Q130 86 100 86 Q70 86 50 96 Z' };
+const WALKER = { zombie: 1, mood: 'zombie', skin: '#cfdcc0', hair: '#6a6a5a', hairHi: '#8a8a76', hairDeep: '#4a4a40', top: '#a8b0cc', sleeve: '#a8b0cc', skirt: '#8a8098', pleats: 1, sock: '#d8d4c8', shoe: '#4a3a3a', tear: 1,
+  armL: 'M79 164 Q60 160 46 154', armR: 'M121 164 Q140 160 154 154',
+  bangs: 'M42 106 C38 62 66 36 100 36 C134 36 162 62 158 106 C150 100 146 94 142 90 C140 100 136 104 130 108 C128 98 122 92 116 90 C114 98 108 102 102 104 C98 92 90 88 84 88 C82 98 78 104 70 108 C68 98 62 94 56 92 C54 100 50 104 42 106 Z' };
+const LENA = { hair: '#8c5e40', top: '#fffaf0', sleeve: '#fffaf0', collar: '#8a9ac8', ribbon: '#d06a6a', skirt: '#b8a898', pleats: 1, sock: '#fffaf0', hat: 'bucket', hatC: '#f6efe6', band: '#3a3030', mood: 'closed', heart: 1 };
+const cast = [[YOU, 'You'], [DOT, 'Auntie Dot'], [WALKER, 'Walker (zombie)'], [LENA, 'Crew: Lena']];
+document.getElementById('cast').innerHTML = cast.map(([o, n]) => `<div class="fig">${chibi(o)}<b>${n}</b></div>`).join('') + `<div class="fig">${kitty()}<b>Mochi</b></div>`;
+const W = [['smile', 0, 0, 0], ['wince', .9, -8, .22], ['wince', .45, -4, .08], ['smile', -.15, 2, 0]];
+document.getElementById('wince').innerHTML = W.map(([m, sq, tilt, fl], i) => `${i ? '<div class="arrow">→</div>' : ''}<div class="fig">${chibi(Object.assign({}, YOU, { mood: m, squash: sq, tilt, flash: fl }))}<b>${['walking', 'hit!', 'stings', 'bounce back'][i]}</b></div>`).join('');
+window.__ready = true;
+</script></body></html>
