@@ -1441,3 +1441,4 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - tour.js steps carry the view they live in (v) and open it before pointing; Houses/Gear/Map steps point at the bottom bar.
 - A new player's Home shows "Your first house · Go" (opens Loot).
 - 0.69.1 (owner: "make auntie dot cuter"): DOT_SVG redrawn chibi: silver hair puff, beaded headwrap, cat-eye glasses on a chain, gold hoops, waving, coffee mug, DOT'S apron.
+- 0.70 (owner: "i want animation when we get hurt like a wince"): house.js hurtPlayer sets p.wince (0.6 s, its own clock): squash then a small bounce, an arm up to the face, head flinch, a sweat drop flying off and an 'ow!/oof!/eek!' pop (winceFx). Hit stun timing unchanged.
