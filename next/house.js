@@ -519,6 +519,25 @@
     if (G.decals.length > 90) G.decals.shift();
   }
   function dmgNum(x, y, v, col) { G.nums.push({ x, y, v, t: 0, col }); }
+  // 0.70 the wince: a sweat drop flies off her head and a little "ow!" pops up and fades
+  const WINCE = .6;
+  function winceFx(p) {
+    const t = WINCE - p.wince, a = Math.min(1, p.wince / .18), side = p.flip ? 1 : -1, hy = p.y - 74;
+    ctx.save(); ctx.globalAlpha = a;
+    const dx = p.x + side * (14 + t * 26), dy = hy - 6 - t * 18 + t * t * 40;   // the drop arcs away
+    ctx.beginPath(); ctx.moveTo(dx, dy - 7); ctx.quadraticCurveTo(dx + 5, dy, dx, dy + 4); ctx.quadraticCurveTo(dx - 5, dy, dx, dy - 7); ctx.closePath();
+    ctx.fillStyle = '#bfe6ff'; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#11142f'; ctx.stroke();
+    const pop = Math.min(1, t / .08), sc = .6 + .5 * pop - .1 * Math.max(0, pop - .9);
+    ctx.translate(p.x - side * 18, hy - 18 - t * 16); ctx.rotate(-.18 * side); ctx.scale(sc, sc);
+    ctx.font = '900 15px Outfit, Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4; ctx.strokeStyle = '#fff6ee'; ctx.strokeText(p.ow || 'ow!', 0, 0); ctx.fillStyle = '#e8504a'; ctx.fillText(p.ow || 'ow!', 0, 0);
+    ctx.restore();
+    // 0.72: with the SpriteCook look, her "> <" face pops up in a little bubble too
+    const im = ART.pinkGirl && ART.pinkGirl(S().look) && ART.img('wince1');
+    if (im) { const r = 19 * Math.min(1, t / .07), bx = p.x - side * 40, by = hy - 4 - t * 8; if (r > 2) { ctx.save(); ctx.globalAlpha = a;
+      ctx.beginPath(); ctx.arc(bx, by, r + 2.5, 0, 6.28); ctx.fillStyle = '#4a2e2a'; ctx.fill(); ctx.beginPath(); ctx.arc(bx, by, r, 0, 6.28); ctx.fillStyle = '#fff6ee'; ctx.fill(); ctx.clip();
+      const sw = im.width, sh = im.height * .5, k = (r * 2.3) / sw; ctx.drawImage(im, 0, im.height * .04, sw, sh, bx - sw * k / 2, by - r * .95, sw * k, sh * k); ctx.restore(); } }
+  }
   // ---------------------------------------------------------------- interaction
   // secrets stay invisible until most of the house has been searched; no announcement when that happens
   const gateSet = () => G.furn.filter(f => f.lootable && !f.secretLoot && !f.lock && !f.car && !f.keyRoom);   // 0.8: brass-key spots never count
@@ -847,7 +866,7 @@
   }
   function updatePlayer(dt, inp) {
     const p = G.p;
-    p.stT += dt; p.inv = Math.max(0, p.inv - dt); p.flash = Math.max(0, p.flash - dt * 5);
+    p.stT += dt; p.inv = Math.max(0, p.inv - dt); p.flash = Math.max(0, p.flash - dt * 5); p.wince = Math.max(0, (p.wince || 0) - dt);
     if (p.st === 'down') { p.downRot = Math.min(1, p.downRot + dt * 3); if (p.stT > 1.3 && !G.over) { if (opts.onDown) { G.over = true; opts.onDown(); } else showDeath(); } return; }
     let spd = 0, running = false;
     // stamina
@@ -1062,6 +1081,7 @@
     if (p.hp > 0 && !G.lastStand && SK.lastStand() && p.hp < maxHp() * .25) { G.lastStand = 1; p.hp = Math.min(maxHp(), p.hp + 25); toast('Last stand! +25 HP', 1.6); SFX.play('alert'); }   // 0.34: Bruiser
     p.kbx = dx * 6 * T; p.kby = dy * 6 * T * .8;
     p.st = 'hurt'; p.stT = 0;
+    p.wince = WINCE; p.ow = ['ow!', 'oof!', 'eek!', 'ow!'][Math.floor(Math.random() * 4)];   // 0.70: the wince
     G.shake = 12; G.redFlash = 1; G.hitstop = .06;
     SFX.play('hurt');
     dmgNum(p.x, p.y - 90, dmg, '#ff6b5a');
@@ -1639,12 +1659,22 @@
     } else if (p.st === 'dodge') {
       rot = dir * .55 * Math.sin(Math.min(1, p.stT / .3) * Math.PI); sy = .9;
     } else if (p.st === 'hurt') rot = -.22 * dir;
+    // 0.70 (owner: "i want animation when we get hurt like a wince"): squash down and flinch, an arm up to the face,
+    // then a little bounce back. Runs on its own clock (p.wince), so it never changes how long a hit stuns you.
+    if (p.wince > 0 && p.st !== 'down') {
+      const t = WINCE - p.wince;
+      if (t < .1) { const k = t / .1; sy = 1 - .17 * k; sx = 1 + .12 * k; }
+      else if (t < .3) { const k = 1 - (t - .1) / .2; sy = 1 - .17 * k; sx = 1 + .12 * k; }
+      else { const k = (t - .3) / (WINCE - .3); sy = 1 + .07 * Math.sin(k * Math.PI) * (1 - k * .5); sx = 1 - .04 * Math.sin(k * Math.PI); }
+      if (t < .34) { const k = Math.min(1, t / .06); parts.arm = { r: -1.55 * k }; parts.bat = { r: -1.55 * k }; parts.head = { r: .22 * dir * k }; }
+    }
     else if (p.st === 'down') { rot = -p.downRot * 1.45 * dir; }
     if (p.inv > 0 && p.st !== 'dodge' && p.st !== 'down') alpha = .65 + .35 * Math.sin(G.t * 40);
     drawShadow(p.x, p.y + 1, 18);
     const wk = weaponKey();
     p._pose = [p.x, p.y + yo, PSCALE, p.flip, { rot, sx, sy, parts, alpha: 1, weapon: wk }];
     ART.drawRig(ctx, 'survivor', p.x, p.y + yo, PSCALE, p.flip, { rot, sx, sy, parts, flash: p.flash, flashRed: true, alpha, weapon: wk });
+    if (p.wince > 0 && p.st !== 'down') winceFx(p);
   }
 
   function drawTurkey(z) {

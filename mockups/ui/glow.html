@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dead Miles - style A in new colours</title>
+<style>
+  @font-face { font-family: Out; src: url(fonts/Outfit-Regular.ttf); font-weight: 400; }
+  @font-face { font-family: Out; src: url(fonts/Outfit-Bold.ttf); font-weight: 800; }
+  * { box-sizing: border-box; } body { margin: 0; background: #0b0a14; font-family: Out, system-ui, sans-serif; }
+  .wall { display: flex; flex-wrap: wrap; gap: 30px 26px; padding: 30px; justify-content: center; max-width: 1760px; margin: 0 auto; }
+  .cap { width: 390px; margin-bottom: 10px; color: #e8e0ff; } .cap b { display: block; font: 800 20px Out; } .cap span { font: 400 13px/1.4 Out; color: #a99fcc; }
+  .ph { position: relative; width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 3px solid #26213e; box-shadow: 0 30px 60px rgba(0,0,0,.55);
+    background: var(--bg); color: var(--txt); padding: 50px 18px 0; }
+  .glow1 { box-shadow: 0 0 16px color-mix(in srgb, var(--c1) 45%, transparent), inset 0 0 26px color-mix(in srgb, var(--c1) 12%, transparent); }
+  .hrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .hrow svg { height: 40px; } .hrow .logo { flex: 0 0 auto; }
+  .pill { padding: 5px 9px; border-radius: 99px; border: 2px solid var(--c3); color: var(--c3); font: 800 12px Out; white-space: nowrap; box-shadow: 0 0 12px color-mix(in srgb, var(--c3) 45%, transparent), inset 0 0 8px color-mix(in srgb, var(--c3) 25%, transparent); }
+  .hero { position: relative; margin: 14px 0 14px; height: 206px; border-radius: 28px; border: 2px solid var(--c2); background: var(--card); overflow: hidden; }
+  .hero canvas { position: absolute; left: 4px; bottom: 0; }
+  .steps { position: absolute; right: 20px; top: 30px; text-align: right; }
+  .steps b { display: block; font: 800 52px/1 Out; color: var(--hi); text-shadow: 0 0 14px var(--c2); } .steps span { font: 800 14px Out; color: var(--c2); }
+  .bar { position: absolute; right: 20px; left: 160px; bottom: 30px; height: 14px; border-radius: 9px; background: var(--deep); border: 2px solid var(--line); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 74%; background: linear-gradient(90deg, var(--c2), var(--c3)); box-shadow: 0 0 12px var(--c2); }
+  .barl { position: absolute; right: 20px; bottom: 50px; font: 800 12px Out; color: var(--mute); }
+  .snow { position: absolute; inset: 0; pointer-events: none; opacity: .5; background-image: radial-gradient(2px 2px at 30px 40px, #fff 50%, transparent 51%), radial-gradient(1.6px 1.6px at 140px 20px, #fff 50%, transparent 51%), radial-gradient(2px 2px at 250px 90px, #fff 50%, transparent 51%), radial-gradient(1.6px 1.6px at 320px 30px, #fff 50%, transparent 51%), radial-gradient(2px 2px at 190px 150px, #fff 50%, transparent 51%); }
+  h3 { margin: 6px 4px 10px; font: 800 15px Out; color: var(--mute); letter-spacing: 2px; text-transform: uppercase; }
+  .do { --c: var(--c1); display: flex; align-items: center; gap: 14px; margin-bottom: 10px; padding: 13px 15px; border-radius: 20px; background: var(--card); border: 2px solid var(--c); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 40%, transparent); }
+  .do.b { --c: var(--c2); } .do.c { --c: var(--c3); }
+  .do .e { font-size: 30px; } .do b { display: block; font: 800 18px Out; } .do span { font: 400 13px Out; color: var(--mute); }
+  .ph .go { margin-left: auto; padding: 9px 16px; border-radius: 14px; background: var(--c, var(--c1)); color: var(--btnTxt); font: 800 15px Out; white-space: nowrap; }
+  .nav { position: absolute; left: 14px; right: 14px; bottom: 18px; height: 78px; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; border-radius: 28px; background: var(--card); border: 2px solid var(--line); }
+  .nav a { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; font: 800 12px Out; color: var(--mute); } .nav a .e { font-size: 26px; filter: grayscale(.55) opacity(.75); }
+  .nav a.on { color: var(--c1); text-shadow: 0 0 8px var(--c1); } .nav a.on .e { filter: drop-shadow(0 0 8px var(--c1)); }
+  .nav a .dot { position: absolute; top: -2px; right: 16px; width: 10px; height: 10px; border-radius: 50%; background: var(--c1); box-shadow: 0 0 8px var(--c1); }
+  /* inner screens */
+  .title { font: 800 28px Out; color: var(--hi); text-shadow: 0 0 12px var(--c1); }
+  .seg { display: flex; gap: 6px; margin: 12px 0 14px; } .seg a { flex: 1; text-align: center; padding: 9px 0; border-radius: 14px; border: 2px solid var(--line); font: 800 14px Out; color: var(--mute); }
+  .seg a.on { border-color: var(--c1); color: var(--hi); box-shadow: 0 0 12px color-mix(in srgb, var(--c1) 45%, transparent); background: color-mix(in srgb, var(--c1) 14%, var(--card)); }
+  .house { display: flex; gap: 12px; align-items: center; padding: 12px; margin-bottom: 10px; border-radius: 20px; background: var(--card); border: 2px solid var(--line); }
+  .house.hot { border-color: var(--c1); box-shadow: 0 0 14px color-mix(in srgb, var(--c1) 40%, transparent); }
+  .house .ic { width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; font-size: 32px; background: var(--deep); border: 2px solid var(--line); }
+  .house b { display: block; font: 800 17px Out; } .house span { font: 400 12px Out; color: var(--mute); }
+  .tags { display: flex; gap: 5px; margin-top: 5px; } .tag { padding: 2px 8px; border-radius: 8px; font: 800 11px Out; background: var(--deep); color: var(--c3); border: 1.5px solid color-mix(in srgb, var(--c3) 50%, transparent); }
+  .dotshop { display: flex; gap: 12px; align-items: center; padding: 12px 14px; margin-bottom: 14px; border-radius: 20px; background: var(--card); border: 2px solid var(--c3); box-shadow: 0 0 14px color-mix(in srgb, var(--c3) 40%, transparent); }
+  .dotshop .ic { font-size: 34px; } .dotshop b { display: block; font: 800 17px Out; } .dotshop span { font: 400 12px Out; color: var(--mute); }
+  .slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .slot { position: relative; aspect-ratio: 1; border-radius: 16px; background: var(--card); border: 2px solid var(--line); display: grid; place-items: center; }
+  .slot img { width: 66%; } .slot em { position: absolute; right: 6px; bottom: 3px; font: 800 12px Out; font-style: normal; color: var(--hi); }
+  .slot.on { border-color: var(--c1); box-shadow: 0 0 12px color-mix(in srgb, var(--c1) 50%, transparent); } .slot.empty { border-style: dashed; opacity: .45; }
+  .meter { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font: 800 13px Out; } .meter .m { flex: 1; height: 12px; border-radius: 8px; background: var(--deep); border: 2px solid var(--line); overflow: hidden; } .meter .m i { display: block; height: 100%; width: 58%; background: var(--c2); box-shadow: 0 0 10px var(--c2); }
+  .detail { margin-top: 14px; padding: 14px; border-radius: 20px; background: var(--card); border: 2px solid var(--c1); box-shadow: 0 0 14px color-mix(in srgb, var(--c1) 35%, transparent); }
+  .detail b { font: 800 18px Out; } .detail p { margin: 4px 0 10px; font: 400 13px Out; color: var(--mute); } .detail .row { display: flex; gap: 8px; } .detail .go { margin: 0; flex: 1; text-align: center; } .ph .detail .go.g { background: none; border: 2px solid var(--line); color: var(--txt); }
+  .notes { max-width: 1700px; margin: 0 auto 40px; padding: 0 30px; color: #c9c0ea; font: 400 15px/1.55 Out; }
+</style></head><body>
+<div class="wall" id="wall"></div>
+<div class="notes">Same look as A in every one: glowing outlined cards, a big step counter, at most 3 jobs on Home, and 5 big tabs at the bottom. Only the colours change. The last two show the Loot and Bag tabs in the first colour scheme.</div>
+<script src="../../next/s2art.js"></script>
+<script src="../../next/art.js"></script>
+<script>window.DM = window.DM || {};</script>
+<script src="../../next/logo.js"></script>
+<script>
+const P = [
+  { n: 'Holly night', d: 'Christmas: deep pine green with glowing red, gold and soft green. Matches the Christmas logo.', snow: 1,
+    v: { bg: 'radial-gradient(120% 70% at 50% 0%, #1f4a36, #10281d 60%, #0a1a13)', card: 'rgba(14,38,28,.88)', deep: '#08170f', line: '#2f5a46', c1: '#ff5a5a', c2: '#ffd166', c3: '#7fe08a', txt: '#f3fff6', hi: '#ffffff', mute: '#a9cdb8', btnTxt: '#14100a' } },
+  { n: 'Grape & amber', d: 'The game\'s own purple with warm amber and coral glow. The closest to Dead Miles today.',
+    v: { bg: 'radial-gradient(120% 70% at 50% 0%, #4a3480, #2a1d4c 60%, #1a1232)', card: 'rgba(34,24,62,.9)', deep: '#150e2a', line: '#4a3c70', c1: '#ffb347', c2: '#ff7a59', c3: '#c9a8ff', txt: '#f6efff', hi: '#ffffff', mute: '#b3a6d6', btnTxt: '#1a1232' } },
+  { n: 'Frostbite', d: 'Icy navy with frosty blue, white and candy pink. Wintery without being Christmas-only.', snow: 1,
+    v: { bg: 'radial-gradient(120% 70% at 50% 0%, #1f3d6a, #0f2240 60%, #091629)', card: 'rgba(14,32,60,.9)', deep: '#081325', line: '#2a4a78', c1: '#8fd8ff', c2: '#ffffff', c3: '#ff8fb8', txt: '#eef8ff', hi: '#ffffff', mute: '#9cbbe0', btnTxt: '#0a1529' } },
+  { n: 'Pumpkin ember', d: 'Dark chocolate with glowing orange, gold and cream. Warm, cozy, a little spooky.',
+    v: { bg: 'radial-gradient(120% 70% at 50% 0%, #4a2a18, #2a170d 60%, #1a0e08)', card: 'rgba(44,26,16,.9)', deep: '#160c06', line: '#5a3a24', c1: '#ff8a3c', c2: '#ffd166', c3: '#ffe9c7', txt: '#fff4e6', hi: '#ffffff', mute: '#d2ad8c', btnTxt: '#1a0e08' } },
+  { n: 'Berry glow', d: 'Dark raspberry with hot pink, lilac and mint. The cutest of the set.',
+    v: { bg: 'radial-gradient(120% 70% at 50% 0%, #5a1d4a, #34102c 60%, #220a1d)', card: 'rgba(50,16,42,.9)', deep: '#1c0717', line: '#6a2a5a', c1: '#ff6fb5', c2: '#9ff0d0', c3: '#d6b4ff', txt: '#fff0f8', hi: '#ffffff', mute: '#d6a6c6', btnTxt: '#220a1d' } },
+  { n: 'Midnight gold', d: 'Almost-black navy with gold, coral and sky blue. Clean and grown-up.',
+    v: { bg: 'radial-gradient(120% 70% at 50% 0%, #1c2140, #10142a 60%, #0a0d1c)', card: 'rgba(22,26,50,.92)', deep: '#0a0d1c', line: '#2c3360', c1: '#ffcf5a', c2: '#ff8a7a', c3: '#8fc8ff', txt: '#f3f4ff', hi: '#ffffff', mute: '#a8aedb', btnTxt: '#10142a' } },
+];
+const css = o => Object.entries(o).map(([k, v]) => `--${k}:${v}`).join(';');
+const nav = on => `<div class="nav">${[['🏠', 'Home'], ['🏚️', 'Loot'], ['🗺️', 'Map'], ['🎒', 'Bag'], ['⭐', 'Me']].map(([e, t], i) => `<a class="${i === on ? 'on' : ''}"><span class="e">${e}</span>${t}${(i === 1 || i === 4) && i !== on ? '<span class="dot"></span>' : ''}</a>`).join('')}</div>`;
+const header = (p, right) => `<div class="hrow"><div class="logo">${DM.Logo.mini(true)}</div>${right}</div>`;
+const home = (p, i) => `${header(p, '<div class="pill">🧟 Horde in 6d</div>')}
+  <div class="hero glow1" style="--c1:var(--c2)">${p.snow ? '<div class="snow"></div>' : ''}<canvas data-ch width="300" height="400" style="width:150px;height:200px"></canvas>
+    <div class="steps"><b>6,420</b><span>steps today</span></div><div class="barl">next house at 7,000</div><div class="bar"><i></i></div></div>
+  <h3>Today</h3>
+  <div class="do"><span class="e">🏚️</span><div><b>3 houses to loot</b><span>one is a pharmacy</span></div><span class="go">Go</span></div>
+  <div class="do b"><span class="e">🃏</span><div><b>Card pack ready</b><span>you hit 10,000 steps</span></div><span class="go">Open</span></div>
+  <div class="do c"><span class="e">🛡️</span><div><b>Horde on Sunday</b><span>take a watch shift</span></div><span class="go">Shift</span></div>${nav(0)}`;
+const loot = p => `<div class="title">Loot</div><div class="seg"><a class="on">Today</a><a>Route</a><a>Daily</a></div>
+  <div class="dotshop"><span class="ic">🧺</span><div><b>Auntie Dot's</b><span>2 jobs · new stock · 140 caps</span></div><span class="go" style="--c:var(--c3)">Visit</span></div>
+  <div class="house hot"><div class="ic">💊</div><div><b>Pharmacy</b><span>412 Nostrand Ave</span><div class="tags"><span class="tag">☠☠☠</span><span class="tag">meds</span><span class="tag">2 locks</span></div></div><span class="go">Loot</span></div>
+  <div class="house"><div class="ic">🏠</div><div><b>Rowhouse</b><span>18 Halsey St</span><div class="tags"><span class="tag">☠</span><span class="tag">someone hiding</span></div></div><span class="go" style="--c:var(--c2)">Loot</span></div>
+  <div class="house"><div class="ic">🏪</div><div><b>Bodega</b><span>701 Fulton St</span><div class="tags"><span class="tag">☠☠</span><span class="tag">food</span></div></div><span class="go" style="--c:var(--c2)">Loot</span></div>${nav(1)}`;
+const bag = p => `<div class="title">Bag</div><div class="seg"><a class="on">Pack</a><a>Stash</a><a>Bench</a><a>Kitchen</a></div>
+  <div class="meter">🎒 7 / 12<div class="m"><i></i></div><span style="color:var(--c3)">🪙 140</span></div>
+  <div class="slots">${['bat', 'beans', 'water', 'bandage', 'lockpick', 'scrap', 'backpack', '', '', '', '', ''].map((k, i) => `<div class="slot${k ? '' : ' empty'}${i === 0 ? ' on' : ''}">${k ? `<img data-ic="${k}"><em>${['', '2', '3', '2', '4', '9', ''][i] || ''}</em>` : ''}</div>`).join('')}</div>
+  <div class="detail"><b>Baseball bat</b> <span style="color:var(--c2);font:800 13px Out">★★★ Solid</span><p>14 damage · 82% left · your weapon</p><div class="row"><span class="go">Equip</span><span class="go g">Stash</span><span class="go g">Repair</span></div></div>${nav(3)}`;
+let html = '';
+P.forEach((p, i) => { html += `<div><div class="cap"><b>${i + 1} · ${p.n}</b><span>${p.d}</span></div><div class="ph" style="${css(p.v)}">${home(p, i)}</div></div>`; });
+html += `<div><div class="cap"><b>Inside: the Loot tab</b><span>Dot's shop on top, then today's houses with danger and what's inside.</span></div><div class="ph" style="${css(P[0].v)}">${loot(P[0])}</div></div>`;
+html += `<div><div class="cap"><b>Inside: the Bag tab</b><span>Pack, stash, workbench and kitchen in one place. Tap an item for its buttons.</span></div><div class="ph" style="${css(P[0].v)}">${bag(P[0])}</div></div>`;
+document.getElementById('wall').innerHTML = html;
+(async () => {
+  await document.fonts.ready;
+  try { ART.buildIcons(); } catch (e) { /* ignore */ }
+  document.querySelectorAll('img[data-ic]').forEach(im => { const u = ART.iconURL[im.dataset.ic]; if (u) im.src = u; });
+  const look = ART.LOOK.norm({ hair: 1, hairC: 4, coat: 6, mouth: 1 });
+  try { await ART.buildRig('survivor', 2, ART.LOOK.recolor(look), 'mock', ART.LOOK.patch(look)); } catch (e) { return; }
+  document.querySelectorAll('canvas[data-ch]').forEach(cv => ART.drawRig(cv.getContext('2d'), 'mock', cv.width / 2, cv.height * .97, 1.45, false, { weapon: 'fists' }));
+})();
+</script>
+</body></html>

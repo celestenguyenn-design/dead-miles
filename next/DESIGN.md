@@ -1383,3 +1383,72 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - Balance to watch: deep-run Nest floors (~14 zombies, many specials), special-infected share as gamestage climbs.
 - Oura API integration was postponed by the owner ("I'll do it next time"); steps from the ring already sync via Apple Health
   with the Shortcut's "Source is Oura" filter.
+
+## Done in 0.67 (owner: "nothing for me to craft", "Dot doesn't really have anything that we need", "our house decorations are pretty bad")
+- Crafting XP from all bench work: weapon repair (5 + 2/quality), quality upgrade (12 + 10/tier), class upgrade (60),
+  building a base piece (15 + 10/tier), base repairs (8), on top of workbench crafts.
+- crafting.js: recipes with `auto` = the Crafting level that teaches them (no blueprint, never a bp_ item): supply crates
+  (ration, snack, first-aid) that pack surplus food/water/bandages into Sell items for Dot, and 19 decor recipes (wood,
+  nails, cloth, batteries, paperbacks). Workbench has a Decor tab; locked ones say "Unlocks at Crafting level N".
+- Dot: far less food/water/snack and starter weapons (crowbar, bat, knife, pan), more tape and batteries, more
+  blueprints; a daily decor shelf (one Dot-only piece, `dot: 1`: jukebox, fish tank - never in loot), and from trader
+  level 2 "Dot's special": a Fine weapon (Masterwork 35% at level 4+). Stock re-rolls once for 0.67 (trader.sv).
+- Decor art redrawn (hay bale, garland, wreaths, cornucopia, scarecrow, gnome, flamingo, lantern, flower box, cactus,
+  posters, presents, string lights) and new pieces: pumpkin pile (Thanksgiving), flag bunting, neon HOME sign, burn barrel,
+  jukebox, fish tank.
+- 0.67.1 pets (Isabel's cat "ran off" as a boss fight started; owner asked what's best): pets still never die, but have
+  HP on runs (40 + 15 per pet level). A lunge hurts 10, a boss charge 18, then 1.4 s of grace; they hop clear and keep
+  following, with a small HP bar and a warning at 40%. Only at 0 HP do they limp home (away until tomorrow, rec.hurt);
+  Crew & pets has "Patch up now · 1 bandage" to bring an away pet back the same day.
+
+## Done in 0.68 - Field cards (owner: "some type of collection thing like cards, artifacts ... never ending, a grind";
+## picked field cards over a relic museum or a bounty ladder)
+- cards.js: 59 cards in 7 sets (The Dead, Survivors, Old Brooklyn, Arsenal, Strays; Thanksgiving + Christmas sets only
+  drop while that holiday runs). Rarity c/r/e/l at 60/28/10/2, foil 1 in 30. Art is painted on canvas from the game's own
+  zombie / survivor rigs, pet portraits, item icons and a few small painters (token, MetroCard, ticket, slice...).
+- Packs (3 cards, last one rare+, epic+ guaranteed by the 10th pack): every 2,500 steps walked (3 a day), 'cardpack' in
+  loot tables (desk, register, safe, attic, locked room, horde crates, deep runs...), Dot's shop, one per boss kill.
+  Kills also drop a single card now and then (1.5%, special 4%, raider 3%).
+- Never ends: copies star a card up at 1/3/6/11/19; past ★5 a copy becomes dust (5/15/40/100, foil x3). Dust crafts a
+  missing card (60/180/480/1200) or buys a pack (120). Full set: 150 caps + 2 tokens. Codex titles for 10/40 cards, a
+  foil, a ★5, a full set.
+- Deck: 3 slots (4 at 20 different cards, 5 at 40). Perks scale x1 -> x3 from ★1 to ★5 and wrap the skill helpers
+  (meleeMul, hpBonus, staBonus, searchMul, extraFind, rareBonus, stepNoise, drainMul, walkFindMax), Codex.dmgVs (per
+  zombie kind), Crew.petMaxHp and Trades.gain('craft'). Card luck = chance of a 4th card per pack.
+- Save: SV.cards. Ideas not built yet: gifting duplicates to friends, comparing binders, new monthly sets.
+- 0.68.1 (owner: "the card drops should be very low"; "I don't want to be able to gift, make it difficult ... we have to
+  walk to gift it"): one walking pack a day at 10,000 steps; loot pack weights cut ~5x and only in safes, attics, locked
+  rooms, horde crates, caches, deep runs, desks/registers (tiny); kills drop a card 0.3% (special 0.8%, raider 0.6%);
+  bosses drop a pack 30%; Dot sells one (120 caps, trader level 2+, 30% of days); dust pack 300. Card packs and cards
+  can't go through the instant friend gift (item.nogift). Walk a spare copy instead (never your last; one at a time):
+  it leaves the binder at once and is sent through next_gift_send as 'fcard_<id>' after 5,000 / 10,000 / 20,000 /
+  40,000 steps (c/r/e/l); "Turn back" returns it. The recipient's tick files fcard_ items into their binder.
+
+## Done in 0.69 - the UI revamp (owner: "the UI is insane and just very difficult to navigate"; can't find things, too
+## much at once; picked "Grape & amber" from the glow samples in mockups/ui/glow.html, "make my character animated, same
+## thing if we have a pet", then all three touches)
+- Five tabs in a bottom bar that is always there (game.js navHTML / goView, HV): Home (walking scene + at most 3 "Today"
+  tiles + the guide + event), Loot (the Houses pane: Dot, route, daily, houses), Map (opens map.js), Bag (Gear +
+  Workbench sub-tabs) and Me (character card, bars, skills, wardrobe, radio feed, every activity tile, and the Walks /
+  Capsules / Event sub-tabs). Nothing was removed: every old element still renders in one of the views (data-hv), so all
+  the old bindings and the tour still find their buttons. tab(t) also switches the view (viewOf). Badges: Loot = new
+  houses, Bag = a better weapon, Me = skill points / new cosmetics / walk rewards.
+- Home's step card (typed steps, sync) folds behind "Log steps" on the scene (Game.openStepLog).
+- The walking scene (heroDraw): her real rig walks down a scrolling block with the active pet. Faster the more steps
+  today (standing still under 100), waves with a "Hi!" when the app opens / comes back / is tapped, and the pet sits
+  with a "…?" until she has walked. Stops drawing when Home is not showing or the app is hidden.
+- theme.css (loaded after the inline styles): glowing outlined cards, amber buttons, the Outfit font (fonts/, OFL).
+- tour.js steps carry the view they live in (v) and open it before pointing; Houses/Gear/Map steps point at the bottom bar.
+- A new player's Home shows "Your first house · Go" (opens Loot).
+- 0.69.1 (owner: "make auntie dot cuter"): DOT_SVG redrawn chibi: silver hair puff, beaded headwrap, cat-eye glasses on a chain, gold hoops, waving, coffee mug, DOT'S apron.
+- 0.70 (owner: "i want animation when we get hurt like a wince"): house.js hurtPlayer sets p.wince (0.6 s, its own clock): squash then a small bounce, an arm up to the face, head flinch, a sweat drop flying off and an 'ow!/oof!/eek!' pop (winceFx). Hit stun timing unchanged.
+- 0.71 (owner chose: keep customisable characters, restyle them toward the soft chibi look for free): art.js CHIBI - survivor heads x1.15 (on top of the player's head size), eyes x1.25, zombie heads x1.15 (rig.headScale in drawRig), ink lines -> warm brown #4a2e2a and 0.68x thinner, ink fills -> #221a1e. VB grew to y -300 / h 308 for the bigger heads. Pets (crew.js drawPet) and DOT_SVG use the same brown line.
+- 0.72 (owner: "use the characters that we created with Sprite Cook ... everything else very similar style", credits on "a dog/cat, cat first"):
+  next/img/*.webp (380 KB, cut out of the SpriteCook sheets kept in mockups/ui/spritecook/): dot, you, lena, zombie,
+  wince0-3, cat0-3 and dog0-3 (one per coat, same order as crew.js COATS). ART.img(name) loads them; ART.pinkGirl(look)
+  (pink hair + pink/blush hoodie) swaps the player's drawn rig for the SpriteCook girl on Home, Me and the hit bubble -
+  other looks keep the customisable drawn rig. Dot's DOT_SVG is now an <img>. Pets everywhere (Home, house runs, the
+  base, crew sheet, cards) use their coat's picture, hopping when they move; only the hiding "peek" is still drawn.
+  Field cards dot / walker / lena / pets use the pictures. Restyle of the drawn rigs: thinner sticker edge, a soft pastel
+  filter, rosy cheeks, the walker recoloured mint + lavender with a small one-fang mouth (no open jaw / drool).
+  Licence of the SpriteCook art not yet confirmed by the owner (free plan); all 40 credits spent.

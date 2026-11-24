@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dead Miles - four UI samples</title>
+<style>
+  @font-face { font-family: Hand; src: url(fonts/NothingYouCouldDo-Regular.ttf); }
+  @font-face { font-family: Pix; src: url(fonts/Silkscreen-Regular.ttf); }
+  @font-face { font-family: Pix2; src: url(fonts/PixelifySans-Medium.ttf); }
+  @font-face { font-family: Out; src: url(fonts/Outfit-Regular.ttf); font-weight: 400; }
+  @font-face { font-family: Out; src: url(fonts/Outfit-Bold.ttf); font-weight: 800; }
+  @font-face { font-family: Chunk; src: url(fonts/EricaOne-Regular.ttf); }
+  * { box-sizing: border-box; } body { margin: 0; background: #0b0a14; font-family: Out, system-ui, sans-serif; }
+  .wall { display: flex; flex-wrap: wrap; gap: 30px; padding: 30px; justify-content: center; }
+  .cap { width: 390px; margin-bottom: 10px; color: #e8e0ff; } .cap b { display: block; font: 800 20px Out; } .cap span { font: 400 13px/1.4 Out; color: #a99fcc; }
+  .phone { position: relative; width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 3px solid #26213e; box-shadow: 0 30px 60px rgba(0,0,0,.55); }
+
+  /* ============ A · NEON NIGHT ============ */
+  .A { background: radial-gradient(120% 70% at 50% 0%, #11454a, #082226 60%, #051619); color: #e9fff6; padding: 56px 18px 0; }
+  .A .logo { font: 400 30px Chunk; letter-spacing: 1px; color: #ff6fb5; text-shadow: 0 0 10px #ff2e93, 0 0 22px #ff2e93; }
+  .A .logo i { font-style: normal; color: #7dffb5; text-shadow: 0 0 10px #22ff88, 0 0 22px #22ff88; }
+  .A .hrow { display: flex; align-items: center; justify-content: space-between; }
+  .A .horde { padding: 6px 12px; border-radius: 99px; border: 2px solid #ffd166; color: #ffd166; font: 800 13px Out; box-shadow: 0 0 12px rgba(255,209,102,.45), inset 0 0 8px rgba(255,209,102,.25); }
+  .A .hero { position: relative; margin: 18px 0 14px; height: 210px; border-radius: 28px; border: 2px solid #7dffb5; box-shadow: 0 0 18px rgba(125,255,181,.35), inset 0 0 30px rgba(125,255,181,.12); background: linear-gradient(160deg, #0f3a3e, #0a2a2d); overflow: hidden; }
+  .A .hero canvas { position: absolute; left: 4px; bottom: 0; }
+  .A .steps { position: absolute; right: 20px; top: 34px; text-align: right; }
+  .A .steps b { display: block; font: 800 52px/1 Out; color: #fff; text-shadow: 0 0 14px #7dffb5; } .A .steps span { font: 800 14px Out; color: #7dffb5; }
+  .A .bar { position: absolute; right: 20px; left: 160px; bottom: 30px; height: 14px; border-radius: 9px; background: #062024; border: 2px solid #2e6a66; overflow: hidden; }
+  .A .bar i { display: block; height: 100%; width: 74%; background: linear-gradient(90deg, #22ff88, #ffd166); box-shadow: 0 0 12px #22ff88; }
+  .A .barl { position: absolute; right: 20px; bottom: 50px; font: 800 12px Out; color: #9fd8c8; }
+  .A h3 { margin: 6px 4px 10px; font: 800 16px Out; color: #9fd8c8; letter-spacing: 2px; text-transform: uppercase; }
+  .A .do { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; padding: 14px 16px; border-radius: 20px; background: rgba(10,40,44,.8); border: 2px solid var(--c); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 45%, transparent); }
+  .A .do .e { font-size: 30px; } .A .do b { display: block; font: 800 18px Out; } .A .do span { font: 400 13px Out; color: #9fd8c8; }
+  .A .do .go { margin-left: auto; padding: 9px 16px; border-radius: 14px; background: var(--c); color: #051619; font: 800 15px Out; }
+  .A .nav { position: absolute; left: 14px; right: 14px; bottom: 18px; height: 78px; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; border-radius: 28px; background: #0a2a2d; border: 2px solid #2e6a66; }
+  .A .nav a { display: flex; flex-direction: column; align-items: center; gap: 3px; font: 800 12px Out; color: #6fa89a; } .A .nav a .e { font-size: 26px; filter: grayscale(.6) opacity(.7); }
+  .A .nav a.on { color: #ff6fb5; text-shadow: 0 0 8px #ff2e93; } .A .nav a.on .e { filter: drop-shadow(0 0 8px #ff2e93); }
+
+  /* ============ B · SURVIVOR'S JOURNAL ============ */
+  .B { background: #3a4a2c; background-image: radial-gradient(circle at 20% 10%, #4b5e38, transparent 40%), radial-gradient(circle at 80% 90%, #2c3a22, transparent 50%); padding: 50px 40px 0 14px; color: #3b2a1a; }
+  .B .page { position: relative; height: 760px; border-radius: 6px 18px 18px 6px; padding: 22px 18px 18px 30px; background-color: #caa574;
+    background-image: repeating-linear-gradient(transparent 0 33px, rgba(90,60,30,.25) 33px 35px), radial-gradient(circle at 70% 20%, rgba(255,240,200,.25), transparent 60%);
+    box-shadow: 6px 8px 0 #22301a, inset 10px 0 18px rgba(80,50,20,.35); }
+  .B .page::before { content: ''; position: absolute; left: 10px; top: 14px; bottom: 14px; width: 6px; border-left: 2px dashed rgba(90,50,20,.45); }
+  .B .hand { font-family: Hand, cursive; }
+  .B h1 { margin: 0; font: 400 34px Hand; color: #4a1f14; transform: rotate(-2deg); }
+  .B .date { font: 400 17px Hand; color: #6a4a2a; }
+  .B .polar { position: absolute; right: 16px; top: 20px; width: 112px; padding: 7px 7px 26px; background: #efe2c4; transform: rotate(5deg); box-shadow: 2px 4px 0 rgba(40,25,10,.4); }
+  .B .polar canvas { width: 98px; height: 102px; background: linear-gradient(#7a8a9a, #4a5a6a); display: block; }
+  .B .polar span { position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font: 400 15px Hand; }
+  .B .tape { position: absolute; width: 60px; height: 20px; background: rgba(240,220,150,.75); }
+  .B .steps { margin: 22px 0 4px; font: 400 21px Hand; } .B .steps b { font: 800 40px Out; color: #4a1f14; }
+  .B .track { display: flex; gap: 4px; margin: 2px 0 14px; } .B .track i { width: 18px; height: 18px; border: 2px solid #4a1f14; border-radius: 50%; } .B .track i.on { background: #b8401f; }
+  .B .track i.x { background: none; border-style: dashed; }
+  .B h2 { margin: 22px 0 6px; font: 400 27px Hand; color: #b8401f; transform: rotate(-1deg); }
+  .B .todo { list-style: none; margin: 0; padding: 0; } .B .todo li { display: flex; align-items: center; gap: 12px; height: 35px; font: 400 20px Hand; white-space: nowrap; }
+  .B .todo .box { width: 22px; height: 22px; border: 2.5px solid #3b2a1a; border-radius: 3px; transform: rotate(-4deg); }
+  .B .todo li .arrow { margin-left: auto; padding: 1px 10px; border: 2px solid #3b2a1a; border-radius: 12px; font: 800 13px Out; background: #e2c08a; }
+  .B .note { position: absolute; right: 18px; bottom: 30px; width: 150px; padding: 14px 12px; background: #f2c94c; transform: rotate(-4deg); box-shadow: 3px 5px 0 rgba(40,25,10,.35); font: 400 18px/1.15 Hand; }
+  .B .note b { display: block; color: #b8401f; font: 400 22px Hand; }
+  .B .tabs { position: absolute; right: -2px; top: 100px; display: flex; flex-direction: column; gap: 6px; }
+  .B .tabs a { width: 46px; padding: 12px 0 12px 8px; border-radius: 0 12px 12px 0; writing-mode: vertical-rl; font: 400 19px Hand; color: #2a1a0a; box-shadow: 3px 3px 0 rgba(20,25,10,.45); }
+  .B .tabs a.on { width: 54px; }
+  .B .stamp { position: absolute; left: 30px; bottom: 34px; padding: 6px 12px; border: 3px solid #b8401f; color: #b8401f; font: 800 15px Out; letter-spacing: 2px; transform: rotate(-8deg); opacity: .8; border-radius: 6px; }
+
+  /* ============ C · YOUR STREET ============ */
+  .C { background: #2a1840; }
+  .C svg.scene { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .C .top { position: absolute; left: 16px; right: 16px; top: 52px; display: flex; gap: 8px; align-items: center; }
+  .C .pill { padding: 8px 13px; border-radius: 16px; background: rgba(30,16,50,.85); border: 2px solid #120a20; color: #ffe8c2; font: 800 14px Out; display: flex; gap: 6px; align-items: center; }
+  .C .pill b { font: 800 17px Out; color: #ffb84d; }
+  .C .label { position: absolute; transform: translateX(-50%); padding: 6px 11px; border-radius: 14px; background: #ffe8c2; color: #2a1840; font: 800 14px Out; border: 2.5px solid #120a20; box-shadow: 0 4px 0 #120a20; white-space: nowrap; }
+  .C .label::after { content: ''; position: absolute; left: 50%; bottom: -10px; margin-left: -6px; border: 6px solid transparent; border-top-color: #120a20; }
+  .C .label.hot { background: #ff7a59; } .C .label.go { background: #9be36d; }
+  .C .label small { display: block; font: 400 11px Out; }
+  .C canvas.who { position: absolute; }
+  .C .hint { position: absolute; left: 50%; top: 104px; transform: translateX(-50%); padding: 8px 14px; border-radius: 14px; background: rgba(18,10,32,.8); color: #ffe8c2; font: 400 13px Out; white-space: nowrap; }
+  .C .dock { position: absolute; left: 16px; right: 16px; bottom: 20px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .C .dock a { height: 74px; border-radius: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: 800 14px Out; color: #2a1840; border: 3px solid #120a20; box-shadow: 0 5px 0 #120a20; }
+  .C .dock a .e { font-size: 28px; }
+
+  /* ============ D · RETRO HANDHELD ============ */
+  .D { background: linear-gradient(160deg, #ef5a66, #c9343f); padding: 44px 22px 0; }
+  .D .brand { text-align: center; font: 400 14px Pix; letter-spacing: 3px; color: #ffd9dc; margin-bottom: 10px; } .D .brand b { color: #fff; }
+  .D .bezel { padding: 18px 18px 26px; border-radius: 16px 16px 50px 16px; background: #3a3550; box-shadow: inset 0 4px 0 rgba(0,0,0,.35); }
+  .D .bezel .led { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #ff3b3b; box-shadow: 0 0 8px #ff3b3b; margin: 0 6px 8px 0; }
+  .D .bezel small { font: 400 9px Pix; color: #a7a2c2; letter-spacing: 1px; }
+  .D .lcd { position: relative; height: 380px; padding: 12px 12px 10px; border-radius: 6px; background: #a7c957; color: #1f3311; font: 400 15px Pix2; box-shadow: inset 0 0 0 3px #8aaa3a; image-rendering: pixelated; }
+  .D .lcd::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(31,51,17,.06) 0 2px, transparent 2px 4px); pointer-events: none; }
+  .D .stat { display: flex; justify-content: space-between; font: 400 12px Pix; }
+  .D .lcd canvas { position: absolute; right: 14px; top: 34px; width: 96px; height: 120px; image-rendering: pixelated; }
+  .D .big { margin: 14px 0 2px; font: 400 30px Pix; } .D .lab { font: 400 11px Pix; }
+  .D .meter { display: flex; gap: 3px; margin: 6px 0 14px; width: 190px; } .D .meter i { flex: 1; height: 12px; background: #1f3311; } .D .meter i.o { background: none; border: 2px solid #1f3311; }
+  .D ul { list-style: none; margin: 0; padding: 0; } .D li { padding: 4px 0 4px 22px; font: 400 17px Pix2; position: relative; }
+  .D li.on { background: #1f3311; color: #a7c957; } .D li.on::before { content: '▶'; position: absolute; left: 4px; } .D li em { float: right; padding-right: 6px; font-style: normal; }
+  .D .ctrl { position: relative; height: 230px; }
+  .D .dpad { position: absolute; left: 22px; top: 44px; width: 110px; height: 110px; }
+  .D .dpad i { position: absolute; background: #2a2638; border-radius: 6px; box-shadow: 0 4px 0 #15121f; }
+  .D .ab { position: absolute; right: 18px; top: 50px; width: 140px; height: 100px; transform: rotate(-22deg); }
+  .D .ab i { position: absolute; width: 56px; height: 56px; border-radius: 50%; background: #2a2638; box-shadow: 0 5px 0 #15121f; color: #ff9aa3; font: 400 16px Pix; display: grid; place-items: center; }
+  .D .sel { position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); display: flex; gap: 22px; }
+  .D .sel span { display: block; width: 52px; height: 13px; border-radius: 8px; background: #8a2a33; transform: rotate(-22deg); }
+  .D .sel em { display: block; margin-top: 6px; font: 400 9px Pix; color: #ffd9dc; font-style: normal; text-align: center; }
+  .D .grill { position: absolute; right: 26px; bottom: 26px; display: flex; gap: 7px; transform: rotate(-22deg); } .D .grill i { width: 6px; height: 46px; border-radius: 3px; background: #a82a35; }
+  .notes { max-width: 1700px; margin: 0 auto 40px; padding: 0 30px; color: #c9c0ea; font: 400 15px/1.55 Out; }
+</style></head><body>
+<div class="wall">
+
+<!-- A -->
+<div><div class="cap"><b>A · Neon night</b><span>Dark teal and glowing neon instead of purple. Home shows 3 jobs max. 5 big tabs at the bottom.</span></div>
+<div class="phone A">
+  <div class="hrow"><div class="logo">DEAD<i>MILES</i></div><div class="horde">🧟 Horde in 6d</div></div>
+  <div class="hero"><canvas id="cA" width="300" height="400" style="width:150px;height:200px"></canvas>
+    <div class="steps"><b>6,420</b><span>steps today</span></div><div class="barl">next house at 7,000</div><div class="bar"><i></i></div></div>
+  <h3>Tonight</h3>
+  <div class="do" style="--c:#ff6fb5"><span class="e">🏚️</span><div><b>3 houses to loot</b><span>one is a pharmacy</span></div><span class="go">Go</span></div>
+  <div class="do" style="--c:#7dffb5"><span class="e">🃏</span><div><b>Card pack ready</b><span>you hit 10,000 steps</span></div><span class="go">Open</span></div>
+  <div class="do" style="--c:#ffd166"><span class="e">🛡️</span><div><b>Horde on Sunday</b><span>take a watch shift</span></div><span class="go">Shift</span></div>
+  <div class="nav"><a class="on"><span class="e">🏠</span>Home</a><a><span class="e">🏚️</span>Loot</a><a><span class="e">🗺️</span>Map</a><a><span class="e">🎒</span>Bag</a><a><span class="e">⭐</span>Me</a></div>
+</div></div>
+
+<!-- B -->
+<div><div class="cap"><b>B · Survivor's journal</b><span>Your game is a field notebook: kraft paper, tape, sticky notes. Coloured index tabs on the side take you to each section.</span></div>
+<div class="phone B">
+  <div class="page">
+    <h1>Day 23</h1><div class="date">Tue · clear · 55°F</div>
+    <div class="polar"><div class="tape" style="left:30px;top:-10px;transform:rotate(-6deg)"></div><canvas id="cB" width="212" height="220"></canvas><span>me + Mochi</span></div>
+    <div class="steps"><b>6,420</b> steps</div>
+    <div class="track"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="x"></i><i class="x"></i><i class="x"></i></div>
+    <div class="hand" style="font-size:18px">one more house at 7,000 →</div>
+    <h2>To do today</h2>
+    <ul class="todo">
+      <li><span class="box"></span>Loot the pharmacy<span class="arrow">go</span></li>
+      <li><span class="box"></span>Open a card pack<span class="arrow">open</span></li>
+      <li><span class="box"></span>Feed the crew<span class="arrow">base</span></li>
+    </ul>
+    <div class="note"><b>Horde!</b>Sunday night. Do a watch shift before then.</div>
+    <div class="stamp">HP 80 · LV 14</div>
+  </div>
+  <div class="tabs">
+    <a class="on" style="background:#e85d4a">Today</a><a style="background:#f2c94c">Loot</a><a style="background:#7fc8a9">Base</a><a style="background:#8fb3e8">Bag</a><a style="background:#d59ae0">Me</a>
+  </div>
+</div></div>
+
+<!-- C -->
+<div><div class="cap"><b>C · Your street</b><span>Almost no menus: home IS your block at sunset. Tap a place to go there. Only 3 buttons at the bottom.</span></div>
+<div class="phone C">
+  <svg class="scene" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice">
+    <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a1d5c"/><stop offset=".45" stop-color="#b54b6b"/><stop offset=".7" stop-color="#ff9a5a"/></linearGradient></defs>
+    <rect width="390" height="844" fill="url(#sky)"/>
+    <circle cx="300" cy="200" r="46" fill="#ffd27a" opacity=".9"/>
+    <path d="M0 330h30v-40h40v20h30v-50h36v70h40v-30h50v40h30v-60h44v30h40v-20h50v370H0z" fill="#5a2d5c" opacity=".7"/>
+    <!-- far row: Dot's + base -->
+    <g stroke="#120a20" stroke-width="3" stroke-linejoin="round">
+      <rect x="18" y="300" width="150" height="150" fill="#7a3a5a"/><rect x="18" y="290" width="150" height="16" fill="#4a1f3a"/>
+      <rect x="30" y="318" width="126" height="30" rx="6" fill="#ffd166"/><text x="93" y="339" font-family="Out" font-weight="800" font-size="16" text-anchor="middle" fill="#2a1840" stroke="none">DOT'S SWAP</text>
+      <rect x="34" y="364" width="50" height="60" fill="#8fd3e8"/><rect x="100" y="364" width="50" height="86" fill="#2a1840"/>
+      <circle cx="50" cy="394" r="12" fill="#e8e0ff"/><circle cx="72" cy="394" r="12" fill="#e8e0ff"/>
+      <path d="M212 450V330l70-50 70 50v120z" fill="#3f8a6a"/><path d="M204 334l78-58 78 58" fill="none" stroke-width="6"/>
+      <rect x="230" y="350" width="34" height="30" fill="#ffd166"/><rect x="298" y="350" width="34" height="30" fill="#ffd166"/><rect x="266" y="398" width="32" height="52" fill="#7a4a2a"/>
+      <path d="M282 278v-40" /><path d="M282 238h30l-8 9 8 9h-30z" fill="#ff7a59"/>
+      <rect x="196" y="440" width="180" height="14" fill="#6a4a2a"/><path d="M200 440v-24M220 440v-24M340 440v-24M360 440v-24" />
+    </g>
+    <!-- street -->
+    <rect y="454" width="390" height="34" fill="#8a6a8a" stroke="#120a20" stroke-width="3"/>
+    <rect y="488" width="390" height="120" fill="#3a2a4a"/>
+    <path d="M10 548h40M90 548h40M170 548h40M250 548h40M330 548h40" stroke="#ffd166" stroke-width="5" stroke-dasharray="0"/>
+    <rect y="608" width="390" height="24" fill="#8a6a8a" stroke="#120a20" stroke-width="3"/>
+    <!-- near row: lootable houses -->
+    <g stroke="#120a20" stroke-width="3" stroke-linejoin="round">
+      <rect x="6" y="632" width="118" height="212" fill="#c55a4a"/><path d="M0 640l65-46 65 46z" fill="#7a2a3a"/><rect x="24" y="664" width="30" height="34" fill="#2a1840"/><rect x="76" y="664" width="30" height="34" fill="#ffd166"/>
+      <rect x="138" y="622" width="116" height="222" fill="#e8e0ff"/><rect x="138" y="622" width="116" height="26" fill="#3fa77a"/><text x="196" y="641" font-family="Out" font-weight="800" font-size="14" text-anchor="middle" fill="#fff" stroke="none">PHARMACY</text>
+      <path d="M186 676h20M196 666v20" stroke="#e8485a" stroke-width="7"/><rect x="152" y="700" width="88" height="40" fill="#8fd3e8"/>
+      <rect x="268" y="640" width="118" height="204" fill="#5a6ab8"/><rect x="284" y="664" width="30" height="34" fill="#ffd166"/><rect x="336" y="664" width="30" height="34" fill="#2a1840"/><path d="M262 646h130l-10-18H272z" fill="#2a3a7a"/>
+    </g>
+  </svg>
+  <div class="top"><div class="pill">👟 <b>6,420</b> · house at 7k</div><div class="pill" style="margin-left:auto">🧟 6d</div></div>
+  <div class="label" style="left:93px;top:250px">🧺 Dot's shop<small>new stock</small></div>
+  <div class="label go" style="left:282px;top:184px">🏠 Your base<small>garden ready</small></div>
+  <div class="label hot" style="left:196px;top:572px">❗ Pharmacy<small>danger 3</small></div>
+  <div class="label hot" style="left:66px;top:582px">❗ Rowhouse</div>
+  <div class="label hot" style="left:327px;top:590px">❗ Bodega</div>
+  <canvas class="who" id="cC" width="200" height="250" style="left:150px;top:420px;width:100px;height:125px"></canvas>
+  <div class="hint">Tap a place to go there</div>
+  <div class="dock"><a style="background:#ffd166"><span class="e">🗺️</span>Map</a><a style="background:#9be36d"><span class="e">🎒</span>Bag</a><a style="background:#ff9ac8"><span class="e">⭐</span>Me</a></div>
+</div></div>
+
+<!-- D -->
+<div><div class="cap"><b>D · Retro handheld</b><span>The whole game is a little device. One simple list menu with a cursor: you always see every place you can go.</span></div>
+<div class="phone D">
+  <div class="brand">DEAD <b>MILES</b> · POCKET</div>
+  <div class="bezel"><span class="led"></span><small>BATTERY · 6,420 STEPS</small>
+    <div class="lcd">
+      <div class="stat"><span>CELESTE LV14</span><span>HP 80</span></div>
+      <canvas id="cD" width="48" height="60"></canvas>
+      <div class="big">6420</div><div class="lab">STEPS · HOUSE AT 7000</div>
+      <div class="meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="o"></i><i class="o"></i></div>
+      <ul>
+        <li class="on">LOOT A HOUSE<em>3!</em></li><li>MY BASE<em>1</em></li><li>DOT'S SHOP</li><li>MAP</li><li>BAG</li><li>ME &amp; CARDS<em>1</em></li>
+      </ul>
+    </div>
+  </div>
+  <div class="ctrl">
+    <div class="dpad"><i style="left:38px;top:0;width:34px;height:110px"></i><i style="left:0;top:38px;width:110px;height:34px"></i></div>
+    <div class="ab"><i style="left:0;top:30px">B</i><i style="left:78px;top:0">A</i></div>
+    <div class="sel"><div><span></span><em>SELECT</em></div><div><span></span><em>START</em></div></div>
+    <div class="grill"><i></i><i></i><i></i><i></i></div>
+  </div>
+</div></div>
+</div>
+<div class="notes">All four keep the same game, just organized differently. Whichever you like, Home only shows what needs you today (max 3 things), and everything else is one tap away in a place that never moves. Colours can be swapped between styles, e.g. the journal in darker colours, or the street at night.</div>
+<script src="../../next/s2art.js"></script>
+<script src="../../next/art.js"></script>
+<script>
+(async () => {
+  await document.fonts.ready;
+  const look = ART.LOOK.norm({ hair: 1, hairC: 4, coat: 6, mouth: 1 });
+  try { await ART.buildRig('survivor', 2, ART.LOOK.recolor(look), 'mock', ART.LOOK.patch(look)); } catch (e) { console.warn(e); return; }
+  const draw = (id, sc, yf = .97) => { const cv = document.getElementById(id), x = cv.getContext('2d'); ART.drawRig(x, 'mock', cv.width / 2, cv.height * yf, sc, false, { weapon: 'fists' }); return { cv, x }; };
+  draw('cA', 1.45); draw('cB', .95, 1.08); draw('cC', .9);
+  // pixel version for the handheld: draw small, then snap every pixel to a 4-shade LCD palette
+  const { cv, x } = draw('cD', .21);
+  const d = x.getImageData(0, 0, cv.width, cv.height), P = [[31, 51, 17], [72, 98, 34], [120, 150, 52], [167, 201, 87]];
+  for (let i = 0; i < d.data.length; i += 4) { if (d.data[i + 3] < 90) { d.data[i + 3] = 0; continue; } const l = (d.data[i] * .3 + d.data[i + 1] * .59 + d.data[i + 2] * .11) / 255, c = P[Math.min(3, Math.floor(l * 4))]; d.data[i] = c[0]; d.data[i + 1] = c[1]; d.data[i + 2] = c[2]; d.data[i + 3] = 255; }
+  x.putImageData(d, 0, 0);
+})();
+</script>
+</body></html>

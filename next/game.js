@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.66.0';
+const NEXT_VERSION = '0.72.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -396,7 +396,7 @@ const NEXT_VERSION = '0.66.0';
       const rnd = D.mulberry32(h.seed ^ 0x2c1b3c6d), cs = L.furn.filter(f => f.loot && !f.secretLoot && f.room !== 'o');
       if (cs.length && rnd() < (h.type === 'mansion' ? .75 : .45)) {
         L.furn = L.furn.map(f => Object.assign({}, f));
-        const ks = Object.keys(D.DECOR), f = L.furn.filter(f => f.loot && !f.secretLoot && f.room !== 'o')[Math.floor(rnd() * cs.length)];
+        const ks = Object.keys(D.DECOR).filter(d => !D.DECOR[d].dot), f = L.furn.filter(f => f.loot && !f.secretLoot && f.room !== 'o')[Math.floor(rnd() * cs.length)];
         f.extra = (f.extra || []).concat(ks[Math.floor(rnd() * ks.length)]); f.noEmpty = 1;
       }
     }
@@ -483,7 +483,7 @@ const NEXT_VERSION = '0.66.0';
   Object.assign(Game, { countItem: k => countItem(k), takeItems: (k, n) => takeItems(k, n), give: (k, n, d, q) => give(k, n, d, q) });
   function refreshTrader(force) {
     const T = SV.trader, day = SV.day.key;
-    if (T.day === day && !force) return;
+    if (T.day === day && !force && T.sv === 67) return;   // 0.67: restock once for the new shelves
     const rnd = D.mulberry32(D.hashStr(SV.seedBase + ':dot:' + day + ':' + traderLevel()));
     if (T.day !== day) { // new quest offers at local midnight
       T.offers = [];
@@ -507,7 +507,13 @@ const NEXT_VERSION = '0.66.0';
     if (L >= 2 && rnd() < .35) { const c = cosOf(D.pickCos([], rnd)); if (!own[c] && !T.stock.some(e => e.k === 'cos_' + c)) T.stock.push({ k: 'cos_' + c, n: 1, price: D.RARITY[D.COS[c].r].price, left: 1 }); }
     // 0.26: Dot's holiday shelf - two pieces of the running holiday's decor (Deck the base), new each day
     if (EVA && EVA.ev.decor) { const dk = EVA.ev.decor.slice().sort(() => rnd() - .5).slice(0, 2); for (const k of dk) T.stock.push({ k, n: 1, price: D.DECOR[k].v * 6, left: 2 }); }
-    T.day = day;
+    // 0.67 (owner: "Dot doesn't really have anything that we need"): a decor shelf every day - one piece only Dot has
+    // (jukebox, fish tank) and two others - and from trader level 2 a Dot's special: a Fine weapon (Masterwork at level 4+)
+    { const exc = Object.keys(D.DECOR).filter(k => D.DECOR[k].dot), rest = Object.keys(D.DECOR).filter(k => !D.DECOR[k].dot && !D.DECOR[k].ev && !T.stock.some(e => e.k === k)).sort(() => rnd() - .5).slice(0, 2);
+      for (const k of [exc[Math.floor(rnd() * exc.length)]].concat(rest)) if (k) T.stock.push({ k, n: 1, price: D.DECOR[k].v * 6, left: 1 }); }
+    if (L >= 2) { const ws = D.SHOP.filter(r => D.isWeapon(r[0]) && r[3] <= L + 1 && r[2] >= 40 && r[2] <= 130); if (ws.length) { const r = ws[Math.floor(rnd() * ws.length)], q = L >= 4 && rnd() < .35 ? 5 : 4;
+      T.stock.push({ k: r[0], n: 1, price: Math.round(r[2] * (q === 5 ? 2.6 : 1.7)), left: 1, q, special: 1 }); } }
+    T.day = day; T.sv = 67;
   }
   function makeQuest(type, tier, rnd) {
     const T = SV.trader, Q = D.QUESTS[type];
@@ -864,7 +870,7 @@ const NEXT_VERSION = '0.66.0';
     return keys.map(k => {
       const r = D.RECIPES[k], ok = known && canCraft(r), out = r.out[0];
       return `<div class="recipe tap${ok ? '' : ' no'}${known ? '' : ' locked'}" data-rec="${k}"><div class="rout">${icon(out)}${r.out[1] > 1 ? `<em>x${r.out[1]}</em>` : ''}</div>
-        <div class="rinfo"><b>${r.n}</b>${known ? '' : `<div class="bpneed">Blueprint needed - Dot trades them${r.cl ? ` · learn at Crafting level ${r.cl}` : ''}</div>`}<div class="rin">${Object.keys(r.in).map(m => { const have = countItem(m); return `<span class="${have >= r.in[m] ? 'ok' : 'miss'}">${icon(m)}<i>${D.ITEMS[m].n}</i> ${have}/${r.in[m]}</span>`; }).join('')}</div></div>
+        <div class="rinfo"><b>${r.n}</b>${known ? '' : `<div class="bpneed">${r.auto ? `Unlocks at Crafting level ${r.auto}` : `Blueprint needed - Dot trades them${r.cl ? ` · learn at Crafting level ${r.cl}` : ''}`}</div>`}<div class="rin">${Object.keys(r.in).map(m => { const have = countItem(m); return `<span class="${have >= r.in[m] ? 'ok' : 'miss'}">${icon(m)}<i>${D.ITEMS[m].n}</i> ${have}/${r.in[m]}</span>`; }).join('')}</div></div>
         ${known ? `<button class="mbtn sm${ok ? '' : ' ghost'}" data-craft="${k}"${ok ? '' : ' disabled'}>Craft</button>` : '<span class="rlock">?</span>'}</div>`;
     }).join('');
   }
@@ -872,9 +878,10 @@ const NEXT_VERSION = '0.66.0';
     if (benchHost && !document.body.contains(benchHost)) benchHost = null;
     const s = SV.survivor, el = benchHost || $('#mpane');
     if (benchHost && benchSel) { el.innerHTML = benchDetailHTML(benchSel); bindDetail(el); return; }
-    const inCat = k => benchCat === 'all' || grpOf(D.RECIPES[k].out[0]) === benchCat;
-    const unknown = Object.keys(D.RECIPES).filter(k => !s.known.includes(k) && inCat(k)), known = s.known.filter(k => D.RECIPES[k] && inCat(k));
-    const bar = `<div class="catf">${[['all', 'All']].concat(DM.Trades ? [['kitchen', '🍳 Kitchen']] : [], CATF.slice(1).filter(([g]) => Object.keys(D.RECIPES).some(k => grpOf(D.RECIPES[k].out[0]) === g))).map(([g, lab]) => `<button class="chip${benchCat === g ? ' on' : ''}" data-bc="${g}">${lab}</button>`).join('')}</div>`;   // 0.59: bench tabs
+    if (DM.Craft) DM.Craft.sync();   // 0.67: recipes that come with Crafting level
+    const inCat = k => benchCat === 'all' || (benchCat === 'decor' ? D.cat(D.RECIPES[k].out[0]) === 'decor' : grpOf(D.RECIPES[k].out[0]) === benchCat);
+    const unknown = Object.keys(D.RECIPES).filter(k => !s.known.includes(k) && inCat(k)).sort((a, b) => (D.RECIPES[a].auto || 99) - (D.RECIPES[b].auto || 99)), known = s.known.filter(k => D.RECIPES[k] && inCat(k));
+    const bar = `<div class="catf">${[['all', 'All']].concat(DM.Trades ? [['kitchen', '🍳 Kitchen']] : [], DM.Craft ? [['decor', '🪑 Decor']] : [], CATF.slice(1).filter(([g]) => Object.keys(D.RECIPES).some(k => grpOf(D.RECIPES[k].out[0]) === g))).map(([g, lab]) => `<button class="chip${benchCat === g ? ' on' : ''}" data-bc="${g}">${lab}</button>`).join('')}</div>`;   // 0.59: bench tabs
     el.innerHTML = bar + (benchCat === 'kitchen' && DM.Trades ? `<div class="ktwrap">${DM.Trades.kitchenHTML(icon)}</div>` : `<div class="kick sect">Workbench · ${s.known.length} recipe${s.known.length === 1 ? '' : 's'} known · 🔨 Crafting level ${DM.Trades ? DM.Trades.lvl('craft') : 1}</div><div class="benchhint">Tap a recipe to see what it does and where to find each material.${benchCat === 'all' && DM.Trades ? ' Cooking is in the 🍳 Kitchen tab.' : ''}</div>` + benchRows(known, true)
       + (unknown.length ? `<div class="kick sect">Not learned yet · ${unknown.length}</div>` + benchRows(unknown, false) : ''))
       + (benchCat === 'kitchen' ? '' : `<div class="empty">${unknown.length ? 'Blueprints: Dot trades them, and some turn up in hidden stashes and safes.' : 'You know every blueprint so far.'}<br>Materials come from the stash and the pack.</div>`);
@@ -890,7 +897,7 @@ const NEXT_VERSION = '0.66.0';
       <div class="kick sect">Materials</div>
       ${Object.keys(r.in).map(m => { const have = countItem(m), ok = have >= r.in[m]; return `<div class="rdmat ${ok ? 'ok' : 'miss'}">${icon(m)}<div><b>${D.ITEMS[m].n}</b><span>${esc(whereFrom(m))}</span></div><em>${have}/${r.in[m]}</em></div>`; }).join('')}
       ${known ? (miss.length ? `<button class="mbtn big" disabled>Missing: ${miss.map(m => D.ITEMS[m].n.toLowerCase()).join(', ')}</button>` : `<button class="mbtn big" id="rdCraft">Craft ${esc(it.n)}${r.out[1] > 1 ? ' x' + r.out[1] : ''}</button>`)
-        : '<button class="mbtn big" disabled>Blueprint needed - Dot trades them</button>'}
+        : `<button class="mbtn big" disabled>${r.auto ? `Unlocks at Crafting level ${r.auto}` : 'Blueprint needed - Dot trades them'}</button>`}
       <button class="mbtn big ghost" id="rdBack">${benchHost ? 'Back to the bench' : 'Close'}</button></div>`;
   }
   function bindDetail(el) {
@@ -906,18 +913,10 @@ const NEXT_VERSION = '0.66.0';
   }
 
   // ---- trader screen
-  const DOT_SVG = `<svg viewBox="0 0 120 140" class="dotsvg"><ellipse cx="60" cy="134" rx="40" ry="6" fill="rgba(8,6,22,.45)"/>
-    <path d="M22 134 Q20 98 38 88 L82 88 Q100 98 98 134 Z" fill="#5a4a86" stroke="#11142f" stroke-width="4" stroke-linejoin="round"/>
-    <path d="M46 88 L60 112 L74 88" fill="#f6e3bb" stroke="#11142f" stroke-width="3" stroke-linejoin="round"/>
-    <path d="M30 104 L40 100 M86 104 L80 112" stroke="#3d2d61" stroke-width="3" stroke-linecap="round"/><rect x="74" y="112" width="12" height="9" rx="2" fill="#93a86c" stroke="#11142f" stroke-width="2.4"/>
-    <circle cx="60" cy="58" r="27" fill="#8a5a3c" stroke="#11142f" stroke-width="4"/>
-    <path d="M32 52 Q30 22 60 20 Q92 20 90 52 Q84 40 60 40 Q38 40 32 52 Z" fill="#f07b3c" stroke="#11142f" stroke-width="4" stroke-linejoin="round"/>
-    <path d="M86 34 Q100 32 98 46 Q92 40 86 42 Z" fill="#c95f2c" stroke="#11142f" stroke-width="3" stroke-linejoin="round"/>
-    <circle cx="48" cy="60" r="8" fill="#f6e3bb" fill-opacity=".25" stroke="#11142f" stroke-width="3"/><circle cx="72" cy="60" r="8" fill="#f6e3bb" fill-opacity=".25" stroke="#11142f" stroke-width="3"/><path d="M56 60 h8" stroke="#11142f" stroke-width="3"/>
-    <circle cx="49" cy="61" r="2.6" fill="#11142f"/><circle cx="73" cy="61" r="2.6" fill="#11142f"/>
-    <path d="M52 74 Q60 79 68 73" stroke="#11142f" stroke-width="3" fill="none" stroke-linecap="round"/>
-    <rect x="70" y="44" width="12" height="5" rx="2" fill="#f4b98a" stroke="#11142f" stroke-width="1.6" transform="rotate(20 76 46)"/>
-    <circle cx="40" cy="70" r="3" fill="#c96a6a" opacity=".5"/><circle cx="80" cy="70" r="3" fill="#c96a6a" opacity=".5"/></svg>`;
+  // 0.69.1 (owner: "make auntie dot cuter cus wtf is that"): chibi like the rest of the cast - silver puff of hair under a
+  // beaded headwrap, cat-eye glasses on a chain, gold hoops, big smile, waving, coffee in the other hand, her shop apron
+  // 0.72 (owner: "let's use the characters that we created with Sprite Cook"): Dot's portrait is the SpriteCook picture
+  const DOT_SVG = '<img class="dotsvg dotimg" src="img/dot.webp" alt="Auntie Dot">';
   let tTab = 'quests', tSel = null;
   // 0.15 (owner: "the trader shouldn't be infinite"): after each visit Dot heads off and is back once you have walked
   // DOT_AWAY more steps (SV.walked: phone/watch steps, typed ones at half, the same total quests use). A visit starts when
@@ -1005,8 +1004,10 @@ const NEXT_VERSION = '0.66.0';
     const row = (e, i) => { const cos = D.ITEMS[e.k].cos, left = e.left && !(cos && Game.hasCos(cos)); return `<div class="shoprow${left ? '' : ' gone'}${cos ? ' cosrow' : ''}">${icon(e.k)}<div><b>${D.ITEMS[e.k].n}${e.n > 1 ? ' x' + e.n : ''}${D.isWeapon(e.k) ? qTag(e) : ''}</b>${cos ? cosRow(e) : `<span>${e.left ? e.left + ' left' : 'sold out'}</span>`}</div>
       <button class="mbtn sm${T.caps >= e.price && left ? '' : ' ghost'}" data-buy="${i}"${left ? '' : ' disabled'}>${icon('caps')}${e.price}</button></div>`; };
     const cosI = T.stock.map((e, i) => i).filter(i => D.ITEMS[T.stock[i].k].cos), goodI = T.stock.map((e, i) => i).filter(i => !D.ITEMS[T.stock[i].k].cos);
-    el.innerHTML = (cosI.length ? `<div class="kick sect">Back shelf · cosmetics</div>` + cosI.map(i => row(T.stock[i], i)).join('') : '') +
-      `<div class="kick sect">Today's stock · level ${traderLevel()}</div>` + (goodI.length ? goodI.map(i => row(T.stock[i], i)).join('') : '<div class="empty">Shelves are bare today.</div>') + '<div class="empty">Bought goods go in your pack, or the stash if it is full. Cosmetics go to your wardrobe.</div>';
+    const spI = goodI.filter(i => T.stock[i].special), decI = goodI.filter(i => D.ITEMS[T.stock[i].k].decor), restI = goodI.filter(i => !spI.includes(i) && !decI.includes(i));   // 0.67
+    const sect = (t, ix) => ix.length ? `<div class="kick sect">${t}</div>` + ix.map(i => row(T.stock[i], i)).join('') : '';
+    el.innerHTML = sect("⭐ Dot's special · today only", spI) + (cosI.length ? `<div class="kick sect">Back shelf · cosmetics</div>` + cosI.map(i => row(T.stock[i], i)).join('') : '') + sect('🪑 Decor shelf · for your base', decI) +
+      `<div class="kick sect">Today's stock · level ${traderLevel()}</div>` + (restI.length ? restI.map(i => row(T.stock[i], i)).join('') : '<div class="empty">Shelves are bare today.</div>') + '<div class="empty">Bought goods go in your pack, or the stash if it is full. Cosmetics go to your wardrobe.</div>';
     el.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
       const e = T.stock[+b.dataset.buy];
       if (T.caps < e.price) { toast('Not enough caps, sugar', 1.4); return; }
@@ -1091,7 +1092,138 @@ const NEXT_VERSION = '0.66.0';
   function hideMenu() { $('#menu').classList.add('off'); }
   function showMenu() { $('#menu').classList.remove('off'); }
   let curTab = 'houses';
-  function tab(t) { curTab = t; sel = null; { const ip = $('#ipop'); if (ip) ip.classList.remove('on'); }   /* 0.59: an item popup never follows you to another tab */ if (t === 'stash' && SV.survivor.better) { SV.survivor.better = null; Game.save(); } document.querySelectorAll('#mtabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); renderHome(); }
+  // ---------------------------------------------------------------- 0.69 the five tabs (owner: "the UI is insane and just very
+  // difficult to navigate ... can't find things, too much at once"; picked the Grape & amber glow style, "make my character
+  // animated, same thing if we have a pet")
+  //   Home = the walking scene + at most 3 things that need you · Loot = today's houses, Dot, route · Map · Bag = gear and
+  //   workbench · Me = your character, skills, wardrobe and every activity. Every old piece of the home screen still exists;
+  //   it lives in one of these views (HV), so nothing lost its button.
+  let HV = 'home', stepLogOpen = false;
+  const ME_TABS = ['walks', 'gacha', 'event'];
+  const viewOf = t => t === 'houses' ? 'loot' : (t === 'stash' || t === 'bench') ? 'bag' : ME_TABS.includes(t) ? 'me' : HV;
+  const meTabOk = t => (t === 'walks' && SV.tutorialDone && DM.Walks && unl('walks')) || (t === 'gacha' && SV.tutorialDone && DM.Gacha && unl('gacha')) || (t === 'event' && SV.tutorialDone && EVA && unl('event'));
+  const paneOn = () => HV === 'loot' || HV === 'bag' || (HV === 'me' && ME_TABS.includes(curTab) && meTabOk(curTab));
+  function goView(v) {
+    if (v === 'map') { if (DM.Map) DM.Map.open(); return; }
+    HV = v;
+    if (v === 'loot') curTab = 'houses';
+    else if (v === 'bag' && curTab !== 'stash' && curTab !== 'bench') curTab = 'stash';
+    else if (v === 'me' && !(ME_TABS.includes(curTab) && meTabOk(curTab))) curTab = ME_TABS.find(meTabOk) || curTab;
+    if (curTab === 'stash' && SV.survivor.better) { SV.survivor.better = null; Game.save(); }
+    renderHome0(); const m = $('#menu'); if (m) m.scrollTop = 0;
+  }
+  Game.goView = goView;
+  Game.view = () => HV;
+  Game.openStepLog = () => { if (stepLogOpen) return; stepLogOpen = true; const el = $('#stepLog'), b = $('#h2Log'); if (el) el.hidden = false; if (b) b.classList.add('on'); };
+  const NAV_ICON = {
+    home: '<path d="M3.5 11 12 4l8.5 7v9h-6v-5.5h-5V20h-6z"/>',
+    loot: '<path d="M4 20V9l5-4 5 4v11zM14 20V12h6v8z"/><path d="M8 20v-4h2v4"/>',
+    map: '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/>',
+    bag: '<path d="M6 8h12l1 12H5zM9 8V6a3 3 0 0 1 6 0v2"/>',
+    me: '<path d="M12 3l2.6 5.5 6 .8-4.4 4.1 1.1 6L12 16.5 6.7 19.4l1.1-6L3.4 9.3l6-.8z"/>',
+  };
+  function navHTML(gated) {
+    const s = SV.survivor, newH = (SV.houses || []).filter(h => h.status === 'new' && !h.quest).length || (!SV.tutorialDone ? 1 : 0);
+    const meDot = DM.Skills.points(s) > 0 || newCos() > 0 || (DM.Walks && SV.tutorialDone && DM.Walks.claimable());
+    const items = [['home', 'Home', 0], ['loot', 'Loot', newH], ['map', 'Map', 0], ['bag', 'Bag', betterBadge() ? '!' : 0], ['me', 'Me', meDot ? '•' : 0]].filter(([k]) => k !== 'map' || DM.Map);
+    return `<nav id="bnav" class="bnav">${items.map(([k, n, b]) => `<button data-nav="${k}" class="${HV === k ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">${NAV_ICON[k]}</svg><span>${n}</span>${b ? `<i class="nbad${b === '•' ? ' dot' : ''}">${b === '•' ? '' : b}</i>` : ''}</button>`).join('')}</nav>`;
+  }
+  function bindNav() {
+    document.querySelectorAll('#bnav [data-nav]').forEach(b => b.onclick = () => { const v = b.dataset.nav; if (v === HV && v !== 'map') { const m = $('#menu'); if (m) m.scrollTo({ top: 0, behavior: 'smooth' }); return; } SFX.play('ui'); goView(v); });
+    const lg = $('#h2Log'); if (lg) lg.onclick = () => { SFX.play('ui'); stepLogOpen = !stepLogOpen; const el = $('#stepLog'); if (el) el.hidden = !stepLogOpen; lg.classList.toggle('on', stepLogOpen); };
+    const hm = $('#hMore'); if (hm) hm.onclick = () => { SFX.play('ui'); goView('me'); };
+    const hc = $('#heroCv'); if (hc) hc.onclick = () => { heroWave(); };
+  }
+
+  // ---------------------------------------------------------------- 0.69 the walking scene on Home
+  // She walks down the block with her pet while the street scrolls past. Three touches (owner: "I'd like all 3"):
+  //   1. the more steps today, the faster she walks (standing still before the first 100);
+  //   2. she waves when you open the app (and when you tap her);
+  //   3. the pet sits beside her until she has walked today, then trots along.
+  const SCN = { raf: 0, wave: -9, t0: 0, waved: false, pet: null, tmp: null, town: null };
+  function heroHTML(d, nxt) {
+    const steps = Math.round(d.phone + d.walk + d.typed), eff = effective(d), pct = nxt ? Math.max(3, Math.min(100, eff / nxt * 100)) : 100;
+    return `<div class="hero2"><canvas id="heroCv" aria-label="You, out walking"></canvas>
+      <div class="h2steps"><b>${steps.toLocaleString('en-US')}</b><span>steps today</span></div>
+      <div class="h2next">${nxt ? `next house at ${nxt.toLocaleString('en-US')}` : 'all houses found today'}</div><div class="h2bar"><i style="width:${pct}%"></i></div>
+      <button class="h2log${stepLogOpen ? ' on' : ''}" id="h2Log">${d.phone ? 'Steps & sync' : '＋ Log steps'}</button></div>`;
+  }
+  function heroWave() { SCN.wave = performance.now() / 1000; }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') SCN.waved = false; });
+  function heroStart() {
+    const cv = $('#heroCv'); if (!cv) return;
+    if (!SCN.waved) { SCN.waved = true; SCN.wave = performance.now() / 1000 + .35; }
+    if (!SCN.tmp) SCN.tmp = document.createElement('canvas');
+    if (!SCN.t0) SCN.t0 = performance.now() / 1000;
+    if (SCN.raf) return;
+    const loop = () => { SCN.raf = 0; const c = $('#heroCv'); if (!c || DM.scene || HV !== 'home' || document.hidden) return; heroDraw(c); SCN.raf = requestAnimationFrame(loop); };
+    SCN.raf = requestAnimationFrame(loop);
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && SV && !DM.scene) heroStart(); });
+  function town(W) {   // a strip of rowhouses, made once per width
+    if (SCN.town && SCN.town.W === W) return SCN.town;
+    const B = []; let x = 0, i = 0; while (x < W * 2.2) { const w = 34 + (i * 37) % 30, h = 58 + (i * 53) % 52; B.push({ x, w, h, win: (i * 7) % 3, roof: i % 3 }); x += w + 3; i++; }
+    return (SCN.town = { W, B, len: x });
+  }
+  function heroDraw(cv) {
+    const dpr = Math.min(3, window.devicePixelRatio || 2), W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+    const d = SV.day, steps = d.phone + d.walk + d.typed, now = performance.now() / 1000, t = now - SCN.t0;
+    const walking = steps >= 100, k = walking ? .6 + Math.min(1.4, steps / 7000) : 0;   // 1. faster with more steps
+    SCN.dist = (SCN.dist || 0) + (SCN.last ? Math.min(.1, now - SCN.last) : 0) * 34 * k; SCN.last = now;
+    SCN.ph = (SCN.ph || 0) + (SCN.lastPh ? Math.min(.1, now - SCN.lastPh) : 0) * 7 * k; SCN.lastPh = now;
+    // sky, moon, the block
+    const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#3a2868'); g.addColorStop(1, '#5a3a7a'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+    x.fillStyle = 'rgba(255,214,140,.14)'; x.beginPath(); x.arc(W * .46, 30, 25, 0, 6.28); x.fill(); x.fillStyle = 'rgba(255,214,140,.92)'; x.beginPath(); x.arc(W * .46, 30, 14, 0, 6.28); x.fill();
+    const gy = H - 22, T = town(W), o1 = (SCN.dist * .35) % T.len;
+    x.lineWidth = 2; x.strokeStyle = '#11142f';
+    for (const rep of [0, 1]) for (const b of T.B) { const bx = b.x - o1 + rep * T.len; if (bx > W || bx + b.w < 0) continue;
+      x.fillStyle = '#2a1d4c'; x.fillRect(bx, gy - b.h, b.w, b.h); x.strokeRect(bx, gy - b.h, b.w, b.h);
+      if (b.roof === 0) { x.fillStyle = '#231a40'; x.fillRect(bx - 2, gy - b.h - 4, b.w + 4, 5); }
+      for (let r = 0; r < 3; r++) for (let c2 = 0; c2 < 2; c2++) { const lit = (b.win + r + c2) % 3 === 0; x.fillStyle = lit ? '#ffb347' : '#3d2d61'; x.fillRect(bx + 6 + c2 * (b.w / 2 - 2), gy - b.h + 8 + r * 13, 7, 8); } }
+    x.fillStyle = '#4a3c70'; x.fillRect(0, gy, W, 12); x.fillStyle = '#11142f'; x.fillRect(0, gy, W, 2); x.fillStyle = '#231a40'; x.fillRect(0, gy + 12, W, H - gy - 12);
+    const o2 = SCN.dist % 40; x.fillStyle = '#ffb347'; for (let dx = -o2; dx < W; dx += 40) x.fillRect(dx, gy + 16, 20, 3);
+    // her
+    const cx = W * .2, fy = gy + 5, ph = SCN.ph, s = walking ? Math.sin(ph) : 0;
+    const wt = now - SCN.wave, waving = wt >= 0 && wt < 1.9;   // 2. a wave on opening the app (or a tap)
+    const yo = walking ? -Math.abs(Math.cos(ph)) * 3.5 : 0, breathe = 1 + Math.sin(now * 2.4) * .012;
+    x.fillStyle = 'rgba(8,6,22,.4)'; x.beginPath(); x.ellipse(cx, fy, 24, 5, 0, 0, 6.28); x.fill();
+    const girl = ART.pinkGirl && ART.pinkGirl(SV.survivor.look), gIm = girl && ART.img(waving ? 'wince3' : walking ? 'wince0' : 'you');
+    if (gIm) {   // 0.72: the SpriteCook girl, bobbing along (a hop per step) instead of the drawn rig
+      const h = H * .82, w = gIm.width * h / gIm.height, bob = walking ? Math.abs(Math.sin(ph)) * 4 : Math.sin(now * 2.4) * .8, sq = walking ? 1 - Math.abs(Math.cos(ph)) * .03 : 1;
+      x.drawImage(gIm, cx - w / 2, fy - h * sq - bob, w, h * sq);
+      if (waving) bubble(x, cx + H * .2, fy - H * .8, 'Hi!', Math.min(1, wt * 5, (1.9 - wt) * 5));
+    } else if (ART.rigs.survivor) {
+      const sh = SV.survivor.hands, wk = sh && D.ITEMS[sh.k] ? D.ITEMS[sh.k].w : 'fists';
+      const parts = { legB: { r: s * .42 }, legF: { r: -s * .42 }, arm: { r: -s * .3 }, bat: { r: -s * .3 }, head: { r: Math.sin(now * 1.3) * .05 } };
+      if (waving) { const a = -1.55 + Math.sin(wt * 13) * .45; parts.arm = { r: a }; parts.bat = { r: a }; parts.head = { r: .1 + Math.sin(wt * 6.5) * .05 }; }
+      ART.drawRig(x, 'survivor', cx, fy + yo, H / 300, false, { sy: walking ? 1 : breathe, rot: walking ? Math.sin(ph * .5) * .02 : 0, parts, weapon: waving ? 'fists' : wk });
+      if (waving) bubble(x, cx + H * .16, fy - H * .74, 'Hi!', Math.min(1, wt * 5, (1.9 - wt) * 5));
+    }
+    // 3. the pet: sits until she has walked today, then trots beside her
+    const p = DM.Crew && DM.Crew.activePet ? DM.Crew.activePet() : null;
+    const pIm = p && DM.Crew.petImg && DM.Crew.petImg(p);
+    if (pIm) {   // 0.72: the SpriteCook pet - sits until you have walked, then hops beside you
+      const h = H * .36, w = pIm.width * h / pIm.height, px = cx + H * .2, hop = walking ? Math.abs(Math.sin(ph * 1.2 + 1)) * 6 : 0;
+      x.fillStyle = 'rgba(8,6,22,.3)'; x.beginPath(); x.ellipse(px + w / 2, fy, w * .36, 3.5, 0, 0, 6.28); x.fill();
+      x.drawImage(pIm, px, fy - h - hop, w, h);
+      if (!walking && !waving) bubble(x, px + w * .7, fy - h - 2, '…?', .5 + .5 * Math.max(0, Math.sin(now * 1.6)));
+    } else if (p) { const tc = SCN.tmp, pw = Math.round(H * .5 * dpr), phh = Math.round(H * .34 * dpr); if (tc.width !== pw) { tc.width = pw; tc.height = phh; }
+      DM.Crew.petPortrait(tc, p, walking ? { sit: false, move: 1, ph: ph * 1.2, t: now, happy: true } : { sit: true, t: now, heart: waving ? 1 : 0 });
+      const pw2 = H * .5, ph2 = H * .34, px = cx + H * .17;
+      x.drawImage(tc, px, fy - ph2, pw2, ph2);
+      if (!walking && !waving) bubble(x, px + pw2 * .5, fy - ph2 * .92, '…?', .5 + .5 * Math.max(0, Math.sin(now * 1.6)));   // waiting for a walk
+    }
+  }
+  function bubble(x, bx, by, txt, a) {   // a little speech bubble on the scene
+    if (a <= 0) return; x.save(); x.globalAlpha = a; x.font = '800 13px Outfit, Inter, sans-serif';
+    const w = x.measureText(txt).width + 16, h = 22; x.fillStyle = '#fff6e6'; x.strokeStyle = '#11142f'; x.lineWidth = 2;
+    x.beginPath(); x.roundRect ? x.roundRect(bx - w / 2, by - h, w, h, 10) : x.rect(bx - w / 2, by - h, w, h); x.fill(); x.stroke();
+    x.beginPath(); x.moveTo(bx - 6, by - 1); x.lineTo(bx - 10, by + 7); x.lineTo(bx + 1, by - 1); x.closePath(); x.fill(); x.stroke();
+    x.fillStyle = '#1a1232'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, bx, by - h / 2 + 1); x.restore();
+  }
+  function tab(t) { curTab = t; HV = viewOf(t); sel = null; { const ip = $('#ipop'); if (ip) ip.classList.remove('on'); }   /* 0.59: an item popup never follows you to another tab */ if (t === 'stash' && SV.survivor.better) { SV.survivor.better = null; Game.save(); } document.querySelectorAll('#mtabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); renderHome(); }
 
   // ---- character creation / edit look
   let cre = { name: '', look: ART.LOOK.norm(null), job: 'scavenger' }, creEdit = false, idleRAF = 0;
@@ -1213,6 +1345,7 @@ const NEXT_VERSION = '0.66.0';
   function drawPortrait(c, weapon, sc = .7) {
     const dpr = c.width / c.clientWidth || 2, x = c.getContext('2d');
     x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.width, c.height);
+    { const im = SV && SV.survivor && ART.pinkGirl(SV.survivor.look) && ART.img('you'); if (im) { const h = c.height * .94, w = im.width * h / im.height; x.drawImage(im, (c.width - w) / 2, c.height - h, w, h); return; } }   // 0.72
     x.fillStyle = 'rgba(8,6,22,.4)'; x.beginPath(); x.ellipse(c.width / 2, c.height * .9, c.width * .28, c.width * .08, 0, 0, 6.3); x.fill();
     const wk = weapon && D.ITEMS[weapon] ? D.ITEMS[weapon].w : weapon;
     ART.drawRig(x, 'survivor', c.width / 2 - 4, c.height * .9, sc * c.height / 260, false, { weapon: wk || 'fists' });
@@ -1263,6 +1396,7 @@ const NEXT_VERSION = '0.66.0';
     if (!SV || !SV.survivor || DM.scene) return;
     if (DM.WalkFX) DM.WalkFX.tick();   // 0.47: walk finds, gear upkeep, walking caches
     if (DM.Collect) DM.Collect.file();   // 0.53: new collectibles file themselves
+    if (DM.Cards) DM.Cards.tick();   // 0.68: field card packs from walking and looting
     if (DM.Life) DM.Life.tick();   // 0.62: walking buddy, radio
     if (DM.City) DM.City.tick();   // 0.63: neighborhood, city horde, co-op (reports real steps)
     if (DM.Journal) DM.Journal.tick();   // 0.50: the survival log
@@ -1277,7 +1411,22 @@ const NEXT_VERSION = '0.66.0';
     $('#mbody').innerHTML = `
       <div class="mtop hometop"><div class="mbrand"><div class="logo">${DM.Logo ? DM.Logo.mini() : 'DEAD MILES'}</div><button id="mver" class="ver">${VERSION}</button></div>${gated ? hordePill() : ''}<span class="mtsp"></span>
         ${gated ? `<button id="hBase" class="gear tbase${BS.gardenNote() ? ' dot' : ''}" aria-label="Go to base"><svg viewBox="0 0 24 24"><path d="M3.5 11.2 12 4l8.5 7.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.8 9.6V20h4.4v-5.4h3.6V20h4.4V9.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>` : ''}<button id="mnet" class="gear" aria-label="Account and friends"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.8 19.5c.6-3.6 3.2-5.6 6.2-5.6s5.6 2 6.2 5.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16.5 13.6c2.6.1 4.4 1.8 4.9 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button><button id="mset" class="gear" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 4.6.1-1.1-.1-1.1 2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.9-1.1L15.8 3h-4l-.4 2.6a8 8 0 0 0-1.9 1.1l-2.4-1-2 3.4 2 1.6-.1 1.1.1 1.1-2 1.6 2 3.4 2.4-1c.6.5 1.2.8 1.9 1.1l.4 2.6h4l.4-2.6a8 8 0 0 0 1.9-1.1l2.4 1 2-3.4z" fill="none" stroke="currentColor" stroke-width="1.7"/></svg></button></div>
+      <div class="hv" data-hv="home"${HV === 'home' ? '' : ' hidden'}>
       ${DM.Weather ? DM.Weather.chipHTML() : ''}   <!-- 0.22: weather chip -->
+      ${heroHTML(d, nxt)}
+      <div class="steplog" id="stepLog"${stepLogOpen ? '' : ' hidden'}>
+        <div class="stepcard"><div class="steptop"><div class="steps"><b>${Math.round(d.phone + d.walk + d.typed).toLocaleString('en-US')}</b><span>steps today</span></div>
+            <div class="scout"><b>${d.scouted}</b><span>house${d.scouted === 1 ? '' : 's'} found</span></div></div>
+          <div class="stepinfo">${d.typed ? `${d.typed.toLocaleString('en-US')} typed (half value) · ` : ''}${Math.round(w).toLocaleString('en-US')} worth${nxt ? ` · next house at <b>${nxt.toLocaleString('en-US')}</b>` : ' · that\'s the max today'}</div>
+          <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="Type today's total" maxlength="8"><button id="mLog" class="mbtn sm">Log</button></div>
+          <div class="syncrow"><div id="msync" class="msync"></div>${window.SYNC ? (window.NET && NET.ok && !d.phone && new Date().getHours() >= 14 ? '<button class="synclink nudge" id="mSyncG" data-m="fix">No phone steps? Fix sync</button>' : '<button class="synclink" id="mSyncG">How to sync steps</button>') : ''}</div>
+          ${IS_IOS && window.NET && NET.ok ? '<button class="mbtn sm" id="mSyncNow" style="width:100%;margin:8px 0 0">Sync my steps now</button>' : ''}</div>
+      </div>
+      ${SV.tutorialDone && DM.WalkFX ? DM.WalkFX.reportHTML() : ''}
+      ${gated ? homeTiles('today') : `<div class="hsect"><span class="kick">Today</span></div><div class="tiles today"><button class="tile" data-tile="firsthouse" style="--tc:#ffb347"><span class="tn">Your first house</span><span class="ts">14 Halsey St is waiting</span><b class="thot">Go</b></button></div><div class="hevent">${eventBanner()}</div>`}
+      ${SV.tutorialDone ? guideCard() : ''}
+      </div>
+      <div class="hv" data-hv="me"${HV === 'me' ? '' : ' hidden'}>
       <div class="hero">
         <div class="scard">
           <div class="portwrap"><canvas id="mPort" width="150" height="190"></canvas><div class="lookbtns"><button class="editlook" id="mLook">Edit look</button><button class="editlook ward" id="mWard">Wardrobe${newCos() ? `<i class="nbadge">${newCos()}</i>` : ''}</button></div></div>
@@ -1290,21 +1439,14 @@ const NEXT_VERSION = '0.66.0';
             <div class="shands">${hands}</div>
           </div>
         </div>
-        <div class="stepcard">
-          <div class="steptop"><div class="steps"><b>${Math.round(d.phone + d.walk + d.typed).toLocaleString('en-US')}</b><span>steps today</span></div>
-            <div class="scout"><b>${d.scouted}</b><span>house${d.scouted === 1 ? '' : 's'} found</span></div></div>
-          <div class="stepinfo">${d.typed ? `${d.typed.toLocaleString('en-US')} typed (half value) · ` : ''}${Math.round(w).toLocaleString('en-US')} worth${nxt ? ` · next house at <b>${nxt.toLocaleString('en-US')}</b>` : ' · that\'s the max today'}</div>
-          <div class="steprow"><input id="mSteps" inputmode="numeric" placeholder="Type today's total" maxlength="8"><button id="mLog" class="mbtn sm">Log</button></div>
-          <div class="syncrow"><div id="msync" class="msync"></div>${window.SYNC ? (window.NET && NET.ok && !d.phone && new Date().getHours() >= 14 ? '<button class="synclink nudge" id="mSyncG" data-m="fix">No phone steps? Fix sync</button>' : '<button class="synclink" id="mSyncG">How to sync steps</button>') : ''}</div>
-          ${IS_IOS && window.NET && NET.ok ? '<button class="mbtn sm" id="mSyncNow" style="width:100%;margin:8px 0 0">Sync my steps now</button>' : ''}
-        </div>
       </div>
       ${SV.tutorialDone && DM.Life ? DM.Life.feedHTML() : ''}
-      ${SV.tutorialDone && DM.WalkFX ? DM.WalkFX.reportHTML() : ''}
-      ${SV.tutorialDone ? guideCard() : ''}
-      ${gated ? homeTiles() : eventBanner()}
-      <div id="mtabs"><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Walks && unl('walks') ? `<button data-t="walks">Walks${DM.Walks.claimable() && curTab !== 'walks' ? '<i class="tbadge">!</i>' : ''}</button>` : ''}${SV.tutorialDone && DM.Gacha && unl('gacha') ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA && unl('event') ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}<button data-t="help" class="helptab" aria-label="Help for this tab">?</button></div>
-      <div id="mpane"></div>`;
+      ${gated ? homeTiles('all') : ''}
+      </div>
+      <div id="mtabs" data-hv="${HV}"${['bag', 'me'].includes(HV) && paneOn() ? '' : ' hidden'}><button data-t="houses">Houses</button><button data-t="stash">Gear${betterBadge() && curTab !== 'stash' ? '<i class="tbadge">!</i>' : ''}</button><button data-t="bench">Workbench</button>${DM.Map ? '<button data-t="map" class="maptab">Map</button>' : ''}${SV.tutorialDone && DM.Walks && unl('walks') ? `<button data-t="walks">Walks${DM.Walks.claimable() && curTab !== 'walks' ? '<i class="tbadge">!</i>' : ''}</button>` : ''}${SV.tutorialDone && DM.Gacha && unl('gacha') ? '<button data-t="gacha">Capsules</button>' : ''}${SV.tutorialDone && EVA && unl('event') ? `<button data-t="event" class="evtabb" style="--evc:${EVA.ev.accent.c}">${EVS.glyph(EVA.id)}${esc(EVA.ev.short || EVA.ev.name)}</button>` : ''}<button data-t="help" class="helptab" aria-label="Help for this tab">?</button></div>
+      <div id="mpane"${paneOn() ? '' : ' hidden'}></div>
+      ${navHTML(gated)}`;
+    bindNav(); heroStart();
     bindGuide(); setTimeout(unlockPops, 600); setTimeout(partyAsk, 1500);   // 0.45; 0.46.1 party nudge
     document.querySelectorAll('#mtabs button').forEach(b => { b.classList.toggle('on', b.dataset.t === curTab); b.onclick = () => { if (b.dataset.t === 'help') { helpTab(); return; } SFX.play('ui'); if (b.dataset.t === 'map') { DM.Map.open(); return; } tab(b.dataset.t); }; });
     $('#mLog').onclick = () => {
@@ -1335,7 +1477,7 @@ const NEXT_VERSION = '0.66.0';
     $('#mset').onclick = openSettings;
     drawPortrait($('#mPort'), s.hands && s.hands.k, .78);
     if ((curTab === 'walks' && !(SV.tutorialDone && DM.Walks)) || (curTab === 'gacha' && !(SV.tutorialDone && DM.Gacha)) || (curTab === 'event' && !(SV.tutorialDone && EVA))) curTab = 'houses';
-    if (curTab === 'houses') renderHouses(); else if (curTab === 'bench') renderBench(); else if (curTab === 'gacha') DM.Gacha.renderPane($('#mpane')); else if (curTab === 'walks') DM.Walks.renderPane($('#mpane')); else if (curTab === 'event') renderEventTab(); else renderStash();
+    if (!paneOn()) { /* Home: no pane */ } else if (curTab === 'houses') renderHouses(); else if (curTab === 'bench') renderBench(); else if (curTab === 'gacha') DM.Gacha.renderPane($('#mpane')); else if (curTab === 'walks') DM.Walks.renderPane($('#mpane')); else if (curTab === 'event') renderEventTab(); else renderStash();
     updateSync();
     if (cosQueue.length) setTimeout(showCosPop, 400); else { tip('home'); if (s.food.h < DM.Food.LOW || s.food.t < DM.Food.LOW) tip('food'); if (DM.Infect && DM.Infect.is(s)) tip('infect'); }
     const ic = document.querySelector('.nstat .inf'); if (ic) ic.onclick = () => { SFX.play('ui'); toast(DM.Infect.effects(s)[0], 5); };   // 0.18
@@ -1535,7 +1677,7 @@ const NEXT_VERSION = '0.66.0';
     });
   }
   // the home tiles: one compact tile per feature; each opens its own sheet
-  function homeTiles() {
+  function homeTiles(mode) {
     let t = [], s = SV.survivor, hr = hordeRes();
     if (hr) t.push({ k: 'horde', c: hr[1].hold ? '#93a86c' : '#ff6b5a', n: 'Horde night', sub: hr[1].hold ? 'Your base held!' : 'The horde got in', hot: 'See' });
     if (DM.Boss) {
@@ -1565,6 +1707,7 @@ const NEXT_VERSION = '0.66.0';
     if (window.NET && NET.ok && NET.name && SV.survivor.name === 'Survivor') publish();   // 0.42.1: pick up the account name
     if (DM.Journal) { const jt = DM.Journal.tile(); if (jt) t.push(jt); }   // 0.50
     if (DM.Collect && SV.tutorialDone) { const ct = DM.Collect.tile(); if (ct) t.push(ct); }   // 0.53
+    if (DM.Cards && SV.tutorialDone) { const ft = DM.Cards.tile(); if (ft) t.push(ft); }   // 0.68 field cards
     if (DM.Life && SV.tutorialDone) t.push(...DM.Life.tiles());   // 0.62: walking buddy, supply run
     if (DM.City && SV.tutorialDone) t.push(...DM.City.tiles());   // 0.63: reclaim the neighborhood, long-distance survivors
     if (DM.Codex && SV.tutorialDone) { DM.Codex.check(); const ct = DM.Codex.tile(); if (ct) t.push(ct); }   // 0.35: bestiary + feats
@@ -1573,15 +1716,15 @@ const NEXT_VERSION = '0.66.0';
     t = t.filter(x => unl(x.k));   // 0.45: new players get these one by one
     // 0.66 (owner: "there's soooo many things on the UI ... it's too jumbled"): only tiles that need you stay on the
     // home screen (a badge: Go, New, Fight, On...); the rest fold into one "All activities" button (remembered per phone).
-    const tileH = x => `<button class="tile" data-tile="${x.k}" style="--tc:${x.c}"><span class="tn">${esc(x.n)}</span><span class="ts">${esc(x.sub)}</span>${x.bar != null ? `<i class="tbar"><i style="width:${Math.max(0, Math.min(100, x.bar))}%"></i></i>` : ''}${x.hot ? `<b class="thot">${esc(x.hot)}</b>` : ''}</button>`, pinned = t.filter(x => x.hot).slice(0, 6), rest = t.filter(x => !pinned.includes(x));
-    let more = false; try { more = localStorage.getItem('dm-next-tiles') === '1'; } catch (e) { /* ignore */ }
-    return `<div class="hsect"><span class="kick">This week</span></div>${ev}${pinned.length ? `<div class="tiles">${pinned.map(tileH).join('')}</div>` : '<p class="tquiet">Nothing needs you right now.</p>'}`
-      + (rest.length ? `<button class="tilemore" id="tileMore">${more ? 'Show less' : `All activities <i>${rest.length}</i>`}<span>${more ? '▴' : '▾'}</span></button>${more ? `<div class="tiles">${rest.map(tileH).join('')}</div>` : ''}` : '');
+    const tileH = x => `<button class="tile" data-tile="${x.k}" style="--tc:${x.c}"><span class="tn">${esc(x.n)}</span><span class="ts">${esc(x.sub)}</span>${x.bar != null ? `<i class="tbar"><i style="width:${Math.max(0, Math.min(100, x.bar))}%"></i></i>` : ''}${x.hot ? `<b class="thot">${esc(x.hot)}</b>` : ''}</button>`, pinned = t.filter(x => x.hot);
+    // 0.69 (owner: "can't find things", "too much at once"): Home shows the 3 things that need you most; Me holds every activity
+    if (mode === 'today') return `<div class="hsect"><span class="kick">Today</span>${pinned.length > 3 ? `<small class="hmore" id="hMore">+${pinned.length - 3} more in Me ›</small>` : ''}</div>${pinned.length ? `<div class="tiles today">${pinned.slice(0, 3).map(tileH).join('')}</div>` : '<p class="tquiet">Nothing needs you right now. Go for a walk!</p>'}${ev ? `<div class="hevent">${ev}</div>` : ''}`;
+    return `<div class="hsect"><span class="kick">Everything to do</span></div><div class="tiles all">${t.map(tileH).join('')}</div>`;
   }
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
     cardSheet = k;
-    const html = DM.City && DM.City.has(k) ? `<div class="cywrap">${DM.City.html(k)}</div>` : DM.Life && DM.Life.has(k) ? `<div class="lfwrap">${DM.Life.html(k)}</div>` : k === 'collect' ? `<div class="clwrap">${DM.Collect.html()}</div>` : k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
+    const html = DM.Cards && DM.Cards.has(k) ? `<div class="fcwrap">${DM.Cards.html()}</div>` : DM.City && DM.City.has(k) ? `<div class="cywrap">${DM.City.html(k)}</div>` : DM.Life && DM.Life.has(k) ? `<div class="lfwrap">${DM.Life.html(k)}</div>` : k === 'collect' ? `<div class="clwrap">${DM.Collect.html()}</div>` : k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
     sheetOpen(`<div class="cardsheet" data-cs="${k}">${html}</div><button class="mbtn ghost" id="csDone">Close</button>`);
     const el = $('#msheet'), root = el.querySelector('.cardsheet');
     el.onclick = e => { if (e.target === el) closeCardSheet(); };
@@ -1594,6 +1737,7 @@ const NEXT_VERSION = '0.66.0';
     else if (k === 'social') { publish(); const w = root.querySelector('.sowrap'), re = () => { w.innerHTML = DM.Social.html(); DM.Social.bind(w, re); }; DM.Social.bind(w, re); }
     else if (k === 'codex') DM.Codex.bind(root.querySelector('.cxwrap'));
     else if (k === 'collect') DM.Collect.bind();
+    else if (DM.Cards && DM.Cards.has(k)) { const w = root.querySelector('.fcwrap'), re = () => { if (!document.body.contains(w)) return; w.innerHTML = DM.Cards.html(); DM.Cards.bind(w, re); }; DM.Cards.bind(w, re); }
     else if (DM.City && DM.City.has(k)) { const w = root.querySelector('.cywrap'), re = () => { if (!document.body.contains(w)) return; w.innerHTML = DM.City.html(k); DM.City.bind(k, w, re); }; DM.City.bind(k, w, re); }
     else if (DM.Life && DM.Life.has(k)) { const w = root.querySelector('.lfwrap'), re = () => { w.innerHTML = DM.Life.html(k); DM.Life.bind(k, w, re); }; DM.Life.bind(k, w, re); }
     else if (k === 'raid') { const g = root.querySelector('#raidGo'); if (g) g.onclick = () => { SFX.play('ui'); cardSheet = null; sheetClose(); BS.raidDefend(); }; else { BS.raidSeen(); } }
@@ -1607,7 +1751,7 @@ const NEXT_VERSION = '0.66.0';
       root.querySelectorAll('[data-seen]').forEach(x => x.onclick = () => { SV.horde.resolved[x.dataset.seen].seen = true; Game.save(); renderHome(); });
     }
   }
-  function closeCardSheet() { cardSheet = null; sheetClose(); }
+  function closeCardSheet() { cardSheet = null; sheetClose(); if (DM.Cards) DM.Cards.reset(); }
   function refreshCardSheet() {
     if (!cardSheet) return;
     const el = $('#msheet'), cs = el.querySelector('.cardsheet');
@@ -1620,7 +1764,8 @@ const NEXT_VERSION = '0.66.0';
     const tm = $('#tileMore'); if (tm) tm.onclick = () => { SFX.play('ui'); try { localStorage.setItem('dm-next-tiles', localStorage.getItem('dm-next-tiles') === '1' ? '0' : '1'); } catch (e) { /* ignore */ } renderHome(); };   // 0.66
     document.querySelectorAll('[data-tile]').forEach(x => x.onclick = () => {
       SFX.play('ui'); const k = x.dataset.tile;
-      if (k === 'garden') goBase();
+      if (k === 'firsthouse') goView('loot');   // 0.69
+      else if (k === 'garden') goBase();
       else if (k === 'horde') openCardSheet('horde');
       else if (k === 'journal') DM.Journal.open();   // 0.50
       else if (k === 'daily') { tab('houses'); const c = $('#dlyCard'); if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 1400); } }
@@ -1975,6 +2120,7 @@ const NEXT_VERSION = '0.66.0';
         let need = cost; for (const list of [s.stash, s.pack]) for (let j = list.length - 1; j >= 0 && need; j--) if (list[j].k === 'scrap') { const t = Math.min(need, list[j].n); list[j].n -= t; need -= t; if (!list[j].n) list.splice(j, 1); }
         const nd = Math.min(max, e.d + Math.round(max * .4));
         if (sel.from === 'hands') s.hands.d = nd; else e.d = nd;
+        if (DM.Trades) DM.Trades.gain('craft', 5 + 2 * q0);   // 0.67: bench work counts
         done('Repaired');
       }]);
       // 0.29.2 (owner: "my bow broke ... or even upgrading it"): raise a weapon one quality tier (more damage and
@@ -1986,7 +2132,7 @@ const NEXT_VERSION = '0.66.0';
           if (cp && SV.trader.caps < cp) return toast(`Needs ${cp} caps`, 1.6);
           for (const [k, n] of mats) { let need = n; for (const list of [s.stash, s.pack]) for (let j = list.length - 1; j >= 0 && need; j--) if (list[j].k === k) { const t = Math.min(need, list[j].n); list[j].n -= t; need -= t; if (!list[j].n) list.splice(j, 1); } }
           SV.trader.caps -= cp;
-          const tgt = sel.from === 'hands' ? s.hands : e; tgt.q = q + 1; tgt.d = D.wMax({ k: e.k, q: q + 1 }); SFX.play('pick');
+          const tgt = sel.from === 'hands' ? s.hands : e; tgt.q = q + 1; tgt.d = D.wMax({ k: e.k, q: q + 1 }); SFX.play('pick'); if (DM.Trades) DM.Trades.gain('craft', 12 + 10 * q);
           done(`${it.n} is now ${D.QUAL[q + 1].n} · ${D.wDmg({ k: e.k, q: q + 1 })} dmg`);
         }]); }
       // 0.54 class weapon upgrades (weapons2.js): bow -> crossbow -> heavy crossbow, etc. Keeps the quality, fully repaired
@@ -1998,7 +2144,7 @@ const NEXT_VERSION = '0.66.0';
           if (SV.trader.caps < C.caps) return toast(`Needs ${C.caps} caps`, 1.6);
           for (const [k, n] of C.m) { let need = n; for (const list of [s.stash, s.pack]) for (let j = list.length - 1; j >= 0 && need; j--) if (list[j].k === k) { const t = Math.min(need, list[j].n); list[j].n -= t; need -= t; if (!list[j].n) list.splice(j, 1); } }
           SV.trader.caps -= C.caps;
-          const tgt = sel.from === 'hands' ? s.hands : e; if (sel.from === 'hands') D.unloadGun(s); tgt.k = CX.to; tgt.d = D.wMax({ k: CX.to, q: D.qOf(tgt) }); SFX.play('pick');
+          const tgt = sel.from === 'hands' ? s.hands : e; if (sel.from === 'hands') D.unloadGun(s); tgt.k = CX.to; tgt.d = D.wMax({ k: CX.to, q: D.qOf(tgt) }); SFX.play('pick'); if (DM.Trades) DM.Trades.gain('craft', 60);
           if (DM.Journal) DM.Journal.note(`Turned my ${it.n.toLowerCase()} into a ${to.n.toLowerCase()}.`);
           if (sel.from === 'hands' && Game.onEquip) Game.onEquip();
           done(`${it.n} → ${to.n}! ${D.wDmg(tgt)} dmg`);
@@ -2018,7 +2164,7 @@ const NEXT_VERSION = '0.66.0';
     // 0.47: a walking cache goes in the cache bag; steps open it
     if (it.wcache && (sel.from === 'pack' || sel.from === 'stash') && DM.WalkFX) btns.push([`Walk it open · ${(it.wcache).toLocaleString('en-US')} steps`, () => { if (DM.WalkFX.bagIt(e, s[sel.from])) done(); }, 'big']);
     // 0.41: gift it to a friend (gifts.js; signed-in players)
-    if ((sel.from === 'pack' || sel.from === 'stash') && !it.quest && DM.Gifts && DM.Gifts.can()) { const list = s[sel.from]; btns.push(['🎁 Gift to a friend', () => { sel = null; itemPop(null); DM.Gifts.open(e, list, () => reHost()); }]); }
+    if ((sel.from === 'pack' || sel.from === 'stash') && !it.quest && !it.nogift && DM.Gifts && DM.Gifts.can()) { const list = s[sel.from]; btns.push(['🎁 Gift to a friend', () => { sel = null; itemPop(null); DM.Gifts.open(e, list, () => reHost()); }]); }
     // 0.24.5 (owner: "make a discard button so we don't have to drop it"): throw it away from the pack or the stash, tap twice
     if ((sel.from === 'pack' || sel.from === 'stash') && !it.quest) { let sure = false; btns.push([e.n > 1 ? `Discard all ${e.n}` : 'Discard', function () { if (!sure) { sure = true; this.textContent = 'Tap again to throw away'; this.classList.add('warn'); return; } const from = sel.from; s[from].splice(sel.i, 1); done(`Threw away ${it.n.toLowerCase()}${e.n > 1 ? ' x' + e.n : ''}`); }, 'discard']); }
     acts.innerHTML = `<div class="sact"><span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}${it.tag ? ` <em>${it.tag}</em>` : ''}${it.w ? ` <i class="wst">${D.QUAL[D.qOf(e)].n} · ${wDmg(e)} dmg · ${Math.round(Math.min(1, (e.d != null ? e.d : D.wMax(e)) / D.wMax(e)) * 100)}% of ${D.wMax(e)}${sel.from === 'hands' ? ' · in your hand' : ''}</i>` : ''}<small class="cline" style="--cc:${D.CATS[D.cat(e.k)].c}">${esc(D.catLine(e.k, e.d))}</small></span></div>`;
@@ -2094,7 +2240,8 @@ const NEXT_VERSION = '0.66.0';
     ['Map jobs: crates, radio calls, deliveries, fog', 'With the map open (or in Pocket mode) there is more to do while you walk. Supply crates: up to 3 a day land at real places near you - walk over one to grab it; an air drop (one a day, after you have walked a bit) has better loot but only 20 minutes. Radio calls: a survivor names a place and a deadline - get there in time for a reward. Dot\'s delivery (one a day, button on the map): pick up a package at one place and carry it to another. Fog of war: the map is fogged except where you have walked; clearing new streets gives XP, sometimes a find, and rewards at 250 / 1,000 / 3,000 / 10,000 squares. Turn the fog off with its button. All of this is kept only on your phone.'],
     ['Capsule machine', 'The capsule machine (Capsules tab) gives a random cosmetic, hairstyle or eye style for a token (new hairstyles and eyes show up in Edit look, marked with a lock until you pull them). You get a token for every 5,000 steps (up to 2 a day), or buy one for 120 caps. Odds: common 55%, rare 30%, epic 12%, legendary 3%, and at least one epic or better every 10 pulls. Cosmetics you do not have yet come first; Dot buys any duplicate. During a holiday its capsules join the machine, and 1 pull in 4 is a piece of holiday decor.'],
     ['Deck the base', 'During Thanksgiving and Christmas, place that holiday\'s decor at your base (Base > Decor) for prizes: 2 pieces = 2 capsule tokens + 40 caps, 5 = 3 tokens + 80 caps, 8 = a legendary holiday hat + 100 caps. Holiday decor comes from Dot\'s holiday shelf, holiday houses (storage, pantries, closets) and the capsule machine.'],
-    ['Workbench & crafting', 'Workbench (home tab, or at the base) lists every recipe you know with each material, what you have and what you need. Tap a recipe to see what it does, every material in full with where to find it, and a big Craft button. Materials come from the stash and the pack. New recipes come from blueprints: Dot trades them, and some turn up in hidden stashes and safes.'],
+    ['Field cards', 'Trading cards you collect (home screen: Field cards). Card packs are rare: one a day once you walk 10,000 steps, and once in a while in a safe, attic, locked room or horde crate, from a boss, or on Dot\'s shelf. Cards can\'t be gifted instantly: to give a friend a spare copy you walk it over (5,000 steps for a common up to 40,000 for a legendary). A pack is 3 cards, at least one rare. Duplicates raise a card\'s stars (★1 to ★5); copies past ★5 become dust, which crafts a missing card or buys a pack. 1 card in 30 is a shiny foil. Put cards in your deck (3 slots, 4 at 20 cards, 5 at 40): their perks work everywhere. Holiday sets only drop while the holiday runs. A full set pays 150 caps and 2 capsule tokens.'],
+    ['Workbench & crafting', 'Workbench (home tab, or at the base) lists every recipe you know with each material, what you have and what you need. Tap a recipe to see what it does, every material in full with where to find it, and a big Craft button. Materials come from the stash and the pack. New recipes come from blueprints: Dot trades them, and some turn up in hidden stashes and safes. Others unlock as your Crafting level rises: base decor (the Decor tab) and supply crates that pack spare food, water and bandages into something Dot will buy. Crafting XP comes from crafting, repairing and upgrading weapons, class upgrades, and building or repairing your base.'],
     ['Crew', 'About 1 house in 25 has a survivor hiding in a closet or a secret room (more in mansions and police stations). Talk to them: with a free bunk they move into your base (2 bunks, build up to 4). Each has a role - Scavenger (crew searches bring back more), Guard (horde-night defence), Medic (heals you each morning), Gardener (waters a plant a day), Tinkerer (cheaper repairs) - and levels up slowly. Each eats 1 food a day from your STASH; three hungry days and they leave a note (they never take anything). The more crew you have, the more a Crew search brings back.'],
     ['Strays', 'Dogs and cats hide under beds, tables and sofas (about 1 house in 30). Move slowly near them (a small push on the joystick) until they trust you, then tap to coax them out - or offer food from your pack. One pet comes along on runs and at the base; up to 4 live with you. Dogs bark when a zombie spots you and sometimes sniff out a container with something good; cats make you quieter and bring little presents some mornings. Pets level from your steps. They never die: a zombie scare sends them running home, back the next day.'],
     ['Weekly boss', 'Every week (Monday to Sunday, New York time) a named boss holes up in a special house on everyone\'s list. Walk 5,000 steps that week to reach it, then fight it up to 2 times a day (90 seconds each). Red markers on the floor show where the next attack lands: a charge line, a slam ring, walkers being called. Its health is shared by your whole party for the whole week; when it falls, everyone who hit it gets a good item, caps and a chance at a boss cosmetic. Going down in a boss fight costs you nothing but the fight.'],

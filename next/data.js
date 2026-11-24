@@ -150,11 +150,18 @@ window.DM = window.DM || {};
     d_cornu: { n: 'Cornucopia', art: 'dcornu', w: 1, h: 1, H: 20, rot: 'flip', v: 6, ev: 'thanksgiving' },
     d_fallwreath: { n: 'Autumn wreath', art: 'dfallwreath', w: 1, h: 1, H: 0, rot: 'flip', wall: 1, v: 5, ev: 'thanksgiving' },
     d_garland: { n: 'Leaf garland', art: 'dgarland', w: 3, h: 1, H: 0, rot: 'flip', wall: 1, v: 6, ev: 'thanksgiving' },
+    d_pumpkins: { n: 'Pumpkin pile', art: 'dpumpkins', w: 2, h: 1, H: 24, rot: 'swap', v: 7, ev: 'thanksgiving' },   // 0.67
     d_xtree: { n: 'Christmas tree', art: 'dxtree', w: 1, h: 1, H: 72, rot: 'flip', glow: 1, v: 10, ev: 'christmas' },
     d_snowman: { n: 'Snowman', art: 'dsnowman', w: 1, h: 1, H: 44, rot: 'flip', v: 7, ev: 'christmas' },
     d_wreath: { n: 'Christmas wreath', art: 'dwreath', w: 1, h: 1, H: 0, rot: 'flip', wall: 1, v: 5, ev: 'christmas' },
     d_stockings: { n: 'Stockings', art: 'dstockings', w: 2, h: 1, H: 0, rot: 'flip', wall: 1, v: 6, ev: 'christmas' },
     d_presents: { n: 'Pile of presents', art: 'dpresents', w: 1, h: 1, H: 20, rot: 'flip', solid: 0, v: 6, ev: 'christmas' },
+    // 0.67 (owner: "our house decorations are pretty bad"): new pieces; dot: only Auntie Dot sells it
+    d_bunting: { n: 'Flag bunting', art: 'dbunting', w: 3, h: 1, H: 0, rot: 'flip', wall: 1, v: 6 },
+    d_neon: { n: 'Neon HOME sign', art: 'dneon', w: 2, h: 1, H: 0, rot: 'flip', wall: 1, glow: 1, v: 12 },
+    d_barrelfire: { n: 'Burn barrel', art: 'dbarrelfire', w: 1, h: 1, H: 34, rot: 'flip', glow: 1, v: 8 },
+    d_jukebox: { n: 'Jukebox', art: 'djukebox', w: 1, h: 1, H: 58, rot: 'flip', glow: 1, v: 20, dot: 1 },
+    d_aquarium: { n: 'Fish tank', art: 'daquarium', w: 2, h: 1, H: 44, rot: 'flip', v: 18, dot: 1 },
   };
   for (const k in D.DECOR) D.ITEMS[k] = { n: D.DECOR[k].n, i: k, decor: 1, tag: 'decor' };
   // blueprints: one item per recipe, e.g. bp_machete
@@ -564,7 +571,7 @@ window.DM = window.DM || {};
     let v = rnd() * opts.reduce((a, o) => a + o[0], 0), items = opts[0][1];
     for (const o of opts) { v -= o[0]; if (v <= 0) { items = o[1]; break; } }
     return items.map(k => k === 'bp_*' ? D.pickBP(rnd)
-      : k === 'decor_*' ? (b => b[Math.floor(rnd() * b.length)])(Object.keys(D.DECOR))
+      : k === 'decor_*' ? (b => b[Math.floor(rnd() * b.length)])(Object.keys(D.DECOR).filter(d => !D.DECOR[d].dot))
       : D.COS_POOL[k] ? D.pickCos(D.COS_POOL[k], rnd) : k);
   };
   D.rollLoot = function (key, rnd = Math.random) {
@@ -575,7 +582,7 @@ window.DM = window.DM || {};
     const ks = Object.keys(tab), tot = ks.reduce((s, k) => s + tab[k], 0);
     for (let i = 0; i < n; i++) { let v = rnd() * tot; for (const k of ks) { v -= tab[k]; if (v <= 0) { if (k !== '__none') out.push(k); break; } } }   // 0.43.1: __none = an empty draw
     for (let i = 0; i < out.length; i++) if (out[i] === 'bp_*') { out[i] = D.pickBP(rnd); }
-      else if (out[i] === 'decor_*') { const b = Object.keys(D.DECOR); out[i] = b[Math.floor(rnd() * b.length)]; }
+      else if (out[i] === 'decor_*') { const b = Object.keys(D.DECOR).filter(d => !D.DECOR[d].dot); out[i] = b[Math.floor(rnd() * b.length)]; }
       else if (out[i] === 'seed_*') { const b = Object.keys(D.ITEMS).filter(x => D.ITEMS[x].seed); out[i] = b[Math.floor(rnd() * b.length)]; }
       else if (D.COS_POOL[out[i]]) out[i] = D.pickCos(D.COS_POOL[out[i]], rnd);
     return out;
@@ -642,12 +649,12 @@ window.DM = window.DM || {};
   };
   D.QUEST_HOUSE = { 1: ['rowS', 'apt'], 2: ['bodega', 'laundro', 'rowL'], 3: ['pharmacy', 'garage'], 4: ['school', 'rowL'], 5: ['police', 'mansion'] };
   D.SHOP = [ // [item, count, price, min trader level, chance]
-    ['beans', 3, 9, 1, .9], ['water', 3, 8, 1, .9], ['snack', 3, 5, 1, .6], ['coffee', 2, 7, 1, .5], ['bandage', 3, 12, 1, .8], ['meds', 2, 24, 1, .6], ['lockpick', 3, 14, 1, .8],
-    ['arrow', 10, 3, 1, .8], ['cloth', 4, 4, 1, .5], ['tape', 2, 8, 1, .5], ['nails', 12, 1, 1, .5], ['wood', 4, 4, 1, .5], ['crowbar', 1, 60, 1, .6], ['bat', 1, 45, 1, .5], ['knife', 1, 25, 1, .5],
+    ['beans', 3, 9, 1, .25], ['water', 3, 8, 1, .25], ['snack', 3, 5, 1, .15], ['coffee', 2, 7, 1, .3], ['bandage', 3, 12, 1, .8], ['meds', 2, 24, 1, .6], ['lockpick', 3, 14, 1, .8],
+    ['arrow', 10, 3, 1, .8], ['cloth', 4, 4, 1, .5], ['tape', 4, 8, 1, .9], ['battery', 3, 7, 1, .75], ['nails', 12, 1, 1, .5], ['wood', 4, 4, 1, .5], ['crowbar', 1, 60, 1, .12], ['bat', 1, 45, 1, .12], ['knife', 1, 25, 1, .1],
     ['backpack', 1, 150, 2, 1], ['machete', 1, 90, 2, .5], ['ammo', 10, 3, 2, .4], ['prybar', 1, 65, 2, .5], ['axe', 1, 120, 3, .5], ['bow', 1, 130, 3, .4], ['lockset', 1, 80, 3, .5],
-    ['key', 1, 30, 2, .35], ['bp_*', 1, 110, 2, .45], ['bp_*', 1, 110, 4, .6],
+    ['key', 1, 30, 2, .35], ['bp_*', 1, 110, 1, .5], ['bp_*', 1, 110, 2, .75], ['bp_*', 1, 110, 4, .6],
     ['antibio', 1, 45, 2, .5],
-    ['shells', 10, 4, 3, .5], ['pistol', 1, 240, 4, .3], ['shotgun', 1, 320, 5, .25], ['nailgun', 1, 110, 3, .3], ['pan', 1, 20, 1, .3], ['turkeysq', 1, 25, 1, .25],   // 0.30
+    ['shells', 10, 4, 3, .5], ['pistol', 1, 240, 4, .3], ['shotgun', 1, 320, 5, .25], ['nailgun', 1, 110, 3, .3], ['pan', 1, 20, 1, .1], ['turkeysq', 1, 25, 1, .25],   // 0.30
     ['armor_pad', 1, 55, 2, .4], ['armor_sport', 1, 80, 3, .35], ['armor_riot', 1, 140, 4, .3],   // 0.28 armor   // 0.18: Dot sells antibiotics from trader level 2 (about every other day)
   ];
   D.STREETS = ['Halsey St', 'Bergen St', 'Dean St', 'Putnam Ave', 'Jefferson Ave', 'Macon St', 'Decatur St', 'Hancock St', 'Lafayette Ave', 'Greene Ave', 'Quincy St', 'Gates Ave', 'Madison St', 'Monroe St', 'Kosciuszko St', 'Stuyvesant Ave', 'Tompkins Ave', 'Marcy Ave', 'Nostrand Ave', 'Bedford Ave', 'Franklin Ave', 'Classon Ave', 'Atlantic Ave', 'Fulton St', 'Pacific St', 'Prospect Pl', 'Sterling Pl', 'St Marks Ave', 'Park Pl', 'Sterling St'];

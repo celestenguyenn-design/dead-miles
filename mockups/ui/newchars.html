@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Dead Miles - the game with the new characters</title>
+<style>
+  @font-face { font-family: Out; src: url(fonts/Outfit-Regular.ttf); font-weight: 400; }
+  @font-face { font-family: Out; src: url(fonts/Outfit-Bold.ttf); font-weight: 800; }
+  * { box-sizing: border-box; } body { margin: 0; background: #0b0a14; font-family: Out, sans-serif; }
+  .wall { display: flex; flex-wrap: wrap; gap: 28px 24px; padding: 28px; justify-content: center; max-width: 1760px; margin: 0 auto; }
+  .cap { width: 390px; margin-bottom: 10px; color: #e8e0ff; } .cap b { display: block; font: 800 19px Out; } .cap span { font: 400 13px/1.4 Out; color: #a99fcc; }
+  .ph { --card: rgba(34,24,62,.92); --deep: #150e2a; --line: #4a3c70; --c1: #ffb347; --c2: #ff7a59; --c3: #c9a8ff; --mute: #b3a6d6;
+    position: relative; width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 3px solid #26213e; color: #f6efff;
+    background: radial-gradient(120% 60% at 50% 0%, #4a3480 0%, #2a1d4c 55%, #1a1232 100%); padding: 48px 16px 0; }
+  .top { display: flex; align-items: center; justify-content: space-between; } .top svg { height: 38px; }
+  .pill { padding: 5px 9px; border-radius: 99px; border: 2px solid var(--c3); color: var(--c3); font: 800 12px Out; }
+  .title { font: 800 28px Out; color: #fff; text-shadow: 0 0 12px var(--c1); }
+  .hero { position: relative; height: 230px; margin: 12px 0; border-radius: 26px; overflow: hidden; border: 2px solid var(--c2); box-shadow: 0 0 16px rgba(255,122,89,.45);
+    background: linear-gradient(#3a2868, #5a3a7a); }
+  .hero .city { position: absolute; left: 0; right: 0; bottom: 30px; height: 120px; background:
+     linear-gradient(#2a1d4c,#2a1d4c) 0 40px/60px 80px no-repeat, linear-gradient(#2a1d4c,#2a1d4c) 64px 10px/52px 110px no-repeat, linear-gradient(#2a1d4c,#2a1d4c) 120px 30px/70px 90px no-repeat,
+     linear-gradient(#2a1d4c,#2a1d4c) 194px 0/56px 120px no-repeat, linear-gradient(#2a1d4c,#2a1d4c) 254px 36px/66px 84px no-repeat, linear-gradient(#2a1d4c,#2a1d4c) 324px 14px/60px 106px no-repeat; }
+  .hero .street { position: absolute; left: 0; right: 0; bottom: 0; height: 32px; background: #4a3c70; border-top: 3px solid #11142f; }
+  .hero .moon { position: absolute; left: 150px; top: 18px; width: 30px; height: 30px; border-radius: 50%; background: #ffd68c; box-shadow: 0 0 20px #ffd68c; }
+  .spr { position: absolute; filter: drop-shadow(0 4px 2px rgba(10,6,24,.35)); }
+  .steps { position: absolute; right: 16px; top: 14px; text-align: right; } .steps b { display: block; font: 800 44px/1 Out; text-shadow: 0 0 14px var(--c2), 0 2px 0 #1a1232; } .steps span { font: 800 13px Out; color: var(--c1); }
+  .bar { position: absolute; right: 16px; top: 92px; width: 44%; height: 11px; border-radius: 8px; background: var(--deep); border: 2px solid var(--line); overflow: hidden; } .bar i { display: block; height: 100%; width: 74%; background: linear-gradient(90deg, var(--c2), var(--c1)); }
+  .bub { position: absolute; padding: 5px 10px; border-radius: 12px; background: #fff6ee; color: #4a3026; font: 800 13px Out; border: 2px solid #6a4636; }
+  h3 { margin: 4px 4px 10px; font: 800 14px Out; color: var(--mute); letter-spacing: 2px; text-transform: uppercase; }
+  .do { --c: var(--c1); display: flex; align-items: center; gap: 12px; margin-bottom: 10px; padding: 12px 14px; border-radius: 20px; background: var(--card); border: 2px solid var(--c); box-shadow: 0 0 12px color-mix(in srgb, var(--c) 38%, transparent); }
+  .do b { display: block; font: 800 17px Out; } .do span { font: 400 13px Out; color: var(--mute); } .do .go { margin-left: auto; padding: 8px 15px; border-radius: 13px; background: var(--c); color: #1a1232; font: 800 14px Out; }
+  .do .av { width: 54px; height: 54px; border-radius: 16px; overflow: hidden; background: var(--deep); border: 2px solid var(--line); flex: none; display: grid; place-items: end center; }
+  .do .av img { width: 120%; }
+  .nav { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-around; padding: 8px 10px 22px; background: rgba(24,17,46,.96); border-top: 2px solid var(--line); }
+  .nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 66px; padding: 6px 0 4px; border-radius: 16px; color: #8f82b8; font: 800 12px Out; } .nav a .e { font-size: 22px; filter: grayscale(.5); }
+  .nav a.on { color: var(--c1); background: rgba(255,179,71,.12); } .nav a.on .e { filter: none; }
+  .dotcard { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 22px; background: linear-gradient(135deg, rgba(63,167,160,.2), var(--card)); border: 2px solid var(--c3); margin-bottom: 12px; box-shadow: 0 0 12px rgba(201,168,255,.3); }
+  .dotcard .port { width: 92px; height: 104px; border-radius: 18px; overflow: hidden; background: radial-gradient(#5a4a86, #2a1d4c); border: 2px solid var(--line); flex: none; display: grid; place-items: start center; }
+  .dotcard .port img { width: 112%; margin-top: 2px; }
+  .dotcard b { font: 800 19px Out; } .dotcard q { display: block; font: 400 italic 13px/1.35 Out; color: #e6dcff; margin: 4px 0; }
+  .house { display: flex; gap: 12px; align-items: center; padding: 11px 12px; margin-bottom: 10px; border-radius: 20px; background: var(--card); border: 2px solid var(--line); }
+  .house .ic { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-size: 28px; background: var(--deep); border: 2px solid var(--line); }
+  .house b { display: block; font: 800 16px Out; } .house span { font: 400 12px Out; color: var(--mute); } .house .go { margin-left: auto; padding: 8px 14px; border-radius: 13px; background: var(--c1); color: #1a1232; font: 800 14px Out; }
+  .run { padding: 0; background: #0b0c20; } .run > img.bg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .run .red { position: absolute; inset: 0; box-shadow: inset 0 0 90px 30px rgba(255,60,60,.55); }
+  .ow { position: absolute; font: 900 22px Out; color: #e8504a; -webkit-text-stroke: 5px #fff6ee; paint-order: stroke fill; transform: rotate(-12deg); }
+  .num { position: absolute; font: 900 26px Out; color: #ff6b5a; text-shadow: 0 2px 0 #11142f; }
+  .me { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 22px; background: var(--card); border: 2px solid var(--c1); box-shadow: 0 0 14px rgba(255,179,71,.3); }
+  .me .port { width: 110px; height: 150px; border-radius: 18px; background: radial-gradient(#c9a8ff, #5a4a86); border: 2px solid var(--line); display: grid; place-items: end center; overflow: hidden; flex: none; }
+  .me .port img { height: 140px; }
+  .me b { font: 800 22px Out; } .me .lv { margin: 6px 0; height: 12px; border-radius: 8px; background: var(--deep); border: 2px solid var(--line); overflow: hidden; } .me .lv i { display: block; height: 100%; width: 62%; background: #b5dd6a; }
+  .me small { font: 800 12px Out; color: var(--mute); } .tag { display: inline-block; padding: 2px 8px; border-radius: 8px; background: #11142f; color: var(--c1); font: 800 11px Out; }
+  .crew { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .crew .c { position: relative; height: 170px; border-radius: 20px; background: var(--card); border: 2px solid var(--line); overflow: hidden; display: grid; place-items: end center; }
+  .crew .c img { height: 140px; margin-bottom: 26px; } .crew .c b { position: absolute; bottom: 8px; font: 800 14px Out; } .crew .c small { position: absolute; z-index: 2; top: 8px; left: 8px; padding: 2px 7px; border-radius: 8px; background: rgba(21,14,42,.9); font: 800 11px Out; color: var(--c1); }
+  .shophead { position: relative; height: 290px; border-radius: 26px; background: radial-gradient(120% 90% at 30% 20%, #3fa7a033, #221840); border: 2px solid var(--c1); box-shadow: 0 0 16px rgba(255,179,71,.35); overflow: hidden; margin: 10px 0 12px; }
+  .shophead img { position: absolute; left: 8px; bottom: 0; height: 270px; }
+  .shophead .say { position: absolute; right: 12px; top: 24px; width: 168px; padding: 12px; border-radius: 16px; background: #fff6ee; color: #4a3026; font: 400 italic 14px/1.35 Out; border: 2px solid #6a4636; }
+  .shophead .say::after { content: ''; position: absolute; left: -12px; top: 30px; border: 7px solid transparent; border-right-color: #6a4636; }
+  .shophead .nm { position: absolute; right: 14px; bottom: 16px; text-align: right; } .shophead .nm b { font: 800 22px Out; display: block; } .shophead .nm span { font: 800 12px Out; color: var(--c1); }
+  .seg { display: flex; gap: 6px; margin-bottom: 10px; } .seg a { flex: 1; text-align: center; padding: 9px 0; border-radius: 14px; border: 2px solid var(--line); font: 800 14px Out; color: var(--mute); } .seg a.on { border-color: var(--c1); color: #fff; background: rgba(255,179,71,.14); }
+  .notes { max-width: 1700px; margin: 0 auto 40px; padding: 0 30px; color: #c9c0ea; font: 400 15px/1.55 Out; }
+</style></head><body>
+<div class="wall" id="w"></div>
+<div class="notes">A sample only: the game is unchanged. Characters come from the two SpriteCook pictures (cut out by hand); the house screenshot is the real game with its current characters hidden.</div>
+<script>window.DM = {};</script>
+<script src="../../next/logo.js"></script>
+<script>
+const I = n => `spritecook/${n}.png`;
+const logo = DM.Logo.mini(true);
+const nav = on => `<div class="nav">${[['🏠', 'Home'], ['🏚️', 'Loot'], ['🗺️', 'Map'], ['🎒', 'Bag'], ['⭐', 'Me']].map(([e, t], i) => `<a class="${i === on ? 'on' : ''}"><span class="e">${e}</span>${t}</a>`).join('')}</div>`;
+const S = [
+  ['Home', 'You and Mochi walk down your block. She waves "Hi!" when you open the app.', `<div class="ph">
+    <div class="top">${logo}<div class="pill">🧟 Horde in 6d</div></div>
+    <div class="hero"><div class="moon"></div><div class="city"></div><div class="street"></div>
+      <img class="spr" src="${I('w_0')}" style="left:16px;bottom:8px;height:178px"><img class="spr" src="${I('c_cat')}" style="left:122px;bottom:10px;height:74px">
+      <div class="bub" style="left:66px;top:20px">Hi! 👋</div>
+      <div class="steps"><b>6,420</b><span>steps today</span></div><div class="bar"><i></i></div></div>
+    <h3>Today</h3>
+    <div class="do"><div class="av"><img src="${I('c_zombie')}"></div><div><b>3 houses to loot</b><span>one is a pharmacy</span></div><span class="go">Go</span></div>
+    <div class="do" style="--c:#ff7a59"><div class="av"><img src="${I('c_lena')}"></div><div><b>Lena found a note</b><span>your crew at the base</span></div><span class="go">Read</span></div>
+    <div class="do" style="--c:#c9a8ff"><div class="av" style="place-items:center"><span style="font-size:28px">🃏</span></div><div><b>Card pack ready</b><span>you hit 10,000 steps</span></div><span class="go">Open</span></div>
+    ${nav(0)}</div>`],
+  ['Loot tab', 'Auntie Dot greets you at the top; the houses you can loot below.', `<div class="ph">
+    <div class="title">Loot</div><div class="seg" style="margin-top:12px"><a class="on">Today</a><a>Route</a><a>Daily</a></div>
+    <div class="dotcard"><div class="port"><img src="${I('c_dot')}"></div><div><b>Auntie Dot</b><q>You look like you walked here, sugar.</q><span class="tag">2 jobs · new stock</span></div></div>
+    <div class="house" style="border-color:#ff7a59"><div class="ic">💊</div><div><b>Pharmacy</b><span>412 Nostrand · ☠☠☠ · 2 locks</span></div><span class="go">Loot</span></div>
+    <div class="house"><div class="ic">🏠</div><div><b>Rowhouse</b><span>18 Halsey · someone hiding</span></div><span class="go">Loot</span></div>
+    <div class="house"><div class="ic">🏪</div><div><b>Bodega</b><span>701 Fulton · ☠☠ · food</span></div><span class="go">Loot</span></div>
+    ${nav(1)}</div>`],
+  ['In a house', 'Looting with your new look; a zombie shuffles in from the street.', `<div class="ph run"><img class="bg" src="${I('run_bg')}">
+    <img class="spr" src="${I('c_you')}" style="left:158px;top:432px;height:120px">
+    <img class="spr" src="${I('c_cat')}" style="left:128px;top:510px;height:44px">
+    <img class="spr" src="${I('c_zombie')}" style="left:282px;top:560px;height:112px;transform:scaleX(-1)"></div>`],
+  ['Getting hit', 'The wince, in the new art: "> <", a sweat drop, "ow!", a red edge, then bounce back.', `<div class="ph run"><img class="bg" src="${I('run_bg')}"><div class="red"></div>
+    <img class="spr" src="${I('w_1')}" style="left:150px;top:448px;height:112px">
+    <img class="spr" src="${I('c_zombie')}" style="left:222px;top:470px;height:112px;transform:scaleX(-1) rotate(-6deg)">
+    <div class="num" style="left:186px;top:410px">16</div></div>`],
+  ['Me tab', 'You, your crew and your pets, all in the new style.', `<div class="ph">
+    <div class="title">Me</div>
+    <div class="me" style="margin-top:12px"><div class="port"><img src="${I('c_you')}"></div><div style="flex:1"><b>Celeste</b><div><span class="tag">🏆 Card Shark</span></div><div class="lv"><i></i></div><small>Level 14 · Scavenger · 13 skill points</small></div></div>
+    <h3 style="margin-top:16px">Crew & pets</h3>
+    <div class="crew"><div class="c"><small>Scavenger · Lv 3</small><img src="${I('c_lena')}"><b>Lena</b></div><div class="c"><small>Walking buddy</small><img src="${I('c_cat')}" style="height:100px"><b>Mochi</b></div></div>
+    ${nav(4)}</div>`],
+  ["Dot's shop", 'Her shop opens with the big picture of her and a line of chat.', `<div class="ph">
+    <div class="title" style="font-size:22px">Dot's Swap Shop</div>
+    <div class="shophead"><img src="${I('c_dot')}"><div class="say">"Caps on the counter, sugar. I run the last honest shop in Bed-Stuy."</div><div class="nm"><b>Auntie Dot</b><span>trader level 1</span></div></div>
+    <div class="seg"><a class="on">Quests</a><a>Shop</a><a>Sell</a></div>
+    <div class="house"><div class="ic">🦃</div><div><b>The block's dinner</b><span>Bring a turkey and 3 pies</span></div><span class="go">Take</span></div>
+    </div>`],
+];
+document.getElementById('w').innerHTML = S.map(([t, d, h]) => `<div><div class="cap"><b>${t}</b><span>${d}</span></div>${h}</div>`).join('');
+window.__ready = true;
+</script></body></html>

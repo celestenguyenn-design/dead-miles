@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dead Miles - UI revamp mockup</title>
+<style>
+  :root {
+    --ink: #11142f; --plum: #3d2d61; --night: #231a40; --night2: #2e2252; --crm: #fff3dc; --crm2: #f6e3bb; --ora: #f07b3c; --ora2: #ffa35c;
+    --pink: #f48fb8; --mint: #8fe0c8; --sky: #8cc8f0; --lime: #b5dd6a; --gold: #ffd36b; --red: #ef6a5a; --lil: #b9a4ec; --mute: #a89cc8;
+    --round: ui-rounded, "SF Pro Rounded", "Nunito", "Varela Round", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; } body { margin: 0; background: #0c0a1c; font-family: var(--round); color: var(--crm); }
+  .wall { display: flex; flex-wrap: wrap; gap: 28px; padding: 28px; justify-content: center; }
+  .cap { width: 390px; text-align: center; font: 800 15px var(--round); color: #cfc4ec; margin-bottom: 8px; }
+  .phone { position: relative; width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 3px solid #2a2048;
+    background: radial-gradient(120% 60% at 50% 0%, #3a2a66 0%, #231a40 55%, #19122f 100%); box-shadow: 0 30px 60px rgba(0,0,0,.5); }
+  .scroll { position: absolute; inset: 0 0 92px 0; overflow: hidden; padding: 54px 16px 20px; }
+  /* sticker look: ink outline + solid drop shadow */
+  .stk { border: 3px solid var(--ink); border-radius: 22px; box-shadow: 0 5px 0 var(--ink); }
+  .top { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .logo { font: 900 22px/1 var(--round); letter-spacing: -.5px; color: var(--crm); text-shadow: 0 3px 0 var(--ink); }
+  .logo b { color: var(--ora); }
+  .sp { flex: 1; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 99px; font: 900 12px var(--round); color: var(--ink); background: var(--pink); border: 2.5px solid var(--ink); box-shadow: 0 3px 0 var(--ink); }
+  .ibtn { width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; background: var(--night2); border: 2.5px solid var(--ink); box-shadow: 0 3px 0 var(--ink); }
+  .ibtn svg { width: 22px; height: 22px; }
+  /* home hero */
+  .hero { position: relative; height: 252px; overflow: hidden; background: linear-gradient(#5a3f8f, #8a5aa8 60%, #e98a7a); }
+  .hero .moon { position: absolute; right: 26px; top: 20px; width: 46px; height: 46px; border-radius: 50%; background: #fff1c9; box-shadow: 0 0 30px #ffe9a8; }
+  .hero svg.city { position: absolute; left: 0; bottom: 34px; width: 100%; }
+  .hero .ground { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: #3d2d61; border-top: 3px solid var(--ink); }
+  .hero canvas { position: absolute; bottom: 14px; }
+  .bubble { position: absolute; left: 104px; top: 22px; padding: 8px 12px; border-radius: 16px; background: var(--crm); color: var(--ink); font: 900 13px var(--round); border: 2.5px solid var(--ink); }
+  .bubble::after { content: ''; position: absolute; left: -9px; bottom: 9px; border: 7px solid transparent; border-right-color: var(--ink); }
+  .ring { position: absolute; right: 14px; bottom: 50px; width: 118px; height: 118px; }
+  .ring .lab { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--ink); }
+  .ring .lab b { display: block; font: 900 24px/1 var(--round); } .ring .lab span { font: 800 10px var(--round); }
+  .chips { display: flex; gap: 6px; margin: 12px 0 4px; }
+  .chip { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 7px 4px; border-radius: 14px; background: var(--night2); border: 2.5px solid var(--ink); box-shadow: 0 3px 0 var(--ink); font: 900 12px var(--round); }
+  .chip i { font-style: normal; font-size: 14px; }
+  .chip.lv { background: var(--gold); color: var(--ink); }
+  h2 { font: 900 17px var(--round); margin: 16px 2px 8px; display: flex; align-items: center; gap: 8px; }
+  h2 small { font: 800 12px var(--round); color: var(--mute); }
+  .todo { display: grid; gap: 8px; }
+  .task { display: flex; align-items: center; gap: 11px; padding: 10px 10px 10px 12px; background: var(--crm); color: var(--ink); }
+  .task .ic { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-size: 22px; border: 2.5px solid var(--ink); }
+  .task b { display: block; font: 900 14px var(--round); } .task span { font: 700 12px var(--round); color: #5a4a86; }
+  .task .go { margin-left: auto; padding: 8px 13px; border-radius: 13px; font: 900 13px var(--round); background: var(--ora); color: var(--ink); border: 2.5px solid var(--ink); box-shadow: 0 3px 0 var(--ink); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .big { position: relative; height: 96px; padding: 12px; color: var(--ink); overflow: hidden; }
+  .big b { position: relative; z-index: 1; font: 900 16px var(--round); } .big span { position: relative; z-index: 1; display: block; font: 800 11px var(--round); opacity: .75; }
+  .big .art { position: absolute; right: -6px; bottom: -8px; font-size: 54px; transform: rotate(-8deg); filter: drop-shadow(0 3px 0 rgba(17,20,47,.35)); }
+  .badge { position: absolute; top: 8px; right: 8px; z-index: 2; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--red); color: #fff; font: 900 12px/18px var(--round); text-align: center; border: 2px solid var(--ink); }
+  /* bottom nav */
+  .nav { position: absolute; left: 12px; right: 12px; bottom: 16px; height: 70px; display: flex; justify-content: space-around; align-items: center; padding: 0 6px;
+    background: var(--crm); border: 3px solid var(--ink); border-radius: 26px; box-shadow: 0 5px 0 var(--ink); }
+  .nav a { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 62px; padding: 6px 0; border-radius: 18px; color: #6a5a96; font: 900 10px var(--round); text-decoration: none; }
+  .nav a svg { width: 26px; height: 26px; }
+  .nav a.on { background: var(--ora); color: var(--ink); border: 2.5px solid var(--ink); transform: translateY(-10px); box-shadow: 0 4px 0 var(--ink); }
+  .nav a .dot { position: absolute; top: 3px; right: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--red); border: 2px solid var(--ink); }
+  /* houses */
+  .seg { display: flex; padding: 4px; gap: 4px; background: var(--night2); border-radius: 18px; border: 2.5px solid var(--ink); margin-bottom: 12px; }
+  .seg a { flex: 1; text-align: center; padding: 8px 0; border-radius: 13px; font: 900 13px var(--round); color: var(--mute); }
+  .seg a.on { background: var(--crm); color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+  .dot-shop { display: flex; gap: 12px; align-items: center; padding: 12px; background: linear-gradient(135deg, #ffd36b, #ffa35c); color: var(--ink); margin-bottom: 12px; }
+  .dot-shop .face { width: 58px; height: 58px; border-radius: 18px; background: #fff3dc; border: 2.5px solid var(--ink); display: grid; place-items: center; font-size: 32px; }
+  .dot-shop b { font: 900 16px var(--round); display: block; } .dot-shop span { font: 800 12px var(--round); }
+  .house { display: grid; grid-template-columns: 74px 1fr; gap: 12px; padding: 10px; background: var(--night2); margin-bottom: 10px; }
+  .house .pic { height: 74px; border-radius: 16px; border: 2.5px solid var(--ink); display: grid; place-items: end center; overflow: hidden; }
+  .house b { font: 900 15px var(--round); display: block; } .house small { font: 800 11px var(--round); color: var(--mute); display: block; margin: 2px 0 6px; }
+  .tags { display: flex; gap: 5px; flex-wrap: wrap; } .tag { padding: 3px 8px; border-radius: 9px; font: 900 10px var(--round); background: #11142f; color: var(--crm2); }
+  .tag.d { background: var(--red); color: var(--ink); } .tag.g { background: var(--lime); color: var(--ink); } .tag.s { background: var(--lil); color: var(--ink); }
+  .loot { margin-top: 8px; display: flex; gap: 6px; } .btn { flex: 1; padding: 8px; border-radius: 13px; text-align: center; font: 900 13px var(--round); color: var(--ink); background: var(--ora); border: 2.5px solid var(--ink); box-shadow: 0 3px 0 var(--ink); }
+  .btn.g { background: var(--crm); } .btn.m { background: var(--mint); }
+  /* me */
+  .me { display: flex; gap: 12px; align-items: center; padding: 12px; background: var(--crm); color: var(--ink); }
+  .me canvas { background: linear-gradient(#b9a4ec, #f48fb8); border-radius: 18px; border: 2.5px solid var(--ink); }
+  .me b { font: 900 20px var(--round); display: block; } .me .t { display: inline-block; margin: 3px 0 6px; padding: 2px 8px; border-radius: 8px; background: var(--ink); color: var(--gold); font: 900 11px var(--round); }
+  .xp { height: 14px; border-radius: 8px; background: #e6d7b8; border: 2.5px solid var(--ink); overflow: hidden; } .xp i { display: block; height: 100%; width: 62%; background: var(--lime); }
+  .me span.s { font: 800 11px var(--round); color: #5a4a86; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .tile { position: relative; height: 98px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--ink); text-align: center; }
+  .tile .e { font-size: 34px; filter: drop-shadow(0 3px 0 rgba(17,20,47,.3)); } .tile b { font: 900 12px var(--round); } .tile small { font: 800 9.5px var(--round); opacity: .7; }
+  /* bag */
+  .bagbar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--night2); margin-bottom: 10px; font: 900 13px var(--round); }
+  .bagbar .meter { flex: 1; height: 14px; border-radius: 8px; background: #11142f; border: 2px solid var(--ink); overflow: hidden; } .bagbar .meter i { display: block; height: 100%; width: 58%; background: var(--mint); }
+  .slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .slot { position: relative; aspect-ratio: 1; border-radius: 16px; background: var(--crm); border: 2.5px solid var(--ink); box-shadow: 0 3px 0 var(--ink); display: grid; place-items: center; }
+  .slot img { width: 70%; } .slot em { position: absolute; right: 5px; bottom: 3px; font: 900 11px var(--round); color: var(--ink); font-style: normal; }
+  .slot.empty { background: transparent; border-style: dashed; border-color: #4a3c70; box-shadow: none; }
+  .slot.q4 { background: #e9ddff; } .slot.new::after { content: 'NEW'; position: absolute; top: -7px; left: -5px; padding: 0 5px; border-radius: 7px; background: var(--red); color: #fff; font: 900 9px/15px var(--round); border: 2px solid var(--ink); }
+  .note { max-width: 900px; margin: 0 auto 28px; padding: 0 28px; color: #cfc4ec; font: 700 14px/1.5 var(--round); }
+  .note b { color: var(--crm); }
+</style></head><body>
+<div class="wall">
+  <!-- HOME -->
+  <div><div class="cap">1 · Home: what matters today, nothing else</div>
+  <div class="phone"><div class="scroll">
+    <div class="top"><div class="logo">DEAD<b>MILES</b></div><span class="sp"></span><span class="pill">🧟 Horde in 6d</span><div class="ibtn"><svg viewBox="0 0 24 24" fill="none" stroke="#fff3dc" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg></div></div>
+    <div class="hero stk">
+      <div class="moon"></div>
+      <svg class="city" viewBox="0 0 390 120" preserveAspectRatio="none"><path d="M0 120V60h40V34h30v26h22V48h34v72zM118 120V40h46v-14h34v14h40v80zM232 120V54h36V30h28v24h40v-8h54v74z" fill="#2e2252" stroke="#11142f" stroke-width="3"/>
+        <g fill="#ffd36b"><rect x="52" y="44" width="8" height="10" rx="2"/><rect x="138" y="52" width="8" height="10" rx="2"/><rect x="176" y="36" width="8" height="10" rx="2"/><rect x="250" y="64" width="8" height="10" rx="2"/><rect x="300" y="70" width="8" height="10" rx="2"/><rect x="344" y="62" width="8" height="10" rx="2"/></g></svg>
+      <div class="ground"></div>
+      <canvas id="heroChar" width="240" height="300" style="left:18px;width:120px;height:150px"></canvas>
+      <div class="bubble">Let's walk! 🚶</div>
+      <svg class="ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="#fff3dc" stroke="#11142f" stroke-width="4"/><circle cx="60" cy="60" r="42" fill="none" stroke="#e6d7b8" stroke-width="12"/>
+        <circle cx="60" cy="60" r="42" fill="none" stroke="#f07b3c" stroke-width="12" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="70" transform="rotate(-90 60 60)"/></svg>
+      <div class="ring"><div class="lab"><div><b>6,420</b><span>steps today<br>house at 7k</span></div></div></div>
+    </div>
+    <div class="chips"><div class="chip"><i>❤️</i>80</div><div class="chip"><i>🍗</i>90</div><div class="chip"><i>💧</i>90</div><div class="chip lv"><i>⭐</i>Lv 14</div></div>
+    <h2>Today <small>3 things need you</small></h2>
+    <div class="todo">
+      <div class="task stk"><div class="ic" style="background:#ffa35c">🏚️</div><div><b>3 houses to loot</b><span>A pharmacy is on the list!</span></div><div class="go">Go</div></div>
+      <div class="task stk"><div class="ic" style="background:#f48fb8">🃏</div><div><b>1 card pack</b><span>You walked 10,000 steps</span></div><div class="go">Open</div></div>
+      <div class="task stk"><div class="ic" style="background:#8fe0c8">🛡️</div><div><b>Horde on Sunday</b><span>Do a watch shift to help</span></div><div class="go">Shift</div></div>
+    </div>
+    <h2>Go somewhere</h2>
+    <div class="grid2">
+      <div class="big stk" style="background:#8fe0c8"><b>Your base</b><span>Garden ready 🌱</span><div class="art">🏠</div><div class="badge">1</div></div>
+      <div class="big stk" style="background:#ffd36b"><b>Auntie Dot</b><span>New stock today</span><div class="art">🧺</div></div>
+    </div>
+  </div>
+  <nav class="nav">
+    <a class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M3.5 11 12 4l8.5 7v9h-6v-5.5h-5V20h-6z"/></svg>Home</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M4 20V9l5-4 5 4v11zM14 20V12h6v8z"/></svg>Houses<span class="dot"></span></a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg>Map</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M6 8h12l1 12H5zM9 8V6a3 3 0 0 1 6 0v2"/></svg>Bag</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M12 3l2.6 5.5 6 .8-4.4 4.1 1.1 6L12 16.5 6.7 19.4l1.1-6L3.4 9.3l6-.8z"/></svg>Me<span class="dot"></span></a>
+  </nav></div></div>
+
+  <!-- HOUSES -->
+  <div><div class="cap">2 · Houses: pick where to loot</div>
+  <div class="phone"><div class="scroll">
+    <div class="top"><div class="logo" style="font-size:24px">Houses</div><span class="sp"></span><span class="pill" style="background:#8fe0c8">3 to loot</span></div>
+    <div class="seg"><a class="on">Today</a><a>Route</a><a>Daily</a></div>
+    <div class="dot-shop stk"><div class="face">👵🏾</div><div><b>Auntie Dot's</b><span>2 jobs open · new stock · 140 caps</span></div><div class="go" style="margin-left:auto;padding:8px 12px;border-radius:13px;font:900 13px var(--round);background:#fff3dc;border:2.5px solid #11142f;box-shadow:0 3px 0 #11142f">Visit</div></div>
+    <div class="house stk"><div class="pic" style="background:linear-gradient(#8cc8f0,#b9a4ec)"><svg viewBox="0 0 70 60" width="66"><path d="M8 60V26L35 8l27 18v34z" fill="#fff3dc" stroke="#11142f" stroke-width="3"/><rect x="28" y="38" width="14" height="22" fill="#ef6a5a" stroke="#11142f" stroke-width="3"/><path d="M14 30h42" stroke="#11142f" stroke-width="3"/><text x="35" y="24" font-size="9" font-weight="900" text-anchor="middle" fill="#11142f">Rx</text></svg></div>
+      <div><b>Pharmacy</b><small>412 Nostrand Ave</small><div class="tags"><span class="tag d">💀💀💀 danger</span><span class="tag g">meds</span><span class="tag s">🔒 2 locks</span></div><div class="loot"><div class="btn">Loot it</div><div class="btn g">Crew</div></div></div></div>
+    <div class="house stk"><div class="pic" style="background:linear-gradient(#ffd36b,#ffa35c)"><svg viewBox="0 0 70 60" width="66"><path d="M10 60V20h50v40z" fill="#b9a4ec" stroke="#11142f" stroke-width="3"/><rect x="18" y="28" width="10" height="10" fill="#ffd36b" stroke="#11142f" stroke-width="2.5"/><rect x="42" y="28" width="10" height="10" fill="#ffd36b" stroke="#11142f" stroke-width="2.5"/><rect x="30" y="42" width="10" height="18" fill="#3d2d61" stroke="#11142f" stroke-width="2.5"/><path d="M6 20h58l-6-8H12z" fill="#ef6a5a" stroke="#11142f" stroke-width="3"/></svg></div>
+      <div><b>Rowhouse</b><small>18 Halsey St</small><div class="tags"><span class="tag d">💀 easy</span><span class="tag">🐾 someone's hiding</span></div><div class="loot"><div class="btn">Loot it</div><div class="btn g">Crew</div></div></div></div>
+    <div class="house stk"><div class="pic" style="background:linear-gradient(#b5dd6a,#8fe0c8)"><svg viewBox="0 0 70 60" width="66"><path d="M6 60V30h58v30z" fill="#fff3dc" stroke="#11142f" stroke-width="3"/><path d="M4 30l8-14h46l8 14z" fill="#3d2d61" stroke="#11142f" stroke-width="3"/><rect x="14" y="38" width="42" height="14" fill="#8cc8f0" stroke="#11142f" stroke-width="2.5"/></svg></div>
+      <div><b>Bodega</b><small>701 Fulton St</small><div class="tags"><span class="tag d">💀💀 medium</span><span class="tag g">food</span></div><div class="loot"><div class="btn">Loot it</div><div class="btn g">Crew</div></div></div></div>
+  </div>
+  <nav class="nav">
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M3.5 11 12 4l8.5 7v9h-6v-5.5h-5V20h-6z"/></svg>Home</a>
+    <a class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M4 20V9l5-4 5 4v11zM14 20V12h6v8z"/></svg>Houses</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg>Map</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M6 8h12l1 12H5zM9 8V6a3 3 0 0 1 6 0v2"/></svg>Bag</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M12 3l2.6 5.5 6 .8-4.4 4.1 1.1 6L12 16.5 6.7 19.4l1.1-6L3.4 9.3l6-.8z"/></svg>Me<span class="dot"></span></a>
+  </nav></div></div>
+
+  <!-- BAG -->
+  <div><div class="cap">3 · Bag: pack, stash and workbench in one place</div>
+  <div class="phone"><div class="scroll">
+    <div class="top"><div class="logo" style="font-size:24px">Bag</div><span class="sp"></span><span class="pill" style="background:#ffd36b">🪙 140 caps</span></div>
+    <div class="seg"><a class="on">Pack</a><a>Stash</a><a>Workbench</a><a>Kitchen</a></div>
+    <div class="bagbar stk">🎒 7 / 12<div class="meter"><i></i></div><span style="color:#a89cc8">Equipped ›</span></div>
+    <div class="slots" id="slots"></div>
+    <h2>Equipped</h2>
+    <div class="grid3">
+      <div class="tile stk" style="background:#ffa35c"><div class="e" id="eqW"></div><b>Baseball bat</b><small>Solid · 82%</small></div>
+      <div class="tile stk" style="background:#b9a4ec"><div class="e">🦺</div><b>Padded jacket</b><small>-10% damage</small></div>
+      <div class="tile stk" style="background:#8fe0c8"><div class="e">🧭</div><b>Brass compass</b><small>charm</small></div>
+    </div>
+  </div>
+  <nav class="nav">
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M3.5 11 12 4l8.5 7v9h-6v-5.5h-5V20h-6z"/></svg>Home</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M4 20V9l5-4 5 4v11zM14 20V12h6v8z"/></svg>Houses<span class="dot"></span></a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg>Map</a>
+    <a class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M6 8h12l1 12H5zM9 8V6a3 3 0 0 1 6 0v2"/></svg>Bag</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M12 3l2.6 5.5 6 .8-4.4 4.1 1.1 6L12 16.5 6.7 19.4l1.1-6L3.4 9.3l6-.8z"/></svg>Me<span class="dot"></span></a>
+  </nav></div></div>
+
+  <!-- ME -->
+  <div><div class="cap">4 · Me: you, your crew and everything you collect</div>
+  <div class="phone"><div class="scroll">
+    <div class="top"><div class="logo" style="font-size:24px">Me</div><span class="sp"></span><div class="ibtn"><svg viewBox="0 0 24 24" fill="none" stroke="#fff3dc" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg></div></div>
+    <div class="me stk"><canvas id="meChar" width="180" height="220" style="width:90px;height:110px"></canvas><div style="flex:1"><b>Celeste</b><span class="t">🏆 Card Shark</span><div class="xp"><i></i></div><span class="s">Level 14 · Scavenger · <b style="color:#ef6a5a">13 skill points!</b></span></div></div>
+    <h2>Grow</h2>
+    <div class="grid3">
+      <div class="tile stk" style="background:#ffd36b"><div class="badge">13</div><div class="e">✨</div><b>Skills</b><small>13 points</small></div>
+      <div class="tile stk" style="background:#f48fb8"><div class="e">👗</div><b>Wardrobe</b><small>18 outfits</small></div>
+      <div class="tile stk" style="background:#8fe0c8"><div class="e">🐾</div><b>Crew & pets</b><small>Mochi · 2 crew</small></div>
+    </div>
+    <h2>Collect</h2>
+    <div class="grid3">
+      <div class="tile stk" style="background:#b9a4ec"><div class="badge">1</div><div class="e">🃏</div><b>Field cards</b><small>21 / 59</small></div>
+      <div class="tile stk" style="background:#8cc8f0"><div class="e">💿</div><b>Collections</b><small>12 / 30</small></div>
+      <div class="tile stk" style="background:#ffa35c"><div class="e">🧟</div><b>Bestiary</b><small>4 titles</small></div>
+      <div class="tile stk" style="background:#b5dd6a"><div class="e">🎰</div><b>Capsules</b><small>2 tokens</small></div>
+      <div class="tile stk" style="background:#fff3dc"><div class="e">📖</div><b>Journal</b><small>Day 23</small></div>
+      <div class="tile stk" style="background:#f48fb8"><div class="e">🚶</div><b>Walks</b><small>titles</small></div>
+    </div>
+  </div>
+  <nav class="nav">
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M3.5 11 12 4l8.5 7v9h-6v-5.5h-5V20h-6z"/></svg>Home</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M4 20V9l5-4 5 4v11zM14 20V12h6v8z"/></svg>Houses<span class="dot"></span></a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg>Map</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M6 8h12l1 12H5zM9 8V6a3 3 0 0 1 6 0v2"/></svg>Bag</a>
+    <a class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"><path d="M12 3l2.6 5.5 6 .8-4.4 4.1 1.1 6L12 16.5 6.7 19.4l1.1-6L3.4 9.3l6-.8z"/></svg>Me</a>
+  </nav></div></div>
+</div>
+<div class="note"><b>The idea.</b> Five tabs at the bottom, always in reach: <b>Home</b> (only what needs you today), <b>Houses</b> (where to loot, Dot, route, daily), <b>Map</b>, <b>Bag</b> (pack, stash, workbench, kitchen) and <b>Me</b> (skills, wardrobe, crew &amp; pets, cards, collections, bestiary, capsules, journal). Bright sticker-style cards with ink outlines like the game art, bigger rounder text, one job per screen, no more 22-step popups.</div>
+<script src="../../next/s2art.js"></script>
+<script src="../../next/art.js"></script>
+<script>
+(async () => {
+  const look = ART.LOOK.norm({ hair: 1, hairC: 4, coat: 6, mouth: 1 });
+  try {
+    await ART.buildRig('survivor', 2, ART.LOOK.recolor(look), 'mock', ART.LOOK.patch(look));
+    for (const [id, sc] of [['heroChar', .95], ['meChar', .7]]) { const cv = document.getElementById(id), x = cv.getContext('2d'); ART.drawRig(x, 'mock', cv.width / 2, cv.height * .97, sc, false, { weapon: 'fists' }); }
+  } catch (e) { console.warn(e); }
+  try { ART.buildIcons(); } catch (e) { /* ignore */ }
+  const its = [['bat', ''], ['beans', '2'], ['water', '3'], ['bandage', '2'], ['lockpick', '4'], ['scrap', '9'], ['cardpack', '1']], el = document.getElementById('slots');
+  el.innerHTML = its.map(([k, n], i) => `<div class="slot${i === 6 ? ' new' : ''}${i === 0 ? ' q4' : ''}">${ART.iconURL[k] ? `<img src="${ART.iconURL[k]}">` : ''}<em>${n}</em></div>`).join('') + '<div class="slot empty"></div>'.repeat(5);
+  if (ART.iconURL.bat) document.getElementById('eqW').innerHTML = `<img src="${ART.iconURL.bat}" style="width:40px">`;
+})();
+</script>
+</body></html>
