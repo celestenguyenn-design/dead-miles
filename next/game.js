@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.71.0';
+const NEXT_VERSION = '0.72.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -915,39 +915,8 @@ const NEXT_VERSION = '0.71.0';
   // ---- trader screen
   // 0.69.1 (owner: "make auntie dot cuter cus wtf is that"): chibi like the rest of the cast - silver puff of hair under a
   // beaded headwrap, cat-eye glasses on a chain, gold hoops, big smile, waving, coffee in the other hand, her shop apron
-  const DOT_SVG = `<svg viewBox="0 0 120 140" class="dotsvg"><ellipse cx="60" cy="135" rx="38" ry="5" fill="rgba(8,6,22,.45)"/>
-  <path d="M24 135 Q22 104 40 96 L80 96 Q98 104 96 135 Z" fill="#b48ad6" stroke="#4a2e2a" stroke-width="3.6" stroke-linejoin="round"/>
-  <path d="M40 104 L80 104 L84 135 L36 135 Z" fill="#ffb347" stroke="#4a2e2a" stroke-width="3" stroke-linejoin="round"/>
-  <path d="M44 104 Q60 112 76 104" fill="none" stroke="#4a2e2a" stroke-width="2.4"/>
-  <rect x="44" y="115" width="32" height="13" rx="3" fill="#ffd27a" stroke="#4a2e2a" stroke-width="2.2"/><text x="60" y="125.5" font-family="Outfit,Inter,sans-serif" font-size="7.4" font-weight="900" text-anchor="middle" fill="#11142f">DOT'S</text>
-  <path d="M51 96 L60 106 L69 96" fill="#f6e3bb" stroke="#4a2e2a" stroke-width="2.6" stroke-linejoin="round"/>
-  <path d="M30 108 Q22 92 18 80" fill="none" stroke="#4a2e2a" stroke-width="10" stroke-linecap="round"/><path d="M30 108 Q22 92 18 80" fill="none" stroke="#b48ad6" stroke-width="6.6" stroke-linecap="round"/>
-  <circle cx="17" cy="76" r="6.4" fill="#8a5a3c" stroke="#4a2e2a" stroke-width="2.6"/><path d="M12 72 l-3-4 M16 70 l-1-5 M20 71 l1-5" stroke="#4a2e2a" stroke-width="2.2" stroke-linecap="round"/>
-  <path d="M8 62 q-4 4 0 8 M4 60 q-6 6 0 12" fill="none" stroke="#ffd27a" stroke-width="2" stroke-linecap="round"/>
-  <path d="M90 108 Q98 104 100 96" fill="none" stroke="#4a2e2a" stroke-width="10" stroke-linecap="round"/><path d="M90 108 Q98 104 100 96" fill="none" stroke="#b48ad6" stroke-width="6.6" stroke-linecap="round"/>
-  <rect x="93" y="82" width="15" height="15" rx="3" fill="#f6efff" stroke="#4a2e2a" stroke-width="2.6"/><path d="M108 85 q6 0 6 5 q0 5 -6 5" fill="none" stroke="#4a2e2a" stroke-width="2.4"/><rect x="95" y="84" width="11" height="3" fill="#7a4a2a"/>
-  <path d="M97 78 q-2 -4 1 -7 M103 78 q-2 -4 1 -7" fill="none" stroke="#e6dcff" stroke-width="1.8" stroke-linecap="round" opacity=".8"/>
-  <circle cx="100" cy="96" r="5.4" fill="#8a5a3c" stroke="#4a2e2a" stroke-width="2.4"/>
-  <g fill="#e2ddf0" stroke="#4a2e2a" stroke-width="3"><circle cx="34" cy="50" r="11"/><circle cx="86" cy="50" r="11"/><circle cx="38" cy="34" r="12"/><circle cx="82" cy="34" r="12"/><circle cx="50" cy="24" r="13"/><circle cx="70" cy="24" r="13"/><circle cx="60" cy="20" r="12"/><circle cx="31" cy="64" r="8"/><circle cx="89" cy="64" r="8"/></g>
-  <g fill="#e2ddf0"><circle cx="40" cy="40" r="10"/><circle cx="80" cy="40" r="10"/><circle cx="60" cy="30" r="12"/></g>
-  <g fill="none" stroke="#b9b1d0" stroke-width="1.6" stroke-linecap="round"><path d="M46 20 q3 3 0 6"/><path d="M68 18 q3 3 0 6"/><path d="M32 30 q3 3 0 6"/><path d="M86 30 q-3 3 0 6"/></g>
-  <circle cx="60" cy="62" r="28" fill="#8a5a3c" stroke="#4a2e2a" stroke-width="3.6"/>
-  <ellipse cx="50" cy="48" rx="9" ry="5" fill="#a8704c" opacity=".55"/>
-  <path d="M30 46 Q60 22 90 46 L88 38 Q60 14 32 38 Z" fill="#3fa7a0" stroke="#4a2e2a" stroke-width="3" stroke-linejoin="round"/>
-  <g fill="#ffd27a"><circle cx="42" cy="35" r="2.4"/><circle cx="54" cy="29" r="2.4"/><circle cx="66" cy="29" r="2.4"/><circle cx="78" cy="35" r="2.4"/></g>
-  <path d="M84 36 q12 -6 14 4 q-8 -2 -12 4 Z" fill="#ff7a59" stroke="#4a2e2a" stroke-width="2.6" stroke-linejoin="round"/><path d="M86 40 q10 2 8 12 q-5 -6 -10 -6 Z" fill="#ff7a59" stroke="#4a2e2a" stroke-width="2.6" stroke-linejoin="round"/>
-  <circle cx="32" cy="70" r="4.2" fill="none" stroke="#f0c23d" stroke-width="2.4"/><circle cx="88" cy="70" r="4.2" fill="none" stroke="#f0c23d" stroke-width="2.4"/>
-  <path d="M42 51 q5 -3 10 0 M68 51 q5 -3 10 0" stroke="#4a2e2a" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-  <ellipse cx="47.5" cy="61" rx="5.2" ry="6.4" fill="#11142f"/><ellipse cx="72.5" cy="61" rx="5.2" ry="6.4" fill="#11142f"/>
-  <circle cx="49.4" cy="58.4" r="2.2" fill="#fff"/><circle cx="74.4" cy="58.4" r="2.2" fill="#fff"/><circle cx="45.8" cy="63.6" r="1.1" fill="#fff"/><circle cx="70.8" cy="63.6" r="1.1" fill="#fff"/>
-  <path d="M36 60 Q36 52 47 52 Q57 52 57 60 Q57 70 47 70 Q37 70 36 60 Z M63 60 Q63 52 73 52 Q84 52 84 60 Q83 70 73 70 Q63 70 63 60 Z" fill="rgba(255,255,255,.12)" stroke="#d9483a" stroke-width="2.8" stroke-linejoin="round"/>
-  <path d="M36 56 l-4 -4 M84 56 l4 -4" stroke="#d9483a" stroke-width="2.8" stroke-linecap="round"/><path d="M57 59 q3 -2 6 0" stroke="#d9483a" stroke-width="2.4" fill="none"/>
-  <path d="M38 55 l4 -2 M65 55 l4 -2" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>
-  <path d="M33 62 Q28 80 34 92 M87 62 Q92 80 86 92" fill="none" stroke="#f0c23d" stroke-width="1.4" stroke-dasharray="1.6 2.4" stroke-linecap="round"/>
-  <ellipse cx="41" cy="74" rx="5.4" ry="3.4" fill="#f07a9a" opacity=".55"/><ellipse cx="79" cy="74" rx="5.4" ry="3.4" fill="#f07a9a" opacity=".55"/>
-  <path d="M50 75 Q60 76 70 75 Q69 86 60 86 Q51 86 50 75 Z" fill="#7a1f2a" stroke="#4a2e2a" stroke-width="2.6" stroke-linejoin="round"/>
-  <path d="M51 76 L69 76 L68 79 L52 79 Z" fill="#fff"/><path d="M54 84 Q60 80 66 84 Q63 86 60 86 Q57 86 54 84 Z" fill="#f07a9a"/>
-</svg>`;
+  // 0.72 (owner: "let's use the characters that we created with Sprite Cook"): Dot's portrait is the SpriteCook picture
+  const DOT_SVG = '<img class="dotsvg dotimg" src="img/dot.webp" alt="Auntie Dot">';
   let tTab = 'quests', tSel = null;
   // 0.15 (owner: "the trader shouldn't be infinite"): after each visit Dot heads off and is back once you have walked
   // DOT_AWAY more steps (SV.walked: phone/watch steps, typed ones at half, the same total quests use). A visit starts when
@@ -1220,7 +1189,12 @@ const NEXT_VERSION = '0.71.0';
     const wt = now - SCN.wave, waving = wt >= 0 && wt < 1.9;   // 2. a wave on opening the app (or a tap)
     const yo = walking ? -Math.abs(Math.cos(ph)) * 3.5 : 0, breathe = 1 + Math.sin(now * 2.4) * .012;
     x.fillStyle = 'rgba(8,6,22,.4)'; x.beginPath(); x.ellipse(cx, fy, 24, 5, 0, 0, 6.28); x.fill();
-    if (ART.rigs.survivor) {
+    const girl = ART.pinkGirl && ART.pinkGirl(SV.survivor.look), gIm = girl && ART.img(waving ? 'wince3' : walking ? 'wince0' : 'you');
+    if (gIm) {   // 0.72: the SpriteCook girl, bobbing along (a hop per step) instead of the drawn rig
+      const h = H * .82, w = gIm.width * h / gIm.height, bob = walking ? Math.abs(Math.sin(ph)) * 4 : Math.sin(now * 2.4) * .8, sq = walking ? 1 - Math.abs(Math.cos(ph)) * .03 : 1;
+      x.drawImage(gIm, cx - w / 2, fy - h * sq - bob, w, h * sq);
+      if (waving) bubble(x, cx + H * .2, fy - H * .8, 'Hi!', Math.min(1, wt * 5, (1.9 - wt) * 5));
+    } else if (ART.rigs.survivor) {
       const sh = SV.survivor.hands, wk = sh && D.ITEMS[sh.k] ? D.ITEMS[sh.k].w : 'fists';
       const parts = { legB: { r: s * .42 }, legF: { r: -s * .42 }, arm: { r: -s * .3 }, bat: { r: -s * .3 }, head: { r: Math.sin(now * 1.3) * .05 } };
       if (waving) { const a = -1.55 + Math.sin(wt * 13) * .45; parts.arm = { r: a }; parts.bat = { r: a }; parts.head = { r: .1 + Math.sin(wt * 6.5) * .05 }; }
@@ -1229,7 +1203,13 @@ const NEXT_VERSION = '0.71.0';
     }
     // 3. the pet: sits until she has walked today, then trots beside her
     const p = DM.Crew && DM.Crew.activePet ? DM.Crew.activePet() : null;
-    if (p) { const tc = SCN.tmp, pw = Math.round(H * .5 * dpr), phh = Math.round(H * .34 * dpr); if (tc.width !== pw) { tc.width = pw; tc.height = phh; }
+    const pIm = p && DM.Crew.petImg && DM.Crew.petImg(p);
+    if (pIm) {   // 0.72: the SpriteCook pet - sits until you have walked, then hops beside you
+      const h = H * .36, w = pIm.width * h / pIm.height, px = cx + H * .2, hop = walking ? Math.abs(Math.sin(ph * 1.2 + 1)) * 6 : 0;
+      x.fillStyle = 'rgba(8,6,22,.3)'; x.beginPath(); x.ellipse(px + w / 2, fy, w * .36, 3.5, 0, 0, 6.28); x.fill();
+      x.drawImage(pIm, px, fy - h - hop, w, h);
+      if (!walking && !waving) bubble(x, px + w * .7, fy - h - 2, '…?', .5 + .5 * Math.max(0, Math.sin(now * 1.6)));
+    } else if (p) { const tc = SCN.tmp, pw = Math.round(H * .5 * dpr), phh = Math.round(H * .34 * dpr); if (tc.width !== pw) { tc.width = pw; tc.height = phh; }
       DM.Crew.petPortrait(tc, p, walking ? { sit: false, move: 1, ph: ph * 1.2, t: now, happy: true } : { sit: true, t: now, heart: waving ? 1 : 0 });
       const pw2 = H * .5, ph2 = H * .34, px = cx + H * .17;
       x.drawImage(tc, px, fy - ph2, pw2, ph2);
@@ -1365,6 +1345,7 @@ const NEXT_VERSION = '0.71.0';
   function drawPortrait(c, weapon, sc = .7) {
     const dpr = c.width / c.clientWidth || 2, x = c.getContext('2d');
     x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.width, c.height);
+    { const im = SV && SV.survivor && ART.pinkGirl(SV.survivor.look) && ART.img('you'); if (im) { const h = c.height * .94, w = im.width * h / im.height; x.drawImage(im, (c.width - w) / 2, c.height - h, w, h); return; } }   // 0.72
     x.fillStyle = 'rgba(8,6,22,.4)'; x.beginPath(); x.ellipse(c.width / 2, c.height * .9, c.width * .28, c.width * .08, 0, 0, 6.3); x.fill();
     const wk = weapon && D.ITEMS[weapon] ? D.ITEMS[weapon].w : weapon;
     ART.drawRig(x, 'survivor', c.width / 2 - 4, c.height * .9, sc * c.height / 260, false, { weapon: wk || 'fists' });

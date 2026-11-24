@@ -78,3 +78,6 @@ html, body { font-family: Outfit, Inter, system-ui, -apple-system, "Segoe UI", R
 #mbody:has(> .bnav) { display: flex; flex-direction: column; min-height: 100%; }
 #mbody:has(> .bnav) > .bnav { margin-top: auto; }
 #mbody:has(> .bnav) > * { flex-shrink: 0; }
+/* 0.72 Auntie Dot is a picture now (img/dot.webp) */
+img.dotsvg { object-fit: contain; object-position: 50% 100%; }
+.dotmini img.dotsvg { width: 60px; height: 70px; object-fit: cover; object-position: 50% 6%; margin-bottom: 0; }

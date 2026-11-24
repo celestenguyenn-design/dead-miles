@@ -358,6 +358,10 @@ window.DM = window.DM || {};
     for (let i = 0; i < 14; i++) { const h = (card.no * 97 + i * 53) % 997; x.fillStyle = 'rgba(255,255,255,.07)'; x.beginPath(); x.arc((h * 7) % W, (h * 13) % H, (h % 3 + 1) * sc, 0, 6.28); x.fill(); }
     x.fillStyle = 'rgba(8,6,22,.35)'; x.beginPath(); x.ellipse(W / 2, H * .9, W * .3, H * .06, 0, 0, 6.28); x.fill();
     const a = card.a;
+    // 0.72: SpriteCook pictures for the cards that have one (Dot, the Walker, Lena, every pet colour)
+    const IMG = { dot: 'dot', walker: 'zombie', lena: 'lena' }, nm = IMG[card.id] || (a.pet ? a.pet[0] + (a.pet[1] % 4) : null);
+    if (nm && ART.img) { let im = ART.img(nm); if (!im) { await new Promise(r => setTimeout(r, 600)); im = ART.img(nm); }
+      if (im) { const k = Math.min(W * .9 / im.width, H * .92 / im.height), w = im.width * k, h = im.height * k; x.drawImage(im, (W - w) / 2, H - h - H * .03, w, h); return; } }
     try {
       if (a.z) { const n = await zRig(a.z); const s = (a.big ? 1.08 : 1) * H / 150; if (a.glow) { const gl = x.createRadialGradient(W / 2, H * .55, 2, W / 2, H * .55, W * .45); gl.addColorStop(0, a.glow + 'aa'); gl.addColorStop(1, a.glow + '00'); x.fillStyle = gl; x.fillRect(0, 0, W, H); }
         ART.drawRig(x, n, W / 2, H * 1.25, s, !!a.flip, { parts: { armF: { r: -.6 }, armB: { r: -.45 }, head: { r: .08 } } });

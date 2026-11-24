@@ -1443,3 +1443,12 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
 - 0.69.1 (owner: "make auntie dot cuter"): DOT_SVG redrawn chibi: silver hair puff, beaded headwrap, cat-eye glasses on a chain, gold hoops, waving, coffee mug, DOT'S apron.
 - 0.70 (owner: "i want animation when we get hurt like a wince"): house.js hurtPlayer sets p.wince (0.6 s, its own clock): squash then a small bounce, an arm up to the face, head flinch, a sweat drop flying off and an 'ow!/oof!/eek!' pop (winceFx). Hit stun timing unchanged.
 - 0.71 (owner chose: keep customisable characters, restyle them toward the soft chibi look for free): art.js CHIBI - survivor heads x1.15 (on top of the player's head size), eyes x1.25, zombie heads x1.15 (rig.headScale in drawRig), ink lines -> warm brown #4a2e2a and 0.68x thinner, ink fills -> #221a1e. VB grew to y -300 / h 308 for the bigger heads. Pets (crew.js drawPet) and DOT_SVG use the same brown line.
+- 0.72 (owner: "use the characters that we created with Sprite Cook ... everything else very similar style", credits on "a dog/cat, cat first"):
+  next/img/*.webp (380 KB, cut out of the SpriteCook sheets kept in mockups/ui/spritecook/): dot, you, lena, zombie,
+  wince0-3, cat0-3 and dog0-3 (one per coat, same order as crew.js COATS). ART.img(name) loads them; ART.pinkGirl(look)
+  (pink hair + pink/blush hoodie) swaps the player's drawn rig for the SpriteCook girl on Home, Me and the hit bubble -
+  other looks keep the customisable drawn rig. Dot's DOT_SVG is now an <img>. Pets everywhere (Home, house runs, the
+  base, crew sheet, cards) use their coat's picture, hopping when they move; only the hiding "peek" is still drawn.
+  Field cards dot / walker / lena / pets use the pictures. Restyle of the drawn rigs: thinner sticker edge, a soft pastel
+  filter, rosy cheeks, the walker recoloured mint + lavender with a small one-fang mouth (no open jaw / drool).
+  Licence of the SpriteCook art not yet confirmed by the owner (free plan); all 40 credits spent.

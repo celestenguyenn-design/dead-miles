@@ -11,7 +11,7 @@ const ART = (() => {
   };
   // The wob filter region is relative to each element's bbox by default; give it a fixed
   // user-space region so separately rendered parts keep identical wobble and are not clipped.
-  const DEFS = S.defs.replace(/<filter id="wob"[^>]*>/, '<filter id="wob" filterUnits="userSpaceOnUse" x="-140" y="-330" width="320" height="380">');
+  const DEFS = '<filter id="soft" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values=".8"/><feComponentTransfer><feFuncR type="linear" slope=".93" intercept=".06"/><feFuncG type="linear" slope=".93" intercept=".05"/><feFuncB type="linear" slope=".93" intercept=".05"/></feComponentTransfer></filter>' + S.defs.replace(/<filter id="wob"[^>]*>/, '<filter id="wob" filterUnits="userSpaceOnUse" x="-140" y="-330" width="320" height="380">');
   const VB = { x: -82, y: -300, w: 172, h: 308 };   // 0.71: taller for the bigger chibi heads (was y -266, h 274)   // tall enough for bunny ears and the pilgrim hat
 
   // ---------- character rigs ----------
@@ -19,7 +19,7 @@ const ART = (() => {
   // same lines in the same order, `mid` lines earlier.
   const RIGS = {
     survivor: {
-      src: S.survivor, oshift: 'translate(3.6 -1)',
+      src: S.survivor, oshift: 'translate(2.4 -.7)',   // 0.72: a thinner sticker edge (was 3.6 -1)
       parts: [
         { name: 'legB', lines: [70, 75], pivot: [-8, -54] },
         { name: 'legF', lines: [71, 72, 73, 74, 76], pivot: [6, -54] },
@@ -30,7 +30,7 @@ const ART = (() => {
       skip: [77, 78],
     },
     zombie: {
-      src: S.zombie, oshift: 'translate(3 -1)',
+      src: S.zombie, oshift: 'translate(2 -.7)',
       parts: [
         { name: 'armB', lines: rng(65, 71), pivot: [6, -110] },
         { name: 'legB', lines: [72, 73, 74, 77], pivot: [2, -60] },
@@ -65,9 +65,16 @@ const ART = (() => {
     const R = RIGS[key];
     const L = R.src.split('\n');
     if (patch) patch(L);
+    if (key === 'zombie') {   // 0.72: a cute-zombie face - small wobbly mouth with one fang instead of the open toothy jaw, no drool
+      L[123] = '<path d="M-44,-110 Q-41,-113 -38,-110 Q-35,-107 -32,-110 Q-29,-113 -27,-110" fill="none" stroke="#11142f" stroke-width="2.6" stroke-linecap="round"/><path d="M-36.6,-109.4 L-35,-105.2 L-33.2,-109.4 Z" fill="#fffaf0" stroke="#11142f" stroke-width="1.2" stroke-linejoin="round"/>';
+      L[124] = ''; L[125] = ''; L[126] = ''; L[129] = ''; L[137] = ''; L[138] = '';
+      L[136] = L[136] + '<ellipse cx="-49" cy="-121" rx="3.6" ry="2.2" fill="#f49aa8" opacity=".3"/><ellipse cx="-22" cy="-121" rx="3.6" ry="2.2" fill="#f49aa8" opacity=".3"/>';
+    }
+    if (key === 'zombie' && !recolor) recolor = { '#93a86c': '#a9c8a2', '#6c8050': '#86a47e', '#4d5c3c': '#66805e', '#6e5f98': '#a294c8', '#4a3c70': '#7a6aa4' };   // 0.72: the walker in SpriteCook's mint and lavender
     if (key === 'survivor') {
       const hi = L.findIndex(l => /translate\(2 -122\) scale\([\d.]+\)/.test(l));
       if (hi > 0) L[hi] = L[hi].replace(/scale\(([\d.]+)\)/, (m, v) => `scale(${(+v * CHIBI.head).toFixed(3)})`);
+      if (L[103] != null) L[103] = L[103] + '<ellipse cx="0" cy="-130.5" rx="3.6" ry="2.2" fill="#f49aa8" opacity=".42"/><ellipse cx="25.5" cy="-130" rx="3.8" ry="2.4" fill="#f49aa8" opacity=".38"/>';   // 0.72 rosy cheeks
       if (L[97] != null && L[100] != null) { L[97] = `<g transform="translate(12.7 -139) scale(${CHIBI.eyes}) translate(-12.7 139)">` + L[97]; L[100] = L[100] + '</g>'; }
     }
     const mid = L.findIndex(l => l.includes('</g></g><g><g class='));
@@ -90,7 +97,7 @@ const ART = (() => {
       colour = colour.replace(/<\/g><\/g><\/g>\s*$/, '');
       const [io, ic] = await Promise.all([
         loadImg(svgURL(`<g filter="url(#wob)"><g transform="${R.oshift}">${outline}</g></g>`, vb, W, H)),
-        loadImg(svgURL(`<g filter="url(#wob)">${colour}</g>`, vb, W, H)),
+        loadImg(svgURL(`<g filter="url(#wob)"><g filter="url(#soft)">${colour}</g></g>`, vb, W, H)),   // 0.72: softer, pastel
       ]);
       const o = toCanvas(io, W, H), red = toCanvas(io, W, H), rc = red.getContext('2d');
       rc.globalCompositeOperation = 'source-in'; rc.fillStyle = '#ff5a48'; rc.fillRect(0, 0, W, H);
@@ -1402,5 +1409,11 @@ const ART = (() => {
   function addIcons(o) { for (const k in o) { if (/^data:/.test(o[k])) iconURL[k] = o[k]; else { EXTRA_ICONS[k] = o[k]; iconURL[k] = svgURL(o[k], '-36 -36 72 72', 96, 96); } } }
   // 0.52: the base's own paint (base.js applyPaint): override one room style's wall face and floor after houseLook(null)
   function paintRoom(k, wall, floor) { if (!WALL0) WALL0 = JSON.parse(JSON.stringify(WALLFACE)); if (wall && WALLFACE[k]) Object.assign(WALLFACE[k], wall); if (floor && FLOOR[k]) Object.assign(FLOOR[k], floor); }
-  return { addIcons, P, LOOK, rigs, buildRig, drawRig, buildIcons, iconURL, rr, blk, line, dot, hash, drawFloorTile, drawWallFace, houseLook, paintRoom, FURN, geo, candle, VB, WEAPON_ART };
+  // 0.72 hand-picked illustrations (img/*.webp, made with SpriteCook): loaded once, null until ready
+  const IMGS = {};
+  function img(name) { let e = IMGS[name]; if (!e) { e = IMGS[name] = { ok: false, im: new Image() }; e.im.onload = () => { e.ok = true; }; e.im.src = 'img/' + name + '.webp'; } return e.ok ? e.im : null; }
+  // the SpriteCook girl stands in for the player only when the chosen look matches her (pink hair + pink hoodie)
+  const pinkGirl = lk => !!(lk && lk.hairC === 4 && (lk.coat === 6 || lk.coat === 7));
+  ['dot', 'you', 'wince0', 'wince1', 'wince3', 'zombie', 'lena', 'cat0', 'cat1', 'cat2', 'cat3', 'dog0', 'dog1', 'dog2', 'dog3'].forEach(img);
+  return { img, pinkGirl, addIcons, P, LOOK, rigs, buildRig, drawRig, buildIcons, iconURL, rr, blk, line, dot, hash, drawFloorTile, drawWallFace, houseLook, paintRoom, FURN, geo, candle, VB, WEAPON_ART };
 })();

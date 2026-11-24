@@ -181,6 +181,11 @@
 
   // ---------------------------------------------------------------- pet art (Style B: ink outline, flat fills, a bit roughed up)
   function drawPet(c, pet, x, y, o = {}) {
+    // 0.72: the SpriteCook pet picture (one per coat), hopping when it moves; the drawn pet only peeks from hiding
+    { const im = !o.peek && C.petImg(pet); if (im) { const sc = o.sc || 1, h = 44 * sc, w = im.width * h / im.height, mv = o.move || 0, hop = mv * Math.abs(Math.sin((o.ph || 0) * 2)) * 5 * sc;
+      c.save(); if (o.alpha != null) c.globalAlpha *= o.alpha; c.fillStyle = 'rgba(8,6,22,.32)'; c.beginPath(); c.ellipse(x, y, w * .36, 4 * sc, 0, 0, 6.28); c.fill();
+      if (o.flip) { c.translate(x, 0); c.scale(-1, 1); c.translate(-x, 0); }
+      c.drawImage(im, x - w / 2, y - h - hop, w, h); c.restore(); return; } }
     const K = COATS[pet.kind][pet.coat] || COATS[pet.kind][0], dog = pet.kind === 'dog', t = o.t || 0, mv = o.move || 0;
     const sw = Math.sin((o.ph || 0) * 2) * mv, INK = '#4a2e2a';   // 0.71: warm chibi lines, like the people
     c.save(); c.translate(x, y); c.scale((o.flip ? -1 : 1) * (o.sc || 1), o.sc || 1); c.lineJoin = 'round'; c.lineCap = 'round';
@@ -254,8 +259,12 @@
     c.restore();
   }
   C.drawPet = drawPet;
+  // 0.72: the SpriteCook pets (img/cat0-3, dog0-3, one per coat) when the pet is not moving
+  C.petImg = pet => ART.img && pet ? ART.img(pet.kind + ((pet.coat | 0) % 4)) : null;
   C.petPortrait = function (cv, pet, o = {}) {
     if (!cv) return; const x = cv.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, cv.width, cv.height);
+    const im = !o.move && C.petImg(pet);
+    if (im) { const k = Math.min(cv.width / im.width, cv.height * .94 / im.height), w = im.width * k, h = im.height * k; if (o.alpha != null) x.globalAlpha = o.alpha; x.drawImage(im, (cv.width - w) / 2, cv.height - h, w, h); x.globalAlpha = 1; return; }
     const sc = cv.height / 46; drawPet(x, pet, cv.width / 2 - 2 * sc, cv.height * .88, Object.assign({ sc, t: 1, sit: true }, o));
   };
   const bark = () => { if (!SFX.ac) return; SFX.tone('square', 560, 360, .09, .05); SFX.tone('square', 600, 380, .09, .05, .14); };

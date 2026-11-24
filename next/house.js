@@ -532,6 +532,11 @@
     ctx.font = '900 15px Outfit, Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.lineWidth = 4; ctx.strokeStyle = '#fff6ee'; ctx.strokeText(p.ow || 'ow!', 0, 0); ctx.fillStyle = '#e8504a'; ctx.fillText(p.ow || 'ow!', 0, 0);
     ctx.restore();
+    // 0.72: with the SpriteCook look, her "> <" face pops up in a little bubble too
+    const im = ART.pinkGirl && ART.pinkGirl(S().look) && ART.img('wince1');
+    if (im) { const r = 19 * Math.min(1, t / .07), bx = p.x - side * 40, by = hy - 4 - t * 8; if (r > 2) { ctx.save(); ctx.globalAlpha = a;
+      ctx.beginPath(); ctx.arc(bx, by, r + 2.5, 0, 6.28); ctx.fillStyle = '#4a2e2a'; ctx.fill(); ctx.beginPath(); ctx.arc(bx, by, r, 0, 6.28); ctx.fillStyle = '#fff6ee'; ctx.fill(); ctx.clip();
+      const sw = im.width, sh = im.height * .5, k = (r * 2.3) / sw; ctx.drawImage(im, 0, im.height * .04, sw, sh, bx - sw * k / 2, by - r * .95, sw * k, sh * k); ctx.restore(); } }
   }
   // ---------------------------------------------------------------- interaction
   // secrets stay invisible until most of the house has been searched; no announcement when that happens
