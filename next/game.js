@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.72.2';
+const NEXT_VERSION = '0.72.3';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -334,7 +334,9 @@ const NEXT_VERSION = '0.72.2';
   // ---------------------------------------------------------------- crew auto-search: instant, ~35-60% of the loot (more with a bigger crew), never secrets
   function autoSearch(h) {
     const L = layoutOf(h), rnd = D.mulberry32(h.seed ^ 0x5bd1e995);
-    const got = [], share = DM.Crew.autoShare(), skip = DM.Crew.lockSkip(), n = SV.crew.list.length;
+    const n = DM.Crew.searchers().length;
+    if (!n) { toast(SV.crew.list.length ? 'Nobody can go - your crew is hurt or too miserable to work today' : 'You have no crew to send - loot it yourself', 2.6); return; }   // 0.72.3
+    const got = [], share = DM.Crew.autoShare(), skip = DM.Crew.lockSkip();
     for (const f of L.furn) {
       if (!f.loot || f.secretLoot || f.keyLock || f.keyRoom) continue;   // 0.8: the crew has no brass key
       if (f.lock && rnd() < skip) continue; // the crew skips some of the locked stuff (scavengers fewer)
@@ -346,7 +348,7 @@ const NEXT_VERSION = '0.72.2';
     h.status = 'auto'; SV.stats.auto++;
     DM.Skills.addXP(3);
     Game.save();
-    showResult(L.name + ' · ' + L.address, stacks, lost, `Everything went to your stash. ${n ? `Your crew of ${n} brought back about ${Math.round(share * 100)}% of what was there` : `With no crew yet, a couple of neighbours helped: about ${Math.round(share * 100)}% of what was there`} - and never the hidden compartments.`);
+    showResult(L.name + ' · ' + L.address, stacks, lost, `Everything went to your stash. ${n === 1 ? 'One crew member' : `Your crew of ${n}`} brought back about ${Math.round(share * 100)}% of what was there - and never the hidden compartments.`);
     renderHome();
   }
 
@@ -1568,7 +1570,7 @@ const NEXT_VERSION = '0.72.2';
           <div class="haddr">${esc(h.address)}</div>
           <div class="hmeta"><span class="danger">${SKULL.repeat(h.danger)}<span class="dim">${SKULL.repeat(5 - h.danger)}</span></span><span>${tags.join(' · ')}</span></div>
           <div class="hdays">${q ? (far ? `${Math.max(0, Math.ceil(q.away - ((SV.walked || 0) - q.base))).toLocaleString('en-US')} steps away` : q.done ? 'Job done - see Dot' : 'Reached · no rush') : done ? (h.status === 'auto' ? 'Crew searched' : 'Looted') : h.type === 'tutorial' ? 'Start here' : left <= 1 ? 'Gone tomorrow' : left + ' days left'}</div></div>
-        ${nqb && nqb.btn ? `<div class="hbtns">${nqb.btn}</div>` : done || far ? '' : q ? `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Go</button></div>` : `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Loot</button>${h.type === 'tutorial' || NM ? '' : `<button class="mbtn ghost" data-auto="${h.id}">Crew</button>`}</div>`}
+        ${nqb && nqb.btn ? `<div class="hbtns">${nqb.btn}</div>` : done || far ? '' : q ? `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Go</button></div>` : `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Loot</button>${h.type === 'tutorial' || NM || !DM.Crew.searchers().length ? '' : `<button class="mbtn ghost" data-auto="${h.id}">Crew</button>`}</div>`}
       </div>`;
     }).join('');
     const find = id => id === 'tutorial' ? { id: 'tutorial', type: 'tutorial', seed: 0, status: 'new' } : SV.houses.find(h => h.id === id);
@@ -2214,7 +2216,7 @@ const NEXT_VERSION = '0.72.2';
     $('#mClose').onclick = sheetClose;
   }
   const HOWTO = [
-    ['Steps & houses', 'All your daily steps count. About every 1,000 steps scouts another house (up to 10 a day; the more you walk, the better the odds of big places like police stations and mansions). Houses wait 3 days. Loot one yourself, or send your Crew - they bring back less and never find secrets.'],
+    ['Steps & houses', 'All your daily steps count. About every 1,000 steps scouts another house (up to 10 a day; the more you walk, the better the odds of big places like police stations and mansions). Houses wait 3 days. Loot one yourself, or send your Crew if someone can go - they bring back less and never find secrets.'],
     ['Daily route', 'Houses tab > Route shows today\'s route: a small branching map, new every midnight. Every 1,500 steps you walk today (typed steps at half, like scouting) opens the next row, and you pick ONE stop in it, from the ones joined to your last pick. Stops: a house (type and danger shown), a ☣ danger house (pharmacy, school, police, mansion), a safehouse (+30 HP, food and water, one day off an infection), Dot (she comes back early for one visit), a supply drop (a few things straight to your stash, no fight), an event (a small choice with a risk) and an elite house (police station or mansion with a jackpot hidden inside). Rows get more dangerous as you go, and the last row is the big one. A stop does not add a house: it takes the place of one of today\'s scouted houses (the newest one you have not touched), so the route chooses which houses you get, not how many. If you already went into all of today\'s houses, the stop takes the next house your steps scout instead. Rows you have reached can still be picked later the same day, in order; whatever is left at midnight is gone. The List view works as before.'],
     ['Looting', 'Walk with the joystick (drag anywhere). Stand by furniture and tap the magnifier to search. Searching makes noise. Your pack has 12 slots; things stack. Leave by the front door - anything you dropped stays behind. Your level makes searches a little faster and luckier (up to level 10).'],
     ['Levels & skills', 'Everything you do earns XP: searching, kills (special infected more), secrets, locks and keys, Dot\'s jobs, horde watch shifts and boss fights. Every level gives 1 skill point - early levels come every few houses, later ones slower. Tap Skills on the home card to spend them in five trees, 5 ranks each: Scavenging (faster searches, extra finds, Keen eye, Pack rat), Stealth (quieter steps and searches, zombies spot you later), Combat (melee and bow damage, longer dodge, more HP), Survival (slower hunger and thirst, better healing, more stamina) and Lockwork (wider sweet spots, picks last longer, quieter crowbar). Each rank needs the one before it; later ranks cost 2-3 points. Your job gives rank 1 of its tree free (Scavenger: Scavenging, Hunter: Stealth, Brawler: Combat, Mechanic: Survival, Thief: Lockwork). Survivors from before 0.13 kept Quiet hands, Keen eye and Pack rat for free and got every point their level earned. Once a week you can reset your skills for 150 caps.'],
