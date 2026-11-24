@@ -73,9 +73,12 @@
   // perks used elsewhere
   C.guardDef = () => SV() && SV().crew ? roleLv('guard').reduce((a, l) => a + 4 + 2 * l, 0) : 0;
   C.repairMul = () => { if (!SV() || !SV().crew) return 1; const l = Math.max(0, ...roleLv('tinkerer')); return l ? 1 - (.1 + .04 * l) : 1; };
+  // 0.72.3 (owner: "we can still loot houses with crew even if all our crew members are dead"): a Crew search needs at
+  // least one living crew member who can go - not hurt today and not too miserable to work. No crew = no Crew search.
+  C.searchers = () => (SV() && SV().crew ? crew().filter(m => working(m) && m.hurt !== dayNo() && C.hpOf(m) > 0) : []);
   C.autoShare = function () { // the crew auto-search loot share: ~35% with no crew (neighbours help), more with a bigger, better crew
     if (!SV() || !SV().crew) return .4;
-    const n = crew().filter(working).length, sc = roleLv('scavenger').reduce((a, l) => a + .02 + .01 * l, 0);
+    const n = C.searchers().length, sc = roleLv('scavenger').reduce((a, l) => a + .02 + .01 * l, 0);
     return Math.min(.62, .35 + .04 * n + sc);
   };
   C.lockSkip = () => Math.max(.3, .5 - .04 * Math.max(0, ...roleLv('scavenger')));
