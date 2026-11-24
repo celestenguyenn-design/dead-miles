@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dead Miles - handheld UI samples</title>
+<style>
+  @font-face { font-family: Pix; src: url(fonts/Silkscreen-Regular.ttf); }
+  @font-face { font-family: Pix2; src: url(fonts/PixelifySans-Medium.ttf); }
+  @font-face { font-family: Out; src: url(fonts/Outfit-Regular.ttf); font-weight: 400; }
+  @font-face { font-family: Out; src: url(fonts/Outfit-Bold.ttf); font-weight: 800; }
+  * { box-sizing: border-box; } body { margin: 0; background: #0b0a14; font-family: Out, system-ui, sans-serif; }
+  .wall { display: flex; flex-wrap: wrap; gap: 30px 26px; padding: 30px; justify-content: center; max-width: 1760px; margin: 0 auto; }
+  .cap { width: 390px; margin-bottom: 10px; color: #e8e0ff; } .cap b { display: block; font: 800 20px Out; } .cap span { font: 400 13px/1.4 Out; color: #a99fcc; }
+  .phone { position: relative; width: 390px; height: 844px; border-radius: 44px; overflow: hidden; border: 3px solid #26213e; box-shadow: 0 30px 60px rgba(0,0,0,.55);
+    background: var(--body); padding: 46px 20px 0; }
+  .phone::before { content: ''; position: absolute; inset: 0; background: var(--bodyfx, none); pointer-events: none; }
+  .logo { position: relative; height: 62px; display: flex; justify-content: center; margin-bottom: 8px; }
+  .logo svg { height: 62px; filter: drop-shadow(0 3px 0 rgba(0,0,0,.25)); }
+  .bezel { position: relative; padding: 14px 14px 22px; border-radius: 18px 18px 46px 18px; background: var(--bezel); box-shadow: inset 0 4px 0 rgba(0,0,0,.35), 0 3px 0 rgba(255,255,255,.12); }
+  .bezel .top { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font: 400 9px Pix; color: var(--bezelTxt); letter-spacing: 1px; }
+  .bezel .led { width: 9px; height: 9px; border-radius: 50%; background: var(--led); box-shadow: 0 0 8px var(--led); }
+  .scr { position: relative; height: 440px; padding: 12px 12px 10px; border-radius: 8px; overflow: hidden; background: var(--scr); color: var(--txt); font: 400 15px Pix2;
+    box-shadow: inset 0 0 0 3px var(--scrEdge), inset 0 0 40px var(--vig, rgba(0,0,0,.35)); }
+  .scr::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, var(--scan, rgba(0,0,0,.08)) 0 2px, transparent 2px 4px); }
+  .glow .scr { text-shadow: 0 0 6px var(--glow), 0 0 14px var(--glow); }
+  .stat { display: flex; justify-content: space-between; align-items: center; font: 400 11px Pix; }
+  .stat .bars { display: flex; gap: 8px; } .stat .bars span { display: inline-flex; align-items: center; gap: 3px; }
+  .sprite { position: absolute; right: 10px; top: 30px; width: 104px; height: 130px; image-rendering: pixelated; }
+  .big { margin: 14px 0 0; font: 400 34px Pix; line-height: 1; } .lab { font: 400 10px Pix; opacity: .85; margin-top: 4px; }
+  .meter { display: flex; gap: 3px; margin: 8px 0 12px; width: 196px; } .meter i { flex: 1; height: 12px; background: var(--txt); box-shadow: 0 0 6px var(--glow, transparent); } .meter i.o { background: none; border: 2px solid var(--txt); opacity: .6; box-shadow: none; }
+  .msg { margin: 0 112px 10px 0; padding: 6px 8px; border: 2px dashed var(--txt); font: 400 12px Pix2; border-radius: 4px; }
+  ul.menu { list-style: none; margin: 0; padding: 0; }
+  ul.menu li { position: relative; display: flex; align-items: center; gap: 9px; height: 34px; padding: 0 8px 0 24px; font: 400 17px Pix2; border-radius: 4px; }
+  ul.menu li canvas { width: 20px; height: 20px; image-rendering: pixelated; }
+  ul.menu li em { margin-left: auto; font: 400 12px Pix; font-style: normal; padding: 1px 6px; border-radius: 3px; background: var(--badge); color: var(--badgeTxt); text-shadow: none; }
+  ul.menu li.on { background: var(--sel); color: var(--selTxt); text-shadow: none; box-shadow: 0 0 12px var(--glow, transparent); }
+  ul.menu li.on::before { content: '▶'; position: absolute; left: 6px; font-size: 13px; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .hint { position: absolute; left: 12px; right: 12px; bottom: 10px; display: flex; justify-content: space-between; font: 400 9px Pix; opacity: .75; }
+  /* inner screens */
+  .head { display: flex; justify-content: space-between; align-items: baseline; font: 400 18px Pix; margin-bottom: 8px; } .head small { font: 400 10px Pix; opacity: .8; }
+  .row { display: flex; align-items: center; gap: 9px; padding: 7px 8px 7px 24px; margin-bottom: 5px; border: 2px solid var(--txt); border-radius: 5px; position: relative; }
+  .row.on { background: var(--sel); color: var(--selTxt); text-shadow: none; border-color: var(--sel); }
+  .row.on::before { content: '▶'; position: absolute; left: 6px; font-size: 12px; }
+  .row b { display: block; font: 400 15px Pix2; } .row span { font: 400 10px Pix; opacity: .85; }
+  .row .sk { margin-left: auto; font: 400 11px Pix; letter-spacing: -1px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+  .cell { position: relative; aspect-ratio: 1; border: 2px solid var(--txt); border-radius: 5px; display: grid; place-items: center; }
+  .cell canvas { width: 70%; height: 70%; image-rendering: pixelated; } .cell em { position: absolute; right: 3px; bottom: 1px; font: 400 10px Pix; font-style: normal; }
+  .cell.on { background: var(--sel); border-color: var(--sel); } .cell.empty { border-style: dashed; opacity: .45; }
+  .info { padding: 6px 8px; border-top: 2px solid var(--txt); font: 400 12px Pix2; }
+  .info b { font: 400 15px Pix2; }
+  /* controls */
+  .ctrl { position: relative; height: 190px; }
+  .dpad { position: absolute; left: 18px; top: 34px; width: 108px; height: 108px; }
+  .dpad i { position: absolute; background: var(--btn); border-radius: 7px; box-shadow: 0 4px 0 var(--btnSh); }
+  .dpad i.v { left: 37px; top: 0; width: 34px; height: 108px; } .dpad i.h { left: 0; top: 37px; width: 108px; height: 34px; }
+  .ab { position: absolute; right: 14px; top: 36px; width: 140px; height: 100px; transform: rotate(-22deg); }
+  .ab i { position: absolute; width: 56px; height: 56px; border-radius: 50%; background: var(--btnAB, var(--btn)); box-shadow: 0 5px 0 var(--btnSh); color: var(--btnTxt); font: 400 16px Pix; display: grid; place-items: center; font-style: normal; }
+  .ab i:first-child { left: 0; top: 30px; } .ab i:last-child { left: 78px; top: 0; }
+  .ab small { position: absolute; font: 400 8px Pix; color: var(--bezelTxt2, var(--btnTxt)); transform: rotate(0); }
+  .sel2 { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; gap: 22px; }
+  .sel2 span { display: block; width: 50px; height: 12px; border-radius: 8px; background: var(--btnSel, var(--btn)); transform: rotate(-22deg); }
+  .sel2 em { display: block; margin-top: 6px; font: 400 8px Pix; color: var(--bodyTxt); font-style: normal; text-align: center; }
+  .grill { position: absolute; right: 20px; bottom: 18px; display: flex; gap: 7px; transform: rotate(-22deg); } .grill i { width: 6px; height: 40px; border-radius: 3px; background: var(--grill); }
+  .snow { position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(2px 2px at 20px 30px, #fff 50%, transparent 51%), radial-gradient(2px 2px at 120px 80px, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 220px 50px, #fff 50%, transparent 51%), radial-gradient(2px 2px at 330px 120px, #fff 50%, transparent 51%), radial-gradient(1.5px 1.5px at 60px 160px, #fff 50%, transparent 51%), radial-gradient(2px 2px at 300px 20px, #fff 50%, transparent 51%); opacity: .55; }
+  .notes { max-width: 1700px; margin: 0 auto 40px; padding: 0 30px; color: #c9c0ea; font: 400 15px/1.55 Out; }
+</style></head><body>
+<div class="wall" id="wall"></div>
+<div class="notes">Same idea in every one: the real Dead Miles logo on the device, one list menu, a blinking cursor, and every place in the game on one screen. Tap a line to go there (the D-pad and A/B buttons work too, for the full handheld feel). The last two show what happens when you pick "Loot a house" and "Bag" - every screen inside keeps the same simple list style.</div>
+<script src="../../next/s2art.js"></script>
+<script src="../../next/art.js"></script>
+<script>window.DM = window.DM || {};</script>
+<script src="../../next/logo.js"></script>
+<script>
+// tiny pixel icons (10 x 10)
+const PIX = {
+  loot: ['....##....', '...####...', '..######..', '.########.', '##########', '.#..##..#.', '.#..##..#.', '.#......#.', '.#..##..#.', '.########.'],
+  base: ['..........', '....#.....', '...###....', '..#####...', '.#######..', '..#...#...', '..#.#.#...', '..#.#.#...', '..#####...', '..........'],
+  dot: ['.########.', '#........#', '#.##..##.#', '#........#', '.########.', '.#......#.', '.#.####.#.', '.#.#..#.#.', '.#.#..#.#.', '.########.'],
+  map: ['##..##..##', '##..##..##', '#.#.#.#.##', '#..##..#.#', '#..##..#.#', '#.#.#.#..#', '##..##..##', '#...#...##', '##..##..##', '..........'],
+  bag: ['...####...', '..#....#..', '..#....#..', '.########.', '#........#', '#..####..#', '#..#..#..#', '#..####..#', '#........#', '.########.'],
+  me: ['....##....', '....##....', '...####...', '##########', '.########.', '..######..', '..######..', '.###..###.', '.##....##.', '##......##'],
+  card: ['.#######..', '.#.....#..', '.#.###.#..', '.#.#.#.#..', '.#.###.#..', '.#.....#..', '.#.###.#..', '.#.....#..', '.#######..', '..........'],
+};
+const MENU = [['loot', 'LOOT A HOUSE', '3!'], ['base', 'MY BASE', '1'], ['dot', "DOT'S SHOP", ''], ['map', 'MAP', ''], ['bag', 'BAG', ''], ['me', 'ME & CARDS', '1']];
+const V = [
+  { id: 'candy', n: 'Candy cane', d: 'Christmas red device, dark screen with warm glowing light-string colours. Your favourite logo, in a handheld.', glow: 1, snow: 1,
+    v: { body: 'linear-gradient(160deg,#e04a4f,#a8242e)', bezel: '#2a1d2c', bezelTxt: '#c9a9b8', led: '#7dff9a', scr: 'radial-gradient(120% 90% at 30% 20%,#1d2a22,#0e1612)', scrEdge: '#2a3a30', txt: '#ffe7b0', glow: 'rgba(255,190,90,.55)', sel: '#ffcf6b', selTxt: '#1a1210', badge: '#e04a4f', badgeTxt: '#fff', btn: '#2a1d2c', btnSh: '#14101a', btnTxt: '#ffb3b8', bodyTxt: '#ffe0e2', grill: '#8a1e27', btnAB: '#3f8a4a' } },
+  { id: 'grape', n: 'Midnight grape', d: 'The game\'s own purple, with an amber screen like an old monitor. Closest to how Dead Miles looks now.', glow: 1,
+    v: { body: 'linear-gradient(160deg,#5a3f8f,#2e2052)', bezel: '#16112a', bezelTxt: '#9d90bf', led: '#ffb347', scr: '#1a1208', scrEdge: '#3a2a12', txt: '#ffb347', glow: 'rgba(255,170,60,.6)', sel: '#ffb347', selTxt: '#1a1208', badge: '#f07b3c', badgeTxt: '#1a1208', btn: '#1f1838', btnSh: '#0e0a1c', btnTxt: '#cfc4ec', bodyTxt: '#cfc4ec', grill: '#241a44' } },
+  { id: 'toxic', n: 'Toxic', d: 'A charcoal device with zombie-green screen glow and hazard stripes. The most "zombie" of the set.', glow: 1,
+    v: { body: 'linear-gradient(160deg,#3a3d42,#1d1f23)', bodyfx: 'repeating-linear-gradient(-45deg,transparent 0 18px,rgba(240,200,40,.0) 18px 19px)', bezel: '#0f1012', bezelTxt: '#8a9a7a', led: '#b6ff3b', scr: 'radial-gradient(120% 90% at 50% 30%,#0f2410,#061006)', scrEdge: '#1f3a1a', txt: '#b6ff3b', glow: 'rgba(150,255,60,.55)', sel: '#b6ff3b', selTxt: '#061006', badge: '#ffcc33', badgeTxt: '#1d1f23', btn: '#2a2d32', btnSh: '#0f1012', btnTxt: '#b6ff3b', bodyTxt: '#c9d4bd', grill: '#141518', btnAB: '#ffcc33' } },
+  { id: 'pumpkin', n: 'Pumpkin spice', d: 'Warm orange device, chocolate screen, cream text. Cozy and Halloween-y, easy on the eyes.',
+    v: { body: 'linear-gradient(160deg,#f08a3c,#c95f22)', bezel: '#3a2214', bezelTxt: '#e8b48a', led: '#ffe28a', scr: '#2a1a12', scrEdge: '#4a2e1e', txt: '#ffe9c7', sel: '#ffe9c7', selTxt: '#2a1a12', badge: '#7fc85a', badgeTxt: '#2a1a12', btn: '#4a2a18', btnSh: '#24140a', btnTxt: '#ffd1a1', bodyTxt: '#fff1dd', grill: '#9e4a18', scan: 'rgba(0,0,0,.12)' } },
+  { id: 'frost', n: 'Frostbite', d: 'Icy blue for the winter: navy screen with frosty white glow, snow on the device.', glow: 1, snow: 1,
+    v: { body: 'linear-gradient(160deg,#7cc4ef,#3b7fc0)', bezel: '#10203a', bezelTxt: '#9cc4e8', led: '#ffffff', scr: 'radial-gradient(120% 90% at 50% 20%,#1a3358,#0a1528)', scrEdge: '#22406a', txt: '#e8f6ff', glow: 'rgba(160,220,255,.6)', sel: '#e8f6ff', selTxt: '#0a1528', badge: '#ff6b81', badgeTxt: '#fff', btn: '#10203a', btnSh: '#081020', btnTxt: '#bfe4ff', bodyTxt: '#eaf6ff', grill: '#2e6aa6' } },
+  { id: 'classic', n: 'Classic, upgraded', d: 'The red one you liked, with the real Christmas logo, bigger text and pixel icons on every line.', lcd: 1,
+    v: { body: 'linear-gradient(160deg,#ef5a66,#c9343f)', bezel: '#3a3550', bezelTxt: '#a7a2c2', led: '#ff3b3b', scr: '#a7c957', scrEdge: '#8aaa3a', txt: '#1f3311', vig: 'rgba(31,51,17,.15)', scan: 'rgba(31,51,17,.07)', sel: '#1f3311', selTxt: '#a7c957', badge: '#1f3311', badgeTxt: '#a7c957', btn: '#2a2638', btnSh: '#15121f', btnTxt: '#ff9aa3', bodyTxt: '#ffd9dc', grill: '#a82a35' } },
+];
+const css = o => Object.entries(o).map(([k, v]) => `--${k}:${v}`).join(';');
+const ctrls = `<div class="ctrl"><div class="dpad"><i class="v"></i><i class="h"></i></div><div class="ab"><i>B</i><i>A</i></div><div class="sel2"><div><span></span><em>SELECT</em></div><div><span></span><em>START</em></div></div><div class="grill"><i></i><i></i><i></i><i></i></div></div>`;
+function phone(x, screen, cap) {
+  return `<div><div class="cap"><b>${cap[0]}</b><span>${cap[1]}</span></div><div class="phone${x.glow ? ' glow' : ''}" style="${css(x.v)}" data-v="${x.id}">${x.snow ? '<div class="snow"></div>' : ''}
+    <div class="logo">${DM.Logo.mini(true)}</div>
+    <div class="bezel"><div class="top"><span class="led"></span>POWER · 6,420 STEPS TODAY</div><div class="scr">${screen}</div></div>${ctrls}</div></div>`;
+}
+const home = x => `<div class="stat"><span>CELESTE LV14</span><span class="bars"><span>♥80</span><span>🍗90</span></span></div>
+  <canvas class="sprite" data-sprite="${x.id}" width="52" height="65"></canvas>
+  <div class="big">6420</div><div class="lab">STEPS · HOUSE AT 7000</div>
+  <div class="meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="o"></i><i class="o"></i></div>
+  <div class="msg">! HORDE IN 6 DAYS</div>
+  <ul class="menu">${MENU.map(([k, t, b], i) => `<li class="${i === 0 ? 'on' : ''}"><canvas data-pix="${k}" width="10" height="10"></canvas>${t}${b ? `<em>${b}</em>` : ''}</li>`).join('')}</ul>
+  <div class="hint"><span>A · OPEN</span><span>B · BACK</span></div>`;
+const loot = () => `<div class="head">LOOT A HOUSE <small>3 TODAY</small></div>
+  <div class="row on"><canvas data-pix="loot" width="10" height="10" style="width:22px;height:22px;image-rendering:pixelated"></canvas><div><b>PHARMACY</b><span>NOSTRAND AVE · 2 LOCKS</span></div><span class="sk">☠☠☠</span></div>
+  <div class="row"><canvas data-pix="base" width="10" height="10" style="width:22px;height:22px;image-rendering:pixelated"></canvas><div><b>ROWHOUSE</b><span>18 HALSEY · SOMEONE HIDING</span></div><span class="sk">☠</span></div>
+  <div class="row"><canvas data-pix="dot" width="10" height="10" style="width:22px;height:22px;image-rendering:pixelated"></canvas><div><b>BODEGA</b><span>701 FULTON · FOOD</span></div><span class="sk">☠☠</span></div>
+  <div class="info"><b>PHARMACY</b><br>DANGER 3 · 9 ZOMBIES<br>GOOD FOR MEDS + ANTIBIOTICS<br><br>A · GO IN &nbsp;&nbsp; ▶ · SEND CREW</div>
+  <div class="hint"><span>A · GO IN</span><span>B · BACK</span></div>`;
+const bag = () => `<div class="head">BAG <small>7 / 12 · 140 CAPS</small></div>
+  <div class="grid">${['bat', 'beans', 'water', 'bandage', 'lockpick', 'scrap', 'backpack', '', '', '', '', ''].map((k, i) => `<div class="cell${k ? '' : ' empty'}${i === 0 ? ' on' : ''}">${k ? `<canvas data-ic="${k}" width="16" height="16"></canvas><em>${['', '2', '3', '2', '4', '9', ''][i] || ''}</em>` : ''}</div>`).join('')}</div>
+  <div class="info"><b>BASEBALL BAT</b> ★★★ SOLID<br>DMG 14 · 82% LEFT<br><br>A · EQUIP &nbsp; ▶ · STASH &nbsp; ◀ · WORKBENCH</div>
+  <div class="hint"><span>A · USE</span><span>B · BACK</span></div>`;
+let html = '';
+for (const x of V) html += phone(x, home(x), [x.n, x.d]);
+html += phone(V[0], loot(), ['Inside: Loot a house', 'Pick "Loot a house" and you get the list of today\'s houses, with the details underneath.']);
+html += phone(V[0], bag(), ['Inside: Bag', 'Your pack as a grid of pixel items. Left/right hops to the stash and workbench.']);
+document.getElementById('wall').innerHTML = html;
+
+(async () => {
+  await document.fonts.ready;
+  try { ART.buildIcons(); } catch (e) { /* ignore */ }
+  // pixel icons, tinted to each device's text colour
+  document.querySelectorAll('canvas[data-pix]').forEach(cv => { const ph = cv.closest('.phone'), li = cv.closest('li,.row'), on = li && li.classList.contains('on');
+    const col = getComputedStyle(ph).getPropertyValue(on ? '--selTxt' : '--txt').trim(), x = cv.getContext('2d'); x.fillStyle = col;
+    PIX[cv.dataset.pix].forEach((r, y) => [...r].forEach((c, i) => { if (c === '#') x.fillRect(i, y, 1, 1); })); });
+  // item icons, drawn tiny so they turn into pixel art
+  const load = u => new Promise(r => { const im = new Image(); im.onload = () => r(im); im.onerror = () => r(null); im.src = u; });
+  for (const cv of document.querySelectorAll('canvas[data-ic]')) { const u = ART.iconURL[cv.dataset.ic]; if (!u) continue; const im = await load(u); if (im) cv.getContext('2d').drawImage(im, 0, 0, 16, 16); }
+  // the character as a pixel sprite (LCD palette on the classic one)
+  const look = ART.LOOK.norm({ hair: 1, hairC: 4, coat: 6, mouth: 1 });
+  try { await ART.buildRig('survivor', 2, ART.LOOK.recolor(look), 'mock', ART.LOOK.patch(look)); } catch (e) { return; }
+  document.querySelectorAll('canvas[data-sprite]').forEach(cv => {
+    const x = cv.getContext('2d'); ART.drawRig(x, 'mock', cv.width / 2, cv.height * .98, .23, false, { weapon: 'fists' });
+    const lcd = V.find(v => v.id === cv.dataset.sprite).lcd, d = x.getImageData(0, 0, cv.width, cv.height), P = [[31, 51, 17], [72, 98, 34], [120, 150, 52], [167, 201, 87]];
+    for (let i = 0; i < d.data.length; i += 4) { if (d.data[i + 3] < 100) { d.data[i + 3] = 0; continue; } d.data[i + 3] = 255;
+      if (lcd) { const l = (d.data[i] * .3 + d.data[i + 1] * .59 + d.data[i + 2] * .11) / 255, c = P[Math.min(3, Math.floor(l * 4))]; d.data[i] = c[0]; d.data[i + 1] = c[1]; d.data[i + 2] = c[2]; } }
+    x.putImageData(d, 0, 0);
+  });
+})();
+</script>
+</body></html>
