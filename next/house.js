@@ -2454,6 +2454,7 @@
   function showDeath() {
     G.over = true;
     const lost = G.pack.filter((_, i) => i % 2 === 1); const keep = G.pack.filter((_, i) => i % 2 === 0); G.pack.length = 0; G.pack.push(...keep);
+    G.lostItems = lost.map(e => Object.assign({}, e));   // 0.73: luck.js can bring some of it back tomorrow
     $('#cardBody').innerHTML = `
       <div class="kick red">down · ${L.address}</div>
       <h2>You barely got out</h2>
@@ -2641,7 +2642,7 @@
   function finishRun(kind) {
     S().hp = Math.max(kind === 'down' ? 20 : 1, Math.round(G.p.hp));
     const res = {
-      kind, address: L.address, type: L.type, id: L.id,
+      kind, address: L.address, type: L.type, id: L.id, lost: G.lostItems || [],
       kills: G.stats.kills, searched: G.furn.filter(f => f.lootable && f.searched).length,
       secrets: G.sec.filter(s => s.found).length, secretsTotal: G.sec.length, zombies: zombieCount(),
       daily: G.dly ? Object.assign({}, G.dly, { t: Math.round(G.dly.t), searched: G.furn.filter((f, i) => i < (L.furn || []).length && f.lootable && !f.secretLoot && f.searched).length, total: G.furn.filter((f, i) => i < (L.furn || []).length && f.lootable && !f.secretLoot).length }) : null,   // 0.18 raid: G.raid && G.raid.on ? { n: G.raid.n, killed: G.raid.killed || 0, away: G.raid.away || 0 } : null, left: G.drops.map(d => ({ k: d.k, n: d.n })),

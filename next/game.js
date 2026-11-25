@@ -444,6 +444,7 @@ const NEXT_VERSION = '0.72.8';
         if (q && q.type === 'clear' && res.zombies.total && res.zombies.dead >= res.zombies.total) questDone(q);
         checkFetch(); if (q && q.done) h.status = 'looted';
         Game.save(); publish(); showMenu(); tab('houses'); renderHome();
+        if (res.kind === 'down' && DM.Luck) DM.Luck.onLoss(res.lost, res.address);   // 0.73 bad-luck stories
         toast(res.kind === 'down' ? 'You made it home. Barely.' : `Home safe from ${res.address}`, 2.4);
       },
     });
@@ -1402,6 +1403,7 @@ const NEXT_VERSION = '0.72.8';
     if (!SV || !SV.survivor || DM.scene) return;
     if (DM.WalkFX) DM.WalkFX.tick();   // 0.47: walk finds, gear upkeep, walking caches
     if (DM.Collect) DM.Collect.file();   // 0.53: new collectibles file themselves
+    if (DM.Luck) setTimeout(() => DM.Luck.check(), 600);   // 0.73: yesterday's bad luck comes back as a story
     if (DM.Cards) DM.Cards.tick();   // 0.68: field card packs from walking and looting
     if (DM.Life) DM.Life.tick();   // 0.62: walking buddy, radio
     if (DM.City) DM.City.tick();   // 0.63: neighborhood, city horde, co-op (reports real steps)
