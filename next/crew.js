@@ -287,6 +287,9 @@
   // ---------------------------------------------------------------- runs: wrap the house.js hooks
   let R = null;
   C.run = () => R;
+  // 0.73 house twists (twists.js): has the hiding survivor been found yet / they gave up waiting
+  C.npcFound = () => !!(R && R.init && R.npcSpec && (!R.npc || R.npc.st !== 'hide'));
+  C.npcLost = () => { if (R && R.npc && R.npc.st === 'hide') R.npc.st = 'leave'; };
   C.wrap = function (o, kind, extra = {}) {
     const v = SV();
     R = { kind, extra, init: false, pet: null, npc: null, stray: null, ents: [], barkT: 0, sniffT: 18 + Math.random() * 10, sniffF: null, sniffLeft: 0, whisper: false, hintT: 0 };

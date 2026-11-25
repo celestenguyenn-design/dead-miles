@@ -249,6 +249,7 @@ const NEXT_VERSION = '0.72.8';
     const L = layoutOf({ type, seed, gv: GV });
     const hh = { id: 'h' + seq, type, seed, gv: GV, day: day || SV.day.key, status: 'new', address: L.address, danger: L.danger, nLocks: L.nLocks, nZombies: L.nZombies };
     if (DM.Named) DM.Named.tag(hh);   // 0.55: about 1 in 12 is somebody's place (collector, prepper, pawn shop, hoarder)
+    if (DM.Twist) DM.Twist.tag(hh);   // 0.73: about 1 in 3 gets a twist (dark, infested, crying survivor, fire, trapped safe, named zombie)
     SV.houses.push(hh);
   }
   const cache = new Map();
@@ -410,6 +411,8 @@ const NEXT_VERSION = '0.72.8';
       }
     }
     if (h.named && DM.Named && !h.daily) { L.furn = DM.Named.prepRun(h, L); setTimeout(() => toast(DM.Named.intro(h), 4), 900); }   // 0.55 named houses
+    else if (h.twist && DM.Twist && !h.daily) { L.furn = DM.Twist.prepRun(h, L); if (!h.run) setTimeout(() => toast(DM.Twist.intro(h), 4.5), 900); }   // 0.73 house twists
+    else L.namedZ = 0;
     if (h.route && DM.Route) L.furn = DM.Route.prepRun(h, L);   // 0.21 route: an elite stop hides a guaranteed jackpot
     // 0.19: the gamestage is snapshotted on the house when the run starts and reused on resume, so a resumed run meets the
     // same zombies. A run started before 0.19 has none: it resumes at gamestage 0 (exactly the zombies it had). Tutorial: none.
@@ -419,10 +422,10 @@ const NEXT_VERSION = '0.72.8';
     L.gs = h.gs;
     SV.stats.runs++; Game.save();
     hideMenu();
-    const hide = h.daily ? {} : DM.Crew.forHouse(h, L);   // phase 5b: a survivor hiding in a closet, a stray under the furniture (rare). 0.18: never in the daily house
+    const hide = h.daily ? {} : (h.twist && DM.Twist && DM.Twist.hide(h, L)) || DM.Crew.forHouse(h, L);   // phase 5b: a survivor hiding in a closet, a stray under the furniture (rare). 0.18: never in the daily house
     // 0.18 DAILY CHALLENGE (daily.js): seeded loot rolls, no raid, no event mini-boss, the score tally (house.js G.dly)
     const daily = h.daily ? { lootSeed: h.seed, daily: { scored: !!(SV.daily && SV.daily.res) }, noRaid: true, noBoss: true } : {};
-    DM.House.start(L, DM.Crew.wrap(Object.assign(daily, {
+    const runO = Object.assign(daily, {
       hint: h.daily ? (h.run ? `Daily challenge · back at ${L.address}` : `Daily challenge · ${L.name} · ${L.address}`) : h.type === 'tutorial' ? (SV.tutorialRun ? 'Back at 14 Halsey St - picking up where you left off' : 'Joystick to move  ·  SEARCH near furniture') : (h.run ? `Back at ${L.address} - picking up where you left off` : `${L.name} · ${L.address}`),
       resume: (h.type === 'tutorial' ? SV.tutorialRun : h.run) || null,
       raid: h.type !== 'tutorial' && !h.daily,   // 0.15: a rare raid can happen (raiders.js decides, seeded from the house)   // the tutorial card is rebuilt each render, so its progress lives on SV
@@ -443,7 +446,8 @@ const NEXT_VERSION = '0.72.8';
         Game.save(); publish(); showMenu(); tab('houses'); renderHome();
         toast(res.kind === 'down' ? 'You made it home. Barely.' : `Home safe from ${res.address}`, 2.4);
       },
-    }), 'house', { hide }));
+    });
+    DM.House.start(L, DM.Crew.wrap(h.twist && DM.Twist && !h.daily ? DM.Twist.wrap(h, runO) : runO, 'house', { hide }));
   }
   Game.loot = loot;   // 0.18: daily.js starts the daily house through the normal run
   // after a boss fight (boss.js)
@@ -1564,14 +1568,14 @@ const NEXT_VERSION = '0.72.8';
         const ip = DM.Inf.plan(HL, h.gs != null ? h.gs : gstage), ni = ip.kinds.filter(Boolean).length, nz = (HL.zombies || []).length + ip.extra;   // 0.13: special infected (danger 3+)
         tags[1] = `${nz} zombie${nz === 1 ? '' : 's'}`; if (ni) tags.push(`<b class="inftag">☣ ${ni} special infected</b>`); }
       if (h.route && !done && DM.Route) tags.push(DM.Route.tagHTML(h));
-      const NM = h.named && DM.Named && DM.Named.KINDS[h.named]; if (NM && !done) tags.unshift(DM.Named.tagHTML(h));   // 0.55   // 0.21 route: picked on the route map
+      const NM = h.named && DM.Named && DM.Named.KINDS[h.named]; if (NM && !done) tags.unshift(DM.Named.tagHTML(h)); if (h.twist && DM.Twist && !done) tags.unshift(DM.Twist.tagHTML(h));   // 0.73 twists   // 0.55   // 0.21 route: picked on the route map
       return `<div class="hcard${done ? ' done' : ''}${h.type === 'tutorial' ? ' tut' : ''}${q ? ' quest' : ''}${NM && !done ? ' named' : ''}"${NM ? ` style="--nc:${NM.c}"` : ''}>
         ${typeIcon(h.type)}
         <div class="hinfo"><div class="hname">${NM ? esc(NM.n) : T.n} <em>${T.size}</em>${h.landmark ? ` <em class="first lmk">${PIN}landmark</em>` : ''}${h.type === 'tutorial' ? ' <em class="first">first house</em>' : ''}${q ? ` <em class="first">quest: ${D.QUESTS[q.type].n.toLowerCase()}</em>` : ''}</div>
           <div class="haddr">${esc(h.address)}</div>
           <div class="hmeta"><span class="danger">${SKULL.repeat(h.danger)}<span class="dim">${SKULL.repeat(5 - h.danger)}</span></span><span>${tags.join(' · ')}</span></div>
           <div class="hdays">${q ? (far ? `${Math.max(0, Math.ceil(q.away - ((SV.walked || 0) - q.base))).toLocaleString('en-US')} steps away` : q.done ? 'Job done - see Dot' : 'Reached · no rush') : done ? (h.status === 'auto' ? 'Crew searched' : 'Looted') : h.type === 'tutorial' ? 'Start here' : left <= 1 ? 'Gone tomorrow' : left + ' days left'}</div></div>
-        ${nqb && nqb.btn ? `<div class="hbtns">${nqb.btn}</div>` : done || far ? '' : q ? `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Go</button></div>` : `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Loot</button>${h.type === 'tutorial' || NM || !DM.Crew.searchers().length ? '' : `<button class="mbtn ghost" data-auto="${h.id}">Crew</button>`}</div>`}
+        ${nqb && nqb.btn ? `<div class="hbtns">${nqb.btn}</div>` : done || far ? '' : q ? `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Go</button></div>` : `<div class="hbtns"><button class="mbtn" data-loot="${h.id}">Loot</button>${h.type === 'tutorial' || NM || (DM.Twist && DM.Twist.noCrew(h)) || !DM.Crew.searchers().length ? '' : `<button class="mbtn ghost" data-auto="${h.id}">Crew</button>`}</div>`}
       </div>`;
     }).join('');
     const find = id => id === 'tutorial' ? { id: 'tutorial', type: 'tutorial', seed: 0, status: 'new' } : SV.houses.find(h => h.id === id);
