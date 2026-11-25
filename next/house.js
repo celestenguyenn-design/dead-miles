@@ -2477,7 +2477,8 @@
   }
   // 0.66 (owner: the tool-belt crowbar "should still be able to break tho but it should give us a warning"): every pry
   // wears the tool used - the tool belt first, then the one in your hand, then one in the pack. Warns when 2 pries are left.
-  const PRY_WEAR = 10, PRYK = ['crowbar', 'prybar'];
+  // 0.72.7 (owner: "have a crowbar last 5 pries"): 18 wear a pry = a plain crowbar (90) lasts 5, a pry bar (110) 7; better quality lasts longer
+  const PRY_WEAR = 18, PRYK = ['crowbar', 'prybar'];
   function wearPry() {
     const s = S(); if (Math.random() < SK.wearSkip()) return;
     const where = s.tool && PRYK.includes(s.tool.k) ? 'tool' : s.hands && PRYK.includes(s.hands.k) ? 'hands' : 'pack';

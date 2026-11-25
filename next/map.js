@@ -1265,7 +1265,8 @@ way[building]->.b;.b out skel geom qt;
 
   // 0.22: for weather.js - the ~0.1-degree area of the square the map last showed (map users from before 0.22), or null
   const lastArea = () => getMeta('last').then(k => { const m = /^(-?\d+):(-?\d+)$/.exec(String(k || '')); return m ? { lat: Math.round((+m[1] + .5) * CELL * 10) / 10, lon: Math.round((+m[2] + .5) * CELL * 10) / 10 } : null; });
-  DM.Map = { open, close, lastArea, get on() { return M.on; }, _M: M, _typeOf: typeOf, _O: O, _tiles: { fromTiles, encode, cellOf },
+  DM.Map = { open, close, lastArea, home,   // 0.72.7: home is the spot she saved herself (camps line on the home screen)
+    get on() { return M.on; }, _M: M, _typeOf: typeOf, _O: O, _tiles: { fromTiles, encode, cellOf },
     get timing() { return { firstDraw: M.tFirst, data: M.tData, render: M.renderMs }; } };
   if (DM.ready && DM.Game && DM.Game.renderHome) DM.Game.renderHome();   // show the Map tab if the home screen drew first
 })();

@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 2.0: the game's live map -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <!-- Android 15+: without this, Health Connect only answers while the app is open, so the
          hourly sync silently failed until the app was launched by hand. -->
@@ -20,13 +23,22 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DeadMiles">
 
+        <!-- 2.0: the game itself opens first -->
         <activity
-            android:name=".MainActivity"
-            android:exported="true">
+            android:name=".GameActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <!-- the old setup screen, now "Step sync settings" (opened from the game) -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
             <!-- Health Connect opens this when the user asks why the app wants steps (Android 13 and earlier) -->
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />

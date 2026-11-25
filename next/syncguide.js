@@ -190,6 +190,10 @@
   }
 
   /* ---------------- pieces ---------------- */
+  // 0.72.7: inside the Dead Miles Android app (android/ GameActivity) the app connects Health Connect by itself
+  const APP = () => { try { return !!(window.DMAndroid && DMAndroid.version && DMAndroid.version() >= 2); } catch (e) { return false; } };
+  const appStatus = () => { try { return JSON.parse(DMAndroid.status()); } catch (e) { return {}; } };
+  window.dmAndroidStatus = j => { UI.andSt = j; if (UI.screen === 'android' && document.getElementById('sg')) render(); };
   const btn = (a, label, cls, extra) => '<button class="btn ' + (cls || '') + '" data-a="' + a + '"' + (extra || '') + '>' + label + '</button>';
   function step(n, title, body) {
     return '<div class="card"><div class="step"><div class="num">' + n + '</div><div><h4>' + title + '</h4>' + (body || '') + '</div></div></div>';
@@ -353,13 +357,31 @@
     return h;
   }
 
-  function scrAndroid() {
+  function scrAppAndroid() {   // 0.72.7: playing inside the app - nothing to copy
+    const st = Object.assign(appStatus(), UI.andSt || {});
     let h = whoLine() + signInGate();
-    h += '<div class="note"><b>Already have the Dead Miles Steps app?</b> Get the <b>new version</b> anyway (step 1) - the old one only synced while it was open. Install it over the old one; your handle and token stay.</div>';
+    const line = !NET.ok ? 'Sign in first - the app connects your steps the moment you do.'
+      : st.health === 'install' ? 'Health Connect needs installing or updating. Tap Connect my steps - it opens the Play Store.'
+      : st.health === 'none' ? 'This phone does not have Health Connect, so steps cannot sync automatically. Type them instead.'
+      : st.allowed === false ? 'Steps are not allowed yet. Tap Connect my steps and allow Steps (and background access).'
+      : st.lastSync ? 'Connected. Last sent ' + ago(st.lastSync) + ': ' + fmt(st.lastSteps) + ' steps. It sends about every hour, and every time you open the game.'
+      : 'Connecting... if nothing happens, tap Connect my steps.';
+    h += '<div class="card"><h3>You are playing in the Dead Miles app</h3><p>Your steps come in by themselves - no codes to copy. ' + esc(line) + '</p>'
+      + (st.error ? '<p class="help warn">' + esc(st.error) + '</p>' : '')
+      + '<div class="row">' + btn('andConnect', 'Connect my steps') + btn('andSend', 'Send now', 'g') + '</div>'
+      + '<p class="help">Fix it by hand: ' + '<a href="#" data-a="andSettings">Step sync settings</a>.</p></div>';
+    h += step(1, 'Make sure your step counter feeds Health Connect', '<p>The app reads steps from <b>Health Connect</b>. On most phones your step counter (Samsung Health, Google Fit, Fitbit...) has to share steps into it: open that app &rarr; Settings &rarr; <b>Health Connect</b> &rarr; allow <b>Steps</b>.</p>');
+    h += step(2, 'Test it', testBlock('android'));
+    return h;
+  }
+  function scrAndroid() {
+    if (APP()) return scrAppAndroid();
+    let h = whoLine() + signInGate();
+    h += '<div class="note"><b>Easiest way:</b> install the <b>Dead Miles app</b> and play in it. Sign in and it connects your steps by itself - no codes to copy. Already have the old Dead Miles Steps app? Install this over it; your settings stay.</div>';
     h += step(1, 'Download the app', '<p>Tap the button.</p>'
-      + '<a class="btn" href="' + APK + '" download="DeadMilesSteps.apk">Download Dead Miles Steps</a>'
+      + '<a class="btn" href="' + APK + '" download="DeadMilesSteps.apk">Download the Dead Miles app</a>'
       + '<p>If <b>Chrome</b> says the file might be harmful: tap <b>Download anyway</b>. (Or open Chrome&rsquo;s <b>Downloads</b>, tap the file, choose <b>Keep</b>.)</p>'
-      + '<p class="help">A tiny app made for this game. It only reads your step count and sends it here. Android is suspicious of it only because it is not from the Play Store.</p>');
+      + '<p class="help">The game itself as an Android app. It also reads your step count from Health Connect and sends it here - nothing else. Android is suspicious of it only because it is not from the Play Store.</p>');
     h += step(2, 'Install it (and get past the blockers)', '<p>Open the download (from the notification, or <b>Files &rarr; Downloads</b>) and tap <b>Install</b>.</p>'
       + '<p><b>"Installs from this source are blocked"</b>: tap <b>Settings</b>, turn on <b>Allow from this source</b>, go back, tap <b>Install</b>.</p>'
       + '<p><b>Samsung phone and it STILL blocks it after you allow it?</b> That is Samsung <b>Auto Blocker</b>. Open <b>Settings &rarr; Security and privacy &rarr; Auto Blocker</b> and turn it <b>off</b>. Install the app, then you can turn Auto Blocker back on - the app keeps working.</p>'
@@ -371,7 +393,10 @@
       + '<details><summary><b>Fitbit, Garmin, Oura or another watch</b></summary><ol><li>Open that app &rarr; Settings &rarr; look for <b>Health Connect</b>.</li><li>Turn it on and allow <b>Steps</b>.</li></ol></details>'
       + '<p><b>Check it worked:</b> open <b>Health Connect</b> (Settings &rarr; <b>Health Connect</b>, or Settings &rarr; Security and privacy &rarr; Privacy &rarr; Health Connect) &rarr; <b>Data and access</b> / <b>Browse data</b> &rarr; <b>Activity</b> &rarr; <b>Steps</b>. You should see <b>today&rsquo;s steps</b> there. If it is empty or 0, the step counter is not sharing yet - go back over the steps above.</p>'
       + '<p class="help">Older phones (Android 13 or below): Health Connect is a separate app. The Dead Miles app sends you to the Play Store to install it.</p>');
-    h += step(4, 'Box 1: your handle', '<p>Open <b>Dead Miles Steps</b>. Paste this in box <b>1. Handle</b>:</p>'
+    h += step(4, 'Open Dead Miles from your home screen and sign in', '<p>The app <b>is the game</b> now. Open <b>Dead Miles</b>, sign in to the same account, and tap <b>Allow</b> when it asks for steps (turn on background access too). That is it - it sends your steps about every hour, even while you keep playing here in Chrome.</p>'
+      + '<p class="help">Signing in on a new device asks for your PIN (Settings &rarr; Account). No PIN, or using an older version of the app? Open the box below and paste your handle and token instead.</p>');
+    h += '<details><summary><b>Rather set it up by hand? (older app)</b></summary>';
+    h += step('a', 'Box 1: your handle', '<p>Open <b>Dead Miles Steps</b>. Paste this in box <b>1. Handle</b>:</p>'
       + (NET.ok ? copyBox('handle', (VALUES.handle = NET.handle), 'my handle', true) : '<p class="help">Sign in first to see it.</p>'));
     let tok = '<p>Paste your token in box <b>2. Token</b>.</p>';
     if (NET.ok) {
@@ -381,19 +406,20 @@
           : '<div class="box">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</div>' + btn('showTok', 'Show my token', 'g'))
         + '<p class="help">This token is your account password. Only put it in the Dead Miles Steps app. Never send it to anyone.</p>';
     } else tok += '<p class="help">Sign in first to see it.</p>';
-    h += step(5, 'Box 2: your token', tok);
-    h += step(6, 'Allow reading steps - including in the background', '<p>Tap <b>Allow reading steps</b>. On the Health Connect screen turn on <b>Steps</b> AND <b>Access data in the background</b> (newer phones show it as a second switch).</p>'
+    h += step('b', 'Box 2: your token', tok);
+    h += step('c', 'Allow reading steps - including in the background', '<p>Tap <b>Allow reading steps</b>. On the Health Connect screen turn on <b>Steps</b> AND <b>Access data in the background</b> (newer phones show it as a second switch).</p>'
       + '<p class="warn"><b class="warn">This is the one that matters.</b> Without background access your phone only lets the app read steps while it is open - that is why steps used to sync only when you opened it.</p>'
       + '<p class="help">Missed it? Settings &rarr; <b>Health Connect</b> (or Security and privacy &rarr; Privacy &rarr; Health Connect) &rarr; App permissions &rarr; <b>Dead Miles Steps</b> &rarr; turn on <b>Access data in the background</b>.</p>');
-    h += step(7, 'Don\'t let it fall asleep', '<p>Tap <b>Don&rsquo;t put it to sleep</b> in the app and choose <b>Allow</b>.</p>'
+    h += step('d', 'Don\'t let it fall asleep', '<p>Tap <b>Don&rsquo;t put it to sleep</b> in the app and choose <b>Allow</b>.</p>'
       + '<p class="help">Or: Settings &rarr; Apps &rarr; <b>Dead Miles Steps</b> &rarr; Battery &rarr; <b>Unrestricted</b>. Samsung: also check it is not in <b>Sleeping apps</b> / <b>Deep sleeping apps</b> (Settings &rarr; Battery &rarr; Background usage limits).</p>');
-    h += step(8, 'Save and send', '<p>Tap <b>Save &amp; start hourly sync</b>, then <b>Send now</b>.</p>'
+    h += step('e', 'Save and send', '<p>Tap <b>Save &amp; start hourly sync</b>, then <b>Send now</b>.</p>'
       + '<p class="help">From now on it sends your steps about every hour by itself. You never have to open it again. If the app shows a warning in its status line, it tells you exactly which switch is still off.</p>');
+    h += '</details>';
     h += '<div class="card"><h3>Wear an Oura ring (or another watch)?</h3><p>Let it count your steps too:</p>'
       + '<p><b>1.</b> Oura app &rarr; your profile &rarr; <b>Data sharing</b> &rarr; <b>Health Connect</b> &rarr; turn on and allow <b>Steps</b>.</p>'
       + '<p><b>2.</b> Settings &rarr; <b>Health Connect</b> &rarr; <b>Data and access</b> &rarr; <b>Steps</b> &rarr; <b>App priority</b> &rarr; move <b>Oura</b> to the top.</p>'
       + '<p class="help">The Dead Miles Steps app reads the Health Connect total, so the ring&rsquo;s steps come through without counting anything twice.</p></div>';
-    h += step(9, 'Test it', testBlock('android'));
+    h += step(5, 'Test it', testBlock('android'));
     return h;
   }
 
@@ -583,6 +609,9 @@
     if (a === 'signin') { if (NET.openPanel) NET.openPanel(); return; }
     if (a.indexOf('copy:') === 0) return copy(a.slice(5));
     if (a.indexOf('test:') === 0) return runTest(a.slice(5));
+    if (a === 'andConnect') { try { DMAndroid.connectSteps(); } catch (e) { } return; }
+    if (a === 'andSend') { try { DMAndroid.sendNow(); } catch (e) { } return say('and', 'Sending...', 'ok'); }
+    if (a === 'andSettings') { try { DMAndroid.openSettings(); } catch (e) { } return; }
     if (a === 'showTok') { UI.showTok = true; return render(); }
     if (a === 'hideTok') { UI.showTok = false; return render(); }
     if (a === 'retryKey') { UI.keyErr = false; render(); return ensureKey(); }
@@ -627,6 +656,7 @@
       UI.hist = []; UI.screen = 'pick'; UI.msg = {}; UI.test = {}; UI.check = null; UI.showTok = false;
       render();
       if (screen && TITLES[screen] && screen !== 'pick') go(screen);
+      else if (APP()) go('android');   // 0.72.7
       return true;
     },
     close() {

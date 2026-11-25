@@ -77,8 +77,8 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener { onClick() }
         }
 
-        root.addView(label("Dead Miles Steps", 26f, true))
-        root.addView(label("Sends today's step count from Health Connect to the game every hour. Nothing else. Fill this in once."))
+        root.addView(label("Step sync settings", 26f, true))
+        root.addView(label("The game fills this in for you when you sign in. Use this screen only to fix step sync by hand."))
 
         root.addView(label("1. Handle (from the game, Settings > Online)", bold = true))
         handleBox = EditText(this).apply { hint = "e.g. celeste"; setText(prefs.handle); inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS }
@@ -150,7 +150,7 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
         } catch (e: Exception) {
             try { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } catch (e2: Exception) {
-                setStatus("Open Settings > Apps > Dead Miles Steps > Battery and choose Unrestricted.")
+                setStatus("Open Settings > Apps > Dead Miles > Battery and choose Unrestricted.")
             }
         }
     }

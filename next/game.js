@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.72.6';
+const NEXT_VERSION = '0.72.7';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -2026,7 +2026,7 @@ const NEXT_VERSION = '0.72.6';
   // the quiver: fill it from the stash/pack, or put its arrows away in the stash
   // 0.66: the tool belt holds one crowbar or pry bar. It counts as carried in every house (prying locks and hollow walls),
   // takes no pack slot and never spills. It is not a weapon there - equip one in your hand to fight with it.
-  const toolLeft = t => Math.ceil((t.d == null ? D.wMax(t) : t.d) / 10);   // pries left (house.js PRY_WEAR = 10 per pry)
+  const toolLeft = t => Math.ceil((t.d == null ? D.wMax(t) : t.d) / 18);   // pries left (house.js PRY_WEAR = 18 per pry, 0.72.7)
   function toolActions(s, acts) {
     const t = s.tool; if (!t) { sel = null; return; }
     const done = msg => { sel = null; Game.save(); reHost(); if (msg) toast(msg, 1.6); };

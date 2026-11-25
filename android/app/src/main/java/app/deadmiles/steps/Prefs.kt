@@ -16,6 +16,12 @@ class Prefs(ctx: Context) {
     var lastSteps: Long
         get() = p.getLong("lastSteps", 0L)
         set(v) = p.edit().putLong("lastSteps", v).apply()
+    var asked: Boolean   // 2.0: the app has asked Health Connect once on its own
+        get() = p.getBoolean("asked", false)
+        set(v) = p.edit().putBoolean("asked", v).apply()
+    var askedBattery: Boolean
+        get() = p.getBoolean("askedBattery", false)
+        set(v) = p.edit().putBoolean("askedBattery", v).apply()
     var lastError: String
         get() = p.getString("lastError", "") ?: ""
         set(v) = p.edit().putString("lastError", v).apply()

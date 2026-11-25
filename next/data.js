@@ -533,6 +533,9 @@ window.DM = window.DM || {};
   // 0.42 (owner: "seeds should be more limited ... an overload of batteries, cloth rags, a ton of 9mm"): those turn up
   // less often everywhere (seeds -60%, batteries -40%, 9mm -40%, cloth -30%); jackpots are unchanged
   for (const t in D.LOOT) { const w = D.LOOT[t][1]; for (const [k, m] of [['seed_*', .4], ['battery', .42], ['ammo', .35], ['cloth', .7], ['bandage', .45], ['meds', .3], ['antibio', .8], ['nails', .75]]) if (w[k]) { const cut = w[k] * (1 - m); w[k] = +(w[k] * m).toFixed(3); w.__none = +((w.__none || 0) + cut).toFixed(3); } }   // the cut weight becomes "nothing" (__none), so fewer items really come out   // 0.43.1 (owner: "a ton of bandages and med stuff ... it never feels bad"): medical x0.45-0.5
+  // 0.72.7 (owner: "I still feel like I have an abundance of food after I looted maybe 3 houses"): a house dropped ~35 hunger
+  // and ~33 thirst on average, against ~60 / ~85 used a day. Food and drink loot x0.4 (the cut becomes "nothing").
+  for (const t in D.LOOT) { const w = D.LOOT[t][1]; for (const k of ['snack', 'beans', 'water', 'drink', 'coffee', 'pie', 'cranberry', 'stuffing']) if (w[k]) { const cut = w[k] * .6; w[k] = +(w[k] * .4).toFixed(3); w.__none = +((w.__none || 0) + cut).toFixed(3); } }
   // 0.44.1 (owner: "there's sooo much 9mm ... check when things are too much of an abundance"): no container guarantees
   // 9mm or medicine any more (safes, caches, armories, crates, cages); a measured run of 60 houses is in DESIGN.md
   for (const t in D.LOOT) { const g = D.LOOT[t][2]; if (Array.isArray(g)) { const left = g.filter(k => k !== 'ammo' && k !== 'meds'); if (left.length !== g.length) D.LOOT[t][2] = left.length ? left : undefined; } }

@@ -128,10 +128,19 @@ window.DM = window.DM || {};
     { k: 'master', n: 'Masterwork weapon', d: 'A random weapon at the top quality tier.', cost: () => 22, left: () => true, buy: () => { const k = ['machete', 'axe', 'spikedbat', 'pistol', 'shotgun', 'baton', 'bow'][Math.floor(Math.random() * 7)], e = { k, n: 1, q: 5 }; e.d = D().wMax(e); G().routeApi.toStash([e]); toast(`A Masterwork ${D().ITEMS[k].n.toLowerCase()} is in your stash`, 2.4); } },
     { k: 'tok', n: '3 capsule tokens', d: 'For the capsule machine.', cost: () => 12,   /* 0.66: was 6 */ left: () => !!DM.Gacha, buy: () => { DM.Gacha.state().tok += 3; } },
   ];
+  // 0.72.7 (owner: "people haven't been stealing my camps ... they probably don't really understand [the map]"): the home
+  // tile and the sheet name the nearest camp to the home spot she saved on the map, and say plainly how to get there.
+  // Her live position is never stored - only the home spot she chose.
+  CP.nearest = function () {
+    const hm = DM.Map && DM.Map.home && DM.Map.home(); if (!hm || !list.length) return null;
+    const sp = CP.spots(hm).filter(x => !mine(x.c)).map(x => [x, dist(x, hm)]).sort((a, b) => a[1] - b[1])[0];
+    return sp ? { c: sp[0].c, d: sp[1] } : null;
+  };
   CP.tile = function () {
     const n = N(); if (!n || !n.ok) return null; CP.refresh();
-    const h = CP.held().length, s = st();
-    return { k: 'camps', c: '#d94a3a', n: 'Camps', sub: list.length ? `You hold ${h}/${list.length} · ${s.marks} mark${s.marks === 1 ? '' : 's'}` : 'Loading...', hot: CP.tribReady() ? 'Tribute' : '' };
+    const h = CP.held().length, s = st(), nr = CP.nearest();
+    const sub = !list.length ? 'Loading...' : nr ? `🏴 ${nr.c.name} · ${fmtD(nr.d)} from home · ${nr.c.handle ? 'held by ' + nr.c.owner : 'bandits'}` : h ? `You hold ${h}/${list.length} · ${s.marks} mark${s.marks === 1 ? '' : 's'}` : '12 enemy camps near you - open the Map';
+    return { k: 'camps', c: '#d94a3a', n: 'Camps', sub, hot: CP.tribReady() ? 'Tribute' : '' };
   };
   CP.html = function () {
     const n = N(), s = st(), v = SV();
@@ -139,7 +148,8 @@ window.DM = window.DM || {};
     const rows = list.map(c => `<div class="cprow${mine(c) ? ' mine' : !c.handle ? ' bandit' : ''}"><b>🏴 ${esc(c.name)}</b><span>${mine(c) ? 'yours' : esc(c.owner)} · defence ${c.def}${c.safe && new Date(c.safe) > new Date() ? ' · safe for now' : ''}</span></div>`).join('');
     const store = STORE.filter(x => x.left(s)).map(x => { const cst = x.cost(s); return `<div class="cpbuy"><div><b>${esc(x.n)}</b><span>${esc(x.d)}</span></div><button class="mbtn sm${s.marks < cst ? ' ghost' : ''}" data-cpb="${x.k}"${s.marks < cst ? ' disabled' : ''}>${cst} marks</button></div>`; }).join('');
     return `<div class="kick">Camps · become the Governor</div><h3>${CP.held().length} of ${list.length} camps held · ${s.marks} mark${s.marks === 1 ? '' : 's'}</h3>
-      <p class="mp dim">Every neighbourhood has its own copy of the same 12 camps (🏴 on the map). Walk to one, raid it - a real fight, people die - and it is yours for everyone. Each camp you or your party holds pays 1 tribute mark a day (more if you hold 3+). Party mates at the same camp fight beside you. 3 raids a day.</p>
+      ${(() => { const nr = CP.nearest(); return `<div class="cphow"><b>How to take a camp</b><ol><li>Open the <b>Map</b> (bottom bar). The red 🏴 flags are camps - every player has the same 12, placed in their own neighbourhood.</li><li><b>Walk</b> there in real life with the Map open. Within about 40 m it asks if you want to raid.</li><li>Win the fight inside and the camp is yours - for everyone. It pays you tribute every day until someone takes it back.</li></ol>${nr ? `<p>Nearest to your home spot: <b>🏴 ${esc(nr.c.name)}</b>, about <b>${fmtD(nr.d)}</b> away, ${nr.c.handle ? `held by <b>${esc(nr.c.owner)}</b>` : 'held by bandits'}.</p>` : '<p class="mp dim">Open the Map once and save your home spot to see how far the nearest camp is.</p>'}<button class="mbtn sm" id="cpMap">Open the Map</button></div>`; })()}
+      <p class="mp dim">Who holds a camp is shared by everyone, wherever they live. Each camp you or your party holds pays 1 tribute mark a day (more if you hold 3+). Party mates at the same camp fight beside you. 3 raids a day.</p>
       ${CP.tribReady() ? '<button class="mbtn" id="cpTrib" style="width:100%;margin:6px 0">Collect today\'s tribute</button>' : ''}
       <div class="cplist">${rows || '<p class="mp dim">Loading camps...</p>'}</div>
       <div class="kick sect" style="margin-top:12px">War chest · marks only</div><div class="cplist">${store}</div>
@@ -147,6 +157,7 @@ window.DM = window.DM || {};
   };
   CP.bind = function (root, re) {
     const t = root.querySelector('#cpTrib'); if (t) t.onclick = () => { CP.claim(); re(); };
+    const mp = root.querySelector('#cpMap'); if (mp) mp.onclick = () => { try { DM.E.SFX.play('ui'); } catch (e) { /* ignore */ } try { G().goView('map'); } catch (e) { if (DM.Map) DM.Map.open(); } };   // 0.72.7
     root.querySelectorAll('[data-cpb]').forEach(b => b.onclick = () => {
       const s = st(), x = STORE.find(y => y.k === b.dataset.cpb), cst = x.cost(s); if (!x.left(s) || s.marks < cst) return;
       if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'Tap to confirm'; return; }
@@ -166,6 +177,7 @@ window.DM = window.DM || {};
     return sp ? [{ t: `🏴 ${sp[0].c.name} · ${sp[0].c.handle ? sp[0].c.owner : 'bandits'}`, s: fmtD(sp[1]), lat: sp[0].lat, lon: sp[0].lon }] : [];
   };
   const css = document.createElement('style'); css.textContent = `
+    .cphow { margin: 6px 0 8px; padding: 9px 11px; border-radius: 12px; background: rgba(217,74,58,.1); border: 2px solid #d94a3a; font-size: 13px; } .cphow ol { margin: 4px 0 6px 18px; padding: 0; } .cphow li { margin: 3px 0; } .cphow p { margin: 4px 0 8px; }
     .cplist { display: grid; gap: 5px; margin: 6px 0; } .cprow { display: flex; justify-content: space-between; gap: 8px; padding: 7px 10px; border-radius: 10px; background: rgba(17,20,47,.6); border: 2px solid #3d2d61; font-size: 13px; }
     .cprow span { color: var(--mute, #9d90bf); font-weight: 700; font-size: 12px; text-align: right; } .cprow.mine { border-color: #7fd49a; } .cprow.bandit b { color: #ff8a7a; }
     .cpbuy { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: rgba(17,20,47,.6); border: 2px solid #3d2d61; } .cpbuy div { flex: 1; min-width: 0; } .cpbuy .mbtn { flex: none; width: auto; min-width: 92px; padding: 0 12px; } .cpbuy b { display: block; font-size: 13.5px; } .cpbuy span { font-size: 11.5px; color: var(--mute, #9d90bf); font-weight: 700; }`;

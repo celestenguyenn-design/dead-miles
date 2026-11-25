@@ -129,6 +129,8 @@
     NET.idSource = src || NET.idSource;
     if (!ledger().since) { ledger().since = dayStr(); saveLedger(); }
     writeId(); changed();
+    // 0.72.7: inside the Dead Miles Android app, hand it the account so it connects Health Connect steps by itself
+    try { if (window.DMAndroid && DMAndroid.setAccount) DMAndroid.setAccount(NET.handle, NET.token); } catch (e) { /* old app */ }
   }
 
   NET.init = async function (opts) {
