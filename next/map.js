@@ -814,7 +814,7 @@ way[building]->.b;.b out skel geom qt;
         li(em('🏴'), `<b>Red flags are enemy camps.</b> Green ones are yours. Blue ones belong to other players.`),
         li(em('🚶'), `<b>Walk there with the map open.</b> Within about 40 m it asks if you want to raid. Party mates who come along fight beside you.`),
         li(em('⚔️'), `<b>Kill every raider inside</b> and the camp is yours. Other players can take it back the same way - walk out and fortify yours once a day.`),
-        li(em('🪙'), `<b>Each camp you hold pays tribute marks every day.</b> Collect them and spend them in the <b>War chest</b>: home screen → <b>Camps</b> → War chest (extra backpack and stash slots, plated armor, Masterwork weapons).`)]],
+        li(em('🪙'), `<b>Each camp you hold pays tribute marks every day.</b> Collect them and spend them in the <b>War chest</b>: <b>Me</b> tab (★, bottom right) → <b>Camps</b> → War chest at the bottom (extra backpack and stash slots, plated armor, Masterwork weapons).`)]],
     ];
     let pg = campsOnly ? pages.length - 1 : 0;
     const draw = () => {
