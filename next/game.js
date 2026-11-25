@@ -237,7 +237,7 @@ const NEXT_VERSION = '0.72.8';
   function pickType(w, rnd) {
     const T = D.BTYPES, keys = Object.keys(T).filter(k => T[k].w > 0);
     // more steps today = slightly better odds of bigger, rarer buildings
-    const wt = keys.map(k => T[k].w * (1 + (T[k].big || 0) * w / 9000));
+    const wt = keys.map(k => T[k].w * (1 + (T[k].big || 0) * w / 9000) * (DM.Journey ? DM.Journey.typeMul(k) : 1));   // 0.73: the town you have walked to
     let v = rnd() * wt.reduce((a, b) => a + b, 0);
     for (let i = 0; i < keys.length; i++) { v -= wt[i]; if (v <= 0) return keys[i]; }
     return keys[0];
@@ -321,7 +321,7 @@ const NEXT_VERSION = '0.72.8';
     if (s) s.gsDays = (+s.gsDays || 0) + 1;   // 0.19: days played (one per day the game is opened, not per day away) for the gamestage
     SV.day = { key: t, phone: 0, typed: 0, walk: 0, scouted: 0 };
     // unlooted houses last 3 days; finished ones are cleared from the list; quest houses stay while the quest is open
-    SV.houses = SV.houses.filter(h => (h.npcq && DM.NPCQ && DM.NPCQ.forHouseQ(h.id)) || (h.quest ? questById(h.quest) && h.status !== 'looted' : h.status === 'new' && dayNum(t) - dayNum(h.day) < 3));   // 0.27: a house with an open NPC request stays
+    SV.houses = SV.houses.filter(h => (h.npcq && DM.NPCQ && DM.NPCQ.forHouseQ(h.id)) || (h.quest ? questById(h.quest) && h.status !== 'looted' : h.status === 'new' && (h.townBoss || dayNum(t) - dayNum(h.day) < 3)));   // 0.27: a house with an open NPC request stays
     if (s) DM.Crew.morning(days);   // phase 5b: the crew eats, the medic heals, the gardener waters, pets come home
     DM.Boss.roll();
   }
@@ -1403,6 +1403,7 @@ const NEXT_VERSION = '0.72.8';
     if (!SV || !SV.survivor || DM.scene) return;
     if (DM.WalkFX) DM.WalkFX.tick();   // 0.47: walk finds, gear upkeep, walking caches
     if (DM.Collect) DM.Collect.file();   // 0.53: new collectibles file themselves
+    if (DM.Journey) DM.Journey.tick();   // 0.73: towns reached, the weekly radio
     if (DM.Luck) setTimeout(() => DM.Luck.check(), 600);   // 0.73: yesterday's bad luck comes back as a story
     if (DM.Cards) DM.Cards.tick();   // 0.68: field card packs from walking and looting
     if (DM.Life) DM.Life.tick();   // 0.62: walking buddy, radio
@@ -1715,6 +1716,7 @@ const NEXT_VERSION = '0.72.8';
     checkInvites();   // 0.60: party invites
     if (window.NET && NET.ok && NET.name && SV.survivor.name === 'Survivor') publish();   // 0.42.1: pick up the account name
     if (DM.Journal) { const jt = DM.Journal.tile(); if (jt) t.push(jt); }   // 0.50
+    if (DM.Journey && SV.tutorialDone) { const jt = DM.Journey.tile(); if (jt) t.unshift(jt); }   // 0.73: the road east
     if (DM.Tips && SV.tutorialDone) { const tp = DM.Tips.tile(); if (tp) t.unshift(tp); }   // 0.73: one feature a day you have not tried
     if (DM.Collect && SV.tutorialDone) { const ct = DM.Collect.tile(); if (ct) t.push(ct); }   // 0.53
     if (DM.Cards && SV.tutorialDone) { const ft = DM.Cards.tile(); if (ft) t.push(ft); }   // 0.68 field cards
@@ -1734,7 +1736,7 @@ const NEXT_VERSION = '0.72.8';
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
     cardSheet = k;
-    const html = DM.Tips && DM.Tips.has(k) ? `<div class="tpwrap">${DM.Tips.html()}</div>` : DM.Cards && DM.Cards.has(k) ? `<div class="fcwrap">${DM.Cards.html()}</div>` : DM.City && DM.City.has(k) ? `<div class="cywrap">${DM.City.html(k)}</div>` : DM.Life && DM.Life.has(k) ? `<div class="lfwrap">${DM.Life.html(k)}</div>` : k === 'collect' ? `<div class="clwrap">${DM.Collect.html()}</div>` : k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
+    const html = DM.Journey && DM.Journey.has(k) ? `<div class="jywrap">${DM.Journey.html()}</div>` : DM.Tips && DM.Tips.has(k) ? `<div class="tpwrap">${DM.Tips.html()}</div>` : DM.Cards && DM.Cards.has(k) ? `<div class="fcwrap">${DM.Cards.html()}</div>` : DM.City && DM.City.has(k) ? `<div class="cywrap">${DM.City.html(k)}</div>` : DM.Life && DM.Life.has(k) ? `<div class="lfwrap">${DM.Life.html(k)}</div>` : k === 'collect' ? `<div class="clwrap">${DM.Collect.html()}</div>` : k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
     sheetOpen(`<div class="cardsheet" data-cs="${k}">${html}</div><button class="mbtn ghost" id="csDone">Close</button>`);
     const el = $('#msheet'), root = el.querySelector('.cardsheet');
     el.onclick = e => { if (e.target === el) closeCardSheet(); };
@@ -1745,6 +1747,7 @@ const NEXT_VERSION = '0.72.8';
     else if (k === 'caches') DM.WalkFX.bindCaches(root);
     else if (k === 'camps') { const w = root.querySelector('.cpwrap'), re = () => { w.innerHTML = DM.Camps.html(); DM.Camps.bind(w, re); }; DM.Camps.bind(w, re); }
     else if (k === 'social') { publish(); const w = root.querySelector('.sowrap'), re = () => { w.innerHTML = DM.Social.html(); DM.Social.bind(w, re); }; DM.Social.bind(w, re); }
+    else if (DM.Journey && DM.Journey.has(k)) { const w = root.querySelector('.jywrap'), re = () => { w.innerHTML = DM.Journey.html(); DM.Journey.bind(w, re); renderHome(); }; DM.Journey.bind(w, re); }   // 0.73
     else if (DM.Tips && DM.Tips.has(k)) DM.Tips.bind(root, closeCardSheet, openCardSheet);   // 0.73
     else if (k === 'codex') DM.Codex.bind(root.querySelector('.cxwrap'));
     else if (k === 'collect') DM.Collect.bind();

@@ -49,7 +49,7 @@ window.DM = window.DM || {};
     if (h.twist === 'named') h.twName = pickOf(NAMES, r);
     return h;
   };
-  TW.title = h => h && KINDS[h.twist] ? (h.twist === 'named' ? `${h.twName} lives here` : KINDS[h.twist].n) : null;
+  TW.title = h => h && KINDS[h.twist] ? (h.twist === 'named' ? (h.townBoss ? `Town boss: ${h.twName}` : `${h.twName} lives here`) : KINDS[h.twist].n) : null;
   TW.tagHTML = h => { const K = KINDS[h.twist]; return K ? `<b class="twtag" style="--tc:${K.c}">${K.g} ${TW.title(h)}</b>` : ''; };
   TW.intro = h => { const K = KINDS[h.twist]; return K ? `${K.g} ${TW.title(h)}: ${K.d}` : ''; };
   // the crew never goes into a burning house or one with a named zombie; the rest they can search as usual
@@ -63,7 +63,9 @@ window.DM = window.DM || {};
     const r = D.mulberry32((h.seed ^ 0x51a7e) >>> 0);
     const furn = L.furn.map(f => Object.assign({}, f)), cs = furn.filter(f => f.loot && f.lootable !== false && !f.secretLoot && D.LOOT[f.loot]);
     if (K.each) for (const f of cs) { const x = K.each(r).filter(k => D.ITEMS[k]); if (x.length) { f.extra = (f.extra || []).concat(x); f.noEmpty = 1; } }
-    if (K.jack && cs.length) { const f = cs[Math.floor(r() * cs.length)]; f.extra = (f.extra || []).concat(K.jack(r).filter(k => D.ITEMS[k])); f.noEmpty = 1; if (h.twist === 'trap') f.trap = 1; }
+    // 0.73 journey.js: a town boss's hideout has a jackpot too
+    const jack = K.jack || (h.townBoss ? rr => [D.pickBP(rr), pickOf(['katana', 'crossbow', 'shotgun', 'axe', 'machete'], rr), pickOf(['cache5', 'cache10', 'armor_riot'], rr), 'jewelry'] : null);
+    if (jack && cs.length) { const f = cs[Math.floor(r() * cs.length)]; f.extra = (f.extra || []).concat(jack(r).filter(k => D.ITEMS[k])); f.noEmpty = 1; if (h.twist === 'trap') f.trap = 1; }
     L._twist = h.id + ':' + h.twist;
     return furn;
   };
@@ -151,7 +153,7 @@ window.DM = window.DM || {};
       const pool = g.zs.filter(z => !z.dead && !z.raider && !z.boss && !z.special);
       const o0 = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null; if (!o0) return null;
       const z = H().spawn(o0.x + 20, o0.y, { st: 'idle', twNamed: 1, boss: 1 });
-      z.hp = z.maxHp = Math.round((o0.maxHp || 100) * 5); z.dmgMul = 1.6; z.kind = o0.kind;
+      z.hp = z.maxHp = Math.round((o0.maxHp || 100) * (h.townBoss ? 10 : 5)); z.dmgMul = h.townBoss ? 2 : 1.6; z.kind = o0.kind;
       return z;
     }
   };
