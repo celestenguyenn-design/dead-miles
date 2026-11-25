@@ -85,6 +85,15 @@ window.DM = window.DM || {};
     if (it.th) f.t = Math.min(100, f.t + it.th);
     return F.label(k);
   };
+  // 0.72.4 (owner: "I can actually keep eating even if I'm full"): a food or drink only helps a bar that is not full.
+  // Returns the reason it would be wasted ('' = fine). Items that also heal HP or give stamina pass if that still helps.
+  F.FULLAT = 98;
+  F.wasted = function (s, k, o = {}) {
+    const it = D.ITEMS[k], f = s && s.food; if (!it || !f || !(it.hu || it.th)) return '';
+    if ((it.hu && f.h < F.FULLAT) || (it.th && f.t < F.FULLAT)) return '';
+    if (o.hpLow && it.hp) return ''; if (o.staLow && it.sta) return '';
+    return it.hu && it.th ? 'You are full and not thirsty' : it.hu ? 'You are full - save it for later' : 'You are not thirsty - save it for later';
+  };
   F.label = k => { const it = D.ITEMS[k]; if (!it) return ''; return [it.hu ? `+${it.hu} hunger` : '', it.th ? `+${it.th} thirst` : ''].filter(Boolean).join(' · '); };
   F.verb = k => { const it = D.ITEMS[k]; return it && it.use === 'Drink' ? 'Drank' : 'Ate'; };
 

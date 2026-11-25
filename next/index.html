@@ -56,6 +56,7 @@
   .fdrow img { width: 34px; height: 34px; flex: none; }
   .fdrow div { flex: 1; min-width: 0; font-size: 12px; font-weight: 800; line-height: 1.25; } .fdrow div em { display: block; font-style: normal; font-size: 10.5px; color: var(--mute); font-weight: 700; }
   .mcard .fdrow .mbtn { flex: none; width: auto; min-width: 72px; margin: 0; }
+  .gneeds { position: sticky; top: 0; z-index: 6; padding: 6px 8px; margin: 4px 0 8px; border-radius: 12px; background: rgba(28,21,56,.96); border: 2px solid #3d2d61; }
   .fdbars { margin: 6px 0 4px; } .fdbars .needs .nbar { height: 12px; } .fdbars .nico { width: 20px; height: 20px; } .fdbars .needs .need b { font-size: 12px; }
   .fdfx { font-size: 12px; font-weight: 700; color: var(--mute); margin: 6px 0 0; padding-left: 16px; } .fdfx li { margin: 2px 0; }
   #room { margin-top: 3px; align-self: flex-start; display: inline-block; font-size: 11px; font-weight: 900; letter-spacing: .14em; padding: 5px 10px; border-radius: 99px; background: rgba(17,20,47,.88); border: 2px solid var(--plum); color: var(--crm); }
@@ -872,7 +873,7 @@
   .slot.fistslot .fistico { font-size: 30px; line-height: 38px; height: 38px; }   /* 0.23.1 */
   .mbtn.discard { color: #ff8a7a !important; border-color: #ff8a7a !important; } .mbtn.discard.warn { background: #c0392b !important; color: var(--crm) !important; }   /* 0.24.5 */
 </style>
-<link rel="stylesheet" href="theme.css?v=0.72.3">
+<link rel="stylesheet" href="theme.css?v=0.72.4">
 </head>
 <body>
 <div id="app">
@@ -935,61 +936,61 @@
   <div id="msheet"></div>
   <div id="loading">LOADING…</div>
 </div>
-<script src="s2art.js?v=0.72.3"></script>
-<script src="art.js?v=0.72.3"></script>
-<script src="net.js?v=0.72.3"></script>
-<script src="netpanel.js?v=0.72.3"></script>
-<script src="syncguide.js?v=0.72.3"></script>
-<script src="events.js?v=0.72.3"></script>
-<script src="data.js?v=0.72.3"></script>
-<script src="food.js?v=0.72.3"></script>
-<script src="skills.js?v=0.72.3"></script>
-<script src="infection.js?v=0.72.3"></script>
-<script src="infected.js?v=0.72.3"></script>
-<script src="engine.js?v=0.72.3"></script>
-<script src="music.js?v=0.72.3"></script>
-<script src="weather.js?v=0.72.3"></script>
-<script src="gen.js?v=0.72.3"></script>
-<script src="raiders.js?v=0.72.3"></script>
-<script src="house.js?v=0.72.3"></script>
-<script src="horde.js?v=0.72.3"></script>
-<script src="base.js?v=0.72.3"></script>
-<script src="armor.js?v=0.72.3"></script>
-<script src="walks.js?v=0.72.3"></script>
-<script src="npcq.js?v=0.72.3"></script>
-<script src="crew.js?v=0.72.3"></script>
-<script src="boss.js?v=0.72.3"></script>
-<script src="daily.js?v=0.72.3"></script>
-<script src="gacha.js?v=0.72.3"></script>
-<script src="tour.js?v=0.72.3"></script>
-<script src="deep.js?v=0.72.3"></script>
-<script src="route.js?v=0.72.3"></script>
-<script src="advent.js?v=0.72.3"></script>
-<script src="install.js?v=0.72.3"></script>
-<script src="logo.js?v=0.72.3"></script>
-<script src="title.js?v=0.72.3"></script>
-<script src="game.js?v=0.72.3"></script>
-<script src="codex.js?v=0.72.3"></script>
-<script src="social.js?v=0.72.3"></script>
-<script src="gifts.js?v=0.72.3"></script>
-<script src="mvt.js?v=0.72.3"></script>
-<script src="mapfx.js?v=0.72.3"></script>
-<script src="mapquest.js?v=0.72.3"></script>
-<script src="mappoi.js?v=0.72.3"></script>
-<script src="camps.js?v=0.72.3"></script>
-<script src="walkfx.js?v=0.72.3"></script>
-<script src="journal.js?v=0.72.3"></script>
-<script src="collect.js?v=0.72.3"></script>
-<script src="charms.js?v=0.72.3"></script>
-<script src="weapons2.js?v=0.72.3"></script>
-<script src="named.js?v=0.72.3"></script>
-<script src="trades.js?v=0.72.3"></script>
-<script src="crafting.js?v=0.72.3"></script>
-<script src="progress.js?v=0.72.3"></script>
-<script src="life.js?v=0.72.3"></script>
-<script src="cards.js?v=0.72.3"></script>
-<script src="push.js?v=0.72.3"></script>
-<script src="city.js?v=0.72.3"></script>
-<script src="map.js?v=0.72.3"></script>
+<script src="s2art.js?v=0.72.4"></script>
+<script src="art.js?v=0.72.4"></script>
+<script src="net.js?v=0.72.4"></script>
+<script src="netpanel.js?v=0.72.4"></script>
+<script src="syncguide.js?v=0.72.4"></script>
+<script src="events.js?v=0.72.4"></script>
+<script src="data.js?v=0.72.4"></script>
+<script src="food.js?v=0.72.4"></script>
+<script src="skills.js?v=0.72.4"></script>
+<script src="infection.js?v=0.72.4"></script>
+<script src="infected.js?v=0.72.4"></script>
+<script src="engine.js?v=0.72.4"></script>
+<script src="music.js?v=0.72.4"></script>
+<script src="weather.js?v=0.72.4"></script>
+<script src="gen.js?v=0.72.4"></script>
+<script src="raiders.js?v=0.72.4"></script>
+<script src="house.js?v=0.72.4"></script>
+<script src="horde.js?v=0.72.4"></script>
+<script src="base.js?v=0.72.4"></script>
+<script src="armor.js?v=0.72.4"></script>
+<script src="walks.js?v=0.72.4"></script>
+<script src="npcq.js?v=0.72.4"></script>
+<script src="crew.js?v=0.72.4"></script>
+<script src="boss.js?v=0.72.4"></script>
+<script src="daily.js?v=0.72.4"></script>
+<script src="gacha.js?v=0.72.4"></script>
+<script src="tour.js?v=0.72.4"></script>
+<script src="deep.js?v=0.72.4"></script>
+<script src="route.js?v=0.72.4"></script>
+<script src="advent.js?v=0.72.4"></script>
+<script src="install.js?v=0.72.4"></script>
+<script src="logo.js?v=0.72.4"></script>
+<script src="title.js?v=0.72.4"></script>
+<script src="game.js?v=0.72.4"></script>
+<script src="codex.js?v=0.72.4"></script>
+<script src="social.js?v=0.72.4"></script>
+<script src="gifts.js?v=0.72.4"></script>
+<script src="mvt.js?v=0.72.4"></script>
+<script src="mapfx.js?v=0.72.4"></script>
+<script src="mapquest.js?v=0.72.4"></script>
+<script src="mappoi.js?v=0.72.4"></script>
+<script src="camps.js?v=0.72.4"></script>
+<script src="walkfx.js?v=0.72.4"></script>
+<script src="journal.js?v=0.72.4"></script>
+<script src="collect.js?v=0.72.4"></script>
+<script src="charms.js?v=0.72.4"></script>
+<script src="weapons2.js?v=0.72.4"></script>
+<script src="named.js?v=0.72.4"></script>
+<script src="trades.js?v=0.72.4"></script>
+<script src="crafting.js?v=0.72.4"></script>
+<script src="progress.js?v=0.72.4"></script>
+<script src="life.js?v=0.72.4"></script>
+<script src="cards.js?v=0.72.4"></script>
+<script src="push.js?v=0.72.4"></script>
+<script src="city.js?v=0.72.4"></script>
+<script src="map.js?v=0.72.4"></script>
 </body>
 </html>

@@ -2255,6 +2255,7 @@
       if (!IFX.is(S())) { toast('You are not infected - save them for a bite', 1.8); return; }
       const m = IFX.cure(S()); e.n--; if (!e.n) G.pack.splice(i, 1); SFX.play('pick'); toast(m, 2.4); hudChips(); lastHud = ''; DM.Game && DM.Game.save(); openPack(); return;
     }
+    { const no = F.wasted(S(), e.k, { hpLow: p.hp < maxHp(), staLow: p.sta < F.staMax() }); if (no) { toast(no, 1.8); return; } }   // 0.72.4
     if (it.hp) p.hp = Math.min(maxHp(), p.hp + SK.heal(it.hp));   // 0.13: Field medic heals more
     const fed = F.isFood(e.k) ? F.eat(S(), e.k) : '';
     if (it.sta) p.sta = Math.min(F.staMax(), p.sta + it.sta);
