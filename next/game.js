@@ -2268,7 +2268,7 @@ const NEXT_VERSION = '0.72.7';
   function openHowTo() {
     sheetOpen(`<div class="kick">Dead Miles</div><h3>How to play</h3>
       ${HOWTO.map(([t, d], i) => `<details class="howto"${i ? '' : ' open'}><summary>${t}</summary><p>${esc(d)}</p></details>`).join('')}
-      <details class="howto"><summary>Step sync</summary><p>Your phone can send steps by itself: an iPhone Shortcut or the Android companion app. Sign in first (Account &amp; friends), then follow the guide.</p>${window.SYNC ? '<button class="mbtn sm" id="hSync">Open the step sync guide</button>' : ''}</details>
+      <details class="howto"><summary>Step sync</summary><p>Your phone can send steps by itself. Android: play in the Dead Miles app (download it from the step sync guide) - sign in and it connects your steps on its own. iPhone: a Shortcut does it; sign in first (Account &amp; friends), then follow the guide.</p>${window.SYNC ? '<button class="mbtn sm" id="hSync">Open the step sync guide</button>' : ''}</details>
       <div class="btnrow"><button class="mbtn sm ghost" id="hBack">Back</button>${SV.survivor && DM.Tour && !DM.scene ? '<button class="mbtn sm ghost" id="hTour">Game tour</button>' : ''}<button class="mbtn sm" id="hClose">Close</button></div>`);
     if ($('#hTour')) $('#hTour').onclick = () => { sheetClose(); DM.Tour.start(true); };
     if ($('#hSync')) $('#hSync').onclick = () => { sheetClose(); try { SYNC.open(); } catch (e) { toast('Sync guide failed to open', 1.6); } };
