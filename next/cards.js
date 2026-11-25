@@ -202,8 +202,10 @@ window.DM = window.DM || {};
     const c = st(); if (!c || c.packs < 1) return null; c.packs--;
     const n = 3 + (rnd() < Math.min(1, P('luck')) ? 1 : 0), out = [];
     c.pity++;
+    // 0.73 (owner said yes to "make your first card pack a guaranteed rare"): the very first pack anyone opens ends on an epic or better
+    const first = !c.opened && !Object.keys(c.own || {}).length; c.opened = (c.opened || 0) + 1;
     for (let i = 0; i < n; i++) {
-      const min = i === n - 1 ? (c.pity >= 10 ? 'e' : 'r') : 'c';
+      const min = i === n - 1 ? (c.pity >= 10 || first ? 'e' : 'r') : 'c';
       const k = pickCard(rnd, min); if (RAR.indexOf(k.r) >= 2) c.pity = 0;
       out.push(add(k.id, rnd() < FOIL));
     }
