@@ -140,7 +140,8 @@ window.DM = window.DM || {};
     const n = N(); if (!n || !n.ok) return null; CP.refresh();
     const h = CP.held().length, s = st(), nr = CP.nearest();
     const sub = !list.length ? 'Loading...' : nr ? `🏴 ${nr.c.name} · ${fmtD(nr.d)} from home · ${nr.c.handle ? 'held by ' + nr.c.owner : 'bandits'}` : h ? `You hold ${h}/${list.length} · ${s.marks} mark${s.marks === 1 ? '' : 's'}` : '12 enemy camps near you - open the Map';
-    return { k: 'camps', c: '#d94a3a', n: 'Camps', sub, hot: CP.tribReady() ? 'Tribute' : '' };
+    const cheap = Math.min(...STORE.filter(x => x.left(s)).map(x => x.cost(s)));
+    return { k: 'camps', c: '#d94a3a', n: 'Camps', sub: s.marks ? `${s.marks} tribute mark${s.marks === 1 ? '' : 's'} to spend · ` + sub : sub, hot: CP.tribReady() ? 'Tribute' : s.marks >= cheap ? 'Spend' : '' };   // 0.72.8
   };
   CP.html = function () {
     const n = N(), s = st(), v = SV();
@@ -151,12 +152,14 @@ window.DM = window.DM || {};
       ${(() => { const nr = CP.nearest(); return `<div class="cphow"><b>How to take a camp</b><ol><li>Open the <b>Map</b> (bottom bar). The red 🏴 flags are camps - every player has the same 12, placed in their own neighbourhood.</li><li><b>Walk</b> there in real life with the Map open. Within about 40 m it asks if you want to raid.</li><li>Win the fight inside and the camp is yours - for everyone. It pays you tribute every day until someone takes it back.</li></ol>${nr ? `<p>Nearest to your home spot: <b>🏴 ${esc(nr.c.name)}</b>, about <b>${fmtD(nr.d)}</b> away, ${nr.c.handle ? `held by <b>${esc(nr.c.owner)}</b>` : 'held by bandits'}.</p>` : '<p class="mp dim">Open the Map once and save your home spot to see how far the nearest camp is.</p>'}<button class="mbtn sm" id="cpMap">Open the Map</button></div>`; })()}
       <p class="mp dim">Who holds a camp is shared by everyone, wherever they live. Each camp you or your party holds pays 1 tribute mark a day (more if you hold 3+). Party mates at the same camp fight beside you. 3 raids a day.</p>
       ${CP.tribReady() ? '<button class="mbtn" id="cpTrib" style="width:100%;margin:6px 0">Collect today\'s tribute</button>' : ''}
+      ${s.marks ? `<button class="mbtn ghost" id="cpChest" style="width:100%;margin:2px 0 6px">🪙 Spend ${s.marks} mark${s.marks === 1 ? '' : 's'} in the War chest ↓</button>` : ''}
       <div class="cplist">${rows || '<p class="mp dim">Loading camps...</p>'}</div>
-      <div class="kick sect" style="margin-top:12px">War chest · marks only</div><div class="cplist">${store}</div>
+      <div class="kick sect" id="cpChestH" style="margin-top:12px">🪙 War chest · spend your tribute marks here</div><p class="mp dim" style="margin:0 0 4px">You have <b>${s.marks}</b> mark${s.marks === 1 ? '' : 's'}. Every camp you hold pays more each day.</p><div class="cplist">${store}</div>
       <p class="mp dim">Backpack ${v.survivor.warPack || 0}/4 bought · stash +${v.survivor.warStash || 0}/40 bought.</p>`;
   };
   CP.bind = function (root, re) {
     const t = root.querySelector('#cpTrib'); if (t) t.onclick = () => { CP.claim(); re(); };
+    const ch = root.querySelector('#cpChest'); if (ch) ch.onclick = () => { const h = root.querySelector('#cpChestH'); if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' }); };   // 0.72.8
     const mp = root.querySelector('#cpMap'); if (mp) mp.onclick = () => { try { DM.E.SFX.play('ui'); } catch (e) { /* ignore */ } try { G().goView('map'); } catch (e) { if (DM.Map) DM.Map.open(); } };   // 0.72.7
     root.querySelectorAll('[data-cpb]').forEach(b => b.onclick = () => {
       const s = st(), x = STORE.find(y => y.k === b.dataset.cpb), cst = x.cost(s); if (!x.left(s) || s.marks < cst) return;

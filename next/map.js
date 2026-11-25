@@ -787,8 +787,9 @@ way[building]->.b;.b out skel geom qt;
   // 0.30.4 (owner: "explain the routes and map better for new players"): a 3-page guide - places, home spots, map jobs.
   // Shown once (new key, so players who saw the old 1-page intro see this once too); the ? button reopens it.
   function intro(force) {
-    let seen = 0; try { seen = localStorage.getItem(INTRO_KEY + '2'); } catch (e) { /* ignore */ }
-    if (seen && !force) return;
+    let seen = 0, seenCamps = 0; try { seen = localStorage.getItem(INTRO_KEY + '2'); seenCamps = localStorage.getItem(INTRO_KEY + '-camps'); } catch (e) { /* ignore */ }
+    if (seen && seenCamps && !force) return;
+    const campsOnly = !!seen && !seenCamps && !force;   // 0.72.8: players who already saw the intro get just the new camps page
     const e = $('#mvIntro'), li = (ic, t) => `<li><i${ic.o ? ' class="o"' : ''}>${ic.h}</i><span>${t}</span></li>`, img = k => ({ h: `<img alt="" src="${iconURL(k)}">` }), em = c => ({ h: c });
     const pages = [
       ['Your real streets', 'This is your real neighbourhood', 'Walk to real places with the map open and they become bonus houses to loot.', [
@@ -808,13 +809,19 @@ way[building]->.b;.b out skel geom qt;
         li(em('🪖'), `<b>Strange places:</b> army checkpoints, crashed helicopters, survivor camps, zombie nests and more sit next to real buildings. They move every Monday. Up to 8 a day, so it never turns into a chore.`),
         li(em('🌫️'), `<b>Fog:</b> the map is foggy where you have never walked. Clearing it gives XP and small finds.`),
         li(em('🚶'), `<b>Pocket mode</b> (walking button, top right): a dark, battery-saving screen so you can walk with the phone in your pocket. Keep the screen on.`)]],
+      // 0.72.8 (owner: "my friend ... didn't know the campsites existed in the maps"; "I don't even know where to use my tribute points")
+      ['Camps', 'Raid a camp, take it for everyone', 'There are 12 enemy camps, and every player has them hidden in their own neighbourhood. Take one and it is yours - for everyone.', [
+        li(em('🏴'), `<b>Red flags are enemy camps.</b> Green ones are yours. Blue ones belong to other players.`),
+        li(em('🚶'), `<b>Walk there with the map open.</b> Within about 40 m it asks if you want to raid. Party mates who come along fight beside you.`),
+        li(em('⚔️'), `<b>Kill every raider inside</b> and the camp is yours. Other players can take it back the same way - walk out and fortify yours once a day.`),
+        li(em('🪙'), `<b>Each camp you hold pays tribute marks every day.</b> Collect them and spend them in the <b>War chest</b>: home screen → <b>Camps</b> → War chest (extra backpack and stash slots, plated armor, Masterwork weapons).`)]],
     ];
-    let pg = 0;
+    let pg = campsOnly ? pages.length - 1 : 0;
     const draw = () => {
       const [k, h, p, items] = pages[pg], last = pg === pages.length - 1;
-      e.innerHTML = `<div class="mvicard"><div class="kick">${k} · ${pg + 1}/${pages.length}</div><h3>${h}</h3><p>${p}</p><ul>${items.join('')}</ul>
-        <div style="display:flex;gap:10px;margin-top:12px">${pg ? '<button class="mbtn ghost" id="mvIntroBack" style="flex:1">Back</button>' : ''}<button class="mbtn" id="mvIntroGo" style="flex:2">${last ? 'Let\'s walk' : 'Next'}</button></div></div>`;
-      $('#mvIntroGo').onclick = () => { DM.E.SFX && DM.E.SFX.play && DM.E.SFX.play('ui'); if (!last) { pg++; draw(); return; } try { localStorage.setItem(INTRO_KEY + '2', '1'); localStorage.setItem(INTRO_KEY, '1'); } catch (x) { /* ignore */ } e.classList.remove('on'); if (M.pos && !home() && !M.homeNo && !M.msgKind) { M.homeAsked = 1; homeAsk(false); } };
+      e.innerHTML = `<div class="mvicard"><div class="kick">${campsOnly ? 'New · ' + k : `${k} · ${pg + 1}/${pages.length}`}</div><h3>${h}</h3><p>${p}</p><ul>${items.join('')}</ul>
+        <div style="display:flex;gap:10px;margin-top:12px">${pg && !campsOnly ? '<button class="mbtn ghost" id="mvIntroBack" style="flex:1">Back</button>' : ''}<button class="mbtn" id="mvIntroGo" style="flex:2">${last ? 'Let\'s walk' : 'Next'}</button></div></div>`;
+      $('#mvIntroGo').onclick = () => { DM.E.SFX && DM.E.SFX.play && DM.E.SFX.play('ui'); if (!last) { pg++; draw(); return; } try { localStorage.setItem(INTRO_KEY + '2', '1'); localStorage.setItem(INTRO_KEY, '1'); localStorage.setItem(INTRO_KEY + '-camps', '1'); } catch (x) { /* ignore */ } e.classList.remove('on'); if (M.pos && !home() && !M.homeNo && !M.msgKind) { M.homeAsked = 1; homeAsk(false); } };
       if ($('#mvIntroBack')) $('#mvIntroBack').onclick = () => { pg--; draw(); };
     };
     draw(); e.classList.add('on');
