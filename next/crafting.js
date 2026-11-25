@@ -17,14 +17,19 @@ window.DM = window.DM || {};
     crate_ration: { n: 'Ration crate', i: 'crate_ration', tag: 'Dot pays well for it' },
     crate_snack: { n: 'Snack crate', i: 'crate_snack', tag: 'Dot pays for it' },
     crate_med: { n: 'First-aid box', i: 'crate_med', tag: 'Dot pays well for it' },
+    // 0.72.4 (owner: "we should be able to craft medkits with bandages and painkillers"): one tap, one slot, a big heal
+    medkit: { n: 'Medkit', i: 'medkit', use: 'Use', hp: 100, tag: 'heals 100 HP' },
   });
-  Object.assign(D.VALUE, { crate_ration: 24, crate_snack: 14, crate_med: 30 });
+  D.STACK.medkit = 5;
+  Object.assign(D.VALUE, { crate_ration: 24, crate_snack: 14, crate_med: 30, medkit: 14 });
   const S = '#11142f';
   const crate = (lid, mark) => `<rect x="-24" y="-14" width="48" height="34" rx="3" fill="#b07a4a" stroke="${S}" stroke-width="2.8"/><rect x="-26" y="-22" width="52" height="10" rx="2" fill="${lid}" stroke="${S}" stroke-width="2.6"/>
     <path d="M-24,-2 H24 M-24,9 H24" stroke="#8a5a32" stroke-width="2"/><path d="M-18,-12 V18 M18,-12 V18" stroke="#8a5a32" stroke-width="2.4"/>${mark}`;
   if (typeof ART !== 'undefined' && ART.addIcons) ART.addIcons({
     crate_ration: crate('#93a86c', `<rect x="-9" y="-9" width="18" height="16" rx="2" fill="#f6e3bb" stroke="${S}" stroke-width="1.8"/><path d="M-5,-3 h10 M-5,2 h7" stroke="#7a5a3a" stroke-width="1.8"/>`),
     crate_snack: crate('#f07b3c', `<path d="M-8,-9 h16 l-2,16 h-12 Z" fill="#e0b94a" stroke="${S}" stroke-width="1.8"/><circle cx="0" cy="-1" r="3" fill="#d9483a"/>`),
+    medkit: `<rect x="-24" y="-16" width="48" height="36" rx="6" fill="#d9483a" stroke="${S}" stroke-width="2.8"/><path d="M-9,-16 v-6 h18 v6" fill="none" stroke="${S}" stroke-width="2.8"/>
+      <rect x="-20" y="-12" width="40" height="6" rx="3" fill="#ff8a7a"/><path d="M0,-6 v20 M-10,4 h20" stroke="#f6e3bb" stroke-width="6" stroke-linecap="round"/>`,
     crate_med: crate('#f6e3bb', `<rect x="-9" y="-9" width="18" height="16" rx="2" fill="#f6e3bb" stroke="${S}" stroke-width="1.8"/><path d="M0,-6 v10 M-5,-1 h10" stroke="#d9483a" stroke-width="3.2"/>`),
   });
   // auto = Crafting level that teaches it
@@ -36,6 +41,7 @@ window.DM = window.DM || {};
     dc_bench: { out: ['d_bench', 1], in: { wood: 4, nails: 8 }, n: 'Park bench (decor)', auto: 2 },
     dc_lantern: { out: ['d_lantern', 1], in: { scrap: 2, battery: 1, tape: 1 }, n: 'Camp lantern (decor)', auto: 2 },
     dc_bunting: { out: ['d_bunting', 1], in: { cloth: 3, tape: 1 }, n: 'Flag bunting (decor)', auto: 2 },
+    medkit: { out: ['medkit', 1], in: { bandage: 2, meds: 1, tape: 1 }, n: 'Medkit (heals 100 HP)', auto: 1 },   // 0.72.4
     crate_med: { out: ['crate_med', 1], in: { bandage: 3, meds: 1, cloth: 1 }, n: 'First-aid box (sell to Dot, 30 caps)', auto: 3 },
     dc_lights: { out: ['d_lights', 1], in: { battery: 2, tape: 1, scrap: 1 }, n: 'String lights (decor)', auto: 3 },
     dc_rug: { out: ['d_rug', 1], in: { cloth: 6 }, n: 'Woven rug (decor)', auto: 3 },

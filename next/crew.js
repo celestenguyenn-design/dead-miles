@@ -569,8 +569,8 @@
     // and patch them up with a bandage (+35 HP) or painkillers (+60) from your pack
     for (const e of (R.fighters || []).concat(R.mate ? [R.mate] : [])) {
       if (e.gone || e.hp >= e.maxHp || Math.hypot(e.x - g.p.x, e.y - g.p.y) > 1.6 * T) continue;
-      const k = g.pack.some(x => x.k === 'bandage') ? 'bandage' : g.pack.some(x => x.k === 'meds') ? 'meds' : null;
-      if (k) A(e, 'Patch up', `${e.m.name} (${D.ITEMS[k].n.toLowerCase()})`, () => { const i = g.pack.findIndex(x => x.k === k); if (i < 0) return; if (!--g.pack[i].n) g.pack.splice(i, 1); const h = k === 'meds' ? 60 : 35; e.hp = Math.min(e.maxHp, e.hp + h); syncHp(e); SFX.play('pick'); toast(`${e.m.name} +${h} HP`, 1.4); }, { dur: .9, verb: 'patching up' });
+      const k = ['bandage', 'meds', 'medkit'].find(q => g.pack.some(x => x.k === q)) || null;   // 0.72.4: medkits too
+      if (k) A(e, 'Patch up', `${e.m.name} (${D.ITEMS[k].n.toLowerCase()})`, () => { const i = g.pack.findIndex(x => x.k === k); if (i < 0) return; if (!--g.pack[i].n) g.pack.splice(i, 1); const h = k === 'medkit' ? 150 : k === 'meds' ? 60 : 35; e.hp = Math.min(e.maxHp, e.hp + h); syncHp(e); SFX.play('pick'); toast(`${e.m.name} +${h} HP`, 1.4); }, { dur: .9, verb: 'patching up' });
     }
     if (R.kind === 'base') for (const e of R.ents) {
       if (e.m) A(e, 'Talk', e.m.name, () => chat(e.m));
@@ -669,7 +669,7 @@
           <div class="cpast">${esc(m.name)} ${esc(m.past)}.${m.hungry ? ` <b class="bad">Hungry ${m.hungry} day${m.hungry > 1 ? 's' : ''}${m.hungry >= 2 ? ' - leaves tomorrow without food!' : ''}</b>` : ''}</div>
           ${m.mate ? '<span class="pactive">Comes along on runs</span> <button class="linkbtn" data-mate="">Leave at base</button>' : `<button class="mbtn sm ghost" data-mate="${m.id}">Take on runs</button>`}
           ${(() => { const hp = C.hpOf(m), mx = C.maxHp(m), w = m.wpn, a = m.arm; return `<div class="cbars"><span>HP ${hp}/${mx}</span><i class="cbar"><i style="width:${hp / mx * 100}%;background:${hp / mx > .5 ? '#7fd49a' : hp / mx > .25 ? '#e0b94a' : '#ff6b5a'}"></i></i></div>
-            ${hp < mx ? `<div class="cgear"><button class="mbtn sm ghost" data-heal="${m.id}" data-hk="bandage">Bandage +35</button><button class="mbtn sm ghost" data-heal="${m.id}" data-hk="meds">Painkillers +60</button></div>` : ''}
+            ${hp < mx ? `<div class="cgear"><button class="mbtn sm ghost" data-heal="${m.id}" data-hk="bandage">Bandage +35</button><button class="mbtn sm ghost" data-heal="${m.id}" data-hk="meds">Painkillers +60</button>${G().countItem('medkit') ? `<button class="mbtn sm ghost" data-heal="${m.id}" data-hk="medkit">Medkit +150</button>` : ''}</div>` : ''}
             <div class="cgear"><span>⚔ ${w ? `${esc(D.QUAL[D.qOf(w)].n)} ${esc(D.ITEMS[w.k].n.toLowerCase())}` : 'bare hands'}</span><button class="linkbtn" data-gw="${m.id}">${w ? 'swap' : 'give a weapon'}</button>${w ? `<button class="linkbtn" data-tw="${m.id}">take</button>` : ''}</div>
             <div class="cgear"><span>🛡 ${a ? esc(D.ITEMS[a.k].n.toLowerCase()) : 'no armor'}</span><button class="linkbtn" data-ga="${m.id}">${a ? 'swap' : 'give armor'}</button>${a ? `<button class="linkbtn" data-ta="${m.id}">take</button>` : ''}</div>`; })()}
           <button class="linkbtn" data-dis="${m.id}">Dismiss</button></div></div>`; }).join('')
@@ -698,7 +698,7 @@
       const m = crew().find(x => x.id === b.dataset.dis); if (m) { back(m.wpn); back(m.arm); } v.crew.list = v.crew.list.filter(x => x !== m); G().save(); toast(`${m.name} packs a bag and heads off. "Good luck."`, 2.2); C.openSheet();
     });
     // 0.37 (owner liked "companion on runs"): one crew member can follow her into houses and fight beside her
-    el.querySelectorAll('[data-heal]').forEach(b => b.onclick = () => { const m = crew().find(x => x.id === b.dataset.heal), k = b.dataset.hk; if (!m) return; if (G().countItem(k) < 1) { toast(`No ${D.ITEMS[k].n.toLowerCase()} in your pack or stash`, 1.8); return; } G().takeItems(k, 1); m.hp = Math.min(C.maxHp(m), C.hpOf(m) + (k === 'meds' ? 60 : 35)); if (m.hp > C.maxHp(m) * .25) m.hurt = 0; G().save(); SFX.play('pick'); toast(`${m.name}: HP ${m.hp}/${C.maxHp(m)}`, 1.6); C.openSheet(); });   // 0.51
+    el.querySelectorAll('[data-heal]').forEach(b => b.onclick = () => { const m = crew().find(x => x.id === b.dataset.heal), k = b.dataset.hk; if (!m) return; if (G().countItem(k) < 1) { toast(`No ${D.ITEMS[k].n.toLowerCase()} in your pack or stash`, 1.8); return; } G().takeItems(k, 1); m.hp = Math.min(C.maxHp(m), C.hpOf(m) + (k === 'medkit' ? 150 : k === 'meds' ? 60 : 35)); if (m.hp > C.maxHp(m) * .25) m.hurt = 0; G().save(); SFX.play('pick'); toast(`${m.name}: HP ${m.hp}/${C.maxHp(m)}`, 1.6); C.openSheet(); });   // 0.51
     // 0.51: give / take crew gear (out of / back into the stash)
     const s0 = () => SV().survivor, pickFrom = (test, onPick, title) => {
       const s = s0(), list = []; for (const [from, L] of [['pack', s.pack], ['stash', s.stash]]) L.forEach(e => { if (test(e)) list.push({ from, e }); });

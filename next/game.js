@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.72.3';
+const NEXT_VERSION = '0.72.4';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1515,7 +1515,7 @@ const NEXT_VERSION = '0.72.3';
       <div class="btnrow"><button class="mbtn sm ghost" id="fdClose">Close</button></div>`);
     $('#msheet').querySelectorAll('[data-fd]').forEach(btn => btn.onclick = () => {
       const r = rows[+btn.dataset.fd], e = r.e, it = D.ITEMS[e.k];
-      SFX.play('pick'); const msg = eatEntry(s, r.from, r.i);
+      const msg = eatEntry(s, r.from, r.i); if (msg && msg.no) { toast(msg.no, 1.8); return; } SFX.play('pick');
       toast(`${FD.verb(e.k)} ${it.n.toLowerCase()} · ${msg}`, 1.8); openFood(); renderHome();
     });
     $('#fdClose').onclick = () => { sheetClose(); renderHome(); };
@@ -1523,6 +1523,7 @@ const NEXT_VERSION = '0.72.3';
   Game.openFood = openFood;
   function eatEntry(s, from, i) { // one bite from the pack or stash: hunger/thirst, plus the smaller HP heal
     const e = s[from][i], it = D.ITEMS[e.k];
+    const no = FD.wasted(s, e.k, { hpLow: s.hp < maxHp(s) }); if (no) return { no };   // 0.72.4
     const fed = FD.eat(s, e.k);
     const hp = it.hp ? DM.Skills.heal(it.hp, s) : 0;   // 0.13: Field medic heals more
     if (hp) s.hp = Math.min(maxHp(s), s.hp + hp);
@@ -1894,8 +1895,13 @@ const NEXT_VERSION = '0.72.3';
   const catTag = k => { const c = D.cat(k); return `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
   Game.catTag = catTag;
   const pawnVal = r => Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n * .5));   // 0.26.3: quick sell, half price
-  const junkOf = s => s.stash.map((e, i) => ({ e, i })).filter(r => (D.cat(r.e.k) === 'sell' || (D.cat(r.e.k) === 'col' && DM.Collect && DM.Collect.has(r.e.k))) && D.VALUE[r.e.k] !== 0);   // 0.53: collectible doubles count as junk
+  const junkOf = s => [['pack', s.pack], ['stash', s.stash]].flatMap(([from, L]) => L.map((e, i) => ({ e, i, from }))).filter(r => (D.cat(r.e.k) === 'sell' || (D.cat(r.e.k) === 'col' && DM.Collect && DM.Collect.has(r.e.k))) && D.VALUE[r.e.k] !== 0);   // 0.53: collectible doubles count as junk   // 0.72.4: backpack too (owner: "I can't sell items to Dot that are in my backpack")
   function sortList(list) { D.mergeStacks(list); const o = k => D.CAT_ORDER.indexOf(D.cat(k)); list.sort((a, b) => o(a.k) - o(b.k) || D.ITEMS[a.k].n.localeCompare(D.ITEMS[b.k].n)); }
+  function junkBtn() {   // 0.72.4: the same sell-junk button on the Backpack and Stash tabs (it sells from both)
+    const s = SV.survivor, junk = junkOf(s); if (!junk.length) return '';
+    const jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n)), 0), away = dotLeft(), shut = !away && dotDone();
+    return `<button class="mbtn sm${away || shut ? ' ghost' : ''}" id="sJunk">${away || shut ? `Quick sell junk · half price · ${icon('caps')}${junk.reduce((a, r) => a + pawnVal(r), 0)}` : `Sell junk to Dot · ${icon('caps')}${jv}`}</button>`;
+  }
   function renderStash() {
     if (stashHost && !document.body.contains(stashHost)) stashHost = null;
     const s = SV.survivor, el = stashHost || $('#mpane');
@@ -1938,16 +1944,16 @@ const NEXT_VERSION = '0.72.3';
       body = `<div class="ghead"><span class="kick">Backpack · ${s.pack.length}/${packSlots()} slots</span>${s.pack.length > 1 ? '<button class="mini" id="sSortP">Sort</button>' : ''}</div>
       ${(() => { if (catF !== 'all' && !s.pack.some(e => grpOf(e.k) === catF)) catF = 'all'; return s.pack.length > 3 ? catBar(s.pack.map(e => e.k), catF, 'data-cf') : ''; })()}
       <div class="grid g4">${s.pack.map((e, i) => catF === 'all' || grpOf(e.k) === catF ? slot(e, 'pack', i) : '').join('')}${catF === 'all' ? empty(packSlots() - s.pack.length) : ''}</div>${A('pack')}
-      ${!s.pack.length ? '<div class="ghint">Empty. Whatever you loot goes here; anything that does not fit is left on the floor.</div>' : !sel ? `<div class="ptools"><button class="mbtn sm" id="sAll">Stash all</button></div><div class="ghint">Tap an item to eat, equip, use or move it.</div>` : ''}`;
+      ${!s.pack.length ? '<div class="ghint">Empty. Whatever you loot goes here; anything that does not fit is left on the floor.</div>' : !sel ? `<div class="ptools"><button class="mbtn sm" id="sAll">Stash all</button>${junkBtn()}</div><div class="ghint">Tap an item to eat, equip, use or move it.</div>` : ''}`;
     } else {
       const junk = junkOf(s), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n)), 0), away = dotLeft(), shut = !away && dotDone();
       body = `<div class="ghead"><span class="kick">${stashHost ? 'Stash chest' : 'Stash chest · at your base'} · ${s.stash.length}/${stashSlots()}</span>${s.stash.length > 1 ? '<button class="mini" id="sSortS">Sort</button>' : ''}</div>
       ${(() => { if (catF !== 'all' && !s.stash.some(e => grpOf(e.k) === catF)) catF = 'all'; return s.stash.length > 5 ? catBar(s.stash.map(e => e.k), catF, 'data-cf') : ''; })()}
       <div class="grid g5">${s.stash.map((e, i) => catF === 'all' || grpOf(e.k) === catF ? slot(e, 'stash', i) : '').join('')}${catF !== 'all' ? '' : empty(Math.min(s.stash.length ? (5 - s.stash.length % 5) % 5 + 5 : 10, stashSlots() - s.stash.length))}</div>${A('stash')}
       ${!s.stash.length ? '<div class="ghint">Nothing stored yet. Move things here from the Backpack tab so a bad run cannot cost you them.</div>' : ''}
-      ${junk.length && !sel ? `<div class="ptools"><button class="mbtn sm${away || shut ? ' ghost' : ''}" id="sJunk">${away || shut ? `Quick sell junk · half price · ${icon('caps')}${junk.reduce((a, r) => a + pawnVal(r), 0)}` : `Sell junk to Dot · ${icon('caps')}${jv}`}</button></div>` : ''}`;
+      ${junk.length && !sel ? `<div class="ptools">${junkBtn()}</div>` : ''}`;
     }
-    el.innerHTML = seg + body;
+    el.innerHTML = seg + (s.food ? `<div class="fdbars gneeds">${FD.barsHTML(s).replace('id="mNeeds"', '')}</div>` : '') + body;   // 0.72.4: hunger + thirst always in view on the gear screens
     el.querySelectorAll('[data-cf]').forEach(b => b.onclick = () => { if (catF === b.dataset.cf) return; catF = b.dataset.cf; sel = null; SFX.play('ui'); renderStash(); });
     el.querySelectorAll('#gtabs button').forEach(b => { b.classList.toggle('on', b.dataset.g === gTab); b.onclick = () => { if (gTab === b.dataset.g) return; gTab = b.dataset.g; sel = null; SFX.play('ui'); renderStash(); }; });
     if (el.querySelector('#eqWard')) el.querySelector('#eqWard').onclick = () => { SFX.play('ui'); sel = null; stashHost = null; if (DM.scene) { toast('The wardrobe is on the home screen', 1.6); return; } editLook('wardrobe'); };
@@ -2002,7 +2008,7 @@ const NEXT_VERSION = '0.72.3';
       <div class="btnrow"><button class="mbtn sm ghost" id="jNo">Keep them</button><button class="mbtn sm" id="jYes">Sell · ${tot} caps</button></div>`);
     $('#jNo').onclick = sheetClose;
     $('#jYes').onclick = () => {
-      for (const r of junk.slice().sort((a, b) => b.i - a.i)) s.stash.splice(r.i, 1);
+      for (const r of junk.slice().sort((a, b) => b.i - a.i)) s[r.from].splice(r.i, 1);
       SV.trader.caps += tot; if (!pawn) dotVisit(); SFX.play('pick'); Game.save(); sheetClose(); renderStash(); toast(`${pawn ? 'The scrap dealer' : 'Dot'} paid ${tot} caps`, 1.8);
     };
   }
@@ -2052,6 +2058,12 @@ const NEXT_VERSION = '0.72.3';
     let top = r.bottom + 8; if (top + h > vh - 8) top = r.top - h - 8; if (top < 8) top = Math.max(8, Math.min(vh - h - 8, r.bottom + 8));
     pop.style.left = left + 'px'; pop.style.top = top + 'px';
     const ax = Math.max(16, Math.min(w - 16, r.left + r.width / 2 - left)); pop.style.setProperty('--ax', ax + 'px'); pop.classList.toggle('up', top < r.top);
+  }
+  // 0.72.4 (owner: "if I click on a blueprint, it should tell me what level my crafting is currently")
+  function bpLine(it) {
+    if (!it.bp || !DM.Trades) return '';
+    const L = DM.Trades.lvl('craft'), r = D.RECIPES[it.bp] || {}, cl = r.cl || 0, known = (SV.survivor.known || []).includes(it.bp);
+    return `<small class="cline" style="--cc:${!cl || L >= cl ? '#7fd49a' : '#ff8a7a'}">🔨 Your Crafting level: <b>${L}</b>${cl ? ` · this needs ${cl}${L >= cl ? ' - you can learn it' : ` - ${cl - L} more to go`}` : ' · you can learn it'}${known ? ' · you already know it' : ''}</small>`;
   }
   function itemPop(host) {
     let pop = $('#ipop');
@@ -2153,7 +2165,7 @@ const NEXT_VERSION = '0.72.3';
         }, 'big']); }
       else if (DM.W2 && DM.W2.lineOf(e.k) && DM.W2.lineOf(e.k) !== s.job) { /* another class's weapon: no button */ }
     }
-    if (it.use && it.use !== 'Read' && (it.hp || it.sta || FD.isFood(e.k)) && !it.slots) btns.push([it.use, () => { if (FD.isFood(e.k)) { const m = eatEntry(s, sel.from, sel.i); done(`${FD.verb(e.k)} ${it.n.toLowerCase()} · ${m}`); return; } s.hp = Math.min(maxHp(s), s.hp + (it.hp || 0)); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(`${it.n}: +${it.hp || 0} HP`); }]);
+    if (it.use && it.use !== 'Read' && (it.hp || it.sta || FD.isFood(e.k)) && !it.slots) btns.push([it.use, () => { if (FD.isFood(e.k)) { const m = eatEntry(s, sel.from, sel.i); if (m && m.no) { toast(m.no, 1.8); return; } done(`${FD.verb(e.k)} ${it.n.toLowerCase()} · ${m}`); return; } s.hp = Math.min(maxHp(s), s.hp + (it.hp || 0)); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(`${it.n}: +${it.hp || 0} HP`); }]);
     if (it.cure && DM.Infect) btns.push([it.use, () => { if (!DM.Infect.is(s)) return toast('You are not infected - keep them for a bite', 1.8); const m = DM.Infect.cure(s); e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(m); renderHome(); }, 'big']);   // 0.18: antibiotics
     if (it.slots || it.bp || e.k === 'shoes' || e.k === 'lockset') btns.push([it.use, () => { const msg = Game.applyUse(e.k); if (!msg) return; e.n--; if (!e.n) s[sel.from].splice(sel.i, 1); done(msg); }]);
     if (e.k === 'note') btns.push(['Read', () => { const nd = e.d && typeof e.d === 'object' ? e.d : null; toast(nd && nd.text ? nd.text + '  (found at ' + nd.addr + ')' : 'The note is too faded to make sense of here.', nd ? 5 : 2); }]);
@@ -2168,8 +2180,12 @@ const NEXT_VERSION = '0.72.3';
     // 0.41: gift it to a friend (gifts.js; signed-in players)
     if ((sel.from === 'pack' || sel.from === 'stash') && !it.quest && !it.nogift && DM.Gifts && DM.Gifts.can()) { const list = s[sel.from]; btns.push(['🎁 Gift to a friend', () => { sel = null; itemPop(null); DM.Gifts.open(e, list, () => reHost()); }]); }
     // 0.24.5 (owner: "make a discard button so we don't have to drop it"): throw it away from the pack or the stash, tap twice
+    if ((sel.from === 'pack' || sel.from === 'stash') && !it.quest && D.VALUE[e.k] !== 0 && !it.cos) {   // 0.72.4: sell one stack from the pack or the stash
+      const pawn = !!(dotLeft() || dotDone()), full = Math.max(1, Math.floor(D.valueOf(e.k, e.d, e.q) * e.n)), pay = pawn ? Math.max(1, Math.floor(full * .5)) : full; let sure = false;
+      btns.push([`${pawn ? 'Quick sell (half price)' : 'Sell to Dot'}${e.n > 1 ? ' all ' + e.n : ''} · ${pay} caps`, function () { if (!sure) { sure = true; this.textContent = `Tap again to sell for ${pay} caps`; return; } const list = s[sel.from], i = list.indexOf(e); if (i < 0) return; list.splice(i, 1); SV.trader.caps += pay; SFX.play('pick'); Game.save(); done(`${pawn ? 'The scrap dealer' : 'Dot'} paid ${pay} caps`); }]);
+    }
     if ((sel.from === 'pack' || sel.from === 'stash') && !it.quest) { let sure = false; btns.push([e.n > 1 ? `Discard all ${e.n}` : 'Discard', function () { if (!sure) { sure = true; this.textContent = 'Tap again to throw away'; this.classList.add('warn'); return; } const from = sel.from; s[from].splice(sel.i, 1); done(`Threw away ${it.n.toLowerCase()}${e.n > 1 ? ' x' + e.n : ''}`); }, 'discard']); }
-    acts.innerHTML = `<div class="sact"><span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}${it.tag ? ` <em>${it.tag}</em>` : ''}${it.w ? ` <i class="wst">${D.QUAL[D.qOf(e)].n} · ${wDmg(e)} dmg · ${Math.round(Math.min(1, (e.d != null ? e.d : D.wMax(e)) / D.wMax(e)) * 100)}% of ${D.wMax(e)}${sel.from === 'hands' ? ' · in your hand' : ''}</i>` : ''}<small class="cline" style="--cc:${D.CATS[D.cat(e.k)].c}">${esc(D.catLine(e.k, e.d))}</small></span></div>`;
+    acts.innerHTML = `<div class="sact"><span><b>${it.n}</b>${e.n > 1 ? ' x' + e.n : ''}${it.tag ? ` <em>${it.tag}</em>` : ''}${it.w ? ` <i class="wst">${D.QUAL[D.qOf(e)].n} · ${wDmg(e)} dmg · ${Math.round(Math.min(1, (e.d != null ? e.d : D.wMax(e)) / D.wMax(e)) * 100)}% of ${D.wMax(e)}${sel.from === 'hands' ? ' · in your hand' : ''}</i>` : ''}<small class="cline" style="--cc:${D.CATS[D.cat(e.k)].c}">${esc(D.catLine(e.k, e.d))}</small>${bpLine(it)}</span></div>`;
     const row = acts.firstChild;
     btns.forEach(([t, fn, big], i) => { const b = document.createElement('button'); b.className = big === 'discard' ? 'mbtn sm ghost discard' : big ? 'mbtn eqbig' : 'mbtn sm' + (i ? ' ghost' : ''); b.textContent = t; b.onclick = () => { SFX.play('pick'); fn.call(b); }; row.appendChild(b); });
   }
