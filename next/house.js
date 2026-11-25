@@ -2441,8 +2441,15 @@
       ${skillLine()}
       <div class="btnrow"><button id="cBack" class="ghost">Go back in</button><button id="cNew">Head home</button></div>`;
     $('#card').classList.add('on');
-    $('#cBack').onclick = () => { hideCards(); G.over = false; G.paused = false; G.p.y = (L.streetY + .4) * T; G.p.vy = 0; };
-    $('#cNew').onclick = () => finishRun('left');
+    // 0.72.5 (owner: "if I'm getting chased by zombies, it automatically prompts me to either stay or leave, and sometimes
+    // I'll fat finger to leave"): the buttons wake up 1 s after the card opens, and only for a tap that STARTS after that
+    // (a finger still moving from the joystick never counts).
+    const armAt = performance.now() + 1000, cb = $('#cBack'), cn = $('#cNew');
+    for (const b of [cb, cn]) { b.classList.add('wait'); b.dataset.down = '0'; b.onpointerdown = () => { b.dataset.down = performance.now() >= armAt ? '1' : '0'; }; }
+    setTimeout(() => { for (const b of [cb, cn]) b.classList.remove('wait'); }, 1000);
+    const ok = (b, e) => performance.now() >= armAt && (!e.detail || b.dataset.down === '1');   // e.detail 0 = keyboard
+    cb.onclick = e => { if (!ok(cb, e)) return; hideCards(); G.over = false; G.paused = false; G.p.y = (L.streetY + .4) * T; G.p.vy = 0; };
+    cn.onclick = e => { if (!ok(cn, e)) return; finishRun('left'); };
   }
   function showDeath() {
     G.over = true;
