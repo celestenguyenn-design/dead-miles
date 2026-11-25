@@ -6,7 +6,12 @@
    - A full set pays 120 caps + a capsule token; all six pay 400 caps + 3 tokens more.
    - The gold piece of each set is the rare one.
    Loot: 'col_*' in a D.LOOT table becomes a piece from a set that fits that furniture (D.rollLoot is wrapped).
-   Save: SV.col = { got: { k: time }, done: { set: time }, all: time, fresh: [k] }. */
+   - 0.72.6 (owner: "the cards ... if we get another one, it stars up ... make that possible for the shiny crawler, for the
+     collectibles as well, because I get a lot of them"): doubles file themselves too and STAR UP the piece, ★1 -> ★5 at
+     1 / 3 / 6 / 11 / 19 copies (same as field cards). Each copy filed pays what Dot would have paid for it + 5 XP, so
+     nothing is lost by not selling. A whole set at ★3: +1 capsule token; at ★5: +150 caps + 2 tokens. Copies past ★5
+     stay in the bag as items (sell them or gift them).
+   Save: SV.col = { got: { k: time }, done: { set: time }, all: time, fresh: [k], n: { k: copies }, sd: { set: best star bonus paid } }. */
 'use strict';
 window.DM = window.DM || {};
 (() => {
@@ -81,7 +86,11 @@ window.DM = window.DM || {};
   for (const s in SETS) for (const t in SETS[s].src) if (D.LOOT[t]) { const w = D.LOOT[t][1]; w['col_*'] = +((w['col_*'] || 0) + SETS[s].src[t]).toFixed(3); }
   for (const t of ['deep2', 'cache', 'safe', 'evidence']) if (D.LOOT[t]) D.LOOT[t][1]['col_*'] = (D.LOOT[t][1]['col_*'] || 0) + .3;
 
-  function st() { const v = SV(); if (!v) return null; v.col = v.col || {}; const c = v.col; c.got = c.got || {}; c.done = c.done || {}; c.fresh = c.fresh || []; return c; }
+  function st() { const v = SV(); if (!v) return null; v.col = v.col || {}; const c = v.col; c.got = c.got || {}; c.done = c.done || {}; c.fresh = c.fresh || []; c.n = c.n || {}; c.sd = c.sd || {}; for (const k in c.got) if (!c.n[k]) c.n[k] = 1; return c; }
+  const STAR_AT = [1, 3, 6, 11, 19], MAXN = STAR_AT[STAR_AT.length - 1];
+  const starOf = n => STAR_AT.filter(x => n >= x).length;
+  C.stars = k => { const c = st(); return c ? starOf(c.n[k] || 0) : 0; };
+  const starsTxt = n => '★'.repeat(n) + '☆'.repeat(5 - n);
   C.st = st;
   C.has = k => { const c = st(); return !!(c && c.got[k]); };
   function pickIn(set, rnd) {
@@ -107,14 +116,31 @@ window.DM = window.DM || {};
   // ---------------------------------------------------------------- filing (home screen)
   C.file = function () {
     const v = SV(), c = st(); if (!v || !c || !v.survivor || DM.scene) return;
-    const s = v.survivor, filed = [];
+    const s = v.survivor, filed = [], ups = [];
+    let caps = 0, xp = 0;
     for (const list of [s.pack, s.stash]) for (let j = list.length - 1; j >= 0; j--) {
-      const e = list[j], it = D.ITEMS[e.k]; if (!it || !it.col || c.got[e.k]) continue;
-      c.got[e.k] = Date.now(); c.fresh.push(e.k); filed.push(e.k); e.n--; if (e.n <= 0) list.splice(j, 1);
+      const e = list[j], it = D.ITEMS[e.k]; if (!it || !it.col) continue;
+      if (!c.got[e.k]) { c.got[e.k] = Date.now(); c.n[e.k] = 1; c.fresh.push(e.k); filed.push(e.k); e.n--; }
+      // 0.72.6: doubles star the piece up (until ★5) instead of sitting in the bag
+      while (e.n > 0 && (c.n[e.k] || 0) < MAXN) {
+        const s0 = starOf(c.n[e.k]); c.n[e.k]++; e.n--; caps += D.VALUE[e.k] || 1; xp += 5;
+        const s1 = starOf(c.n[e.k]); if (s1 > s0) ups.push([e.k, s1]);
+      }
+      if (e.n <= 0) list.splice(j, 1);
     }
-    if (!filed.length) return;
+    if (!filed.length && !caps) return;
+    if (caps) { v.trader.caps += caps; if (DM.Skills && DM.Skills.addXP) DM.Skills.addXP(xp); }
     const msgs = [];
     for (const k of filed) { const it = D.ITEMS[k]; msgs.push(`📔 New for your collection: ${it.n} (${it.setN} ${have(it.col)}/5)`); }
+    const best = {}; for (const [k, n] of ups) best[k] = Math.max(best[k] || 0, n);
+    for (const k in best) msgs.push(`⭐ ${D.ITEMS[k].n} is now ★${best[k]}!`);
+    if (caps && !Object.keys(best).length) msgs.push(`📔 Doubles filed into your collection: +${caps} caps`);
+    else if (caps) msgs.push(`+${caps} caps for the doubles`);
+    for (const set in SETS) {   // set star bonuses: every piece at ★3, then every piece at ★5
+      const low = Math.min(...SETS[set].p.map((_, i) => starOf(c.n[keyOf(set, i)] || 0)));
+      if (low >= 3 && (c.sd[set] || 0) < 3) { c.sd[set] = 3; if (DM.Gacha) DM.Gacha.state().tok += 1; msgs.push(`🌟 ${SETS[set].n}: every piece ★3! +1 capsule token`); }
+      if (low >= 5 && (c.sd[set] || 0) < 5) { c.sd[set] = 5; v.trader.caps += 150; if (DM.Gacha) DM.Gacha.state().tok += 2; msgs.push(`👑 ${SETS[set].n}: every piece ★5! +150 caps, +2 capsule tokens`); }
+    }
     for (const set in SETS) if (!c.done[set] && have(set) === 5) {
       c.done[set] = Date.now(); v.trader.caps += SET_CAPS; if (DM.Gacha) DM.Gacha.state().tok += 1; if (DM.Skills && DM.Skills.addXP) DM.Skills.addXP(60);
       DM.Journal && DM.Journal.note(`Finished the ${SETS[set].n} collection.`);
@@ -136,12 +162,12 @@ window.DM = window.DM || {};
   C.html = function () {
     const c = st(), img = k => (typeof ART !== 'undefined' && ART.iconURL[k]) ? `<img alt="" src="${ART.iconURL[k]}">` : '';
     return `<div class="kick">Collections · ${C.count()}/${C.total()}</div><h3>Your collections</h3>
-      <p class="mp dim">Things worth keeping turn up while you loot and walk. A new one files itself when you get home - no bag space. Doubles: sell them to Dot or gift them to a friend. A full set: ${SET_CAPS} caps + a capsule token. All six: ${ALL_CAPS} caps + 3 tokens.</p>
+      <p class="mp dim">Things worth keeping turn up while you loot and walk. A new one files itself when you get home - no bag space. Doubles file themselves too and star the piece up (★1 to ★5 at 1 / 3 / 6 / 11 / 19 copies), paying what Dot would. A whole set at ★3: a capsule token; at ★5: 150 caps + 2 tokens. Copies past ★5 stay in your bag to sell or gift. A full set: ${SET_CAPS} caps + a capsule token. All six: ${ALL_CAPS} caps + 3 tokens.</p>
       <div class="cllist">${Object.keys(SETS).map(set => {
         const S0 = SETS[set], n = have(set), done = !!c.done[set];
         return `<div class="clset${done ? ' done' : ''}"><div class="clhead"><b>${S0.g} ${esc(S0.n)}</b><em>${done ? 'Complete ✓' : n + '/5'}</em></div>
           <div class="clrow">${S0.p.map((p, i) => { const k = keyOf(set, i), got = !!c.got[k], nw = c.fresh.includes(k);
-            return `<div class="clp${got ? ' got' : ''}${nw ? ' nw' : ''}${i === 4 ? ' gold' : ''}">${got ? img(k) : '<span>?</span>'}<small>${got ? esc(p[0]) : i === 4 ? 'Rare' : '???'}</small></div>`; }).join('')}</div>
+            return `<div class="clp${got ? ' got' : ''}${nw ? ' nw' : ''}${i === 4 ? ' gold' : ''}">${got ? img(k) : '<span>?</span>'}<small>${got ? esc(p[0]) : i === 4 ? 'Rare' : '???'}</small>${got ? `<i class="clst" title="${c.n[k] || 1} cop${(c.n[k] || 1) === 1 ? 'y' : 'ies'}">${starsTxt(starOf(c.n[k] || 1))}</i>` : ''}</div>`; }).join('')}</div>
           <p class="clwhere">${S0.walk ? '🚶 ' : '🔎 '}${esc(S0.where)}</p></div>`;
       }).join('')}</div>`;
   };
@@ -156,6 +182,7 @@ window.DM = window.DM || {};
     .clp img { width: 42px; height: 42px; } .clp > span { height: 42px; line-height: 42px; font-size: 22px; font-weight: 900; color: #3d2d61; }
     .clp small { font-size: 9px; font-weight: 800; line-height: 1.15; text-align: center; color: var(--mute, #9d90bf); } .clp.got small { color: var(--crm, #f6e3bb); }
     .clp.nw::after { content: 'NEW'; position: absolute; top: -6px; right: -4px; padding: 1px 4px; border-radius: 5px; background: #d9483a; color: #fff; font: 900 8px Inter, system-ui, sans-serif; }
+    .clst { font-style: normal; font-size: 8.5px; letter-spacing: -.5px; color: #e0b94a; line-height: 1; }
     .clwhere { margin: 2px 0 0; font-size: 11px; font-weight: 700; color: var(--mute, #9d90bf); }`;
   document.head.appendChild(css);
 })();

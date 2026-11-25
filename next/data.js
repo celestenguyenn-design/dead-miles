@@ -225,7 +225,7 @@ window.DM = window.DM || {};
     if (c === 'sell') return 'Sell to Dot · ' + Math.max(1, Math.floor(D.valueOf(k, d))) + ' caps';
     if (k === 'ammo') return 'Ammo · no gun for it yet, Dot buys it';
     if (k === 'arrow') return 'Ammo · for the bow (fill the quiver)';
-    if (c === 'col') { const it = D.ITEMS[k], X = DM.Collect && DM.Collect.has(k); return `Collectible · ${it.setN}${X ? ' · you have it - sell or gift' : ' · new! files itself at home'}`; }
+    if (c === 'col') { const it = D.ITEMS[k], X = DM.Collect && DM.Collect.has(k); return `Collectible · ${it.setN}${X ? (DM.Collect.stars && DM.Collect.stars(k) < 5 ? ' · a double - stars it up at home' : ' · ★5 already - sell or gift') : ' · new! files itself at home'}`; }
     if (D.ITEMS[k] && D.ITEMS[k].charm) return 'Walking charm · ' + D.ITEMS[k].tag;
     if (D.ITEMS[k] && D.ITEMS[k].mod) return 'Weapon mod · ' + D.ITEMS[k].tag.replace(/^(melee|ranged) mod: /, '$1: ') + ' · tap it, then Fit';   // 0.57 (owner: mods should say what they do)
     if (c === 'tool') return C.n + (k === 'lockpick' ? ' · picks locks, and a material' : ' · opens attic hatches');

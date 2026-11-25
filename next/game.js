@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.72.5';
+const NEXT_VERSION = '0.72.6';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1026,7 +1026,7 @@ const NEXT_VERSION = '0.72.5';
     for (const [from, list] of [['pack', s.pack], ['stash', s.stash]]) list.forEach((e, i) => { const v = D.valueOf(e.k, e.d, e.q); if (D.VALUE[e.k] === 0 || D.ITEMS[e.k].quest) return; rows.push({ from, i, e, v }); });
     // 0.29.3 (owner: "in dots shop we should have an option to auto sell junk with a button"): everything marked Sell
     // (no crafting / base use) from the pack and the stash, in one go - tap twice
-    const junk = rows.filter(r => D.cat(r.e.k) === 'sell' || (D.cat(r.e.k) === 'col' && DM.Collect && DM.Collect.has(r.e.k))), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(r.v * r.e.n)), 0);
+    const junk = rows.filter(r => D.cat(r.e.k) === 'sell' || (D.cat(r.e.k) === 'col' && DM.Collect && DM.Collect.has(r.e.k) && !(DM.Collect.stars && DM.Collect.stars(r.e.k) < 5))), jv = junk.reduce((a, r) => a + Math.max(1, Math.floor(r.v * r.e.n)), 0);
     const ex = extras(s), sw = spareWeapons(s), keys = +s.keys || 0;
     el.innerHTML = `<div class="kick sect">Sell to Dot · she pays low</div>`
       + (keys ? `<div class="shoprow">${icon('key')}<div><b>Brass keys x${keys}</b><span>keyring · Dot collects them</span></div><div style="display:flex;flex-direction:column;gap:4px"><button class="mbtn sm" id="tKey1">Sell 1 · ${icon('caps')}15</button>${keys >= 10 ? `<button class="mbtn sm ghost" id="tKey3">10 for a blueprint</button>` : ''}</div></div>` : '')
@@ -1895,7 +1895,7 @@ const NEXT_VERSION = '0.72.5';
   const catTag = k => { const c = D.cat(k); return `<small class="ctag" style="--cc:${D.CATS[c].c}">${D.CATS[c].n}</small>`; };
   Game.catTag = catTag;
   const pawnVal = r => Math.max(1, Math.floor(D.valueOf(r.e.k, r.e.d) * r.e.n * .5));   // 0.26.3: quick sell, half price
-  const junkOf = s => [['pack', s.pack], ['stash', s.stash]].flatMap(([from, L]) => L.map((e, i) => ({ e, i, from }))).filter(r => (D.cat(r.e.k) === 'sell' || (D.cat(r.e.k) === 'col' && DM.Collect && DM.Collect.has(r.e.k))) && D.VALUE[r.e.k] !== 0);   // 0.53: collectible doubles count as junk   // 0.72.4: backpack too (owner: "I can't sell items to Dot that are in my backpack")
+  const junkOf = s => [['pack', s.pack], ['stash', s.stash]].flatMap(([from, L]) => L.map((e, i) => ({ e, i, from }))).filter(r => (D.cat(r.e.k) === 'sell' || (D.cat(r.e.k) === 'col' && DM.Collect && DM.Collect.has(r.e.k) && !(DM.Collect.stars && DM.Collect.stars(r.e.k) < 5))) && D.VALUE[r.e.k] !== 0);   // 0.53: collectible doubles count as junk   // 0.72.4: backpack too (owner: "I can't sell items to Dot that are in my backpack")
   function sortList(list) { D.mergeStacks(list); const o = k => D.CAT_ORDER.indexOf(D.cat(k)); list.sort((a, b) => o(a.k) - o(b.k) || D.ITEMS[a.k].n.localeCompare(D.ITEMS[b.k].n)); }
   function junkBtn() {   // 0.72.4: the same sell-junk button on the Backpack and Stash tabs (it sells from both)
     const s = SV.survivor, junk = junkOf(s); if (!junk.length) return '';
