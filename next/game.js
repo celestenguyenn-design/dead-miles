@@ -16,7 +16,7 @@ var IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform
 })();
 /* Bump with every release: also next/version.txt and the ?v= on the scripts in next/index.html. Phones that see a
    newer version.txt save and reload once, so friends do not wait out the GitHub Pages cache. */
-const NEXT_VERSION = '0.72.8';
+const NEXT_VERSION = '0.73.0';
 /* Dead Miles (next) - meta game: save, character creation, steps -> scouted houses, home screen, pack/stash.
    Steps arrive through ONE function: DM.addSteps(n, src) with src 'phone' | 'typed' | 'walk'.
    DM.onlineState is reserved for the account panel (net.js, written separately). */
@@ -1717,6 +1717,7 @@ const NEXT_VERSION = '0.72.8';
     if (window.NET && NET.ok && NET.name && SV.survivor.name === 'Survivor') publish();   // 0.42.1: pick up the account name
     if (DM.Journal) { const jt = DM.Journal.tile(); if (jt) t.push(jt); }   // 0.50
     if (DM.Journey && SV.tutorialDone) { const jt = DM.Journey.tile(); if (jt) t.unshift(jt); }   // 0.73: the road east
+    if (DM.Friends && SV.tutorialDone) { const ft = DM.Friends.tile(); if (ft) t.push(ft); }   // 0.73: friends feed + party mission
     if (DM.Tips && SV.tutorialDone) { const tp = DM.Tips.tile(); if (tp) t.unshift(tp); }   // 0.73: one feature a day you have not tried
     if (DM.Collect && SV.tutorialDone) { const ct = DM.Collect.tile(); if (ct) t.push(ct); }   // 0.53
     if (DM.Cards && SV.tutorialDone) { const ft = DM.Cards.tile(); if (ft) t.push(ft); }   // 0.68 field cards
@@ -1736,7 +1737,7 @@ const NEXT_VERSION = '0.72.8';
   let cardSheet = null;   // which feature sheet is open ('boss' | 'deep' | 'crew' | 'horde'), so renderHome can refresh it
   function openCardSheet(k) {
     cardSheet = k;
-    const html = DM.Journey && DM.Journey.has(k) ? `<div class="jywrap">${DM.Journey.html()}</div>` : DM.Tips && DM.Tips.has(k) ? `<div class="tpwrap">${DM.Tips.html()}</div>` : DM.Cards && DM.Cards.has(k) ? `<div class="fcwrap">${DM.Cards.html()}</div>` : DM.City && DM.City.has(k) ? `<div class="cywrap">${DM.City.html(k)}</div>` : DM.Life && DM.Life.has(k) ? `<div class="lfwrap">${DM.Life.html(k)}</div>` : k === 'collect' ? `<div class="clwrap">${DM.Collect.html()}</div>` : k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
+    const html = DM.Friends && DM.Friends.has(k) ? `<div class="frwrap">${DM.Friends.html()}</div>` : DM.Journey && DM.Journey.has(k) ? `<div class="jywrap">${DM.Journey.html()}</div>` : DM.Tips && DM.Tips.has(k) ? `<div class="tpwrap">${DM.Tips.html()}</div>` : DM.Cards && DM.Cards.has(k) ? `<div class="fcwrap">${DM.Cards.html()}</div>` : DM.City && DM.City.has(k) ? `<div class="cywrap">${DM.City.html(k)}</div>` : DM.Life && DM.Life.has(k) ? `<div class="lfwrap">${DM.Life.html(k)}</div>` : k === 'collect' ? `<div class="clwrap">${DM.Collect.html()}</div>` : k === 'bounty' ? `<div class="btwrap">${DM.WalkFX.bountyHTML()}</div>` : k === 'caches' ? `<div class="wcwrap">${DM.WalkFX.cachesHTML()}</div>` : k === 'camps' ? `<div class="cpwrap">${DM.Camps.html()}</div>` : k === 'social' ? `<div class="sowrap">${DM.Social.html()}</div>` : k === 'codex' ? `<div class="cxwrap">${DM.Codex.html()}</div>` : k === 'raid' ? BS.raidHTML() : k === 'advent' ? `<div class="advwrap">${DM.Advent.html()}</div>` : k === 'boss' ? DM.Boss.cardHTML() : k === 'deep' ? DM.Deep.cardHTML() : k === 'crew' ? DM.Crew.cardHTML() : hordeCardHTML();
     sheetOpen(`<div class="cardsheet" data-cs="${k}">${html}</div><button class="mbtn ghost" id="csDone">Close</button>`);
     const el = $('#msheet'), root = el.querySelector('.cardsheet');
     el.onclick = e => { if (e.target === el) closeCardSheet(); };
@@ -1747,6 +1748,7 @@ const NEXT_VERSION = '0.72.8';
     else if (k === 'caches') DM.WalkFX.bindCaches(root);
     else if (k === 'camps') { const w = root.querySelector('.cpwrap'), re = () => { w.innerHTML = DM.Camps.html(); DM.Camps.bind(w, re); }; DM.Camps.bind(w, re); }
     else if (k === 'social') { publish(); const w = root.querySelector('.sowrap'), re = () => { w.innerHTML = DM.Social.html(); DM.Social.bind(w, re); }; DM.Social.bind(w, re); }
+    else if (DM.Friends && DM.Friends.has(k)) { const w = root.querySelector('.frwrap'), re = () => { w.innerHTML = DM.Friends.html(); DM.Friends.bind(w, re); }; DM.Friends.bind(w, re); }   // 0.73
     else if (DM.Journey && DM.Journey.has(k)) { const w = root.querySelector('.jywrap'), re = () => { w.innerHTML = DM.Journey.html(); DM.Journey.bind(w, re); renderHome(); }; DM.Journey.bind(w, re); }   // 0.73
     else if (DM.Tips && DM.Tips.has(k)) DM.Tips.bind(root, closeCardSheet, openCardSheet);   // 0.73
     else if (k === 'codex') DM.Codex.bind(root.querySelector('.cxwrap'));
@@ -2425,7 +2427,7 @@ const NEXT_VERSION = '0.72.8';
     // 0.42.1 (owner: "some of my friends still have their name as Survivor"): a character still on the default name takes
     // the account's name (what they typed when they signed up), so friends see who they are
     if ((!s.name || s.name === 'Survivor') && NET.name && NET.name !== 'Survivor') { s.name = String(NET.name).slice(0, 24); Game.save(); }
-    try { NET.publish({ name: s.name, level: D.survLvl(s.xp), job: s.job, scav: Math.round(s.xp), looted: SV.stats.runs, kills: SV.stats.kills, extra: { look: s.look, trader: traderLevel(), quests: SV.trader.completed, secrets: SV.stats.secrets, cosmetics: Object.keys(s.wardrobe.own).length, wk: DM.Social ? DM.Social.myWeek() : undefined } }); } catch (e) { /* offline */ }
+    try { NET.publish({ name: s.name, level: D.survLvl(s.xp), job: s.job, scav: Math.round(s.xp), looted: SV.stats.runs, kills: SV.stats.kills, extra: { look: s.look, trader: traderLevel(), quests: SV.trader.completed, secrets: SV.stats.secrets, cosmetics: Object.keys(s.wardrobe.own).length, wk: DM.Social ? DM.Social.myWeek() : undefined, wkx: DM.Friends ? DM.Friends.wkx() : undefined } }); } catch (e) { /* offline */ }
   }
   Game.onLevel = () => publish();
   // a newer release on the site: save, then reload once (no loop: one try per version per tab session)

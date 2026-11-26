@@ -197,6 +197,27 @@ async function sendNext(TEST) {
   console.log(`next: ${rows.length} subscription(s), ${sent} sent, ${dead} dead removed.`);
 }
 
+// 0.73 friend alerts (next/alerts.sql): things other players did to you ("Isa took The Mill!"), pushed once each to
+// every phone of that player that has notifications on. Marked pushed even if a phone was gone, so nothing repeats.
+async function sendAlerts() {
+  let rows;
+  try { rows = await rpc('next_alerts_due', { p_secret: SECRET }); }
+  catch (e) { console.log('alerts: not set up yet. ' + e.message.slice(0, 120)); return; }
+  if (!rows || !rows.length) { console.log('alerts: nothing new.'); return; }
+  const ids = new Set(); let sent = 0;
+  for (const row of rows) {
+    ids.add(row.id);
+    const sub = { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } };
+    try { await webpush.sendNotification(sub, JSON.stringify({ title: String(row.title).slice(0, 80), body: String(row.body || '').slice(0, 240), tag: 'alert-' + row.id }), { TTL: 6 * 3600 }); sent++; }
+    catch (e) {
+      if (e.statusCode === 404 || e.statusCode === 410) await rpc('next_push_gone', { p_secret: SECRET, p_endpoint: row.endpoint });
+      else console.log(`alerts: failed ${row.id}: ${e.statusCode || ''} ${e.message}`);
+    }
+  }
+  await rpc('next_alerts_pushed', { p_secret: SECRET, p_ids: [...ids] });
+  console.log(`alerts: ${ids.size} alert(s), ${sent} push(es) sent.`);
+}
+
 (async () => {
   await keepWarm();
   if (MISSING.length) {
@@ -214,6 +235,7 @@ async function sendNext(TEST) {
   }
   const TEST = process.env.TEST_PUSH === 'true' || process.env.TEST_PUSH === '1';
   await sendNext(TEST);   // the new game (/next/) first; it never stops the old game's run below
+  if (!TEST) { try { await sendAlerts(); } catch (e) { console.log('alerts: ' + e.message); } }
   const rows = await rpc('push_targets', { p_secret: SECRET });
   if (!rows || !rows.length) { console.log('No subscribers.'); return; }
   console.log(`${rows.length} subscription(s).`);
