@@ -352,6 +352,8 @@ window.DM = window.DM || {};
   };
   function santaHat(c, x, y, s) { c.save(); c.translate(x, y); c.scale(s, s); poly(c, [-12, 0, 12, 0, 4, -20, 16, -16], '#d9483a', 2); ell(c, 0, 1, 14, 4, '#f4efe6', 2); ell(c, 17, -16, 4, 4, '#f4efe6', 1.6); c.restore(); }
   function pilgrimHat(c, x, y, s) { c.save(); c.translate(x, y); c.scale(s, s); ell(c, 0, 0, 18, 4, '#2a2838', 2); poly(c, [-10, 0, 10, 0, 8, -18, -8, -18], '#2a2838', 2); line(c, -9, -4, 9, -4, '#c9a94a', 3); blk(c, -3, -7, 6, 6, '#e0c46a', 1, 1.4); c.restore(); }
+  // a SpriteCook picture, waiting up to ~3 s for it the first time (the pictures load on demand, not at start)
+  async function artImg(k) { let im = ART.img(k); for (let i = 0; !im && i < 10; i++) { await new Promise(r => setTimeout(r, 300)); im = ART.img(k); } return im; }
   async function paintArt(cv, card) {
     const x = cv.getContext('2d'), W = cv.width, H = cv.height, sc = W / 120; x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, W, H);
     const Sx = SETS[card.set], g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, Sx.bg[0]); g.addColorStop(1, Sx.bg[1]); x.fillStyle = g; x.fillRect(0, 0, W, H);
@@ -361,8 +363,18 @@ window.DM = window.DM || {};
     x.fillStyle = 'rgba(8,6,22,.35)'; x.beginPath(); x.ellipse(W / 2, H * .9, W * .3, H * .06, 0, 0, 6.28); x.fill();
     const a = card.a;
     // 0.72: SpriteCook pictures for the cards that have one (Dot, the Walker, Lena, every pet colour)
-    const IMG = { dot: 'dot', walker: 'zombie', lena: 'lena' }, nm = IMG[card.id] || (a.pet ? a.pet[0] + (a.pet[1] % 4) : null);
-    if (nm && ART.img) { let im = ART.img(nm); if (!im) { await new Promise(r => setTimeout(r, 600)); im = ART.img(nm); }
+    // 0.73.1: and every other character card - the dead, the survivors, the pilgrim, Krampus and the zombie turkey
+    const IMG = { dot: 'dot', walker: 'zombie', lena: 'lena', shambler: 'shambler', runner: 'runner', sprinter: 'sprinter', bloater: 'bloater',
+      screamer: 'screamer', armored: 'armored', captain: 'captain', zero: 'zero', courier: 'courier', nurse: 'ama', coach: 'coach', sal: 'sal',
+      ray: 'ray', jo: 'jo', fitz: 'fitz', mo: 'mo', pilgrim: 'pilgrim', krampus: 'krampus', zturkey: 'zturkey' };
+    const nm = IMG[card.id] || (a.pet ? a.pet[0] + (a.pet[1] % 4) : null);
+    // the horde cards: three of the pictures in a crowd (walker, runner, shambler)
+    if (a.horde && ART.img) { const ims = []; for (const k of ['zombie', 'runner', 'shambler']) ims.push(await artImg(k));
+      if (ims.every(Boolean)) { const hh = H * .62;
+        for (const [i, dx, dy, k] of [[0, -.26, -.06, .9], [1, .26, -.05, .9], [2, 0, 0, 1.06]]) { const im = ims[i], h = hh * k, w = im.width * h / im.height; x.drawImage(im, W / 2 + dx * W - w / 2, H * .97 + dy * H - h, w, h); }
+        if (a.sale) { x.save(); x.translate(W * .78, H * .2); x.rotate(.2); x.scale(sc, sc); blk(x, -20, -10, 40, 20, '#d9483a', 3, 2.4); x.fillStyle = '#fff6c8'; x.font = '900 11px Inter, system-ui, sans-serif'; x.textAlign = 'center'; x.fillText('SALE', 0, 4); x.restore(); }
+        return; } }
+    if (nm && ART.img) { const im = await artImg(nm);
       if (im) { const k = Math.min(W * .9 / im.width, H * .92 / im.height), w = im.width * k, h = im.height * k; x.drawImage(im, (W - w) / 2, H - h - H * .03, w, h); return; } }
     try {
       if (a.z) { const n = await zRig(a.z); const s = (a.big ? 1.08 : 1) * H / 150; if (a.glow) { const gl = x.createRadialGradient(W / 2, H * .55, 2, W / 2, H * .55, W * .45); gl.addColorStop(0, a.glow + 'aa'); gl.addColorStop(1, a.glow + '00'); x.fillStyle = gl; x.fillRect(0, 0, W, H); }

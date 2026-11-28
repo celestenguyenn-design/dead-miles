@@ -1454,3 +1454,9 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   Licence of the SpriteCook art not yet confirmed by the owner (free plan); all 40 credits spent.
 - 0.72.1 (owner: "the sounds are gone the music"): audio resumes from any not-running AudioContext state (iOS 'interrupted' after calls / CarPlay / Bluetooth), on every tap and on pageshow - before, only 'suspended' was handled, so an interrupted context stayed silent until the app was killed.
 - 0.72.2 (owner: friends "should show their characters look instead of D for David or B for Bel"): netpanel.js friends board draws each friend's published look (board row pub.look, from game.js publish extra.look) as a head-and-shoulders portrait (one rig per friend, cached by look); the SpriteCook girl for the pink look; the letter only for a friend whose game has not published a look yet.
+- 0.73.1 (owner: "use my sprite credits now to update the rest"): 19 more SpriteCook pictures in next/img (gpt-image-2.5-flare,
+  transparent, the 0.72 cast lineup as style reference, 304 credits): shambler, runner, sprinter, bloater, screamer, armored,
+  captain, zero, krampus, zturkey, courier, ama (Nurse Ama), coach, sal, ray, jo, fitz, mo, pilgrim. Every character field card
+  now uses its picture (cards.js IMG); The Horde and Black Friday horde draw walker + runner + shambler pictures together.
+  Pictures load on demand (cards.js artImg waits up to 3 s), not at start. The animated rigs in houses, the map and the title
+  screen are still drawn (a still picture cannot swing a bat); the four bosses have no portrait outside the fight, so none were made.
