@@ -136,6 +136,7 @@ window.DM = window.DM || {};
       ? r.R[2].map(([l, k, d]) => `<button class="mbtn sm jyopt" data-jy="${k}"><b>${esc(l)}</b><span>${esc(d)}</span></button>`).join('')
       : `<p class="mp"><b>You chose:</b> ${esc(r.R[2].find(o => o[1] === r.pick)[0])}.${r.pick === 'walk' ? (r.paid ? ' Done - they kept their end.' : ` ${fmt(Math.max(0, RADIO_STEPS - (walked() - r.base)))} steps left this week.`) : ''} A new call comes Monday.</p>`}</div>` : '';
     return `<div class="kick">The road east · ${cur + 1}/${TOWNS.length}</div><h3>${ch.g} ${esc(ch.n)}</h3><p class="mp">${esc(ch.ch)}</p>
+      ${ch.boss ? `<div class="jyboss"><img src="img/town${cur}.webp" alt="" onerror="this.style.display='none'"><div><div class="kick">Town boss</div><b>${esc(ch.boss)}</b><span>${(SV().houses || []).some(h => h.townBoss === cur && h.status === 'new') ? 'Hiding in one of your houses. 10x health, and a jackpot.' : 'Their hideout is gone from your houses.'}</span></div></div>` : ''}
       ${nx ? `<div class="jybar"><i style="width:${Math.round(100 * (1 - J.toNext() / STEP))}%"></i></div><p class="mp dim">Next: <b>${esc(nx.n)}</b> in ${fmt(J.toNext())} steps. Every step counts (typed steps at half). Each town brings a story, a reward, its own kind of houses - and a boss.</p>` : '<p class="mp"><b>You walked all the way to Montauk.</b></p>'}
       ${radio}<div class="kick sect" style="margin-top:10px">The road</div><div class="jyroad">${road}</div>`;
   };
@@ -147,6 +148,8 @@ window.DM = window.DM || {};
     .jybar { height: 10px; border-radius: 6px; background: #11142f; border: 2px solid #3d2d61; overflow: hidden; margin: 6px 0; } .jybar i { display: block; height: 100%; background: #5fb3d9; }
     .jyradio { margin: 10px 0 4px; padding: 10px; border-radius: 12px; background: rgba(95,179,217,.08); border: 2px solid #5fb3d9; }
     .jyopt { display: block; width: 100%; text-align: left; margin: 6px 0 0; height: auto !important; padding: 8px 12px !important; } .jyopt b { display: block; font-size: 14px; } .jyopt span { display: block; font-size: 11.5px; font-weight: 700; opacity: .8; }
+    .jyboss { display: flex; align-items: center; gap: 10px; margin: 8px 0; padding: 8px 10px; border-radius: 12px; background: rgba(255,138,122,.08); border: 2px solid #ff8a7a; }
+    .jyboss img { height: 92px; flex: none; filter: drop-shadow(0 3px 0 rgba(0,0,0,.35)); } .jyboss .kick { color: #ff8a7a; } .jyboss b { display: block; font-size: 16px; } .jyboss span { display: block; font-size: 11.5px; font-weight: 700; opacity: .8; }
     .jyroad { display: grid; gap: 3px; } .jyt { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 9px; font-size: 13px; color: var(--mute, #9d90bf); }
     .jyt i { font-style: normal; width: 22px; text-align: center; } .jyt span { flex: 1; font-weight: 800; } .jyt em { font-style: normal; font-size: 11px; font-weight: 800; }
     .jyt.done { color: var(--crm, #f6e3bb); } .jyt.here { background: rgba(95,179,217,.15); color: var(--crm, #f6e3bb); border: 2px solid #5fb3d9; }`;

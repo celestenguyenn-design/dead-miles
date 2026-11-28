@@ -158,19 +158,20 @@
     const hs = hitters(st), pct = Math.max(0, st.hp / st.max * 100), dl = B.daysLeft();
     const code = B.code(), party = code !== 'local' && !code.startsWith('solo:');
     const btn = dead ? '' : far ? '' : left ? '<button class="mbtn" data-boss="go">Fight</button>' : '';
-    if (compact) return `<div class="hcard bossh"><div class="bicon bossic" style="--bc:${boss.col}">${SKULLB}</div>
+    if (compact) return `<div class="hcard bossh"><div class="bicon bossic" style="--bc:${boss.col}">${bossPic(boss, 'bpic sm')}</div>
       <div class="hinfo"><div class="hname">${esc(boss.name)} <em>weekly boss</em></div><div class="haddr">${esc(boss.place)}</div>
       <div class="bbar sm"><i style="width:${pct}%"></i></div>
       <div class="hdays">${dead ? 'Defeated!' : far ? `${fmt(B.STEPS - ws)} more steps this week to reach it` : left ? `${left}/${B.PER_DAY} fights left today` : 'No fights left today - back tomorrow'}</div></div>
       ${btn ? `<div class="hbtns">${btn}</div>` : ''}</div>`;
     return `<div class="bosscard${dead ? ' dead' : ''}" style="--bc:${boss.col}"><div class="hhead"><span class="kick">Weekly boss</span><span class="hwhen">${dl <= 1 ? 'last day!' : dl + ' days left'} · Mon-Sun NY</span></div>
-      <div class="bname">${esc(boss.name)}</div><div class="bplace">${esc(boss.place)}${party ? ` · party <b>${esc(code)}</b>` : code === 'local' ? ' · on this phone (sign in to share it)' : ' · solo'}</div>
+      ${bossPic(boss, 'bpic')}<div class="bname">${esc(boss.name)}</div><div class="bplace">${esc(boss.place)}${party ? ` · party <b>${esc(code)}</b>` : code === 'local' ? ' · on this phone (sign in to share it)' : ' · solo'}</div>
       <div class="bbar"><i style="width:${pct}%"></i><span>${dead ? 'DOWN' : `${fmt(st.hp)} / ${fmt(st.max)}`}</span></div>
       <div class="bhits">${hs.length ? hs.slice(0, 5).map(([h, d]) => `<span${h === B.me() ? ' class="me"' : ''}>${esc(who(h))} <b>${fmt(d)}</b></span>`).join('') : '<span class="none">Nobody has hit it yet this week.</span>'}${st.killed_by ? `<span class="kb">killed by ${esc(who(st.killed_by))}</span>` : ''}</div>
       <div class="hbtnrow">${dead ? `<span class="hdone">${bs().claimed[b.week] ? 'Reward collected' : b.mine ? 'Reward on its way' : 'Beaten this week - hit it next week to share the reward'}</span>`
         : far ? `<span class="hdone">${fmt(ws)}/${fmt(B.STEPS)} steps this week · walk to reach it</span>` : left ? `<button class="mbtn sm" data-boss="go">Fight (${left}/${B.PER_DAY} today)</button>` : '<span class="hdone">2 fights a day - back tomorrow</span>'}<button class="mbtn sm ghost" data-boss="info">Info</button></div></div>`;
   };
-  const SKULLB = '<svg viewBox="0 0 40 40"><path d="M20 5c-8.3 0-14 5.6-14 13 0 4.6 2.2 7.3 4.6 8.6V32c0 1.6 1.2 2.6 2.6 2.6h13.6c1.4 0 2.6-1 2.6-2.6v-5.4C31.8 25.3 34 22.6 34 18 34 10.6 28.3 5 20 5z" fill="var(--bc)" stroke="#11142f" stroke-width="3" stroke-linejoin="round"/><circle cx="14.5" cy="19" r="4" fill="#11142f"/><circle cx="25.5" cy="19" r="4" fill="#11142f"/><path d="M20 23l-2.4 4h4.8z" fill="#11142f"/><path d="M15 31v3M20 31v3M25 31v3" stroke="#11142f" stroke-width="2"/></svg>';
+  // 0.73.2: the boss's SpriteCook portrait (img/boss_<id>.webp)
+  const bossPic = (boss, cls) => `<img class="${cls}" src="img/boss_${boss.id}.webp" alt="" onerror="this.style.display='none'">`;
   B.bind = function (root) {
     (root || document).querySelectorAll('[data-boss]').forEach(b => b.onclick = () => { SFX.play('ui'); if (b.dataset.boss === 'go') B.fight(); else infoSheet(); });
     if (bs().reward && !bs().reward.seen && !DM.scene) setTimeout(rewardSheet, 300);
@@ -178,7 +179,7 @@
   function infoSheet() {
     const b = bs(), boss = B.bossOf(b.week), st = B.state(), next = B.bossOf(keyOfUTC(Date.UTC(...b.week.split('-').map((x, i) => i === 1 ? x - 1 : +x)) + 7 * 864e5));
     const el = $('#msheet');
-    el.innerHTML = `<div class="mcard"><div class="kick">Weekly boss</div><h3>${esc(boss.name)}</h3><p class="mp">${esc(boss.blurb)}</p>
+    el.innerHTML = `<div class="mcard"><div class="kick">Weekly boss</div>${bossPic(boss, 'bpic big')}<h3>${esc(boss.name)}</h3><p class="mp">${esc(boss.blurb)}</p>
       <div class="evrow"><b>Where</b><span>${esc(boss.place)}. Reachable after ${fmt(B.STEPS)} steps in the week (Mon-Sun, New York time).</span></div>
       <div class="evrow"><b>Health</b><span>Shared by your whole party for the whole week. Every fight's damage is added. ${fmt(st.max)} HP${B.code() === 'local' ? ' (on this phone - sign in and join a party to share it)' : ''}.</span></div>
       <div class="evrow"><b>Fights</b><span>${B.PER_DAY} a day, ${B.FIGHT_S} seconds each. Watch the red markers: they show where the next attack lands. Going down just ends the fight - you keep your pack.</span></div>

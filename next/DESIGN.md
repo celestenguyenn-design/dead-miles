@@ -1460,3 +1460,8 @@ our crew members with weapons ... and armor"; blueprint trade "more than 3 - I h
   now uses its picture (cards.js IMG); The Horde and Black Friday horde draw walker + runner + shambler pictures together.
   Pictures load on demand (cards.js artImg waits up to 3 s), not at start. The animated rigs in houses, the map and the title
   screen are still drawn (a still picture cannot swing a bat); the four bosses have no portrait outside the fight, so none were made.
+- 0.73.2 (owner: "use the rest of the credits on boss portraits"): 14 SpriteCook boss portraits in next/img. Weekly bosses
+  boss_butcher / boss_ash / boss_warden / boss_nurse (style reference: the 0.72 lineup) show on the home boss tile (instead
+  of the skull), the boss card (greyed out once it is down) and the boss info sheet. Town bosses town1-10 (The Foreman ...
+  The Keeper, by TOWNS index; made without a reference to stretch the credits) show on the road east sheet under the
+  chapter, with whether their hideout is still in your houses. SpriteCook balance left: 24 credits.
